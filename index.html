@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Walk Ancient Rome</title>
+  <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
+  <link rel="stylesheet" href="walk.css?v=65">
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <div id="fatal" hidden>
+    <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
+    <button type="button" onclick="location.reload()">Reload</button>
+  </div>
+  <script>
+    window.addEventListener("error", function (e) {
+      if (e.message && /pointer lock/i.test(e.message)) return;
+      document.getElementById("fatal").hidden = false;
+    }, true);
+  </script>
+
+  <div id="hud">
+    <div class="top-left">
+      <h1>Walk Ancient Rome <small>c. 128 AD</small></h1>
+      <div class="progress" aria-label="Landmarks discovered">
+        <span>Discovered <b id="count">0 / 0</b></span>
+        <div class="bar"><div id="bar-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="top-center"><span id="compass">N 0°</span><span id="clock"></span><span id="sleep-hint">Press <kbd>Z</kbd> to sleep until morning</span></div>
+    <div id="nav" hidden>
+      <div id="nav-arrow" aria-hidden="true">▲</div>
+      <div class="txt"><strong id="nav-name"></strong><span id="nav-dist"></span><span id="nav-step"></span></div>
+      <button id="nav-close" type="button" aria-label="Stop directions">×</button>
+    </div>
+    <button id="leave" type="button">✕ Leave <kbd>Esc</kbd></button>
+
+    <div class="top-right">
+      <canvas id="minimap" width="200" height="200" title="Click to open the full map"></canvas>
+      <div class="buttons">
+        <button id="btn-map" type="button">Map <kbd>M</kbd></button>
+        <button id="btn-dirs" type="button">Directions <kbd>G</kbd></button>
+        <button id="btn-places" type="button">Places <kbd>P</kbd></button>
+        <button id="btn-sound" type="button">Sound on <kbd>O</kbd></button>
+        <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
+        <button id="btn-time" type="button">Time <kbd>T</kbd></button>
+        <button id="btn-view" type="button">View <kbd>C</kbd></button>
+        <button id="btn-controls" type="button">Controls <kbd>H</kbd></button>
+      </div>
+    </div>
+
+    <div id="help">
+      <p><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Shift</kbd> run · <kbd>1</kbd>-<kbd>9</kbd> walking speed · drag mouse or <kbd>Q</kbd><kbd>E</kbd> to look around · <kbd>C</kbd> camera view · <kbd>H</kbd> hide this help</p>
+    </div>
+
+    <article id="card">
+      <h2 id="card-name"></h2>
+      <p class="sub" id="card-sub"></p>
+      <p id="card-text"></p>
+      <p class="fact"><b>Did you know?</b> <span id="card-fact"></span></p>
+    </article>
+
+    <div id="vitals" aria-label="Your condition">
+      <div class="row"><span>Health</span><div class="bar"><div id="v-hp"></div></div></div>
+      <div class="row"><span>Horses</span><div class="bar"><div id="v-horse"></div></div></div>
+      <div class="row coins"><span>Denarii</span><b id="v-coins">100</b></div>
+      <p id="v-rest"></p>
+    </div>
+    <div id="toast" role="status"></div>
+    <button id="prompt" type="button"></button>
+    <div id="center-msg"></div>
+    <div id="countdown"></div>
+
+    <div id="fight-hud">
+      <div id="reticle" hidden></div>
+      <div class="foe"><span id="foe-name"></span><div class="bar"><div id="foe-fill"></div></div></div>
+      <div class="me">
+        <div class="bars"><div class="bar hp"><div id="hp-fill"></div></div><div class="bar st"><div id="st-fill"></div></div></div>
+        <div id="bow-hud" hidden><span id="ammo"></span><div class="bar"><div id="draw-fill"></div></div></div>
+        <p id="fight-keys"><kbd>Space</kbd> or click to attack · hold <kbd>Shift</kbd> or right-click to block · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Esc</kbd> leave</p>
+      </div>
+    </div>
+
+    <div id="duel-hud">
+      <strong id="act-title">The games</strong>
+      <span id="act-step"></span>
+      <div id="duel-bars">
+        <div class="wb"><span id="da-name"></span><div class="bar"><div id="da-fill"></div></div></div>
+        <div class="wb"><span id="db-name"></span><div class="bar"><div id="db-fill"></div></div></div>
+      </div>
+    </div>
+    <p id="subtitle"></p>
+    <p id="watch-keys"><kbd>C</kbd> camera · <kbd>N</kbd> next act · <kbd>1</kbd>-<kbd>5</kbd> pick an act · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk the stands · <kbd>V</kbd> or <kbd>Esc</kbd> stop</p>
+
+    <div id="naval-hud">
+      <div class="stats">
+        <strong id="nv-wave"></strong><span id="nv-enemies"></span>
+        <span class="lbl">Hull</span><div class="bar"><div id="nv-hull"></div></div>
+        <div class="cool"><span id="nv-port">Port <kbd>Q</kbd></span><span id="nv-star">Starboard <kbd>E</kbd></span></div>
+      </div>
+      <p class="keys"><kbd>W</kbd><kbd>S</kbd> sail · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Q</kbd> port cannons · <kbd>E</kbd> starboard cannons · <kbd>Space</kbd> or click fire at nearest · <kbd>Esc</kbd> leave</p>
+    </div>
+
+    <div id="race-hud">
+      <div class="stats">
+        <strong id="race-lap"></strong><span id="race-pos"></span><span id="race-speed"></span>
+        <span id="race-pace"></span>
+        <div class="bar" id="race-horse-bar" title="Horse stamina"><div id="race-horse"></div></div>
+        <div class="bar" id="race-bar"><div id="race-stam"></div></div>
+        <ol id="race-order"></ol>
+      </div>
+      <p class="keys" id="race-keys"><kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer (<kbd>Shift</kbd> fine) · <kbd>Q</kbd><kbd>E</kbd> hop lane · <kbd>1</kbd>-<kbd>9</kbd> speed · <kbd>Space</kbd> whip · <kbd>X</kbd> cruise · <kbd>C</kbd> camera · <kbd>B</kbd> look back</p>
+    </div>
+  </div>
+
+  <div id="flash"></div>
+
+  <div id="sleep" aria-hidden="true"><p>Sleeping...</p></div>\n  <div id="result" role="dialog" aria-live="polite">
+    <div class="box">
+      <h2 id="result-title"></h2>
+      <p id="result-text"></p>
+      <div id="result-buttons"></div>
+    </div>
+  </div>
+
+  <aside id="places">
+    <header><h2 id="places-title">Places</h2><button id="places-close" type="button" aria-label="Close">×</button></header>
+    <div id="places-actions" hidden>
+      <p>Pick a place below for walking directions. A route appears on the map, gold markers lead the way, and a card tells you when to turn.</p>
+      <button id="dirs-nearest" type="button">Take me to the nearest place I haven't seen</button>
+      <button id="dirs-home" type="button">🏠 Take me home (Your House)</button>
+      <button id="dirs-stop" type="button" hidden>Stop directions</button>
+    </div>
+    <ul id="places-list"></ul>
+  </aside>
+
+  <div id="controls" role="dialog" aria-label="Controls">
+    <div class="box">
+      <header><h2>Controls</h2><button id="controls-close" type="button" aria-label="Close">×</button></header>
+      <table>
+        <tr><th>Move</th><td><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
+        <tr><th>Time and sleep</th><td>A day lasts about 20 minutes. After dark, go to <strong>Your House</strong> (directions with <kbd>G</kbd>, it is near the road to the Colosseum), step inside and press <kbd>Z</kbd> to sleep until morning. Stay up and at 4 am you collapse in the street (the clock warns you from 10:30 pm). <kbd>T</kbd> skips ahead in the day, but it cannot skip the night: without sleep you stay up until 4 am and collapse</td></tr>
+        <tr><th>Walking speed</th><td><kbd>1</kbd>-<kbd>9</kbd> (1 slow stroll, 4 normal, 9 sprint) · hold <kbd>Shift</kbd> to run</td></tr>
+        <tr><th>Look around</th><td>Drag the mouse</td></tr>
+        <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
+        <tr><th>Turn</th><td><kbd>Q</kbd> left · <kbd>E</kbd> right</td></tr>
+        <tr><th>Lock mouse</th><td>Double-click the view (press <kbd>Esc</kbd> to release)</td></tr>
+        <tr><th>Map</th><td><kbd>M</kbd> or click the minimap. Click the map to teleport</td></tr>
+        <tr><th>Fight (Colosseum)</th><td>Stand in the arena, press <kbd>F</kbd>. <kbd>Space</kbd> or click attacks, hold <kbd>Shift</kbd> or right-click blocks</td></tr>
+        <tr><th>Animal hunt (Colosseum)</th><td>Stand in the arena, press <kbd>U</kbd>. Hunt a boar, a bear and then a lion with a <strong>bow and arrows</strong>: hold <kbd>Space</kbd> or the mouse to draw, release to shoot (a longer draw is stronger and straighter), <kbd>Shift</kbd> to dodge roll, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move</td></tr>
+        <tr><th>Lion (Colosseum)</th><td>Stand in the arena, press <kbd>L</kbd> to hunt a lion on its own with the bow (same controls as the animal hunt)</td></tr>
+        <tr><th>Naval battle (Colosseum)</th><td>Stand in the arena, press <kbd>N</kbd>. The arena floods and you command a galley with cannons. <kbd>W</kbd><kbd>S</kbd> sail, <kbd>A</kbd><kbd>D</kbd> steer, <kbd>Q</kbd> or <kbd>E</kbd> fire a broadside, <kbd>Space</kbd> fires at the nearest enemy</td></tr>
+        <tr><th>Race (Circus Maximus)</th><td>Stand on the track, press <kbd>R</kbd>. <kbd>W</kbd> gas, <kbd>S</kbd> brake, <kbd>A</kbd><kbd>D</kbd> steer (hold <kbd>Shift</kbd> for fine steering), <kbd>Q</kbd><kbd>E</kbd> hop a lane, <kbd>1</kbd>-<kbd>9</kbd> speed level (1 slowest, 9 gallop), <kbd>Space</kbd> whip, <kbd>X</kbd> cruise control, <kbd>C</kbd> camera, hold <kbd>B</kbd> to look back</td></tr>
+        <tr><th>Watch</th><td>Press <kbd>V</kbd> in the Colosseum to watch the games: an animal hunt, three myth dramas (Orpheus, Icarus, Hercules) and gladiator matches. <kbd>N</kbd> skips to the next act, <kbd>1</kbd>-<kbd>5</kbd> picks one. In the Circus stands, <kbd>V</kbd> shows a chariot race. <kbd>C</kbd> switches camera</td></tr>
+        <tr><th>Rest and heal</th><td>Press <kbd>Z</kbd> to sit and rest (move to stand up). You recover on your own while you are not in a game, but resting is about four times faster, and the horses only recover quickly at the Circus stables. Fights and naval battles need health 35 or more, and races need rested horses and a 20 denarii entry fee. Winning earns denarii; losing costs you</td></tr>
+        <tr><th>Directions</th><td>Click the <strong>Directions</strong> button (or press <kbd>G</kbd>) and pick a place. A route appears on the minimap and map, gold markers lead the way on the ground, a light beam marks the destination, and a card at the top gives distance and turns. You can also click a pin on the <kbd>M</kbd> map</td></tr>
+        <tr><th>Voice</th><td>A narrator reads captions aloud: the subtitles of the Colosseum shows, the history card of each landmark you reach, the result screens and turn-by-turn directions. Press <kbd>J</kbd> or the Voice button to turn it on or off. It uses your browser's built-in voice</td></tr>
+        <tr><th>Sound</th><td>Press <kbd>O</kbd> or the Sound button to turn sound on or off. Places make sound you can hear from a distance, such as the crowds of the Colosseum and Circus, and it pans to the side they are on and is muffled when they are behind you</td></tr>
+        <tr><th>Places list</th><td><kbd>P</kbd></td></tr>
+        <tr><th>Time of day</th><td><kbd>T</kbd></td></tr>
+        <tr><th>This screen</th><td><kbd>H</kbd></td></tr>
+        <tr><th>Close any panel</th><td><kbd>Esc</kbd></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="bigmap">
+    <header><h2>Map of Rome <small>click a pin for directions, or anywhere else to drop in</small></h2><button id="bigmap-close" type="button" aria-label="Close">×</button></header>
+    <canvas id="bigmap-canvas"></canvas>
+  </div>
+
+  <div id="intro">
+    <div class="box">
+      <p class="eyebrow">Rome, c. 128 AD · the reign of Hadrian</p>
+      <h1>Walk Ancient Rome</h1>
+      <p>Explore the city at street level. Climb the seats of the Colosseum, stand beneath the Pantheon's dome and walk the Via Sacra. Discover all 16 landmarks to learn their story, then fight as a gladiator in the arena or race a chariot in the Circus Maximus.</p>
+      <button id="start" type="button">Enter Rome</button>
+      <p class="note">Stylized, not to scale. Best on a desktop browser with a keyboard.</p>
+      <p class="note"><a href="guide/">History guide, timeline &amp; quiz</a></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
+  <script src="landmarks.js?v=65"></script>
+  <script src="physics.js?v=65"></script>
+  <script src="vitals.js?v=65"></script>
+  <script src="narrator.js?v=65"></script>
+  <script src="audio.js?v=65"></script>
+  <script src="world.js?v=65"></script>
+  <script src="city.js?v=65"></script>
+  <script src="home.js?v=65"></script>
+  <script src="spectators.js?v=65"></script>
+  <script src="fight.js?v=65"></script>
+  <script src="nav.js?v=65"></script>
+  <script src="show.js?v=65"></script>
+  <script src="naval.js?v=65"></script>
+  <script src="watch.js?v=65"></script>
+  <script src="race.js?v=65"></script>
+  <script src="game.js?v=65"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ancient Rome</title>
+  <meta name="description" content="An interactive guide to Ancient Rome: timeline, key figures, a Roman numeral converter and a quiz.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top">SPQR</a>
+    <nav>
+      <a href="#timeline">Timeline</a>
+      <a href="#people">People</a>
+      <a href="#numerals">Numerals</a>
+      <a href="#quiz">Quiz</a>
+      <a href="../">Walk Rome 3D</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow">753 BC – 476 AD</p>
+      <h1>Ancient Rome</h1>
+      <p class="lead">From a village on the Tiber to an empire spanning three continents. Explore the timeline, meet the people who shaped it, and test what you learn.</p>
+      <div class="stats">
+        <div><strong>1,200+</strong><span>years, Kingdom to Western fall</span></div>
+        <div><strong>~5M km²</strong><span>at its peak, 117 AD</span></div>
+        <div><strong>3</strong><span>forms of government</span></div>
+      </div>
+    </section>
+
+    <section id="timeline">
+      <h2>Timeline</h2>
+      <div class="filters" data-target="timeline" role="group" aria-label="Filter timeline by era"></div>
+      <ol class="timeline" id="timeline-list"></ol>
+    </section>
+
+    <section id="people">
+      <h2>Key figures</h2>
+      <div class="filters" data-target="people" role="group" aria-label="Filter people by era"></div>
+      <div class="cards" id="people-list"></div>
+    </section>
+
+    <section id="numerals">
+      <h2>Roman numeral converter</h2>
+      <p class="hint">Enter a number from 1 to 3999, or a Roman numeral.</p>
+      <form id="numeral-form" autocomplete="off">
+        <label for="numeral-input" class="sr-only">Number or Roman numeral</label>
+        <input id="numeral-input" type="text" inputmode="text" placeholder="e.g. 476 or MDCCLXXVI">
+        <output id="numeral-output" for="numeral-input" aria-live="polite"></output>
+      </form>
+    </section>
+
+    <section id="quiz">
+      <h2>Quiz</h2>
+      <div id="quiz-box" class="quiz"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Ancient Rome · a static site, no build step. Dates before 1 AD are BC.</p>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
