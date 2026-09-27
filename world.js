@@ -663,6 +663,58 @@ function buildColossus() {
   F.box(0, 0, 0, 0.1, 0.05, 0.1, M.marble2);
 }
 
+
+// ---------- Servian Wall ----------
+// Rome's old city wall, 4th century BC. By Hadrian's time the city had sprawled far past it, so it now runs
+// straight through the built-up city rather than around its edge. One long stretch survives here, with a gate
+// (evoking the real Porta Collina, near the Quirinal) you can walk through, and stairs up either side of it so
+// you can walk along the top.
+
+function buildServianWall() {
+  const F = frame(0, 0, 0, 0); // no rotation: local coordinates are world coordinates
+  const T = 3.4, H = 9; // wall thickness and walkway height
+  const zA = -465; // the long stretch runs east-west here, north of the Forum and Quirinal
+  const xB = 420; // then turns south for a shorter stretch, east of the Trajan/Quirinal district
+  const gate0 = 108, gate1 = 132; // the gate opening, flanked by two towers
+  const stone = lambert(0x9c9482, { map: stoneTex("#ffffff") });
+
+  const wallRun = (x0, x1, z0, z1, mat = stone) => {
+    const horiz = z0 === z1;
+    const w = horiz ? x1 - x0 : T, d = horiz ? T : z1 - z0;
+    F.box((x0 + x1) / 2, 0, (z0 + z1) / 2, w, H, d, mat, { solid: true, walk: true, map: "#8d8570" });
+  };
+  const merlons = (x0, x1, z0, z1, horiz) => {
+    const n = Math.round(((horiz ? x1 - x0 : z1 - z0)) / 6);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const x = horiz ? x0 + (x1 - x0) * t : (x0 + x1) / 2 + (horiz ? 0 : 0);
+      if (horiz) F.box(x0 + (x1 - x0) * t, H, z0 - T * 0.18, 1.3, 1, T * 0.55, stone);
+      else F.box(x0 + T * 0.18, H, z0 + (z1 - z0) * t, T * 0.55, 1, 1.3, stone);
+    }
+  };
+
+  // the long east-west stretch, split around the gate
+  wallRun(-420, gate0 - 10, zA, zA);
+  wallRun(gate1 + 10, xB, zA, zA);
+  merlons(-420, gate0 - 10, zA, zA, true);
+  merlons(gate1 + 10, xB, zA, zA, true);
+
+  // the gate towers, and the passage between them stays open
+  for (const [t0, t1] of [[gate0 - 10, gate0], [gate1, gate1 + 10]]) wallRun(t0, t1, zA, zA);
+  F.box((gate0 + gate1) / 2, H, zA, gate1 - gate0 + 20, 1.6, T + 1.2, stone); // the lintel over the gate, purely decorative
+
+  // the shorter north-south stretch, turning the corner at xB
+  wallRun(xB, xB, zA, -150);
+  merlons(xB, xB, zA, -150, false);
+
+  // stairs up either side of the gate, so you can walk along the top
+  F.stairs(gate0 - 5, zA + T / 2, 8, 12, H / 12, 0.85, M.marble2);
+  F.stairs(gate1 + 5, zA + T / 2, 8, 12, H / 12, 0.85, M.marble2);
+
+  MAP_SHAPES.push({ k: "r", x0: -422, x1: xB + 2, z0: zA - T / 2 - 1.5, z1: zA + T / 2 + 1.5, c: "#8d8570" });
+  MAP_SHAPES.push({ k: "r", x0: xB - T / 2 - 1.5, x1: xB + T / 2 + 1.5, z0: -152, z1: zA, c: "#8d8570" });
+}
+
 // ---------- entry ----------
 
 function buildLandmarks(sc) {
@@ -676,4 +728,5 @@ function buildLandmarks(sc) {
   buildCircus();
   buildPantheon();
   buildColossus();
+  buildServianWall();
 }

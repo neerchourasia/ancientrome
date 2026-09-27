@@ -5,7 +5,8 @@ const $ = (s) => document.querySelector(s);
 const EYE = 1.7;
 const MAP = { x0: -800, x1: 700, z0: -700, z1: 850 };
 
-const player = { x: 165, z: 6, yaw: Math.PI / 2, pitch: -0.02, feet: 0, y: EYE, vx: 0, vz: 0, bob: 0 };
+const player = { x: 165, z: 6, yaw: Math.PI / 2, pitch: -0.02, feet: 0, y: EYE, vx: 0, vz: 0, bob: 0, airY: 0, vy: 0 };
+const GRAVITY = 22, JUMP_SPEED = 7.2;
 const keys = new Set();
 let started = false, dragging = false, locked = false, panelOpen = false;
 let mode = "walk"; // "walk", "fight" (Colosseum), "race" (Circus Maximus) or "watch" (spectating)
@@ -102,6 +103,7 @@ function wireInput(canvas) {
     if (k === "KeyO") toggleSound();
     if (k === "KeyJ") toggleVoice();
     if (k === "KeyZ") toggleRest();
+    if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
     if (k === "KeyG" && (mode === "walk" || mode === "watch")) toggleDirections();
     if (mode === "walk" || mode === "watch") {
       if (k === "KeyM") toggleBigMap();
@@ -323,7 +325,15 @@ function updatePlayer(dt) {
 
   const ground = groundAt(player.x, player.z);
   player.feet += (ground - player.feet) * Math.min(1, dt * 14);
-  player.y = player.feet + EYE + Math.sin(player.bob) * Math.min(0.045, moving * 0.006);
+
+  // jumping: a simple hop, with gravity pulling you back down to the ground you're standing on
+  if (player.airY > 0 || player.vy > 0) {
+    player.vy -= GRAVITY * dt;
+    player.airY = Math.max(0, player.airY + player.vy * dt);
+    if (player.airY <= 0) { player.airY = 0; player.vy = 0; }
+  }
+
+  player.y = player.feet + player.airY + EYE + Math.sin(player.bob) * Math.min(0.045, moving * 0.006);
 }
 
 // Teleport to (x, z), moving to the nearest open spot if that one is blocked.
@@ -409,7 +419,7 @@ function buildAvatar() {
 function updateAvatar(dt) {
   avatar.visible = viewId() !== "first" && mode === "walk";
   if (!avatar.visible) return;
-  avatar.position.set(player.x, player.feet, player.z);
+  avatar.position.set(player.x, player.feet + player.airY, player.z);
   avatar.rotation.y = player.yaw;
   const pace = Math.hypot(player.vx, player.vz);
   if (pace > 0.3) avPhase += dt * (pace / 5.5) * 6.2;

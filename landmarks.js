@@ -100,6 +100,12 @@ const LANDMARKS = [
     fact: "Trajan's ashes were placed inside the base of the column.",
   },
   {
+    id: "servian", name: "Servian Wall", sub: "Rome's old city wall · 4th century BC",
+    x: 120, z: -465, r: 80, stand: [120, -430],
+    text: "Rome's first great defensive wall, built of volcanic tuff after the Gauls sacked the city in 390 BC. By Hadrian's time the city had long since grown past it in every direction, so it now stands deep inside the built-up city rather than around its edge, its old gates still used as street crossings. Climb the stairs beside the gate to walk along the top.",
+    fact: "The wall was about 11 kilometres long and up to 10 metres high in places. A stretch of it can still be seen today outside Rome's Termini railway station.",
+  },
+  {
     id: "pantheon", name: "The Pantheon", sub: "Temple to all the gods · c. 126 AD",
     x: -480, z: -380, r: 55, stand: [-480, -462],
     text: "Rebuilt by Hadrian (an earlier one was built by Agrippa, whose name is still on the front). Its dome is 43 metres across and open at the top in a circular oculus. Step inside.",

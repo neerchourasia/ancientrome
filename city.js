@@ -163,6 +163,8 @@ const EXCLUDE = [ // [x0, x1, z0, z1]
   [-312, -148, 100, 780],  // Circus Maximus
   [-360, -110, -175, 75],  // Capitoline approaches
   [-40, 120, 60, 130],     // Palatine approach
+  [-422, 422, -472, -458], // Servian Wall, east-west stretch
+  [412, 428, -472, -140],  // Servian Wall, north-south stretch
   [222, 290, 24, 78],      // your house
 ];
 
