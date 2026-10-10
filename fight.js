@@ -301,7 +301,7 @@ const Fight = (() => {
           const r = f.def.kind === "bear" ? 0.95 : 0.7, top = f.def.kind === "bear" ? 2.2 : 1.7;
           if (Math.hypot(a.x - f.x, a.z - f.z) < r && a.y > 0.05 && a.y < top) {
             const head = a.y > (f.def.kind === "bear" ? 1.5 : 1.2);
-            hurtFoe((8 + 22 * a.charge) * (head ? 1.4 : 1), false);
+            hurtFoe((8 + 22 * a.charge) * (head ? 1.4 : 1) * Character.mod("arrow"), false);
             if (head) msg("Headshot!", 500);
             scene.remove(a.mesh); arrows.splice(i, 1); done = true;
           }
@@ -327,7 +327,7 @@ const Fight = (() => {
     if (f.hp <= 0) {
       f.alive = false; f.hp = 0; phase = "roundwon"; phaseT = 2.4;
       Sfx.play("cheer");
-      const purse = PURSE[f.def.name] || 30;
+      const purse = Math.round((PURSE[f.def.name] || 30) * Character.mod("coin"));
       earned += purse; Vitals.coins += purse;
       msg(`${round === lastRound ? "The crowd erupts!" : `${f.def.name} falls. The crowd roars!`} +${purse} denarii`, 2200);
     }
@@ -336,14 +336,14 @@ const Fight = (() => {
   function playerHit() {
     const f = foe, d = Math.hypot(f.x - player.x, f.z - player.z);
     if (!f.alive || d > 3.1) return;
-    hurtFoe(20 * (0.85 + Math.random() * 0.3), true);
+    hurtFoe(20 * (0.85 + Math.random() * 0.3) * Character.mod("melee"), true);
   }
 
   function foeStrike() {
     const f = foe, d = Math.hypot(f.x - player.x, f.z - player.z);
     if (d > (f.def.reach || 3.1)) return;
     if (P.iframes > 0) { msg("Dodged!", 500); return; }
-    let dmg = f.def.dmg * (0.85 + Math.random() * 0.3);
+    let dmg = f.def.dmg * (0.85 + Math.random() * 0.3) * Character.mod("taken");
     if (P.block && P.stam > 0) {
       dmg *= 0.15; P.stam = Math.max(0, P.stam - 16);
       f.state = "stagger"; f.t = 0.5; msg("Blocked!", 600); Sfx.play("clash");

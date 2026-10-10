@@ -3,6 +3,12 @@
 
 const T = THREE;
 let worldScene; // set by buildLandmarks
+let colossusGroup = null, circusTrackMat = null;
+const colosseumMats = { wall: null, seat: null, arena: null, arenaSand: null, arenaRuin: null, ancientWalls: [], modernWalls: [] };
+// Parts that look different in Modern Rome: columns can break or vanish, roofs and entablatures are gone. Buildings
+// that still stand today (the Pantheon, the Curia, the Arch of Titus) are built with `ruinOk` off or `F.intact`.
+const RUIN = { cols: [], roofs: [], floors: [] };
+let ruinOk = true;
 
 // ---------- textures & materials ----------
 
@@ -44,6 +50,21 @@ const M = {
   sand: lambert(0xd9c793),
 };
 
+// The colours every landmark is built from, for the Ancient Rome / Modern Rome switch. Weathered stone and
+// oxidised metal for "today"; the buildings' shapes stay the same (only their materials change), so a
+// landmark that has really vanished (like the Colossus) is hidden separately instead.
+const M_ANCIENT = { marble: 0xf1ebdd, marble2: 0xd9d0bc, travertine: 0xd9c8a0, brick: 0xb0623f, roof: 0xa24d2f, gold: 0xdcb444, goldEmissive: 0x3d2f05, bronze: 0x9a6a2c, granite: 0x8e8e8a, dark: 0x241d16, lead: 0x8d8b84, sand: 0xd9c793 };
+const M_MODERN = { marble: 0xc7c0ab, marble2: 0xaba594, travertine: 0xb3a688, brick: 0x8a5a42, roof: 0x6b6b68, gold: 0x7c8a6e, goldEmissive: 0x000000, bronze: 0x5f6b52, granite: 0x76766f, dark: 0x1c1a16, lead: 0x74726c, sand: 0xc2b190 };
+
+function applyMaterialEra(modern) {
+  const palette = modern ? M_MODERN : M_ANCIENT;
+  for (const key of Object.keys(palette)) {
+    if (key === "goldEmissive") continue;
+    M[key].color.setHex(palette[key]);
+  }
+  M.gold.emissive.setHex(palette.goldEmissive);
+}
+
 const BOX = new T.BoxGeometry(1, 1, 1);
 const CYL = new T.CylinderGeometry(1, 1, 1, 16);
 
@@ -83,6 +104,7 @@ function frame(x, z, rot = 0, y = heightAt(x, z)) {
       m.scale.set(w, h, d);
       m.position.set(lx, ly + h / 2, lz);
       g.add(m);
+      if ((o.roof || mat === M.roof) && ruinOk && !F.intact) RUIN.roofs.push(m);
       if (o.solid || o.walk || o.map) {
         const a = aabb(lx, lz, w, d);
         if (o.solid) addBlockerBox(a.x0, a.x1, a.z0, a.z1, y + ly, y + ly + h);
@@ -118,7 +140,11 @@ function frame(x, z, rot = 0, y = heightAt(x, z)) {
       base.position.set(lx, ly + r * 0.2, lz);
       g.add(base);
       const [cx, cz] = toW(lx, lz);
-      addBlockerCircle(cx, cz, r, y + ly, y + ly + h);
+      const bl = addBlockerCircle(cx, cz, r, y + ly, y + ly + h);
+      if (ruinOk && !F.intact) {
+        const u = Math.sin(cx * 12.9898 + cz * 78.233) * 43758.5453;
+        RUIN.cols.push({ m, cap, base, bl, ly, h, fate: u - Math.floor(u) });
+      }
       return m;
     },
 
@@ -139,6 +165,7 @@ function frame(x, z, rot = 0, y = heightAt(x, z)) {
       const m = shadowed(new T.Mesh(geo, mat));
       m.position.set(lx, ly, lz);
       g.add(m);
+      if (ruinOk && !F.intact) RUIN.roofs.push(m);
       return m;
     },
   };
@@ -178,7 +205,7 @@ function temple(x, z, rot, o) {
   const cellaD = d - 13;
   F.box(0, podH, bz + 1.6 + cellaD / 2, w - 7, colH + 0.6, cellaD, M.marble, { solid: true });
   F.box(0, podH, bz + 1.6 + cellaD + 0.05, 3.4, 6.8, 0.2, M.dark);
-  F.box(0, podH + colH, 0, w - 0.4, 1.6, d - 0.4, M.marble2);
+  F.box(0, podH + colH, 0, w - 0.4, 1.6, d - 0.4, M.marble2, { roof: true });
   const gh = w * 0.15;
   F.gable(0, podH + colH + 1.6, 0, w - 0.4, gh, d - 0.4, roof);
   F.gable(0, podH + colH + 1.6, (d - 0.4) / 2, w - 0.4, gh, 0.5, M.marble);
@@ -191,8 +218,8 @@ function arcadeBuilding(x, z, rot, w, d, h, mat, wallMap = "#b9a27a") {
   F.box(0, 0, 0, w, h, d, mat, { solid: true, map: wallMap });
   const n = Math.floor(w / 6);
   for (let i = 0; i < n; i++) F.column(-w / 2 + 3 + (i * (w - 6)) / (n - 1), d / 2 + 2.4, 0.7, h * 0.72, 0);
-  F.box(0, h * 0.72, d / 2 + 2.4, w, 1.2, 5, M.marble2);
-  F.box(0, h, 0, w + 1, 1.2, d + 1, M.marble2);
+  F.box(0, h * 0.72, d / 2 + 2.4, w, 1.2, 5, M.marble2, { roof: true });
+  F.box(0, h, 0, w + 1, 1.2, d + 1, M.marble2, { roof: true });
   F.box(0, h + 1.2, 0, w - 2, 2.2, d - 2, M.roof);
   return F;
 }
@@ -203,6 +230,7 @@ function planeAt(x, z, w, d, tex, y = 0.05) {
   m.position.set(x, y, z);
   m.receiveShadow = true;
   worldScene.add(m);
+  if (ruinOk) RUIN.floors.push({ mesh: m, ancient: tex, broken: null }); // the paving cracks and wears away in Modern Rome
   return m;
 }
 
@@ -227,6 +255,7 @@ function buildForum() {
 
   // Curia Julia (Senate House)
   const curia = frame(-10, -52, 0);
+  curia.intact = true; // the Senate House still stands today
   curia.box(0, 0, 0, 26, 21, 34, M.brick, { solid: true, map: "#a9603f" });
   curia.box(0, 0, 17.05, 5, 8, 0.2, M.dark);
   curia.box(0, 21, 0, 27.5, 1.4, 35.5, M.marble2);
@@ -262,6 +291,7 @@ function buildForum() {
   const cone = shadowed(new T.Mesh(new T.ConeGeometry(8.4, 3.4, 24), M.roof));
   cone.position.set(0, 1.2 + 7.6 + 1.7, 0);
   vesta.add(cone);
+  if (ruinOk) RUIN.roofs.push(cone);
 
   // Golden Milestone
   const ms = frame(-58, 6, 0);
@@ -427,6 +457,7 @@ function buildColosseum() {
 
   const wallMat = new T.MeshLambertMaterial({ map: arcadeWallTex(), side: T.DoubleSide });
   const seatMat = new T.MeshStandardMaterial({ color: 0xd8c59b, roughness: 1, flatShading: true, side: T.DoubleSide, map: seatingTex() });
+  colosseumMats.wall = wallMat; colosseumMats.seat = seatMat;
 
   // Outer wall, split so the two gates (east and west) stay open.
   for (const start of [Math.PI / 2 + gap, -Math.PI / 2 + gap]) {
@@ -434,6 +465,25 @@ function buildColosseum() {
     wall.scale.x = sx;
     wall.position.y = 24;
     g.add(wall);
+    colosseumMats.ancientWalls.push(wall);
+  }
+
+  // Modern Rome: only the north side of the outer wall still stands at full height, tapering down toward the
+  // east and west; the south side has collapsed to a low, jagged stub, as it has in real life.
+  {
+    const addWall = (start, len, h, parts) => {
+      // a shorter wall shows only the lower part of the arcade texture, so the arches are not squashed
+      const m = wallMat.clone();
+      m.map = wallMat.map.clone(); m.map.repeat.set(1, h / 48); m.map.needsUpdate = true;
+      m.color.setHex(0xa8a49a);
+      const w = shadowed(new T.Mesh(new T.CylinderGeometry(az, az, h, parts, 1, true, start, len), m));
+      w.scale.x = sx; w.position.y = h / 2; w.visible = false;
+      g.add(w); colosseumMats.modernWalls.push(w);
+    };
+    const north = [[Math.PI / 2 + gap, 0.35, 30], [Math.PI / 2 + gap + 0.35, 0.5, 40], [Math.PI / 2 + gap + 0.85, 1.35, 48], [Math.PI / 2 + gap + 2.2, 0.6, 38], [Math.PI / 2 + gap + 2.8, Math.PI - 2 * gap - 2.8, 26]];
+    for (const [s, l, h] of north) addWall(s, l, h, 24);
+    const stubs = [13, 9, 12, 6, 11, 13, 8, 5, 10, 13, 7, 12], seg = arc / stubs.length;
+    stubs.forEach((h, i) => addWall(-Math.PI / 2 + gap + i * seg, seg, h, 6));
   }
 
   // Tiered seating (lathe profile, stepped)
@@ -457,12 +507,15 @@ function buildColosseum() {
   arena.position.y = 0.05;
   arena.receiveShadow = true;
   g.add(arena);
+  colosseumMats.arena = arena.material; colosseumMats.arenaSand = arena.material.map;
 
   // Collision: seating rows are walkable steps, the wall is solid, gates are open.
   for (let k = 1; k <= rows; k++) {
     addPlatformRing({ cx, cz, ax, az, u0: (r0 + (k - 1) * tread) / az, u1: (r0 + k * tread) / az, gap: 2.8, axis: "x", side: 0, top: k * rise });
   }
-  addBlockerRing({ cx, cz, ax, az, u0: r1 / az, u1: 1.0, gap: 2.8, axis: "x", side: 0, y0: 0, y1: 48 });
+  addBlockerRing({ cx, cz, ax, az, u0: r1 / az, u1: 1.0, gap: 2.8, axis: "x", side: 0, y0: 0, y1: 48, era: "ancient" });
+  addBlockerRing({ cx, cz, ax, az, u0: r1 / az, u1: 1.0, gap: 2.8, axis: "x", side: 0, y0: 0, y1: 48, zs: -1, era: "modern" }); // the north wall still stands
+  addBlockerRing({ cx, cz, ax, az, u0: r1 / az, u1: 1.0, gap: 2.8, axis: "x", side: 0, y0: 0, y1: 13, zs: 1, era: "modern" }); // the south wall is a low stub
   MAP_SHAPES.push({ k: "e", cx, cz, ax, az, c: "#c9b58c" });
 }
 
@@ -477,6 +530,7 @@ function buildCircus() {
   track.position.set(cx, 0.05, midZ);
   track.receiveShadow = true;
   worldScene.add(track);
+  circusTrackMat = track.material;
   MAP_SHAPES.push({ k: "r", x0: cx - w / 2, x1: cx + w / 2, z0: zA, z1: zB, c: "#dfcd9d" });
 
   const gaps = [[300, 312], [560, 572]];
@@ -613,6 +667,7 @@ function buildPantheon() {
 
 function buildColossus() {
   const F = frame(288, -36, 0); // stands north of the Via Sacra, facing south toward the road
+  colossusGroup = F.group; // gone today: hidden entirely in Modern Rome
   const gold = lambert(0xcf9f34, { emissive: 0x4a3608 });
   const bronze = lambert(0x9a6c2c, { emissive: 0x2a1c06 });
   const baseTop = 3.5;
@@ -715,17 +770,112 @@ function buildServianWall() {
   MAP_SHAPES.push({ k: "r", x0: xB - T / 2 - 1.5, x1: xB + T / 2 + 1.5, z0: -152, z1: zA, c: "#8d8570" });
 }
 
+// ---------- Ancient Rome / Modern Rome ----------
+
+// Paving as it is today: cracked slabs, patches where slabs are missing down to the earth, and weeds in the joints.
+function brokenPaving(tex, seed) {
+  const src = tex.image, c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext("2d");
+  g.drawImage(src, 0, 0);
+  const r = mulberry32(seed), W = c.width, H = c.height;
+  for (let i = 0; i < 5; i++) { // missing slabs
+    const x = r() * W, y = r() * H, w = 14 + r() * 22, h = 10 + r() * 18;
+    g.fillStyle = r() < 0.5 ? "#7d6a4b" : "#6f6a45"; g.fillRect(x, y, w, h);
+    g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(x, y, w, 2); g.fillRect(x, y, 2, h);
+  }
+  g.strokeStyle = "rgba(25,18,10,.75)"; g.lineWidth = 1.4;
+  for (let i = 0; i < 12; i++) { // cracks
+    let x = r() * W, y = r() * H;
+    g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 26; y += (r() - 0.5) * 26; g.lineTo(x, y); }
+    g.stroke();
+  }
+  for (let i = 0; i < 16; i++) { // weeds and grass
+    g.fillStyle = r() < 0.5 ? "#5f7f3a" : "#7a9a45";
+    const x = r() * W, y = r() * H;
+    for (let k = 0; k < 4; k++) g.fillRect(x + (r() - 0.5) * 7, y + (r() - 0.5) * 7, 2 + r() * 2, 2 + r() * 3);
+  }
+  const t = new T.CanvasTexture(c);
+  t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.repeat.copy(tex.repeat); t.anisotropy = 4;
+  return t;
+}
+
+// The underground chambers (hypogeum) of the Colosseum, which show now that the arena floor is gone.
+function hypogeumTex() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d"), r = mulberry32(99);
+  g.fillStyle = "#3f372b"; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = "#9a8d72"; g.lineWidth = 6;
+  for (let x = 16; x < 256; x += 32) for (let y = 16; y < 256; y += 32) {
+    if (r() < 0.6) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 32, y); g.stroke(); }
+    if (r() < 0.6) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 32); g.stroke(); }
+  }
+  g.fillStyle = "rgba(0,0,0,.25)";
+  for (let i = 0; i < 30; i++) g.fillRect(r() * 256, r() * 256, 10 + r() * 20, 10 + r() * 20);
+  return new T.CanvasTexture(c);
+}
+
+
+// Applies (or reverts) the "modern Rome" look to every landmark: weathered materials everywhere, the
+// Colosseum's arcade and seats greyed with age, the Circus Maximus track gone to grass, and the Colossus
+// (which no longer exists) hidden. Building shapes and collision are unchanged either way.
+function applyWorldEra(modern) {
+  applyMaterialEra(modern);
+  if (colosseumMats.wall) colosseumMats.wall.color.setHex(modern ? 0xa8a49a : 0xffffff);
+  if (colosseumMats.seat) colosseumMats.seat.color.setHex(modern ? 0xaea48c : 0xd8c59b);
+  if (circusTrackMat) circusTrackMat.color.setHex(modern ? 0x6f8f52 : 0xffffff);
+  if (colossusGroup) colossusGroup.visible = !modern;
+  for (const w of colosseumMats.ancientWalls) w.visible = !modern;
+  for (const w of colosseumMats.modernWalls) w.visible = modern;
+  setPhysicsEra(modern);
+  applyRuins(modern);
+}
+
+// Columns: some still stand, some are broken stumps, some are gone. Roofs and the beams that rested on the
+// columns have fallen. A column that is gone no longer blocks the way.
+function applyRuins(modern) {
+  for (const c of RUIN.cols) {
+    let k = 1, cap = true, gone = false;
+    if (modern) {
+      if (c.fate < 0.28) { gone = true; cap = false; }
+      else if (c.fate < 0.58) { k = 0.3 + (0.35 * (c.fate - 0.28)) / 0.3; cap = false; }
+    }
+    c.m.visible = !gone;
+    c.m.scale.y = k;
+    c.m.position.y = c.ly + (c.h * k) / 2;
+    c.cap.visible = cap;
+    c.bl.off = gone;
+  }
+  for (const r of RUIN.roofs) r.visible = !modern;
+  RUIN.floors.forEach((f, i) => {
+    if (modern && !f.broken) f.broken = brokenPaving(f.ancient, 11 + i * 7);
+    f.mesh.material.map = modern ? f.broken : f.ancient;
+    f.mesh.material.needsUpdate = true;
+  });
+  if (colosseumMats.arena) { // the arena floor is gone: the chambers underneath show
+    if (modern && !colosseumMats.arenaRuin) colosseumMats.arenaRuin = hypogeumTex();
+    colosseumMats.arena.map = modern ? colosseumMats.arenaRuin : colosseumMats.arenaSand;
+    colosseumMats.arena.needsUpdate = true;
+  }
+}
+
 // ---------- entry ----------
 
 function buildLandmarks(sc) {
   worldScene = sc;
+  ruinOk = true; // these weather into ruins in Modern Rome
   buildForum();
+  ruinOk = false; // the Arch of Titus still stands
   buildArch();
+  ruinOk = true;
   buildCapitolium();
   buildTrajan();
   buildPalatine();
   buildColosseum();
   buildCircus();
+  ruinOk = false; // the Pantheon still stands; the Colossus is simply gone; the wall and your house are unchanged
   buildPantheon();
   buildColossus();
   buildServianWall();

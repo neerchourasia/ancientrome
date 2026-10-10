@@ -5,21 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Walk Ancient Rome</title>
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
-  <link rel="stylesheet" href="walk.css?v=67">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="walk.css?v=79">
 </head>
 <body>
   <canvas id="view"></canvas>
 
   <div id="fatal" hidden>
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
-    <button type="button" onclick="location.reload()">Reload</button>
+    <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script>
-    window.addEventListener("error", function (e) {
-      if (e.message && /pointer lock/i.test(e.message)) return;
-      document.getElementById("fatal").hidden = false;
-    }, true);
-  </script>
+  <script src="boot.js?v=79"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -30,7 +27,7 @@
       </div>
     </div>
 
-    <div class="top-center"><span id="compass">N 0°</span><span id="clock"></span><span id="sleep-hint">Press <kbd>Z</kbd> to sleep until morning</span></div>
+    <div class="top-center"><span id="compass">N 0°</span><span id="clock"></span><span id="era-badge" class="ancient">Ancient Rome</span><span id="sleep-hint">Press <kbd>Z</kbd> to sleep until morning</span></div>
     <div id="nav" hidden>
       <div id="nav-arrow" aria-hidden="true">▲</div>
       <div class="txt"><strong id="nav-name"></strong><span id="nav-dist"></span><span id="nav-step"></span></div>
@@ -47,13 +44,16 @@
         <button id="btn-sound" type="button">Sound on <kbd>O</kbd></button>
         <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
         <button id="btn-time" type="button">Time <kbd>T</kbd></button>
+        <button id="btn-char" type="button">Character <kbd>Y</kbd></button>
+        <button id="btn-premium" type="button">★ Premium</button>
         <button id="btn-view" type="button">View <kbd>C</kbd></button>
+        <button id="btn-era" type="button">Modern Rome <kbd>K</kbd></button>
         <button id="btn-controls" type="button">Controls <kbd>H</kbd></button>
       </div>
     </div>
 
     <div id="help">
-      <p><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Shift</kbd> run · <kbd>1</kbd>-<kbd>9</kbd> walking speed · drag mouse or <kbd>Q</kbd><kbd>E</kbd> to look around · <kbd>Space</kbd> jump · <kbd>C</kbd> camera view · <kbd>H</kbd> hide this help</p>
+      <p><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Shift</kbd> run · <kbd>1</kbd>-<kbd>9</kbd> walking speed · drag mouse or <kbd>Q</kbd><kbd>E</kbd> to look around · <kbd>Space</kbd> jump · <kbd>C</kbd> camera view · <kbd>K</kbd> ancient/modern Rome · <kbd>H</kbd> hide this help</p>
     </div>
 
     <article id="card">
@@ -61,16 +61,26 @@
       <p class="sub" id="card-sub"></p>
       <p id="card-text"></p>
       <p class="fact"><b>Did you know?</b> <span id="card-fact"></span></p>
+      <p class="modern-note" id="card-modern" hidden></p>
     </article>
 
     <div id="vitals" aria-label="Your condition">
       <div class="row"><span>Health</span><div class="bar"><div id="v-hp"></div></div></div>
       <div class="row"><span>Horses</span><div class="bar"><div id="v-horse"></div></div></div>
       <div class="row coins"><span>Denarii</span><b id="v-coins">100</b></div>
+      <p id="v-char"></p>
       <p id="v-rest"></p>
     </div>
     <div id="toast" role="status"></div>
     <button id="prompt" type="button"></button>
+
+    <div id="touch-controls" aria-hidden="true">
+      <div id="tc-stick"><div id="tc-knob"></div></div>
+      <div id="tc-walk-btns">
+        <button id="tc-jump" type="button">Jump</button>
+        <button id="tc-run" type="button">Run</button>
+      </div>
+    </div>
     <div id="center-msg"></div>
     <div id="countdown"></div>
 
@@ -81,6 +91,10 @@
         <div class="bars"><div class="bar hp"><div id="hp-fill"></div></div><div class="bar st"><div id="st-fill"></div></div></div>
         <div id="bow-hud" hidden><span id="ammo"></span><div class="bar"><div id="draw-fill"></div></div></div>
         <p id="fight-keys"><kbd>Space</kbd> or click to attack · hold <kbd>Shift</kbd> or right-click to block · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Esc</kbd> leave</p>
+      </div>
+      <div class="tc-row tc-fight">
+        <button id="tc-block" type="button">Block / Dodge</button>
+        <button id="tc-attack" type="button">Attack / hold to draw</button>
       </div>
     </div>
 
@@ -102,6 +116,7 @@
         <div class="cool"><span id="nv-port">Port <kbd>Q</kbd></span><span id="nv-star">Starboard <kbd>E</kbd></span></div>
       </div>
       <p class="keys"><kbd>W</kbd><kbd>S</kbd> sail · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Q</kbd> port cannons · <kbd>E</kbd> starboard cannons · <kbd>Space</kbd> or click fire at nearest · <kbd>Esc</kbd> leave</p>
+      <div class="tc-row"><button id="tc-fire" type="button">Fire</button></div>
     </div>
 
     <div id="race-hud">
@@ -113,6 +128,12 @@
         <ol id="race-order"></ol>
       </div>
       <p class="keys" id="race-keys"><kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer (<kbd>Shift</kbd> fine) · <kbd>Q</kbd><kbd>E</kbd> hop lane · <kbd>1</kbd>-<kbd>9</kbd> speed · <kbd>Space</kbd> whip · <kbd>X</kbd> cruise · <kbd>C</kbd> camera · <kbd>B</kbd> look back</p>
+      <div class="tc-row tc-race">
+        <button id="tc-hopL" type="button">◀ Lane</button>
+        <button id="tc-whip" type="button">Whip</button>
+        <button id="tc-cruise" type="button">Cruise</button>
+        <button id="tc-hopR" type="button">Lane ▶</button>
+      </div>
     </div>
   </div>
 
@@ -137,6 +158,32 @@
     <ul id="places-list"></ul>
   </aside>
 
+<aside id="creator" role="dialog" aria-label="Create your character">
+  <h2>Your character</h2>
+  <label class="cr-field">Name <input id="cr-name" type="text" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Marcus"></label>
+  <h3>Class</h3>
+  <div id="cr-classes"></div>
+  <h3>Look</h3>
+  <div class="cr-row"><span>Skin</span><div id="cr-skin" class="swatches"></div></div>
+  <div class="cr-row"><span>Hair</span><div id="cr-hair" class="swatches"></div></div>
+  <div class="cr-row"><span>Toga</span><div id="cr-toga" class="swatches"></div></div>
+  <div class="cr-row"><span>Sash</span><div id="cr-sash" class="swatches"></div></div>
+  <p id="cr-note" class="cr-note">Turn the camera with the mouse or by dragging to look at yourself. Locked colours (★) are Premium.</p>
+  <button id="cr-premium" type="button">★ Get Premium</button>
+    <div class="cr-actions"><button id="cr-ok" type="button">Begin</button><button id="cr-cancel" type="button">Cancel</button></div>
+</aside>
+
+  <div id="premium" role="dialog" aria-label="Premium">
+    <div class="box">
+      <header><h2>★ Premium</h2><button id="premium-close" type="button" aria-label="Close">×</button></header>
+      <p>Premium is for looks only: it never makes you stronger. It unlocks these cosmetics for your character:</p>
+      <ul id="pr-items"></ul>
+      <p id="pr-price"></p>
+      <button id="pr-buy" type="button">Get Premium</button>
+      <p id="pr-status" class="pr-status"></p>
+    </div>
+  </div>
+
   <div id="controls" role="dialog" aria-label="Controls">
     <div class="box">
       <header><h2>Controls</h2><button id="controls-close" type="button" aria-label="Close">×</button></header>
@@ -147,6 +194,9 @@
         <tr><th>Jump</th><td><kbd>Space</kbd></td></tr>
         <tr><th>Look around</th><td>Drag the mouse</td></tr>
         <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
+        <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
+        <tr><th>Ancient / Modern Rome</th><td><kbd>K</kbd> switches the whole city between 128 AD and today: the Colosseum and Forum weather into ruins, the Circus Maximus becomes a park, apartment blocks and citizens turn modern, and the Colossus (long gone) disappears. Only works while walking, not mid-game</td></tr>
+        <tr><th>Touch (phone/tablet)</th><td>A joystick (bottom-left) moves, dragging anywhere else looks around. Jump/Run buttons appear while walking; fights, races and naval battles get their own on-screen buttons</td></tr>
         <tr><th>Turn</th><td><kbd>Q</kbd> left · <kbd>E</kbd> right</td></tr>
         <tr><th>Lock mouse</th><td>Double-click the view (press <kbd>Esc</kbd> to release)</td></tr>
         <tr><th>Map</th><td><kbd>M</kbd> or click the minimap. Click the map to teleport</td></tr>
@@ -184,22 +234,24 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
-  <script src="landmarks.js?v=67"></script>
-  <script src="physics.js?v=67"></script>
-  <script src="vitals.js?v=67"></script>
-  <script src="narrator.js?v=67"></script>
-  <script src="audio.js?v=67"></script>
-  <script src="world.js?v=67"></script>
-  <script src="city.js?v=67"></script>
-  <script src="home.js?v=67"></script>
-  <script src="spectators.js?v=67"></script>
-  <script src="fight.js?v=67"></script>
-  <script src="nav.js?v=67"></script>
-  <script src="show.js?v=67"></script>
-  <script src="naval.js?v=67"></script>
-  <script src="watch.js?v=67"></script>
-  <script src="race.js?v=67"></script>
-  <script src="game.js?v=67"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
+  <script src="landmarks.js?v=79"></script>
+  <script src="character.js?v=79"></script>
+  <script src="physics.js?v=79"></script>
+  <script src="vitals.js?v=79"></script>
+  <script src="narrator.js?v=79"></script>
+  <script src="audio.js?v=79"></script>
+  <script src="world.js?v=79"></script>
+  <script src="city.js?v=79"></script>
+  <script src="modern.js?v=79"></script>
+  <script src="home.js?v=79"></script>
+  <script src="spectators.js?v=79"></script>
+  <script src="fight.js?v=79"></script>
+  <script src="nav.js?v=79"></script>
+  <script src="show.js?v=79"></script>
+  <script src="naval.js?v=79"></script>
+  <script src="watch.js?v=79"></script>
+  <script src="race.js?v=79"></script>
+  <script src="game.js?v=79"></script>
 </body>
 </html>

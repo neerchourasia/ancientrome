@@ -173,14 +173,21 @@ function excluded(x, z, m) {
   return false;
 }
 
+// Two palettes for the apartment blocks: ancient plaster, or modern render/brick/glass. Same length, so a
+// building keeps the same "slot" (and so a consistent look) whichever era it's shown in.
+const PLASTER_ANCIENT = [0xd9b98a, 0xe0c9a0, 0xc99a6a, 0xd6a877, 0xe4d2ae, 0xbf8b62].map((c) => new THREE.Color(c));
+const PLASTER_MODERN = [0xb9bcc0, 0x8fa3ad, 0xcdc6b8, 0x707a72, 0xd8d8d0, 0xa6774f].map((c) => new THREE.Color(c));
+const INSULAE = { list: [], body: null, shops: null, roofs: null };
+
 function buildInsulae(scene) {
-  const cell = 44, list = [];
+  const cell = 44, list = INSULAE.list;
   for (let x = -760; x <= 660; x += cell) {
     for (let z = -660; z <= 800; z += cell) {
       const px = x + (rnd() - 0.5) * 8, pz = z + (rnd() - 0.5) * 8;
       if (rnd() < 0.16 || excluded(px, pz, 22) || heightAt(px, pz) > 0.6) continue;
       const w = 18 + rnd() * 12, d = 18 + rnd() * 12, h = 9 + Math.floor(rnd() * 4) * 3.4;
-      list.push({ x: px, z: pz, w, d, h });
+      const ci = Math.floor(rnd() * PLASTER_ANCIENT.length);
+      list.push({ x: px, z: pz, w, d, h, ci });
     }
   }
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -188,20 +195,31 @@ function buildInsulae(scene) {
   const body = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length);
   const shops = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x5a3f2c }), list.length);
   const roofs = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xa04a2c }), list.length);
-  const plaster = [0xd9b98a, 0xe0c9a0, 0xc99a6a, 0xd6a877, 0xe4d2ae, 0xbf8b62].map((c) => new THREE.Color(c));
   const o = new THREE.Object3D();
   list.forEach((b, i) => {
     o.rotation.set(0, 0, 0);
     o.position.set(b.x, 0, b.z); o.scale.set(b.w, b.h, b.d); o.updateMatrix(); body.setMatrixAt(i, o.matrix);
     o.position.set(b.x, 0, b.z); o.scale.set(b.w + 0.5, 3.2, b.d + 0.5); o.updateMatrix(); shops.setMatrixAt(i, o.matrix);
     o.position.set(b.x, b.h, b.z); o.scale.set(b.w + 1.4, 1.1, b.d + 1.4); o.updateMatrix(); roofs.setMatrixAt(i, o.matrix);
-    body.setColorAt(i, pick(plaster));
+    body.setColorAt(i, PLASTER_ANCIENT[b.ci]);
     addBlockerBox(b.x - b.w / 2, b.x + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, 0, b.h + 1);
     MAP_SHAPES.push({ k: "r", x0: b.x - b.w / 2, x1: b.x + b.w / 2, z0: b.z - b.d / 2, z1: b.z + b.d / 2, c: "#d29b72" });
   });
   for (const m of [body, shops, roofs]) { m.instanceMatrix.needsUpdate = true; scene.add(m); }
   body.instanceColor.needsUpdate = true;
   body.castShadow = false; roofs.castShadow = false;
+  INSULAE.body = body; INSULAE.shops = shops; INSULAE.roofs = roofs;
+}
+
+// Switches the apartment blocks between ancient plaster and a modern city palette.
+function applyInsulaeEra(modern) {
+  const { list, body, shops, roofs } = INSULAE;
+  if (!body) return;
+  const palette = modern ? PLASTER_MODERN : PLASTER_ANCIENT;
+  list.forEach((b, i) => body.setColorAt(i, palette[b.ci]));
+  body.instanceColor.needsUpdate = true;
+  shops.material.color.setHex(modern ? 0x24313a : 0x5a3f2c);
+  roofs.material.color.setHex(modern ? 0x3a3a3a : 0xa04a2c);
 }
 
 // ---------- trees ----------
@@ -243,13 +261,15 @@ function buildTrees(scene) {
 // ---------- citizens ----------
 
 const CITIZENS = { list: [], body: null, head: null };
+// Ancient togas and tunics, or modern street clothes. Same length, so a citizen keeps the same "slot".
+const ROBES_ANCIENT = [0xf1ead8, 0xf1ead8, 0xf1ead8, 0xd8c39a, 0xb0473a, 0x4f6f8f, 0xd6a13a, 0x7d8f5b].map((c) => new THREE.Color(c));
+const ROBES_MODERN = [0x2b3a55, 0x454545, 0xb23b3b, 0x3f6b4a, 0xd9d9d9, 0x8a6d3f, 0x2e2e2e, 0x5577aa].map((c) => new THREE.Color(c));
 
 function buildCitizens(scene, count = 90) {
   const bodyGeo = new THREE.CylinderGeometry(0.3, 0.4, 1.35, 8); bodyGeo.translate(0, 0.68, 0);
   const headGeo = new THREE.SphereGeometry(0.19, 8, 6); headGeo.translate(0, 1.58, 0);
   const body = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), count);
   const head = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), count);
-  const robes = [0xf1ead8, 0xf1ead8, 0xf1ead8, 0xd8c39a, 0xb0473a, 0x4f6f8f, 0xd6a13a, 0x7d8f5b].map((c) => new THREE.Color(c));
   const skins = [0xe0b38a, 0xc9956b, 0xa8724c, 0xefc9a3].map((c) => new THREE.Color(c));
   const hubs = [[30, 0, 90], [-150, -240, 45], [300, 20, 60], [-230, 430, 60], [-480, -430, 40], [40, 250, 40]];
   for (let i = 0; i < count; i++) {
@@ -259,14 +279,24 @@ function buildCitizens(scene, count = 90) {
       else { x = BOUNDS.minX + rnd() * (BOUNDS.maxX - BOUNDS.minX); z = BOUNDS.minZ + rnd() * (BOUNDS.maxZ - BOUNDS.minZ); }
       if (canMove(x, z, x + 0.1, z)) break;
     }
-    CITIZENS.list.push({ x, z, a: rnd() * Math.PI * 2, v: 0.8 + rnd() * 0.9, t: rnd() * 5, phase: rnd() * 6 });
-    body.setColorAt(i, pick(robes));
+    const ci = Math.floor(rnd() * ROBES_ANCIENT.length);
+    CITIZENS.list.push({ x, z, a: rnd() * Math.PI * 2, v: 0.8 + rnd() * 0.9, t: rnd() * 5, phase: rnd() * 6, ci });
+    body.setColorAt(i, ROBES_ANCIENT[ci]);
     head.setColorAt(i, pick(skins));
   }
   body.instanceColor.needsUpdate = head.instanceColor.needsUpdate = true;
   body.castShadow = true;
   scene.add(body, head);
   CITIZENS.body = body; CITIZENS.head = head;
+}
+
+// Switches citizens between togas and modern clothes.
+function applyCitizensEra(modern) {
+  const { list, body } = CITIZENS;
+  if (!body) return;
+  const palette = modern ? ROBES_MODERN : ROBES_ANCIENT;
+  list.forEach((c, i) => body.setColorAt(i, palette[c.ci]));
+  body.instanceColor.needsUpdate = true;
 }
 
 const _o = new THREE.Object3D();

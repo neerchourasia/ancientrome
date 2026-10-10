@@ -65,14 +65,24 @@ function addPlatformCircle(cx, cz, r, top) {
 function addPlatformRing(p) {
   platformGrid.add({ t: 2, gap: 0, axis: "x", side: 0, ...p }, p.cx - p.ax, p.cx + p.ax, p.cz - p.az, p.cz + p.az);
 }
-function addBlockerBox(x0, x1, z0, z1, y0, y1) {
-  blockerGrid.add({ t: 0, x0, x1, z0, z1, y0, y1 }, x0, x1, z0, z1);
+// Obstacles can belong to one era only (`extra.era` = "ancient" or "modern"), or be switched off (`off`), so the
+// Ancient / Modern Rome switch can change what blocks you. The item is returned so it can be changed later.
+let modernEra = false;
+const setPhysicsEra = (m) => { modernEra = !!m; };
+function addBlockerBox(x0, x1, z0, z1, y0, y1, extra) {
+  const item = { t: 0, x0, x1, z0, z1, y0, y1, ...extra };
+  blockerGrid.add(item, x0, x1, z0, z1);
+  return item;
 }
-function addBlockerCircle(cx, cz, r, y0, y1) {
-  blockerGrid.add({ t: 1, cx, cz, r, y0, y1 }, cx - r, cx + r, cz - r, cz + r);
+function addBlockerCircle(cx, cz, r, y0, y1, extra) {
+  const item = { t: 1, cx, cz, r, y0, y1, ...extra };
+  blockerGrid.add(item, cx - r, cx + r, cz - r, cz + r);
+  return item;
 }
 function addBlockerRing(p) {
-  blockerGrid.add({ t: 2, gap: 0, axis: "x", side: 0, ...p }, p.cx - p.ax, p.cx + p.ax, p.cz - p.az, p.cz + p.az);
+  const item = { t: 2, gap: 0, axis: "x", side: 0, ...p };
+  blockerGrid.add(item, p.cx - p.ax, p.cx + p.ax, p.cz - p.az, p.cz + p.az);
+  return item;
 }
 
 // Height of the walkable surface at (x, z).
@@ -100,6 +110,7 @@ function blockedAt(x, z, feet) {
   const list = blockerGrid.at(x, z);
   for (let i = 0; i < list.length; i++) {
     const b = list[i];
+    if (b.off || (b.era && (b.era === "modern") !== modernEra)) continue;
     if (!(feet + 1.2 > b.y0 && feet < b.y1 - 0.9)) continue;
     if (b.t === 0) {
       if (x > b.x0 - PLAYER_R && x < b.x1 + PLAYER_R && z > b.z0 - PLAYER_R && z < b.z1 + PLAYER_R) { lastBlock = b; return true; }
@@ -107,6 +118,7 @@ function blockedAt(x, z, feet) {
       if (Math.hypot(x - b.cx, z - b.cz) < b.r + PLAYER_R) { lastBlock = b; return true; }
     } else {
       const dx = x - b.cx, dz = z - b.cz;
+      if (b.zs && Math.sign(dz) !== b.zs) continue; // only the north (-1) or south (+1) half of the ring
       const u = Math.hypot(dx / b.ax, dz / b.az);
       if (u >= b.u0 && u <= b.u1 && !inCorridor(b, dx, dz)) { lastBlock = b; return true; }
     }

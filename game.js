@@ -11,8 +11,13 @@ const keys = new Set();
 let started = false, dragging = false, locked = false, panelOpen = false;
 let mode = "walk"; // "walk", "fight" (Colosseum), "race" (Circus Maximus) or "watch" (spectating)
 let renderer, camera, scene, sky, discovered = new Set();
+let era = "ancient"; // "ancient" (c. 128 AD) or "modern" (today); K switches
 
-try { discovered = new Set(JSON.parse(localStorage.getItem("rome-discovered") || "[]")); } catch (e) { /* storage unavailable */ }
+try { // saved progress is only trusted if it names real landmarks, so edited or corrupted storage cannot inflate the count
+  const saved = JSON.parse(localStorage.getItem("rome-discovered") || "[]");
+  if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => LANDMARKS.some((l) => l.id === id && !l.home)));
+} catch (e) { /* storage unavailable */ }
+try { if (localStorage.getItem("rome-era") === "modern") era = "modern"; } catch (e) { /* storage unavailable */ }
 
 // ---------- setup ----------
 
@@ -35,7 +40,11 @@ function init() {
   buildInsulae(scene);
   buildTrees(scene);
   buildCitizens(scene);
+  Modern.build(scene);
   buildAvatar();
+  buildCreator();
+  buildPremium();
+  applyCharacter();
   Crowd.build(scene);
   Fight.init(scene, camera);
   Race.init(scene);
@@ -44,6 +53,7 @@ function init() {
   Show.init(scene);
   Nav.init(scene);
   scene.traverse((o) => { if (o.isInstancedMesh) o.frustumCulled = false; });
+  applyEra();
 
   buildBaseMap();
   refreshViewButton();
@@ -60,6 +70,7 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  creatorCamera(creatorOpen);
   if (bigMapOpen()) drawBigMap();
 }
 
@@ -93,8 +104,10 @@ function wireInput(canvas) {
   addEventListener("keydown", (e) => {
     const k = keyCode(e);
     if (k === "Escape") { leaveMode(); return; }
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // typing a name: leave the keys alone
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(k)) e.preventDefault();
     if (!started) return;
+    if (creatorOpen || premiumOpen) return; // the character or premium screen is open
     keys.add(k);
     if (Vitals.resting && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(k)) Vitals.stopRest(); // moving stands you up
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
@@ -103,6 +116,8 @@ function wireInput(canvas) {
     if (k === "KeyO") toggleSound();
     if (k === "KeyJ") toggleVoice();
     if (k === "KeyZ") toggleRest();
+    if (k === "KeyK") toggleEra();
+    if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
     if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
     if (k === "KeyG" && (mode === "walk" || mode === "watch")) toggleDirections();
     if (mode === "walk" || mode === "watch") {
@@ -118,7 +133,8 @@ function wireInput(canvas) {
       else if (k === "KeyN") Watch.nextAct();
       else { const m = /^(?:Digit|Key|Numpad)([1-5])$/.exec(k); if (m) Watch.setAct(Number(m[1]) - 1); }
     } else if (mode === "walk" && canStart()) {
-      if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
+      if (era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
+      else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
       else if (k === "KeyL" && inArena(player.x, player.z)) Fight.start({ lion: true });
       else if (k === "KeyU" && inArena(player.x, player.z)) Fight.start({ hunt: true });
       else if (k === "KeyN" && inArena(player.x, player.z)) Naval.start();
@@ -153,7 +169,7 @@ function wireInput(canvas) {
   addEventListener("mouseup", (e) => { dragging = false; if (e.button === 2) Fight.mouseBlock = false; if (e.button === 0 && mode === "fight") Fight.release(); });
   $("#prompt").addEventListener("click", () => {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
-    if (mode !== "walk" || !canStart()) return;
+    if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
     else if (inColosseum(player.x, player.z)) Watch.start("duel");
@@ -175,6 +191,7 @@ function wireInput(canvas) {
     started = true;
     Sfx.init();
     $("#intro").classList.add("hidden");
+    if (!Character.exists) openCreator(true);
     $("#help").classList.add("show");
     setTimeout(() => $("#help").classList.remove("show"), 9000);
   });
@@ -188,6 +205,8 @@ function wireInput(canvas) {
   $("#dirs-nearest").addEventListener("click", guideMe);
   $("#dirs-home").addEventListener("click", () => startDirections(LANDMARKS.find((l) => l.home)));
   $("#btn-view").addEventListener("click", () => { if (mode === "walk") cycleView(1); else toast("The camera view can be changed while walking"); });
+  $("#btn-era").addEventListener("click", toggleEra);
+  $("#btn-char").addEventListener("click", () => { if (mode === "walk" && !panelOpen && canStart()) openCreator(false); else toast("Close what is open and stop the game first"); });
   canvas.addEventListener("wheel", (e) => {
     if (!started || panelOpen || mode !== "walk" || viewId() === "first") return;
     e.preventDefault();
@@ -202,6 +221,111 @@ function wireInput(canvas) {
   $("#bigmap-close").addEventListener("click", closePanels);
   $("#bigmap-canvas").addEventListener("click", onBigMapClick);
   $("#minimap").addEventListener("click", toggleBigMap);
+  wireTouch(canvas);
+}
+
+// ---------- touch controls (phones / tablets) ----------
+// Reuses the existing keyboard-driven game logic: the joystick and buttons just add or remove the same key
+// codes the keyboard would, or dispatch the same synthetic key events, so fight.js/race.js/naval.js need no
+// changes at all.
+
+const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
+function sendKey(type, code) { dispatchEvent(new KeyboardEvent(type, { code })); }
+
+// A button that fires a one-shot key event on touch (jump, whip, a lane hop, cruise) or holds a key down for
+// as long as it's pressed (block, dodge, drawing the bow).
+function tcButton(id, code, opts = {}) {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    if (opts.toggle) { const on = keys.has(code) ? (keys.delete(code), false) : (keys.add(code), true); el.classList.toggle("active", on); sendKey(on ? "keydown" : "keyup", code); return; }
+    keys.add(code);
+    el.classList.add("active");
+    sendKey("keydown", code);
+    if (!opts.hold) { keys.delete(code); sendKey("keyup", code); el.classList.remove("active"); }
+  }, { passive: false });
+  if (opts.hold) {
+    const up = (e) => { e.preventDefault(); keys.delete(code); sendKey("keyup", code); el.classList.remove("active"); };
+    el.addEventListener("touchend", up);
+    el.addEventListener("touchcancel", up);
+  }
+}
+
+function wireTouch(canvas) {
+  if (!isTouch) return;
+  document.body.classList.add("touch");
+
+  // The joystick: left thumb, drives the same WASD keys the keyboard does (diagonals included).
+  const stick = $("#tc-stick"), knob = $("#tc-knob");
+  const R = 46;
+  let stickId = null, cx = 0, cz = 0;
+  const setDir = (dx, dy) => {
+    for (const k of ["KeyW", "KeyA", "KeyS", "KeyD"]) keys.delete(k);
+    if (Math.hypot(dx, dy) < R * 0.22) return;
+    const a = Math.atan2(dx, -dy); // 0 = up (forward)
+    if (a > -Math.PI * 0.875 && a < -Math.PI * 0.125) keys.add("KeyA");
+    if (a > Math.PI * 0.125 && a < Math.PI * 0.875) keys.add("KeyD");
+    if (a > -Math.PI * 0.625 && a < Math.PI * 0.625) keys.add("KeyW");
+    if (a > Math.PI * 0.375 || a < -Math.PI * 0.375) keys.add("KeyS");
+  };
+  stick.addEventListener("touchstart", (e) => {
+    if (stickId !== null) return;
+    const t = e.changedTouches[0], r = stick.getBoundingClientRect();
+    stickId = t.identifier; cx = r.left + r.width / 2; cz = r.top + r.height / 2;
+    e.preventDefault();
+  }, { passive: false });
+  stick.addEventListener("touchmove", (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stickId) continue;
+      let dx = t.clientX - cx, dy = t.clientY - cz;
+      const d = Math.hypot(dx, dy);
+      if (d > R) { dx = (dx / d) * R; dy = (dy / d) * R; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      setDir(dx, dy);
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const stickEnd = (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stickId) continue;
+      stickId = null;
+      knob.style.transform = "";
+      for (const k of ["KeyW", "KeyA", "KeyS", "KeyD"]) keys.delete(k);
+    }
+  };
+  stick.addEventListener("touchend", stickEnd);
+  stick.addEventListener("touchcancel", stickEnd);
+
+  // Dragging anywhere else on the view looks around, the same as a mouse drag.
+  let lookId = null, lookX = 0, lookY = 0;
+  canvas.addEventListener("touchstart", (e) => {
+    if (!started || panelOpen || lookId !== null) return;
+    const t = e.changedTouches[0];
+    lookId = t.identifier; lookX = t.clientX; lookY = t.clientY;
+  }, { passive: true });
+  canvas.addEventListener("touchmove", (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookId || !started || panelOpen) continue;
+      player.yaw -= (t.clientX - lookX) * 0.0032;
+      player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch - (t.clientY - lookY) * 0.0032));
+      lookX = t.clientX; lookY = t.clientY;
+    }
+  }, { passive: true });
+  const lookEnd = (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
+  canvas.addEventListener("touchend", lookEnd);
+  canvas.addEventListener("touchcancel", lookEnd);
+
+  tcButton("#tc-jump", "Space");
+  tcButton("#tc-run", "ShiftLeft", { toggle: true });
+  tcButton("#tc-attack", "Space", { hold: true });
+  tcButton("#tc-block", "ShiftLeft", { hold: true });
+  tcButton("#tc-fire", "Space");
+  tcButton("#tc-whip", "Space");
+  tcButton("#tc-hopL", "KeyQ");
+  tcButton("#tc-hopR", "KeyE");
+  tcButton("#tc-cruise", "KeyX"); // Race tracks cruise on/off itself and shows its own on-screen message
 }
 
 // ---------- movement ----------
@@ -236,6 +360,8 @@ function describeObstacle(tx, tz) {
   blockedAt(tx, tz, groundAt(player.x, player.z));
   const b = lastBlock;
   if (!b) return "a wall";
+  if (b.era === "modern" && b.t === 1) return "a lamp post";
+  if (b.era === "modern" && b.y1 === 1.5) return "a parked car";
   if (b.t === 2) return "the huge stone wall";
   if (b.y1 - b.y0 > 7) return "a building";
   if (b.t === 1) return "a column";
@@ -363,7 +489,7 @@ function goTo(lm) {
 
 // ---------- your own avatar, for third-person view ----------
 
-let avatar, avParts, avPhase = 0;
+let avatar, avParts, avPhase = 0, avMats = null;
 
 // Camera views, cycled with C (Shift+C goes back). Every view except "first" shows your own character.
 const VIEWS = [
@@ -414,10 +540,11 @@ function buildAvatar() {
   g.visible = false;
   scene.add(g);
   avatar = g; avParts = { armL, armR, legL, legR };
+  avMats = { skin, robe, trim, hair: hairMat };
 }
 
 function updateAvatar(dt) {
-  avatar.visible = viewId() !== "first" && mode === "walk";
+  avatar.visible = (viewId() !== "first" || creatorOpen) && mode === "walk";
   if (!avatar.visible) return;
   avatar.position.set(player.x, player.feet + player.airY, player.z);
   avatar.rotation.y = player.yaw;
@@ -440,10 +567,10 @@ function cycleView(dir) {
 
 // The chase cameras: put the camera at an offset from you (pulled in when a wall is in the way) and look toward you.
 function chaseCamera() {
-  let id = viewId();
+  let id = creatorOpen ? "front" : viewId();
   if (id === "top" && Home.inside(player.x, player.z)) id = "close"; // the roof would hide you
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx; // forward and right
-  const z = camZoom;
+  const z = creatorOpen ? (innerWidth > 700 ? 0.62 : 1.5) : camZoom; // narrow screens: pull back so the whole figure fits above the panel
   let dx = -fx, dz = -fz, dist = 4.2 * z, up = 0, pitch = player.pitch, yaw = player.yaw, tilt = 0.6;
   if (id === "far") { dist = 10 * z; up = 2.6 * z; pitch = player.pitch - 0.14; tilt = 0.4; }
   else if (id === "side") { dx = rx; dz = rz; dist = 5 * z; up = 0.3; yaw = Math.atan2(rx, rz); pitch = -0.06; tilt = 0; }
@@ -455,6 +582,133 @@ function chaseCamera() {
   const cy = Math.max(groundAt(cx, cz) + 0.5, player.y + up - Math.sin(player.pitch) * d * tilt);
   camera.position.set(cx, cy, cz);
   camera.rotation.set(pitch, yaw, 0);
+}
+
+// ---------- your character: name, class and look ----------
+
+let premiumOpen = false;
+
+function buildPremium() {
+  for (const part of Object.keys(Character.PREMIUM_NAMES)) {
+    for (const i of Object.keys(Character.PREMIUM_NAMES[part])) {
+      const li = document.createElement("li"), dot = document.createElement("span");
+      dot.className = "dot"; dot.style.background = "#" + Character.COLORS[part][i].toString(16).padStart(6, "0");
+      li.append(dot, document.createTextNode(Character.PREMIUM_NAMES[part][i]));
+      $("#pr-items").append(li);
+    }
+  }
+  const shop = Character.SHOP, live = /^https:\/\//.test(shop.checkoutUrl);
+  $("#pr-price").textContent = shop.price ? `Price: ${shop.price}` : "";
+  $("#pr-buy").disabled = !live;
+  $("#pr-buy").textContent = live ? "Get Premium" : "Not on sale yet";
+  $("#pr-status").textContent = live ? "You will be taken to a secure payment page." : "Payments are not switched on yet. When they are, this button takes you to a secure checkout, and your premium colours unlock once the payment is confirmed.";
+  $("#pr-buy").addEventListener("click", () => { if (live) window.open(shop.checkoutUrl, "_blank", "noopener"); });
+  $("#premium-close").addEventListener("click", closePremium);
+  $("#premium").addEventListener("click", (e) => { if (e.target.id === "premium") closePremium(); });
+  $("#cr-premium").addEventListener("click", openPremium);
+  $("#btn-premium").addEventListener("click", () => { if (mode === "walk" && !panelOpen && canStart()) openPremium(); else toast("Close what is open and stop the game first"); });
+}
+function openPremium() { premiumOpen = true; panelOpen = true; $("#premium").classList.add("show"); }
+function closePremium() { premiumOpen = false; panelOpen = creatorOpen; $("#premium").classList.remove("show"); }
+
+
+let creatorOpen = false, draft = null;
+
+function applyLook(look) {
+  if (!avMats) return;
+  avMats.skin.color.setHex(Character.color("skin", look.skin));
+  avMats.hair.color.setHex(Character.color("hair", look.hair));
+  avMats.robe.color.setHex(Character.color("toga", look.toga));
+  avMats.trim.color.setHex(Character.color("sash", look.sash));
+}
+
+function applyCharacter() {
+  applyLook(Character.look);
+  $("#v-char").textContent = Character.exists ? `${Character.name} · ${Character.className}` : "";
+}
+
+// Slides the 3D view to the right so you can see yourself beside the character panel.
+function creatorCamera(on) {
+  if (!camera) return;
+  const w = innerWidth, h = innerHeight;
+  if (on && w > 700) camera.setViewOffset(w, h, -w * 0.2, 0, w, h); // panel on the left: slide the view right
+  else if (on) camera.setViewOffset(w, h, 0, h * 0.24, w, h); // panel along the bottom: slide the view up
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+
+function buildCreator() {
+  const mk = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text) el.textContent = text; return el; };
+  for (const id of Object.keys(Character.CLASSES)) {
+    const c = Character.CLASSES[id];
+    const b = mk("button", "cr-class"), ul = mk("ul");
+    b.type = "button"; b.dataset.id = id;
+    for (const t of c.perks) ul.append(mk("li", "", t));
+    b.append(mk("strong", "", c.name), mk("small", "", c.blurb), ul);
+    b.addEventListener("click", () => { draft.cls = id; refreshCreator(); });
+    $("#cr-classes").append(b);
+  }
+  for (const part of Object.keys(Character.COLORS)) {
+    Character.COLORS[part].forEach((hex, i) => {
+      const s = mk("button", "swatch");
+      s.type = "button"; s.dataset.part = part; s.dataset.i = i;
+      s.style.background = "#" + hex.toString(16).padStart(6, "0");
+      s.setAttribute("aria-label", `${part} colour ${i + 1}${Character.owns(part, i) ? "" : " (premium, locked)"}`);
+      if (!Character.owns(part, i)) { s.classList.add("premium"); s.title = "Premium cosmetic"; }
+      s.addEventListener("click", () => {
+        if (!Character.owns(part, i)) { openPremium(); return; }
+        draft.look[part] = i; $("#cr-note").textContent = ""; refreshCreator();
+      });
+      $(`#cr-${part}`).append(s);
+    });
+  }
+  $("#cr-name").addEventListener("input", (e) => { draft.name = e.target.value; });
+  $("#cr-ok").addEventListener("click", confirmCreator);
+  $("#cr-cancel").addEventListener("click", () => { if (Character.exists) closeCreator(); });
+  $("#cr-name").addEventListener("keydown", (e) => { if (e.key === "Enter") confirmCreator(); });
+}
+
+function refreshCreator() {
+  for (const b of document.querySelectorAll(".cr-class")) b.classList.toggle("on", b.dataset.id === draft.cls);
+  for (const s of document.querySelectorAll(".swatch")) s.classList.toggle("on", draft.look[s.dataset.part] === Number(s.dataset.i));
+  applyLook(draft.look);
+}
+
+function openCreator(first) {
+  if (mode !== "walk" || creatorOpen) return;
+  closePanels();
+  draft = { name: Character.name, cls: Character.cls, look: { ...Character.look } };
+  creatorOpen = true; panelOpen = true;
+  document.body.classList.add("creating");
+  Vitals.stopRest();
+  player.vx = player.vz = 0; keys.clear();
+  $("#creator").classList.add("show");
+  $("#cr-name").value = draft.name;
+  $("#cr-cancel").hidden = !Character.exists;
+  $("#cr-ok").textContent = first ? "Begin" : "Save";
+  $("#cr-note").textContent = "Pick a name, a class and your look. Locked colours (★) are Premium: tap one to see what Premium includes.";
+  if (document.pointerLockElement) document.exitPointerLock();
+  creatorCamera(true);
+  refreshCreator();
+  setTimeout(() => { try { $("#cr-name").focus(); } catch (e) { /* ignore */ } }, 50);
+}
+
+function closeCreator() {
+  creatorOpen = false; panelOpen = false;
+  document.body.classList.remove("creating");
+  $("#creator").classList.remove("show");
+  try { document.activeElement.blur(); } catch (e) { /* ignore */ }
+  creatorCamera(false);
+  applyCharacter(); // drops any unsaved preview
+}
+
+function confirmCreator() {
+  const name = Character.cleanName(draft.name);
+  if (name.length < 2) { toast("Give your character a name (2 to 16 letters)"); $("#cr-name").focus(); return; }
+  Character.set({ name, cls: draft.cls, look: draft.look });
+  closeCreator();
+  toast(`Welcome, ${Character.name} the ${Character.className}`);
+  Narrator.say(`Welcome, ${Character.name} the ${Character.className}.`, { interrupt: true });
 }
 
 // ---------- discovery & info card ----------
@@ -495,6 +749,9 @@ function showCard(lm) {
   $("#card-sub").textContent = lm.sub;
   $("#card-text").textContent = lm.text;
   $("#card-fact").textContent = lm.fact;
+  const modernNote = $("#card-modern");
+  if (era === "modern" && lm.modern) { modernNote.textContent = "Today: " + lm.modern; modernNote.hidden = false; }
+  else modernNote.hidden = true;
   card.classList.add("show");
 }
 
@@ -517,6 +774,8 @@ function toast(msg) {
 
 const bigMapOpen = () => $("#bigmap").classList.contains("show");
 function closePanels() {
+  if (premiumOpen) { closePremium(); return; }
+  if (creatorOpen) { if (!Character.exists) return; closeCreator(); } // the first-time screen cannot be skipped
   $("#bigmap").classList.remove("show");
   $("#places").classList.remove("show");
   $("#controls").classList.remove("show");
@@ -525,6 +784,7 @@ function closePanels() {
 }
 function openPanel(id) {
   if (mode === "fight" || mode === "race" || mode === "naval") return;
+  if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
   panelOpen = true;
@@ -543,6 +803,33 @@ function toggleVoice() {
 }
 function refreshSoundButton() { $("#btn-sound").firstChild.textContent = Sfx.on ? "Sound on " : "Sound off "; }
 function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); toast(Sfx.on ? "Sound on" : "Sound off"); }
+
+// ---------- Ancient Rome / Modern Rome ----------
+
+function applyEra() {
+  const modern = era === "modern";
+  applyWorldEra(modern);
+  applyInsulaeEra(modern);
+  applyCitizensEra(modern);
+  Modern.apply(modern);
+  Crowd.setVisible(!modern);
+  $("#era-badge").textContent = modern ? "Modern Rome" : "Ancient Rome";
+  $("#era-badge").classList.toggle("ancient", !modern);
+  $("#btn-era").innerHTML = modern ? 'Ancient Rome <kbd>K</kbd>' : 'Modern Rome <kbd>K</kbd>';
+}
+
+function toggleEra() {
+  if (mode !== "walk") { toast("Leave the game first to switch eras"); return; }
+  era = era === "ancient" ? "modern" : "ancient";
+  try { localStorage.setItem("rome-era", era); } catch (e) { /* ignore */ }
+  applyEra();
+  Nav.clear(); // a route drawn in the other era may no longer be walkable
+  if (blockedAt(player.x, player.z, player.feet)) placeAt(player.x, player.z); // something appeared where you stand
+  const modern = era === "modern";
+  toast(modern ? "Modern Rome: the city as it stands today" : "Ancient Rome, c. 128 AD");
+  Narrator.say(modern ? "Modern Rome. The city as it stands today." : "Ancient Rome, around 128 AD, under the emperor Hadrian.", { interrupt: true });
+  if (currentLm) showCard(currentLm); // refresh the open card's "today" note
+}
 
 function toggleDirections() { if ($("#places").classList.contains("show") && placesMode === "dirs") closePanels(); else openPlaces("dirs"); }
 function toggleControls() { if ($("#controls").classList.contains("show")) closePanels(); else openPanel("#controls"); }
@@ -570,8 +857,9 @@ function updatePrompt() {
     const stables = inCircusArea(player.x, player.z);
     p.dataset.kind = "";
     if (Vitals.resting) text = "Resting... move to stand up";
+    else if (era === "modern" && (inArena(player.x, player.z) || inCircusTrack(player.x, player.z) || inColosseum(player.x, player.z) || inCircusStands(player.x, player.z))) text = "The games only ran in Ancient Rome. Press K to go back";
     else if (inArena(player.x, player.z)) text = Vitals.canFight() ? "F: gladiators · U: animal hunt · L: lion · N: naval battle · V: watch the games" : "Too wounded to fight. Press Z to rest and heal · V: watch the games";
-    else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Vitals.RACE_ENTRY} denarii) · V: watch a race`;
+    else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
@@ -878,6 +1166,7 @@ function updateTime(dt) {
   if (started && !sleeping) Time.advance(dt);
   sky.setHour(Time.hour);
   Home.update(sky.night);
+  Modern.update(sky.night);
 
   const label = Time.label() + (Time.late && !sleeping ? " · sleepy: sleep before 4:00" : "");
   if (label !== lastClock) { lastClock = label; $("#clock").textContent = label; }
@@ -935,7 +1224,7 @@ function tick(dt) {
   else if (mode === "naval") Naval.camera(camera, dt);
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {
-    if (mode === "walk" && viewId() !== "first") chaseCamera();
+    if (mode === "walk" && (viewId() !== "first" || creatorOpen)) chaseCamera();
     else {
       camera.position.set(player.x, player.y, player.z);
       camera.rotation.set(player.pitch, player.yaw, 0);

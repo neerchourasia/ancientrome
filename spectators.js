@@ -60,6 +60,8 @@ const Crowd = (() => {
     build,
     get cheering() { return cheering; },
     setCheer(on) { if (cheering && !on) writeMatrices(0, false); cheering = on; },
+    // Modern Rome has no spectators in the stands.
+    setVisible(on) { if (body) { body.visible = on; head.visible = on; } },
     update(dt, time) {
       if (!cheering) return;
       acc += dt;

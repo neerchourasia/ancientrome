@@ -13,8 +13,8 @@ const Sfx = (() => {
 
   // Places that make sound. `crowd` sources swell when the crowd is cheering.
   const AMBIENCE = [
-    { id: "colosseum", x: 430, z: 30, range: 420, base: 0.55, freq: 650, Q: 0.5, swell: 0.3, crowd: true },
-    { id: "circus", x: -230, z: 430, range: 460, base: 0.5, freq: 600, Q: 0.5, swell: 0.3, crowd: true },
+    { id: "colosseum", x: 430, z: 30, range: 420, base: 0.55, freq: 650, Q: 0.5, swell: 0.3, crowd: true, when: () => era === "ancient" },
+    { id: "circus", x: -230, z: 430, range: 460, base: 0.5, freq: 600, Q: 0.5, swell: 0.3, crowd: true, when: () => era === "ancient" },
     { id: "forum", x: 30, z: 0, range: 300, base: 0.45, freq: 900, Q: 0.7, swell: 0.6 },
     { id: "trajan", x: -150, z: -240, range: 220, base: 0.3, freq: 1000, Q: 0.8, swell: 0.6 },
     { id: "pantheon", x: -480, z: -420, range: 200, base: 0.26, freq: 800, Q: 0.8, swell: 0.4 },
@@ -190,6 +190,7 @@ const Sfx = (() => {
       const sp = spatial(L, s.x, s.z, s.range);
       const swell = 1 + s.swell * (Math.sin(clock * 0.7 + s.phase) * 0.5 + Math.sin(clock * 1.9 + s.phase * 2) * 0.3);
       let vol = s.base * sp.att * swell * (0.55 + 0.45 * sp.facing);
+      if (era === "modern") vol *= s.id === "city" ? 2.2 : (s.id === "forum" || s.id === "trajan") ? 0.5 : 1; // traffic hum; quiet ruins
       if (s.crowd) vol *= 1 + 1.8 * excite + 1.0 * burst;
       const cut = 500 + 4500 * Math.pow(sp.facing, 1.6) + (s.crowd ? 1500 * excite : 0); // behind you = muffled
       s.target = { gain: +Math.min(1.3, vol).toFixed(3), pan: +sp.pan.toFixed(2), cutoff: Math.round(cut), dist: Math.round(sp.d) };

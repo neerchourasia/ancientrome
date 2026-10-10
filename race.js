@@ -34,7 +34,7 @@ const Race = (() => {
   let camMode = 0, keysRef = new Set();
 
   let scene, active = false, state = "idle", t = 0, elapsed = 0, endT = 0, camYaw = 0;
-  let cars = [], me = null, msgTimer, watching = false;
+  let cars = [], me = null, msgTimer, watching = false, entryFee = 0; // entryFee: what you paid this race (your class can lower it)
   const el = (id) => document.getElementById(id);
 
   // ---------- track geometry ----------
@@ -123,8 +123,9 @@ const Race = (() => {
     watching = !!opts.watch;
     if (!watching) { // racing costs money, and needs rested horses
       if (!Vitals.canRace()) { toast(`The horses are too tired to race (${Math.round(Vitals.horses)}/100). Rest at the Circus stables with Z.`); return; }
-      if (Vitals.coins < Vitals.RACE_ENTRY) { toast(`The entry fee is ${Vitals.RACE_ENTRY} denarii and you only have ${Vitals.coins}. Win some fights first.`); return; }
-      Vitals.coins -= Vitals.RACE_ENTRY;
+      entryFee = Math.round(Vitals.RACE_ENTRY * Character.mod("fee"));
+      if (Vitals.coins < entryFee) { toast(`The entry fee is ${entryFee} denarii and you only have ${Vitals.coins}. Win some fights first.`); return; }
+      Vitals.coins -= entryFee;
     }
     active = true; mode = watching ? "watch" : "race"; state = "countdown"; t = 3.2; elapsed = 0;
     for (const c of cars) scene.remove(c.model.g);
@@ -225,10 +226,10 @@ const Race = (() => {
       steer = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
       // exhausted horses can't go faster than a fast trot until they have recovered
       const pace = PACES[(c.tired ? Math.min(c.pace, 4) : c.pace) - 1];
-      target = gas ? VMAX * pace.speed : 0;
+      target = gas ? VMAX * pace.speed * Character.mod("racespeed") : 0;
       if (brake) { c.v = Math.max(0, c.v - 26 * dt); c.cruise = false; }
       if (state === "race") {
-        c.horse = Math.max(0, Math.min(100, c.horse - PACES[c.pace - 1].tire * (c.v > 3 ? 1 : 0) * dt + (c.v <= 3 ? 8 * dt : 0)));
+        c.horse = Math.max(0, Math.min(100, c.horse - PACES[c.pace - 1].tire * Character.mod("tire") * (c.v > 3 ? 1 : 0) * dt + (c.v <= 3 ? 8 * dt : 0)));
         if (!c.tired && c.horse < 10) { c.tired = true; msg("The horses are exhausted! Slow down to let them recover", 2000); }
         else if (c.tired && c.horse > 35) { c.tired = false; msg("The horses have recovered", 1200); }
       }
@@ -400,11 +401,11 @@ const Race = (() => {
     const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
     const time = me.finished ? fmt(me.finishT) : null;
     const leader = ranking()[0];
-    const prize = rank === 1 ? 100 : rank === 2 ? 40 : 0; // only the top two are paid
+    const prize = Math.round((rank === 1 ? 100 : rank === 2 ? 40 : 0) * Character.mod("coin")); // only the top two are paid
     Vitals.coins += prize;
     const money = prize
-      ? ` Prize: +${prize} denarii (after the ${Vitals.RACE_ENTRY} denarii entry fee).`
-      : ` No prize: you lose your ${Vitals.RACE_ENTRY} denarii entry fee.`;
+      ? ` Prize: +${prize} denarii (after the ${entryFee} denarii entry fee).`
+      : ` No prize: you lose your ${entryFee} denarii entry fee.`;
     const tired = " Your horses are worn out, so rest them at the stables with Z.";
     stop(
       won ? "Victory in the Circus!" : `You finished ${ords[rank]}${rank > 2 ? ": you lose the race" : ""}`,
