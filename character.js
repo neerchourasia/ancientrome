@@ -23,7 +23,12 @@ const Character = (() => {
   // Where the "Get Premium" button sends people. Leave `checkoutUrl` empty until payments are set up; paste a
   // Stripe Payment Link (https://buy.stripe.com/...) here to turn the button on. Unlocking after payment still
   // needs a server (accounts + a Stripe webhook), because anything the browser decides can be edited.
-  const SHOP = { price: "", checkoutUrl: "" };
+  const cfg = window.ROME_CONFIG || {};
+  const SHOP = { price: String(cfg.price || ""), checkoutUrl: String(cfg.checkoutUrl || "") };
+  // Whether this player has Premium (set from their account; cached so saved premium colours survive a reload).
+  // Only cosmetics depend on this in the browser; online play re-checks it on the server.
+  let premiumOwned = false;
+  try { premiumOwned = localStorage.getItem("rome-premium") === "1"; } catch (e) { /* storage unavailable */ }
 
   // `mods` are multipliers (1 = no change) read by the fights and races.
   const CLASSES = {
@@ -52,7 +57,7 @@ const Character = (() => {
   const DEFAULT = { name: "", cls: "gladiator", look: { skin: 1, hair: 1, toga: 0, sash: 0 } };
 
   const cleanName = (v) => String(v == null ? "" : v).replace(/[^A-Za-z0-9 '\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 16);
-  const owns = (part, i) => !PREMIUM[part].includes(i); // later: also true if the account bought it
+  const owns = (part, i) => premiumOwned || !PREMIUM[part].includes(i);
   const validIndex = (part, i) => Number.isInteger(i) && i >= 0 && i < COLORS[part].length && owns(part, i);
 
   // Anything that is not valid falls back to the default, so edited or corrupted storage cannot do harm.
@@ -81,6 +86,7 @@ const Character = (() => {
     get look() { return s.look; },
     color: (part, i) => COLORS[part][validIndex(part, i) ? i : 0],
     mod: (key) => { const m = CLASSES[s.cls].mods[key]; return m === undefined ? 1 : m; },
+    setPremium(v) { premiumOwned = !!v; try { localStorage.setItem("rome-premium", v ? "1" : "0"); } catch (e) { /* ignore */ } },
     set(next) {
       s = sanitize(next);
       saved = s.name.length >= 2;

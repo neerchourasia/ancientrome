@@ -77,10 +77,11 @@ DUEL_TIME = 150.0
 SWING_HIT_AT, SWING_END, SWING_COST, REACH, REACH_SLACK = 0.28, 0.7, 14.0, 3.1, 0.5
 
 RACE_LEN = 2 * 340 + 2 * math.pi * 22   # one lap of the Circus Maximus path
-RACE_LAPS = 3
+RACE_LAPS = int(os.environ.get("RACE_LAPS", "3"))   # 3 in the game; set lower to test a whole race quickly
 RACE_TOTAL = RACE_LEN * RACE_LAPS
 RACE_VMAX = 32.0          # fastest honest chariot speed (m/s); the game's top is about 27
 RACE_COUNTDOWN = 4.0
+RACE_GRACE = 40.0         # seconds the others get to finish after the first racer crosses the line
 
 
 def now():
@@ -267,7 +268,7 @@ class Conn:
 class Duelist:
     def __init__(self, conn, index, bot=False, name=None):
         self.conn, self.i, self.bot = conn, index, bot
-        self.name = name or (conn.name if conn else "Practice bot")
+        self.name = name or (conn.name if conn else "Brutus")
         self.cls = conn.cls if conn else "gladiator"
         self.look = conn.look if conn else clean_look({"toga": 2, "sash": 1}, False)
         self.melee = CLASS_MODS.get(self.cls, CLASS_MODS["gladiator"])["melee"]
@@ -521,7 +522,7 @@ class RaceRoom:
         humans = [p for p in self.players if p.conn]
         if humans and all(p.fin is not None for p in humans):
             self.finish("finished")
-        elif self.first_fin and t - self.first_fin > 25:
+        elif self.first_fin and t - self.first_fin > RACE_GRACE:
             self.finish("timeout")
         elif t - self.start_at > 600:
             self.finish("timeout")

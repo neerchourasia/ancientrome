@@ -325,3 +325,42 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 .pr-status { margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
 #cr-premium { width: 100%; margin-top: 10px; font: 700 .95rem inherit; cursor: pointer; padding: 9px; border-radius: 9px; border: 1px solid var(--gold); color: var(--gold); background: transparent; }
 #pr-items .soon { margin-left: auto; padding: 2px 9px; font-size: .72rem; border-radius: 999px; background: rgba(120,160,200,.25); color: #bcd0e6; white-space: nowrap; }
+
+/* ---------- account and online play ---------- */
+#account, #online { position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.7); }
+#account.show, #online.show { display: flex; }
+#account .box, #online .box { width: min(420px, 100%); max-height: 92vh; overflow-y: auto; background: rgba(28,22,16,.97); border: 1px solid rgba(226,185,85,.45); border-radius: 12px; padding: 6px 18px 18px; }
+#account header, #online header { display: flex; justify-content: space-between; align-items: center; }
+#account h2, #online h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
+#account-close, #on-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
+#account [hidden], #online [hidden] { display: none !important; }
+#account label { display: block; margin: 8px 0; font-weight: 600; }
+#account input[type=email], #account input[type=password] { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--ink); background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; }
+#account input:focus { outline: 2px solid var(--gold); }
+.ac-check { display: flex !important; align-items: flex-start; gap: 8px; font-weight: 400 !important; font-size: .85rem; color: var(--muted); }
+.ac-check a { color: var(--gold); }
+.ac-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.ac-actions button, .on-games button, #on-cancel, .on-links button { flex: 1; font: 700 1rem inherit; cursor: pointer; padding: 10px; border-radius: 9px; border: 0; color: #2a2118; background: var(--gold); }
+#ac-logout, #on-cancel { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.35); font-weight: 400; }
+.ac-msg { min-height: 1.4em; margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
+.ac-msg.bad { color: #f0a090; }
+.on-games { display: grid; gap: 10px; margin: 10px 0; }
+.on-games button:disabled { opacity: .45; cursor: not-allowed; }
+#on-cancel { width: 100%; margin-top: 8px; }
+.on-links { display: flex; gap: 10px; margin-top: 10px; }
+#btn-account { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+
+#online-hud { display: none; }
+#online-hud.show { display: block; }
+.od-top { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); width: min(560px, 94vw); display: flex; gap: 14px; }
+.od-p { flex: 1; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+.od-p.foe { text-align: right; }
+.od-p .bar { height: 14px; margin-top: 3px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 7px; overflow: hidden; }
+#od-me-hp { height: 100%; width: 100%; background: #3aa557; }
+#od-foe-hp { height: 100%; width: 100%; background: #c0392b; margin-left: auto; }
+.od-bottom { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(460px, 92vw); text-align: center; }
+.od-st { height: 10px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; }
+#od-st { height: 100%; width: 100%; background: #d8b04a; }
+.od-keys { margin: 8px 0 0; font-size: .8rem; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+@media (max-width: 700px) { body.touch .od-bottom { bottom: 150px; } }
+body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left { display: none !important; }

@@ -91,7 +91,7 @@ class WS:
 class ServerTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.cfg = dict(server.CFG)
-        self.saved = (server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN)
+        self.saved = (server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE)
         server.CFG.update(require_premium=False, bot_wait=0.6, race_wait=0.6, origins=[], supabase_url="", stripe_secret="")
         self.srv = await server.serve("127.0.0.1", 0)
         self.port = self.srv.sockets[0].getsockname()[1]
@@ -106,7 +106,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             q.clear()
         server.CFG.clear()
         server.CFG.update(self.cfg)
-        server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN = self.saved
+        server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE = self.saved
         for t in asyncio.all_tasks():
             if t is not asyncio.current_task() and "matchmaker" in repr(t):
                 t.cancel()
@@ -266,7 +266,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
     # ---------------------------------------------------------------- races
 
     async def test_race_order_and_cheating(self):
-        server.RACE_COUNTDOWN, server.RACE_TOTAL = 0.4, 100.0
+        server.RACE_COUNTDOWN, server.RACE_TOTAL, server.RACE_GRACE = 0.4, 100.0, 1.5
         a, b = await self.player("Ann"), await self.player("Ben")
         a.send({"t": "queue", "mode": "race"})
         b.send({"t": "queue", "mode": "race"})

@@ -4,7 +4,8 @@
 const inCircusTrack = (x, z) => Math.abs(x + 230) < 48 && z > 132 && z < 735;
 
 const Race = (() => {
-  const CX = -230, MIDZ = 430, R0 = 22, LS = 340, LAPS = 3;
+  const CX = -230, MIDZ = 430, R0 = 22, LS = 340;
+  let LAPS = 3; // online races use the length the server says
   const ZN = MIDZ - LS / 2, ZS = MIDZ + LS / 2;
   const ARC = Math.PI * R0, LEN = 2 * LS + 2 * ARC;
   const VMAX = 27, LAT = 16, D_MIN = -16, D_MAX = 26;
@@ -34,7 +35,7 @@ const Race = (() => {
   let camMode = 0, keysRef = new Set();
 
   let scene, active = false, state = "idle", t = 0, elapsed = 0, endT = 0, camYaw = 0;
-  let cars = [], me = null, msgTimer, watching = false, entryFee = 0; // entryFee: what you paid this race (your class can lower it)
+  let cars = [], me = null, msgTimer, watching = false, entryFee = 0, online = false; // entryFee: what you paid this race (your class can lower it)
   const el = (id) => document.getElementById(id);
 
   // ---------- track geometry ----------
@@ -121,6 +122,7 @@ const Race = (() => {
   function start(opts = {}) {
     if (active) return;
     watching = !!opts.watch;
+    LAPS = 3;
     if (!watching) { // racing costs money, and needs rested horses
       if (!Vitals.canRace()) { toast(`The horses are too tired to race (${Math.round(Vitals.horses)}/100). Rest at the Circus stables with Z.`); return; }
       entryFee = Math.round(Vitals.RACE_ENTRY * Character.mod("fee"));
@@ -149,8 +151,9 @@ const Race = (() => {
     updateHud();
   }
 
-  function stop(title, text) {
+  function stop(title, text, buttons) {
     if (!active) return;
+    if (online) { online = false; Online.leaveGame(); } // leaving a live race
     // Racing wears the horses out, and finishing a race takes even more out of them.
     if (!watching && me) Vitals.horses = Math.max(5, me.horse - (me.finished ? 12 : 0));
     active = false; state = "idle";
@@ -164,7 +167,7 @@ const Race = (() => {
     camera.fov = 70; camera.updateProjectionMatrix();
     if (watching) return;
     placeAt(CX + 30, ZN - 60, Math.PI); // back on foot near the start, facing south
-    if (title) showResult(title, text, [
+    if (title) showResult(title, text, buttons || [
       { label: "Race again", fn: () => { closePanels(); start(); } },
       { label: "Leave the circus", fn: closePanels },
     ]);
@@ -351,13 +354,14 @@ const Race = (() => {
       elapsed += dt;
     }
 
-    for (const c of cars) stepCar(c, dt, keys);
+    for (const c of cars) { if (c.remote) stepRemote(c, dt); else stepCar(c, dt, keys); }
     if (state !== "countdown") collisions(dt);
 
     for (const c of cars) {
       if (!c.finished && c.s >= LAPS * LEN) {
         c.finished = true; c.finishT = elapsed;
-        if (c === me && state === "race") { state = "ending"; endT = 2.2; msg("Finish!", 1800); Sfx.play("horn"); Sfx.play("cheer"); }
+        if (online) { if (c === me && state === "race") { state = "ending"; endT = 1e9; msg("Finish! Waiting for the others...", 4000); Sfx.play("horn"); } } // the server announces the result
+        else if (c === me && state === "race") { state = "ending"; endT = 2.2; msg("Finish!", 1800); Sfx.play("horn"); Sfx.play("cheer"); }
         else if (!watching && c !== me && state === "race") { state = "ending"; endT = 3; msg(`The ${c.team.name} win the race!`, 3000); Sfx.play("horn"); }
         else if (watching && state === "race") { state = "ending"; endT = 3.5; msg(`The ${c.team.name} win!`, 3000); }
       }
@@ -386,6 +390,7 @@ const Race = (() => {
       const f = el("flash");
       f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.2);
     }
+    if (online && state === "race" && me) Online.raceTick(dt, me.s, me.d);
     updateHud();
 
     if (state === "ending") {
@@ -413,6 +418,64 @@ const Race = (() => {
         ? `You drove the Greens to victory in ${time}. The crowd showers you with cheers, and the winning charioteer receives a palm branch and prize money. The star Diocles won 1,462 races over a career of 24 years.`
         : `${time ? `Finished in ${time}.` : `The ${leader.team.name} won in ${fmt(leader.finishT)} while you were still on the track.`} Real races were 7 laps of the track and could be brutal, with crashes (naufragia, or 'shipwrecks') a common sight. Try a wider lane in the corners, and save your whip for the straights.`) + money + tired
     );
+  }
+
+  // ---- live races against real people: the other chariots are driven by what the game server tells us ----
+  function startOnline(m) {
+    if (active) return;
+    watching = false; online = true; LAPS = m.laps || 3;
+    active = true; mode = "race"; state = "countdown"; t = m.countdown || 4; elapsed = 0;
+    for (const c of cars) scene.remove(c.model.g);
+    cars = m.players.map((pl, i) => {
+      const team = { ...TEAMS[i % TEAMS.length], name: pl.name };
+      return {
+        skill: 1, restAt: 1e9, resumeAt: 1e9, aggressive: false, team, model: makeChariot(team), player: i === m.you, remote: i !== m.you,
+        s: 0, d: pl.d, v: 0, phase: 0, whip: 0, stam: 100, laneGoal: pl.d, laneT: 2, finished: false, finishT: 0, bump: 0, yaw: 0,
+        slowT: 0, hitCd: 0, shake: 0, pace: 7, horse: 100, tired: false, cruise: false, sv: 0, pd: pl.d, lean: 0, pathYaw: 0, hopTo: null,
+      };
+    });
+    me = cars[m.you];
+    me.horse = Vitals.horses; me.tired = me.horse < 10;
+    for (const c of cars) { scene.add(c.model.g); place(c); }
+    camYaw = me.yaw;
+    const hud = el("race-hud");
+    hud.classList.add("show");
+    hud.classList.remove("watching");
+    Crowd.setCheer(true);
+    closePanels();
+    updateHud();
+    msg("Racing real people. Ave!", 2000);
+  }
+
+  function stepRemote(c, dt) {
+    if (c.tS === undefined) { c.tS = c.s; c.tD = c.d; c.tV = 0; }
+    const k = Math.min(1, dt * 8);
+    c.s += (c.tS - c.s) * k; c.d += (c.tD - c.d) * k;
+    c.v = c.tV;
+    c.phase += c.v * dt * 1.6;
+  }
+
+  function onlineState(m) {
+    if (!online) return;
+    for (const [i, s, d, v] of m.p) {
+      const c = cars[i];
+      if (c && c.remote) { c.tS = s; c.tD = d; c.tV = v; }
+    }
+  }
+
+  function onlineEnd(m) {
+    if (!active || !online) return;
+    online = false;
+    const idx = cars.indexOf(me), rank = m.order.findIndex((o) => o.i === idx) + 1;
+    const ords = ["", "1st", "2nd", "3rd", "4th"];
+    const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    const prize = rank === 1 ? 60 : rank === 2 ? 25 : 0;
+    Vitals.coins += prize;
+    const table = m.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${fmt(o.time)})` : " (did not finish)"}`).join("  ·  ");
+    stop(rank === 1 ? "You won the race!" : `You finished ${ords[rank] || "last"}`, `${table}.${prize ? ` Prize: +${prize} denarii.` : ""}`, [
+      { label: "Race again", fn: () => { closePanels(); Online.openLobby(); } },
+      { label: "Leave the circus", fn: closePanels },
+    ]);
   }
 
   // Chase camera behind `target` (defaults to the player's chariot; spectators follow the leader).
@@ -458,5 +521,5 @@ const Race = (() => {
     el("race-order").innerHTML = order.map((c, i) => `<li><span class="sw" style="background:#${c.team.color.toString(16).padStart(6, "0")}"></span>${i + 1}. ${c.team.name}${c.player ? " (you)" : ""}${!c.player && c.resting ? " (resting)" : ""}</li>`).join("");
   }
 
-  return { init, start, stop: () => stop(), update, whip, setPace, toggleCruise, hop, cycleCamera, camera: camera_, leader: () => ranking()[0], speed: () => (me ? me.v : 0), get active() { return active; }, debug: () => ({ state, LEN, LAPS, cars }) };
+  return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => online, stop: () => stop(), update, whip, setPace, toggleCruise, hop, cycleCamera, camera: camera_, leader: () => ranking()[0], speed: () => (me ? me.v : 0), get active() { return active; }, debug: () => ({ state, LEN, LAPS, cars }) };
 })();

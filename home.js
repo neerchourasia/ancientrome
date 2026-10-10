@@ -28,6 +28,7 @@ const Time = (() => {
       saveT += dt;
       if (saveT > 3) { saveT = 0; save(); }
     },
+    setClock(h, d) { s.hour = ((h % 24) + 24) % 24; s.day = Math.max(1, Math.floor(d)); save(); },
     set(h) { s.hour = ((h % 24) + 24) % 24; save(); },
     nextPreset() {
       const h = s.hour;

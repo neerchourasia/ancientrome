@@ -44,6 +44,8 @@ function init() {
   buildAvatar();
   buildCreator();
   buildPremium();
+  Account.bind();
+  Online.bind();
   applyCharacter();
   Crowd.build(scene);
   Fight.init(scene, camera);
@@ -93,6 +95,7 @@ function leaveMode() {
   else if (mode === "race") Race.stop();
   else if (mode === "naval") Naval.stop();
   else if (mode === "watch") Watch.stop();
+  else if (mode === "online") Online.leave();
   else closePanels();
 }
 
@@ -149,6 +152,8 @@ function wireInput(canvas) {
       else if (k === "KeyX") Race.toggleCruise();
       else if (k === "KeyC") Race.cycleCamera();
       else { const m = /^(?:Digit|Key|Numpad)([1-9])$/.exec(k); if (m) Race.setPace(Number(m[1])); }
+    } else if (mode === "online") {
+      if (k === "Space") Online.swing();
     } else if (k === "Space" && mode === "fight") {
       Fight.attack();
     }
@@ -325,6 +330,8 @@ function wireTouch(canvas) {
   tcButton("#tc-whip", "Space");
   tcButton("#tc-hopL", "KeyQ");
   tcButton("#tc-hopR", "KeyE");
+  tcButton("#tc-oattack", "Space");
+  tcButton("#tc-oblock", "ShiftLeft", { hold: true });
   tcButton("#tc-cruise", "KeyX"); // Race tracks cruise on/off itself and shows its own on-screen message
 }
 
@@ -432,7 +439,7 @@ function updatePlayer(dt) {
   if (keys.has("KeyE")) turn -= 1;
   player.yaw += turn * 1.9 * dt;
 
-  const speed = keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13, walkSpeed()) : walkSpeed();
+  const speed = mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13, walkSpeed()) : walkSpeed(); // in a duel everyone is the same speed (Shift blocks)
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   const rx = -fz, rz = fx;
   let tx = fx * fwd + rx * side, tz = fz * fwd + rz * side;
@@ -518,7 +525,8 @@ let viewIndex = 0, camZoom = 1; // camZoom: the mouse wheel moves the camera clo
 try { const i = VIEWS.findIndex((v) => v.id === localStorage.getItem("rome-view")); if (i >= 0) viewIndex = i; } catch (e) { /* storage unavailable */ }
 const viewId = () => VIEWS[viewIndex].id;
 
-function buildAvatar() {
+// A person: you, and the other players online.
+function createFigure() {
   const g = new THREE.Group();
   const skin = new THREE.MeshLambertMaterial({ color: 0xd9a273 });
   const robe = new THREE.MeshLambertMaterial({ color: 0xf3e6c8 });
@@ -551,14 +559,35 @@ function buildAvatar() {
   const legL = mkLimb(legGeo, robe, -0.13, 0.62, 0);
   const legR = mkLimb(legGeo, robe, 0.13, 0.62, 0);
 
-  g.visible = false;
-  scene.add(g);
-  avatar = g; avParts = { armL, armR, legL, legR };
-  avMats = { skin, robe, trim, hair: hairMat };
+  // a short sword in the right hand (shown in duels)
+  const sword = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, 0.025), new THREE.MeshLambertMaterial({ color: 0xc9ced4 }));
+  blade.position.y = -0.98;
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.06), new THREE.MeshLambertMaterial({ color: 0x8a6a2a }));
+  guard.position.y = -0.52;
+  sword.add(blade, guard);
+  sword.visible = false;
+  armR.add(sword);
+  return { g, parts: { armL, armR, legL, legR }, mats: { skin, robe, trim, hair: hairMat }, sword };
+}
+
+function paintFigure(mats, look) {
+  mats.skin.color.setHex(Character.color("skin", look.skin));
+  mats.hair.color.setHex(Character.color("hair", look.hair));
+  mats.robe.color.setHex(Character.color("toga", look.toga));
+  mats.trim.color.setHex(Character.color("sash", look.sash));
+}
+
+let avFig = null;
+function buildAvatar() {
+  avFig = createFigure();
+  avFig.g.visible = false;
+  scene.add(avFig.g);
+  avatar = avFig.g; avParts = avFig.parts; avMats = avFig.mats;
 }
 
 function updateAvatar(dt) {
-  avatar.visible = (viewId() !== "first" || creatorOpen) && mode === "walk";
+  avatar.visible = ((viewId() !== "first" || creatorOpen) && mode === "walk") || mode === "online";
   if (!avatar.visible) return;
   avatar.position.set(player.x, player.feet + player.airY, player.z);
   avatar.rotation.y = player.yaw;
@@ -567,6 +596,7 @@ function updateAvatar(dt) {
   const swing = pace > 0.3 ? Math.sin(avPhase) * Math.min(1, pace / 8.5) * 0.7 : 0;
   avParts.armL.rotation.x = swing; avParts.armR.rotation.x = -swing;
   avParts.legL.rotation.x = -swing; avParts.legR.rotation.x = swing;
+  if (mode === "online") Online.poseMine(avParts);
 }
 
 function refreshViewButton() { $("#btn-view").innerHTML = `View: ${VIEWS[viewIndex].name} <kbd>C</kbd>`; }
@@ -581,7 +611,7 @@ function cycleView(dir) {
 
 // The chase cameras: put the camera at an offset from you (pulled in when a wall is in the way) and look toward you.
 function chaseCamera() {
-  let id = creatorOpen ? "front" : viewId();
+  let id = creatorOpen ? "front" : (mode === "online" && viewId() === "first" ? "close" : viewId());
   if (id === "top" && Home.inside(player.x, player.z)) id = "close"; // the roof would hide you
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx; // forward and right
   const z = creatorOpen ? (innerWidth > 700 ? 0.62 : 1.5) : camZoom; // narrow screens: pull back so the whole figure fits above the panel
@@ -613,33 +643,59 @@ function buildPremium() {
   }
   for (const name of Character.PREMIUM_FEATURES) {
     const li = document.createElement("li"), badge = document.createElement("span");
-    badge.className = "soon"; badge.textContent = "Coming soon";
+    badge.className = "soon"; badge.textContent = Online.available ? "Included" : "Coming soon";
     li.append(document.createTextNode(name), badge);
     $("#pr-items").append(li);
   }
-  const shop = Character.SHOP, live = /^https:\/\//.test(shop.checkoutUrl);
-  $("#pr-price").textContent = shop.price ? `Price: ${shop.price}` : "";
-  $("#pr-buy").disabled = !live;
-  $("#pr-buy").textContent = live ? "Get Premium" : "Not on sale yet";
-  $("#pr-status").textContent = live ? "You will be taken to a secure payment page." : "Payments are not switched on yet. When they are, this button takes you to a secure checkout, and your premium colours unlock once the payment is confirmed.";
-  $("#pr-buy").addEventListener("click", () => { if (live) window.open(shop.checkoutUrl, "_blank", "noopener"); });
+  $("#pr-price").textContent = Character.SHOP.price ? `Price: ${Character.SHOP.price}` : "";
+  $("#pr-buy").addEventListener("click", () => {
+    const shop = Character.SHOP;
+    if (!/^https:\/\//.test(shop.checkoutUrl) || Account.premium) return;
+    if (!Account.loggedIn) { closePremium(); Account.open(); return; }
+    const u = new URL(shop.checkoutUrl); // the payment is tagged with your account, so the server knows who paid
+    u.searchParams.set("client_reference_id", Account.userId);
+    if (Account.email) u.searchParams.set("prefilled_email", Account.email);
+    window.open(u.toString(), "_blank", "noopener");
+    watchPremium();
+  });
+  Account.onChange(() => { renderPremium(); refreshLocks(); });
+  renderPremium();
   $("#premium-close").addEventListener("click", closePremium);
   $("#premium").addEventListener("click", (e) => { if (e.target.id === "premium") closePremium(); });
   $("#cr-premium").addEventListener("click", openPremium);
   $("#btn-premium").addEventListener("click", () => { if (mode === "walk" && !panelOpen && canStart()) openPremium(); else toast("Close what is open and stop the game first"); });
 }
-function openPremium() { premiumOpen = true; panelOpen = true; $("#premium").classList.add("show"); }
+function renderPremium() {
+  const shop = Character.SHOP, live = /^https:\/\//.test(shop.checkoutUrl), btn = $("#pr-buy"), st = $("#pr-status");
+  if (Account.premium) { btn.disabled = true; btn.textContent = "You have Premium ★"; st.textContent = "Thank you! Your premium colours are unlocked and you can play real people."; return; }
+  if (!live) { btn.disabled = true; btn.textContent = "Not on sale yet"; st.textContent = "Payments are not switched on yet. When they are, this button takes you to a secure checkout, and Premium unlocks once the payment is confirmed."; return; }
+  btn.disabled = false;
+  if (!Account.loggedIn) { btn.textContent = "Log in to get Premium"; st.textContent = "Premium belongs to your account, so log in (or create an account) first."; }
+  else { btn.textContent = "Get Premium"; st.textContent = "You will be taken to a secure payment page. Premium unlocks here once the payment is confirmed, usually within a minute."; }
+}
+
+// After sending you to pay, keep checking for a few minutes so Premium appears as soon as the payment is confirmed.
+function watchPremium() {
+  let n = 0;
+  const iv = setInterval(async () => { if (Account.premium || ++n > 60) { clearInterval(iv); return; } await Account.loadPremium(); }, 5000);
+}
+
+function refreshLocks() {
+  for (const s of document.querySelectorAll(".swatch")) {
+    const locked = !Character.owns(s.dataset.part, Number(s.dataset.i));
+    s.classList.toggle("premium", locked);
+    s.title = locked ? "Premium cosmetic" : "";
+  }
+}
+
+function openPremium() { premiumOpen = true; panelOpen = true; renderPremium(); $("#premium").classList.add("show"); if (Account.loggedIn) Account.loadPremium(); }
 function closePremium() { premiumOpen = false; panelOpen = creatorOpen; $("#premium").classList.remove("show"); }
 
 
 let creatorOpen = false, draft = null;
 
 function applyLook(look) {
-  if (!avMats) return;
-  avMats.skin.color.setHex(Character.color("skin", look.skin));
-  avMats.hair.color.setHex(Character.color("hair", look.hair));
-  avMats.robe.color.setHex(Character.color("toga", look.toga));
-  avMats.trim.color.setHex(Character.color("sash", look.sash));
+  if (avMats) paintFigure(avMats, look);
 }
 
 function applyCharacter() {
@@ -794,6 +850,8 @@ function toast(msg) {
 
 const bigMapOpen = () => $("#bigmap").classList.contains("show");
 function closePanels() {
+  $("#account").classList.remove("show");
+  $("#online").classList.remove("show");
   if (premiumOpen) { closePremium(); return; }
   if (creatorOpen) { if (!Character.exists) return; closeCreator(); } // the first-time screen cannot be skipped
   $("#bigmap").classList.remove("show");
@@ -803,7 +861,7 @@ function closePanels() {
   panelOpen = false;
 }
 function openPanel(id) {
-  if (mode === "fight" || mode === "race" || mode === "naval") return;
+  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online") return;
   if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
@@ -1233,6 +1291,7 @@ function tick(dt) {
   if (mode === "fight") Fight.update(dt, keys);
   else if (mode === "race") Race.update(dt, keys);
   else if (mode === "naval") Naval.update(dt, keys);
+  else if (mode === "online") Online.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (started && !panelOpen) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
@@ -1241,11 +1300,12 @@ function tick(dt) {
 
   if (mode !== prevMode) { if (mode === "walk") startLockUntil = performance.now() + 700; prevMode = mode; }
   document.body.classList.toggle("playing", mode !== "walk");
+  document.body.classList.toggle("dueling", mode === "online");
   if (mode === "race") Race.camera(camera, dt);
   else if (mode === "naval") Naval.camera(camera, dt);
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {
-    if (mode === "walk" && (viewId() !== "first" || creatorOpen)) chaseCamera();
+    if ((mode === "walk" && (viewId() !== "first" || creatorOpen)) || mode === "online") chaseCamera();
     else {
       camera.position.set(player.x, player.y, player.z);
       camera.rotation.set(player.pitch, player.yaw, 0);

@@ -73,6 +73,10 @@ Then visit http://localhost:8123. Because it is static, it also works on GitHub 
 | `audio.js` | Positional ambience, footsteps and sound effects |
 | `city.js` | Ground, sky, apartment blocks, trees and citizens |
 | `landmarks.js` | Landmark text, positions and teleport spots. Edit this to change the content |
+| `server/` | The game server for live duels and races against real people (Python, nothing to install), its 15 tests, a fake Supabase for testing, and a deployment guide (`server/README.md`) |
+| `config.js` | The settings you change to go online: Supabase, game server address, Stripe payment link |
+| `account.js`, `online.js` | Sign-up, login and cloud saving; the lobby and live duels and races |
+| `terms.html`, `privacy.html` | Drafts of the Terms of Use and Privacy Policy (add your contact email; have them reviewed) |
 | `supabase.sql` | Database setup for accounts and saving (run once in Supabase). Players can read and change only their own save; only the server can grant premium |
 | `modern.js` | Modern Rome only: asphalt streets, parked cars, street lamps and window grids on the apartment blocks |
 | `character.js` | Your character: name, class, look and the class bonuses. All saving and checking goes through here, ready to be replaced by a server account |
@@ -97,6 +101,10 @@ The game is a static site: no server code, no accounts, no database and no netwo
 
 **Keep your accounts safe:** turn on two-factor authentication on GitHub and on the host, use a GitHub token limited to this one repo with a short expiry, and revoke tokens you no longer use.
 
-## Roadmap: paid extras and playing real people
+## Accounts, Premium and playing real people
+
+Built and tested: accounts (sign up, login, your game saved online), Premium (bought through a Stripe Payment Link, unlocked by the server when the payment is confirmed), and live duels and races against real people judged by the game server, with practice bots when nobody is around. Everything stays switched off until you fill in `config.js` and run the server: see `server/README.md` for the step-by-step.
+
+Old notes:
 
 Step 1 (done): character creator and classes, saved in the browser. Next steps need a server: accounts and saved characters (e.g. Supabase or Firebase), payments for cosmetics (e.g. Stripe), then races against other players' recorded runs, then live duels and races on a game server that decides the result. Class bonuses and owned cosmetics must be checked on the server before any player-versus-player mode, because anything stored only in the browser can be edited by the player.
