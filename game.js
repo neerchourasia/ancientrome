@@ -578,7 +578,23 @@ function createFigure() {
   const cuirass = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.35, 0.5, 10), metal(0xcfa84a));
   cuirass.position.y = 1.12;
   const bands = [armL, armR].map((arm) => { const b = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.022, 6, 12), metal(0xd9b44a)); b.rotation.x = Math.PI / 2; b.position.y = -0.12; arm.add(b); return b; }); // on the upper arms, so they swing with them
-  acc.wreath = [wreath]; acc.helmet = [helmet]; acc.cloak = [cloak, clasp]; acc.cuirass = [cuirass]; acc.armbands = bands;
+  const crown = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 14, 1, true), metal(0xe0b83c));
+  ring.position.y = 1.7; crown.add(ring);
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.14, 4), metal(0xe0b83c)); tip.position.set(Math.cos(a) * 0.2, 1.81, Math.sin(a) * 0.2); crown.add(tip); }
+  const royalcloak = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.15, 0.04), new THREE.MeshLambertMaterial({ color: 0x6a1b5e, side: THREE.DoubleSide }));
+  royalcloak.position.set(0, 0.95, 0.25); royalcloak.rotation.x = 0.12;
+  const trim2 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.05), metal(0xe0b83c));
+  trim2.position.set(0, 0.4, 0.27);
+  const boots = [legL, legR].map((leg) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.1, 0.22, 8), new THREE.MeshLambertMaterial({ color: 0x4a3322 })); b.position.y = -0.5; leg.add(b); return b; });
+  const shield = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 16), new THREE.MeshLambertMaterial({ color: 0xa8342c }));
+  disc.rotation.z = Math.PI / 2;
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), metal(0xb08a3a));
+  boss.position.x = -0.04;
+  shield.add(disc, boss); shield.position.set(-0.08, -0.3, -0.12); armL.add(shield);
+  acc.wreath = [wreath]; acc.helmet = [helmet]; acc.crown = [crown]; acc.cloak = [cloak, clasp]; acc.royalcloak = [royalcloak, trim2];
+  acc.cuirass = [cuirass]; acc.armbands = bands; acc.boots = boots; acc.shield = [shield];
   for (const list of Object.values(acc)) for (const o of list) { o.visible = false; if (!o.parent) g.add(o); }
 
   // a short sword in the right hand (shown in duels)
@@ -1354,6 +1370,7 @@ function tick(dt) {
   sky.follow(camera.position);
   updateCitizens(dt, clock);
   updateAvatar(dt);
+  Pets.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

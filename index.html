@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=87">
+  <link rel="stylesheet" href="walk.css?v=88">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=87"></script>
+  <script src="boot.js?v=88"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -199,8 +199,7 @@
         <p id="mk-house-next" class="mk-next"></p>
         <button id="mk-house-buy" type="button">Buy</button>
       </div>
-      <h3>Things to wear</h3>
-      <ul id="mk-items"></ul>
+      <div id="mk-sections"></div>
     </div>
   </div>
 
@@ -256,7 +255,7 @@
         <tr><th>Jump</th><td><kbd>Space</kbd></td></tr>
         <tr><th>Look around</th><td>Drag the mouse</td></tr>
         <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
-        <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear</td></tr>
+        <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear, a hound or eagle companion, house decorations, healing supplies and training</td></tr>
         <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
         <tr><th>Ancient / Modern Rome</th><td><kbd>K</kbd> switches the whole city between 128 AD and today: the Colosseum and Forum weather into ruins, the Circus Maximus becomes a park, apartment blocks and citizens turn modern, and the Colossus (long gone) disappears. Only works while walking, not mid-game</td></tr>
         <tr><th>Touch (phone/tablet)</th><td>A joystick (bottom-left) moves, dragging anywhere else looks around. Jump/Run buttons appear while walking; fights, races and naval battles get their own on-screen buttons</td></tr>
@@ -298,27 +297,28 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=87"></script>
-  <script src="config.js?v=87"></script>
-  <script src="character.js?v=87"></script>
-  <script src="physics.js?v=87"></script>
-  <script src="vitals.js?v=87"></script>
-  <script src="narrator.js?v=87"></script>
-  <script src="audio.js?v=87"></script>
-  <script src="world.js?v=87"></script>
-  <script src="city.js?v=87"></script>
-  <script src="modern.js?v=87"></script>
-  <script src="home.js?v=87"></script>
-  <script src="spectators.js?v=87"></script>
-  <script src="fight.js?v=87"></script>
-  <script src="nav.js?v=87"></script>
-  <script src="show.js?v=87"></script>
-  <script src="naval.js?v=87"></script>
-  <script src="watch.js?v=87"></script>
-  <script src="race.js?v=87"></script>
-  <script src="account.js?v=87"></script>
-  <script src="online.js?v=87"></script>
-  <script src="market.js?v=87"></script>
-  <script src="game.js?v=87"></script>
+  <script src="landmarks.js?v=88"></script>
+  <script src="config.js?v=88"></script>
+  <script src="character.js?v=88"></script>
+  <script src="physics.js?v=88"></script>
+  <script src="vitals.js?v=88"></script>
+  <script src="narrator.js?v=88"></script>
+  <script src="audio.js?v=88"></script>
+  <script src="world.js?v=88"></script>
+  <script src="city.js?v=88"></script>
+  <script src="modern.js?v=88"></script>
+  <script src="home.js?v=88"></script>
+  <script src="spectators.js?v=88"></script>
+  <script src="fight.js?v=88"></script>
+  <script src="nav.js?v=88"></script>
+  <script src="show.js?v=88"></script>
+  <script src="naval.js?v=88"></script>
+  <script src="watch.js?v=88"></script>
+  <script src="race.js?v=88"></script>
+  <script src="account.js?v=88"></script>
+  <script src="online.js?v=88"></script>
+  <script src="pets.js?v=88"></script>
+  <script src="market.js?v=88"></script>
+  <script src="game.js?v=88"></script>
 </body>
 </html>

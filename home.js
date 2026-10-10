@@ -51,7 +51,8 @@ const Time = (() => {
 // Your house (a small domus): a room with a bed, a table and a lamp, just south of the Via Sacra beside the Colosseum road.
 const Home = (() => {
   const X = 255, Z = 50, W = 12, D = 10; // centre and size, in metres
-  let glass = null, lamp = null, lit = false;
+  let glass = null, lamp = null, lit = false, floorMat = null, floorMap = null, mosaicTex = null;
+  const banners = [];
 
   const inside = (x, z) => Math.abs(x - X) < W / 2 - 0.4 && Math.abs(z - Z) < D / 2 - 0.4;
 
@@ -61,7 +62,8 @@ const Home = (() => {
     const H = 4, t = 0.5;
 
     // floor, walls with a doorway, lintel, roof
-    F.box(0, 0, 0, W, 0.15, D, lambert(0xb9a17c, { map: stoneTex("#ffffff") }), { walk: true, map: "#c9a878" });
+    const floor = F.box(0, 0, 0, W, 0.15, D, lambert(0xb9a17c, { map: stoneTex("#ffffff") }), { walk: true, map: "#c9a878" });
+    floorMat = floor.material; floorMap = floorMat.map;
     F.box(-W / 2 + t / 2, 0, 0, t, H, D, wall, { solid: true });
     F.box(W / 2 - t / 2, 0, 0, t, H, D, wall, { solid: true });
     F.box(0, 0, -D / 2 + t / 2, W, H, t, wall, { solid: true });
@@ -106,6 +108,41 @@ const Home = (() => {
     lamp.position.set(lx, F.y + 3, lz);
     worldScene.add(lamp);
     buildExtensions();
+
+    // door banners, bought in the Market (hidden until then)
+    const cloth = lambert(0xa8342c, { side: T.DoubleSide }), trimGold = lambert(0xd9b44a, { emissive: 0x3d2f05 });
+    for (const bx of [252.9, 257.1]) {
+      const b = shadowed(new T.Mesh(BOX, cloth)); b.scale.set(0.8, 2.4, 0.06); b.position.set(bx, 2.0, 44.88);
+      const bar = shadowed(new T.Mesh(BOX, trimGold)); bar.scale.set(0.95, 0.1, 0.1); bar.position.set(bx, 3.25, 44.86);
+      const tas = shadowed(new T.Mesh(BOX, trimGold)); tas.scale.set(0.12, 0.3, 0.06); tas.position.set(bx, 0.7, 44.88);
+      for (const m of [b, bar, tas]) { m.visible = false; worldScene.add(m); banners.push(m); }
+    }
+  }
+
+  // Market decorations: the banners outside, a mosaic floor inside
+  function setDecor(d) {
+    for (const m of banners) m.visible = !!d.banners;
+    if (floorMat) {
+      if (d.mosaic && !mosaicTex) mosaicTex = makeMosaic();
+      floorMat.map = d.mosaic ? mosaicTex : floorMap;
+      floorMat.needsUpdate = true;
+    }
+  }
+
+  function makeMosaic() {
+    const c = document.createElement("canvas");
+    c.width = 240; c.height = 200;
+    const g = c.getContext("2d");
+    g.fillStyle = "#efe2c0"; g.fillRect(0, 0, 240, 200);
+    for (let x = 0; x < 240; x += 10) for (let y = 0; y < 200; y += 10) { g.fillStyle = (x / 10 + y / 10) % 2 ? "rgba(120,90,50,.07)" : "rgba(255,255,255,.1)"; g.fillRect(x, y, 10, 10); }
+    for (const [inset, col] of [[6, "#2f5d8a"], [18, "#a8342c"], [30, "#2f5d8a"]]) { g.strokeStyle = col; g.lineWidth = 6; g.strokeRect(inset, inset, 240 - inset * 2, 200 - inset * 2); }
+    g.translate(120, 100);
+    for (let i = 0; i < 12; i++) { g.rotate(Math.PI / 6); g.fillStyle = i % 2 ? "#a8342c" : "#d9b44a"; g.beginPath(); g.moveTo(0, 0); g.lineTo(8, -38); g.lineTo(-8, -38); g.closePath(); g.fill(); }
+    g.fillStyle = "#2f5d8a"; g.beginPath(); g.arc(0, 0, 14, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#efe2c0"; g.beginPath(); g.arc(0, 0, 7, 0, Math.PI * 2); g.fill();
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 4;
+    return t;
   }
 
   // ---- house upgrades, bought in the Market: each tier is built hidden (its collision switched off) and appears when you own it
@@ -187,5 +224,5 @@ const Home = (() => {
     lamp.intensity = 0.25 + night * 1.0;
   }
 
-  return { X, Z, W, D, inside, build, update, setTier, restBoost, get tier() { return tier; } };
+  return { X, Z, W, D, inside, build, update, setTier, setDecor, restBoost, get tier() { return tier; } };
 })();

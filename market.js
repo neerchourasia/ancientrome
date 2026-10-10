@@ -1,7 +1,7 @@
 "use strict";
-// The Market: spend your denarii on a better house and on things to wear. What you own is saved in the browser
-// (and with your account's cloud save). Denarii are a game currency earned in fights and races, not real money.
-// Depends on game.js, home.js and vitals.js at run time.
+// The Market: spend your denarii on a better house, things to wear, a companion, decorations, supplies and training.
+// What you own is saved in the browser (and with your account's cloud save). Denarii are a game currency earned in
+// fights and races, not real money. Depends on game.js, home.js, pets.js and vitals.js at run time.
 
 const Market = (() => {
   const KEY = "rome-owned";
@@ -14,14 +14,31 @@ const Market = (() => {
     { name: "Villa with a tower", price: 1000, rest: 3, rent: 40, perk: "A tower, a pool behind the house and a gilded pavilion. Resting heals 3 times faster, and rent is 40 denarii each morning." },
   ];
 
-  // slot: only one thing per slot is worn at a time
+  // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
+  // supply (used up at once) or perk (a permanent bonus in single-player games).
   const ITEMS = {
-    wreath: { name: "Laurel wreath", price: 60, slot: "head", note: "The crown of a victor." },
-    helmet: { name: "Crested helmet", price: 120, slot: "head", note: "Bronze, with a crimson crest." },
-    cloak: { name: "Crimson cloak", price: 90, slot: "back", note: "A cloak fastened with a gold clasp." },
-    cuirass: { name: "Gilded breastplate", price: 180, slot: "body", note: "Armour fit for a champion." },
-    armbands: { name: "Gold armbands", price: 70, slot: "arms", note: "Worn by gladiators who have won their freedom." },
+    wreath: { type: "wear", slot: "head", name: "Laurel wreath", price: 60, note: "The crown of a victor." },
+    helmet: { type: "wear", slot: "head", name: "Crested helmet", price: 120, note: "Bronze, with a crimson crest." },
+    crown: { type: "wear", slot: "head", name: "Golden crown", price: 250, note: "Fit for an emperor." },
+    cloak: { type: "wear", slot: "back", name: "Crimson cloak", price: 90, note: "Fastened with a gold clasp." },
+    royalcloak: { type: "wear", slot: "back", name: "Royal purple cloak", price: 140, note: "Tyrian purple: once only emperors could wear it." },
+    cuirass: { type: "wear", slot: "body", name: "Gilded breastplate", price: 180, note: "Armour fit for a champion." },
+    armbands: { type: "wear", slot: "arms", name: "Gold armbands", price: 70, note: "Worn by gladiators who have won their freedom." },
+    boots: { type: "wear", slot: "feet", name: "Hobnailed boots", price: 50, note: "Legionary boots, built for long marches." },
+    shield: { type: "wear", slot: "hand", name: "Round shield", price: 110, note: "Painted red, with a bronze boss." },
+    hound: { type: "pet", slot: "pet", name: "Hound", price: 150, note: "A loyal dog that trots along behind you." },
+    eagle: { type: "pet", slot: "pet", name: "Eagle", price: 220, note: "The eagle of Rome, circling above you." },
+    banners: { type: "decor", name: "Door banners", price: 60, note: "Two crimson banners either side of your front door." },
+    mosaic: { type: "decor", name: "Mosaic floor", price: 90, note: "A patterned floor of coloured tiles inside your house." },
+    salve: { type: "supply", name: "Healing salve", price: 40, note: "Heals 40 health at once." },
+    fodder: { type: "supply", name: "Fodder for the horses", price: 40, note: "Restores 40 points of your horses' fitness at once." },
+    horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
+    training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
+  const SECTIONS = [
+    ["Things to wear", "wear"], ["Companions", "pet"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+  ];
+  const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
   let s = { house: 0, items: [], worn: [] };
   try {
@@ -34,10 +51,10 @@ const Market = (() => {
     const out = { house: 0, items: [], worn: [] };
     if (raw && Number.isInteger(raw.house) && raw.house >= 0 && raw.house < HOUSES.length) out.house = raw.house;
     const items = Array.isArray(raw && raw.items) ? raw.items : [], worn = Array.isArray(raw && raw.worn) ? raw.worn : [];
-    out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id)))];
+    out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply"))];
     const slots = new Set();
     for (const id of worn) {
-      if (typeof id !== "string" || !out.items.includes(id) || slots.has(ITEMS[id].slot)) continue;
+      if (typeof id !== "string" || !out.items.includes(id) || !ITEMS[id].slot || slots.has(ITEMS[id].slot)) continue;
       slots.add(ITEMS[id].slot); out.worn.push(id);
     }
     return out;
@@ -46,10 +63,12 @@ const Market = (() => {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } };
   const $m = (id) => document.getElementById(id);
 
-  // Put what you own on show: the house, and the accessories on your character.
+  // Put what you own on show: the house, what is in it, what you wear and who follows you.
   function applyAll() {
     Home.setTier(s.house);
-    if (avFig) applyAccessories(avFig, s.worn);
+    Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic") });
+    if (avFig) applyAccessories(avFig, s.worn.filter((id) => ITEMS[id].type === "wear"));
+    Pets.set(s.worn.find((id) => ITEMS[id].type === "pet"));
     render();
   }
 
@@ -65,19 +84,28 @@ const Market = (() => {
 
   function buyItem(id) {
     const it = ITEMS[id];
-    if (!it || s.items.includes(id)) return;
+    if (!it || (it.type !== "supply" && s.items.includes(id))) return;
     if (Vitals.coins < it.price) { toast(`The ${it.name.toLowerCase()} costs ${it.price} denarii (you have ${Vitals.coins}).`); return; }
+    if (it.type === "supply") {
+      if (id === "salve" ? Vitals.hp >= 99 : Vitals.horses >= 99) { toast(id === "salve" ? "You are already in good health." : "Your horses are already fit."); return; }
+      Vitals.coins -= it.price;
+      if (id === "salve") Vitals.hp = Vitals.hp + 40; else Vitals.horses = Vitals.horses + 40;
+      Sfx.play("coin"); render();
+      toast(id === "salve" ? `The salve heals you. Health ${Math.round(Vitals.hp)}/100.` : `Your horses feel stronger. Fitness ${Math.round(Vitals.horses)}/100.`);
+      return;
+    }
     Vitals.coins -= it.price;
     s.items.push(id); save(); Sfx.play("coin");
-    wear(id);
-    toast(`You bought the ${it.name.toLowerCase()} and put it on.`);
+    if (it.slot) wear(id); else applyAll();
+    toast(it.type === "perk" ? `${it.name}: yours for good.` : it.type === "decor" ? `You decorated your house with the ${it.name.toLowerCase()}.` : `You bought the ${it.name.toLowerCase()} and took it with you.`);
   }
 
+  // Wear (or take off) something, or bring a companion along (or send it home)
   function wear(id) {
     const it = ITEMS[id];
-    if (!it || !s.items.includes(id)) return;
+    if (!it || !it.slot || !s.items.includes(id)) return;
     if (s.worn.includes(id)) s.worn = s.worn.filter((w) => w !== id);
-    else s.worn = [...s.worn.filter((w) => ITEMS[w].slot !== it.slot), id]; // replaces what you wore in that slot
+    else s.worn = [...s.worn.filter((w) => ITEMS[w].slot !== it.slot), id]; // replaces what you had in that slot
     save(); applyAll();
   }
 
@@ -95,17 +123,24 @@ const Market = (() => {
       $m("mk-house-buy").textContent = `Buy for ${next.price} denarii`;
       $m("mk-house-buy").disabled = Vitals.coins < next.price;
     } else $m("mk-house-perk").textContent += " It is the finest house in Rome.";
-    const list = $m("mk-items");
-    list.replaceChildren(...Object.entries(ITEMS).map(([id, it]) => {
-      const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
-      const name = document.createElement("strong"), note = document.createElement("small");
-      name.textContent = it.name; note.textContent = it.note;
-      txt.append(name, note);
-      b.type = "button";
-      if (!s.items.includes(id)) { b.textContent = `Buy · ${it.price}`; b.disabled = Vitals.coins < it.price; b.addEventListener("click", () => buyItem(id)); }
-      else { b.textContent = s.worn.includes(id) ? "Take off" : "Wear"; b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
-      li.append(txt, b);
-      return li;
+
+    $m("mk-sections").replaceChildren(...SECTIONS.flatMap(([title, type]) => {
+      const h = document.createElement("h3"), ul = document.createElement("ul");
+      h.textContent = title; ul.className = "mk-items";
+      for (const [id, it] of Object.entries(ITEMS).filter(([, x]) => x.type === type)) {
+        const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
+        const name = document.createElement("strong"), note = document.createElement("small");
+        name.textContent = it.name; note.textContent = it.note;
+        txt.append(name, note);
+        b.type = "button";
+        const owned = s.items.includes(id);
+        if (it.type === "supply" || !owned) { b.textContent = `Buy · ${it.price}`; b.disabled = Vitals.coins < it.price; b.addEventListener("click", () => buyItem(id)); }
+        else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
+        else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
+        li.append(txt, b);
+        ul.append(li);
+      }
+      return [h, ul];
     }));
   }
 
@@ -126,7 +161,10 @@ const Market = (() => {
   return {
     bind, open, render, ITEMS,
     get house() { return s.house; },
-    get worn() { return s.worn.slice(); },
+    get worn() { return s.worn.filter((id) => ITEMS[id].type === "wear"); }, // what other players can see
+    get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },
+    owns: (id) => s.items.includes(id),
+    perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),
     rent: () => HOUSES[s.house].rent,
     houseName: () => HOUSES[s.house].name,
     snapshot: () => ({ house: s.house, items: s.items.slice(), worn: s.worn.slice() }),

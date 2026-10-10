@@ -70,7 +70,7 @@ CLASS_MODS = {  # only what a duel needs
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 PREMIUM_LOOK = {"toga": (5, 6), "sash": (5,)}
-ACCESSORIES = ("wreath", "helmet", "cloak", "cuirass", "armbands")   # bought in the Market; cosmetic only
+ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped

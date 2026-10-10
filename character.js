@@ -85,7 +85,7 @@ const Character = (() => {
     get className() { return CLASSES[s.cls].name; },
     get look() { return s.look; },
     color: (part, i) => COLORS[part][validIndex(part, i) ? i : 0],
-    mod: (key) => { const m = CLASSES[s.cls].mods[key]; return m === undefined ? 1 : m; },
+    mod: (key) => { const m = CLASSES[s.cls].mods[key]; return (m === undefined ? 1 : m) * (typeof Market !== "undefined" ? Market.perk(key) : 1); }, // class bonus x anything bought in the Market
     setPremium(v) { premiumOwned = !!v; try { localStorage.setItem("rome-premium", v ? "1" : "0"); } catch (e) { /* ignore */ } },
     set(next) {
       s = sanitize(next);

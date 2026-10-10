@@ -379,11 +379,11 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .mk-card { padding: 10px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); border-radius: 10px; }
 .mk-card p { margin: 4px 0; font-size: .88rem; }
 .mk-card .mk-next { color: var(--muted); }
-.mk-card button, #mk-items button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); white-space: nowrap; }
+.mk-card button, .mk-items button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); white-space: nowrap; }
 .mk-card button { width: 100%; margin-top: 6px; }
-.mk-card button:disabled, #mk-items button:disabled { opacity: .45; cursor: not-allowed; }
-#mk-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-#mk-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
-#mk-items li span { display: flex; flex-direction: column; }
-#mk-items small { color: var(--muted); }
-#mk-items button.on { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.4); }
+.mk-card button:disabled, .mk-items button:disabled { opacity: .45; cursor: not-allowed; }
+.mk-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mk-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
+.mk-items li span { display: flex; flex-direction: column; }
+.mk-items small { color: var(--muted); }
+.mk-items button.on { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.4); }
