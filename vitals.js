@@ -35,7 +35,7 @@ const Vitals = (() => {
         const rest = resting && ctx.mode === "walk";
         // You always recover a little while you are not in a game; resting is about four times faster.
         // From 20 health: about 55 s resting, or about 3.5 minutes just walking around. Horses are slower: about 90 s from 30 to full resting at the stables, and many minutes on their own.
-        s.hp = clamp(s.hp + (rest ? 1.45 : 0.38) * dt);
+        s.hp = clamp(s.hp + (rest ? 1.45 * (ctx.restBoost || 1) : 0.38) * dt); // a better house heals you faster
         s.horses = clamp(s.horses + (rest && ctx.atStables ? 0.8 : 0.06) * dt);
         if (rest && s.hp >= 99.5 && (!ctx.atStables || s.horses >= 99.5)) { resting = false; return "refreshed"; }
       }

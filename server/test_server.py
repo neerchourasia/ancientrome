@@ -143,9 +143,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         a = await self.player(name="<script>alert(1)</script>Bob", cls="god-mode", look={"toga": 99, "skin": -3, "sash": "x"})
         self.assertFalse(a.welcome["premium"])
         self.assertEqual(server.clean_name("<b>Mara</b>"), "bMarab")
-        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}, True), {"skin": 0, "hair": 2, "toga": 0, "sash": 0})
+        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}, True), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": []})
+        self.assertEqual(server.clean_look({"acc": ["cloak", "cloak", "<script>", 7, "helmet"]}, False)["acc"], ["cloak", "helmet"])
         # premium colours are only for premium players
-        self.assertEqual(server.clean_look({"toga": 5, "sash": 5}, False), {"skin": 0, "hair": 0, "toga": 0, "sash": 0})
+        self.assertEqual(server.clean_look({"toga": 5, "sash": 5}, False), {"skin": 0, "hair": 0, "toga": 0, "sash": 0, "acc": []})
         self.assertEqual(server.clean_look({"toga": 5, "sash": 5}, True)["toga"], 5)
 
     async def test_must_say_hello_first(self):

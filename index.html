@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=84">
+  <link rel="stylesheet" href="walk.css?v=87">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=84"></script>
+  <script src="boot.js?v=87"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -45,6 +45,7 @@
         <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
         <button id="btn-time" type="button">Time <kbd>T</kbd></button>
         <button id="btn-char" type="button">Character <kbd>Y</kbd></button>
+        <button id="btn-market" type="button">🛒 Market</button>
         <button id="btn-premium" type="button">★ Premium</button>
         <button id="btn-online" type="button">🌐 Play online</button>
         <button id="btn-account" type="button">Log in</button>
@@ -187,6 +188,22 @@
     <div class="cr-actions"><button id="cr-ok" type="button">Begin</button><button id="cr-cancel" type="button">Cancel</button></div>
 </aside>
 
+  <div id="market" role="dialog" aria-label="Market">
+    <div class="box">
+      <header><h2>The Market</h2><button id="market-close" type="button" aria-label="Close">×</button></header>
+      <p class="mk-purse">Your purse: <b id="mk-coins">0</b> denarii. Win fights and races to earn more.</p>
+      <h3>Your house</h3>
+      <div class="mk-card">
+        <strong id="mk-house-name"></strong>
+        <p id="mk-house-perk"></p>
+        <p id="mk-house-next" class="mk-next"></p>
+        <button id="mk-house-buy" type="button">Buy</button>
+      </div>
+      <h3>Things to wear</h3>
+      <ul id="mk-items"></ul>
+    </div>
+  </div>
+
   <div id="account" role="dialog" aria-label="Account">
     <div class="box">
       <header><h2>Your account</h2><button id="account-close" type="button" aria-label="Close">×</button></header>
@@ -239,6 +256,7 @@
         <tr><th>Jump</th><td><kbd>Space</kbd></td></tr>
         <tr><th>Look around</th><td>Drag the mouse</td></tr>
         <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
+        <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear</td></tr>
         <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
         <tr><th>Ancient / Modern Rome</th><td><kbd>K</kbd> switches the whole city between 128 AD and today: the Colosseum and Forum weather into ruins, the Circus Maximus becomes a park, apartment blocks and citizens turn modern, and the Colossus (long gone) disappears. Only works while walking, not mid-game</td></tr>
         <tr><th>Touch (phone/tablet)</th><td>A joystick (bottom-left) moves, dragging anywhere else looks around. Jump/Run buttons appear while walking; fights, races and naval battles get their own on-screen buttons</td></tr>
@@ -280,26 +298,27 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=84"></script>
-  <script src="config.js?v=84"></script>
-  <script src="character.js?v=84"></script>
-  <script src="physics.js?v=84"></script>
-  <script src="vitals.js?v=84"></script>
-  <script src="narrator.js?v=84"></script>
-  <script src="audio.js?v=84"></script>
-  <script src="world.js?v=84"></script>
-  <script src="city.js?v=84"></script>
-  <script src="modern.js?v=84"></script>
-  <script src="home.js?v=84"></script>
-  <script src="spectators.js?v=84"></script>
-  <script src="fight.js?v=84"></script>
-  <script src="nav.js?v=84"></script>
-  <script src="show.js?v=84"></script>
-  <script src="naval.js?v=84"></script>
-  <script src="watch.js?v=84"></script>
-  <script src="race.js?v=84"></script>
-  <script src="account.js?v=84"></script>
-  <script src="online.js?v=84"></script>
-  <script src="game.js?v=84"></script>
+  <script src="landmarks.js?v=87"></script>
+  <script src="config.js?v=87"></script>
+  <script src="character.js?v=87"></script>
+  <script src="physics.js?v=87"></script>
+  <script src="vitals.js?v=87"></script>
+  <script src="narrator.js?v=87"></script>
+  <script src="audio.js?v=87"></script>
+  <script src="world.js?v=87"></script>
+  <script src="city.js?v=87"></script>
+  <script src="modern.js?v=87"></script>
+  <script src="home.js?v=87"></script>
+  <script src="spectators.js?v=87"></script>
+  <script src="fight.js?v=87"></script>
+  <script src="nav.js?v=87"></script>
+  <script src="show.js?v=87"></script>
+  <script src="naval.js?v=87"></script>
+  <script src="watch.js?v=87"></script>
+  <script src="race.js?v=87"></script>
+  <script src="account.js?v=87"></script>
+  <script src="online.js?v=87"></script>
+  <script src="market.js?v=87"></script>
+  <script src="game.js?v=87"></script>
 </body>
 </html>

@@ -364,3 +364,26 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 .od-keys { margin: 8px 0 0; font-size: .8rem; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
 @media (max-width: 700px) { body.touch .od-bottom { bottom: 150px; } }
 body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left { display: none !important; }
+
+/* ---------- market ---------- */
+#market { position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.7); }
+#market.show { display: flex; }
+#market .box { width: min(460px, 100%); max-height: 92vh; overflow-y: auto; background: rgba(28,22,16,.97); border: 1px solid rgba(226,185,85,.45); border-radius: 12px; padding: 6px 18px 18px; }
+#market header { display: flex; justify-content: space-between; align-items: center; }
+#market h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
+#market h3 { margin: 14px 0 6px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#market-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
+#market [hidden] { display: none !important; }
+.mk-purse { margin: 4px 0 0; color: var(--muted); }
+.mk-purse b { color: var(--gold); font-size: 1.1rem; }
+.mk-card { padding: 10px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); border-radius: 10px; }
+.mk-card p { margin: 4px 0; font-size: .88rem; }
+.mk-card .mk-next { color: var(--muted); }
+.mk-card button, #mk-items button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); white-space: nowrap; }
+.mk-card button { width: 100%; margin-top: 6px; }
+.mk-card button:disabled, #mk-items button:disabled { opacity: .45; cursor: not-allowed; }
+#mk-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+#mk-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
+#mk-items li span { display: flex; flex-direction: column; }
+#mk-items small { color: var(--muted); }
+#mk-items button.on { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.4); }

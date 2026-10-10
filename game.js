@@ -46,6 +46,7 @@ function init() {
   buildPremium();
   Account.bind();
   Online.bind();
+  Market.bind();
   applyCharacter();
   Crowd.build(scene);
   Fight.init(scene, camera);
@@ -559,6 +560,27 @@ function createFigure() {
   const legL = mkLimb(legGeo, robe, -0.13, 0.62, 0);
   const legR = mkLimb(legGeo, robe, 0.13, 0.62, 0);
 
+  // accessories bought in the Market (hidden until worn)
+  const metal = (c) => new THREE.MeshLambertMaterial({ color: c, emissive: 0x241a05 });
+  const acc = {};
+  const wreath = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 16), new THREE.MeshLambertMaterial({ color: 0x4f7a3a }));
+  wreath.rotation.x = Math.PI / 2; wreath.position.y = 1.62;
+  const helmet = new THREE.Group();
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.235, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), metal(0xb08a3a));
+  dome.position.y = 1.54;
+  const crest = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.4), new THREE.MeshLambertMaterial({ color: 0xa8342c }));
+  crest.position.y = 1.83;
+  helmet.add(dome, crest);
+  const cloak = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.0, 0.04), new THREE.MeshLambertMaterial({ color: 0xa8342c, side: THREE.DoubleSide }));
+  cloak.position.set(0, 1.0, 0.24); cloak.rotation.x = 0.1;
+  const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), metal(0xd9b44a));
+  clasp.position.set(0, 1.42, -0.2);
+  const cuirass = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.35, 0.5, 10), metal(0xcfa84a));
+  cuirass.position.y = 1.12;
+  const bands = [armL, armR].map((arm) => { const b = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.022, 6, 12), metal(0xd9b44a)); b.rotation.x = Math.PI / 2; b.position.y = -0.12; arm.add(b); return b; }); // on the upper arms, so they swing with them
+  acc.wreath = [wreath]; acc.helmet = [helmet]; acc.cloak = [cloak, clasp]; acc.cuirass = [cuirass]; acc.armbands = bands;
+  for (const list of Object.values(acc)) for (const o of list) { o.visible = false; if (!o.parent) g.add(o); }
+
   // a short sword in the right hand (shown in duels)
   const sword = new THREE.Group();
   const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, 0.025), new THREE.MeshLambertMaterial({ color: 0xc9ced4 }));
@@ -568,7 +590,7 @@ function createFigure() {
   sword.add(blade, guard);
   sword.visible = false;
   armR.add(sword);
-  return { g, parts: { armL, armR, legL, legR }, mats: { skin, robe, trim, hair: hairMat }, sword };
+  return { g, parts: { armL, armR, legL, legR }, mats: { skin, robe, trim, hair: hairMat }, sword, acc, hair };
 }
 
 function paintFigure(mats, look) {
@@ -576,6 +598,13 @@ function paintFigure(mats, look) {
   mats.hair.color.setHex(Character.color("hair", look.hair));
   mats.robe.color.setHex(Character.color("toga", look.toga));
   mats.trim.color.setHex(Character.color("sash", look.sash));
+}
+
+// Show the accessories in `ids` on a figure (yours, or another player's online).
+function applyAccessories(fig, ids) {
+  const worn = new Set(Array.isArray(ids) ? ids : []);
+  for (const [id, list] of Object.entries(fig.acc)) for (const o of list) o.visible = worn.has(id);
+  fig.hair.visible = !worn.has("helmet");
 }
 
 let avFig = null;
@@ -852,6 +881,7 @@ const bigMapOpen = () => $("#bigmap").classList.contains("show");
 function closePanels() {
   $("#account").classList.remove("show");
   $("#online").classList.remove("show");
+  $("#market").classList.remove("show");
   if (premiumOpen) { closePremium(); return; }
   if (creatorOpen) { if (!Character.exists) return; closeCreator(); } // the first-time screen cannot be skipped
   $("#bigmap").classList.remove("show");
@@ -1231,7 +1261,9 @@ function wakeUp() {
     Narrator.say(`Day ${Time.day}. You collapsed from tiredness, and were carried home. Next time, sleep in your bed at night.`, { interrupt: true });
   } else {
     Vitals.hp = 100;
-    toast(`Day ${Time.day}: you wake at dawn, fully rested`);
+    const rent = Market.rent();
+    if (rent) Vitals.coins += rent;
+    toast(`Day ${Time.day}: you wake at dawn, fully rested${rent ? `. Your tenants paid you ${rent} denarii` : ""}`);
     Narrator.say(`Day ${Time.day}. You wake at dawn, fully rested.`, { interrupt: true });
   }
   Sfx.play("discover");
@@ -1280,7 +1312,7 @@ function updateTime(dt) {
 function tick(dt) {
   updateTime(dt);
   // condition: passive recovery, resting, and the HUD
-  Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
+  Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();

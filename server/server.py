@@ -70,6 +70,7 @@ CLASS_MODS = {  # only what a duel needs
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 PREMIUM_LOOK = {"toga": (5, 6), "sash": (5,)}
+ACCESSORIES = ("wreath", "helmet", "cloak", "cuirass", "armbands")   # bought in the Market; cosmetic only
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
@@ -101,6 +102,8 @@ def clean_look(look, premium):
         if ok and not premium and i in PREMIUM_LOOK.get(part, ()):
             ok = False   # premium colours only for premium players
         out[part] = i if ok else 0
+    acc = look.get("acc") if isinstance(look, dict) else None
+    out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:5] if isinstance(acc, list) else []
     return out
 
 

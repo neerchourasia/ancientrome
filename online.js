@@ -22,7 +22,7 @@ const Online = (() => {
 
   function connect() {
     if (!URL) return;
-    const key = [accountToken(), Account.premium, Character.name, Character.cls, JSON.stringify(Character.look)].join("|");
+    const key = [accountToken(), Account.premium, Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join()].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is
       ws.close();                                         // you logged in or changed character: connect again
@@ -32,7 +32,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: Character.look });
+      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn } });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -136,6 +136,7 @@ const Online = (() => {
       if (p.i === me) continue;
       const f = createFigure();
       paintFigure(f.mats, p.look);
+      applyAccessories(f, p.look.acc);
       f.sword.visible = true;
       f.g.add(label(p.name));
       f.g.position.set(ARENA.cx + (p.i === 0 ? -12 : 12), 0, ARENA.cz);

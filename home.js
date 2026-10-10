@@ -105,6 +105,78 @@ const Home = (() => {
     lamp = new T.PointLight(0xffc477, 0.3, 17);
     lamp.position.set(lx, F.y + 3, lz);
     worldScene.add(lamp);
+    buildExtensions();
+  }
+
+  // ---- house upgrades, bought in the Market: each tier is built hidden (its collision switched off) and appears when you own it
+  const ext = [null, { meshes: [], blockers: [] }, { meshes: [], blockers: [] }, { meshes: [], blockers: [] }];
+  let tier = 0;
+  const GROUNDS = [232, 278, 28, 58]; // x0, x1, z0, z1: resting here heals faster (the villa's back garden counts too)
+
+  function buildExtensions() {
+    const stone = M.travertine, green = lambert(0x5f8a3f), hedge = lambert(0x3f6b34), leaf = lambert(0x2f5a35);
+    const gold = lambert(0xd9b44a, { emissive: 0x3d2f05 });
+    // a box (or a cone/cylinder) at world coordinates, belonging to one tier; `solid` also makes it block the way
+    const piece = (t, geo, mat, x, y, z, sx, sy, sz, solid, round) => {
+      const m = shadowed(new T.Mesh(geo, mat));
+      m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.visible = false;
+      worldScene.add(m); ext[t].meshes.push(m);
+      if (solid) ext[t].blockers.push(round ? addBlockerCircle(x, z, sx, y - sy / 2, y + sy / 2, { off: true }) : addBlockerBox(x - sx / 2, x + sx / 2, z - sz / 2, z + sz / 2, y - sy / 2, y + sy / 2, { off: true }));
+      return m;
+    };
+    const CONE = new T.ConeGeometry(1, 1, 8), PYR = new T.ConeGeometry(1, 1, 4);
+
+    // tier 1: a walled garden in front of the door, with a fountain, hedges and cypress trees
+    piece(1, BOX, green, 255, 0.05, 37.2, 34, 0.1, 16.4);
+    piece(1, BOX, hedge, 238.5, 0.65, 37.2, 1, 1.3, 16, true);
+    piece(1, BOX, hedge, 271.5, 0.65, 37.2, 1, 1.3, 16, true);
+    piece(1, BOX, hedge, 243.5, 0.65, 29.5, 10, 1.3, 1, true);
+    piece(1, BOX, hedge, 266.5, 0.65, 29.5, 10, 1.3, 1, true);
+    piece(1, CYL, stone, 246, 0.6, 37, 2.3, 1.2, 2.3, true, true);        // fountain basin (taller than a step, so it blocks you)
+    piece(1, CYL, M.water, 246, 1.18, 37, 1.95, 0.1, 1.95);
+    piece(1, CYL, stone, 246, 2.0, 37, 0.3, 1.8, 0.3);
+    piece(1, CYL, stone, 246, 3.0, 37, 0.8, 0.25, 0.8);
+    for (const [cx, cz] of [[241.5, 32.5], [268.5, 32.5], [241.5, 41.5], [268.5, 41.5]]) {
+      piece(1, CYL, lambert(0x5c4630), cx, 0.5, cz, 0.18, 1, 0.18);
+      piece(1, CONE, leaf, cx, 3.2, cz, 1.2, 5.4, 1.2, true, true);
+    }
+
+    // tier 2: two wings either side of the house, and a colonnade over the garden path
+    for (const wx of [243, 267]) {
+      piece(2, BOX, stone, wx, 2, 50, 12, 4, 10, true);
+      piece(2, BOX, M.roof, wx, 4.3, 50, 13.2, 0.6, 11.2);
+      piece(2, BOX, M.dark, wx, 1.2, 44.9, 2, 2.4, 0.2);
+    }
+    for (const cx of [240, 245, 265, 270]) piece(2, CYL, M.marble, cx, 2.3, 43.2, 0.45, 4.6, 0.45, true, true);
+    piece(2, BOX, M.marble2, 242.5, 4.8, 43.2, 8.6, 0.7, 2);
+    piece(2, BOX, M.marble2, 267.5, 4.8, 43.2, 8.6, 0.7, 2);
+    piece(2, BOX, M.marble2, 264, 0.6, 35.5, 1.6, 1.2, 1.6, true);        // a statue on its plinth
+    piece(2, CYL, M.bronze, 264, 2.2, 35.5, 0.4, 2, 0.4);
+    piece(2, new T.SphereGeometry(1, 10, 8), M.bronze, 264, 3.45, 35.5, 0.3, 0.3, 0.3);
+
+    // tier 3: a tower on the roof, a pool behind the house and a gilded pavilion
+    piece(3, BOX, stone, 255, 7.45, 50, 7, 5, 6);
+    piece(3, PYR, gold, 255, 11.5, 50, 5.4, 3, 5.4).rotation.y = Math.PI / 4;
+    piece(3, BOX, M.marble2, 255, 0.06, 66, 22, 0.12, 12);
+    piece(3, BOX, M.water, 255, 0.1, 66, 19.6, 0.1, 9.6);
+    for (const [cx, cz] of [[268, 70], [273, 70], [268, 75], [273, 75]]) piece(3, CYL, M.marble, cx, 2, cz, 0.4, 4, 0.4, true, true);
+    piece(3, PYR, gold, 270.5, 4.9, 72.5, 5.2, 1.8, 5.2).rotation.y = Math.PI / 4;
+  }
+
+  // 0 = the small house you start with; 1, 2, 3 = the upgrades
+  function setTier(n) {
+    tier = Math.max(0, Math.min(3, n | 0));
+    for (let t = 1; t <= 3; t++) {
+      const on = t <= tier;
+      for (const m of ext[t].meshes) m.visible = on;
+      for (const b of ext[t].blockers) b.off = !on;
+    }
+  }
+
+  // How much faster you recover when resting at home (see Market.REST for the numbers)
+  function restBoost(x, z) {
+    const inGrounds = x > GROUNDS[0] && x < GROUNDS[1] && z > GROUNDS[2] && z < (tier >= 3 ? 78 : GROUNDS[3]);
+    return inGrounds || inside(x, z) ? [1, 1.5, 2, 3][tier] : 1;
   }
 
   // Brighten the windows and the room after dark.
@@ -115,5 +187,5 @@ const Home = (() => {
     lamp.intensity = 0.25 + night * 1.0;
   }
 
-  return { X, Z, W, D, inside, build, update };
+  return { X, Z, W, D, inside, build, update, setTier, restBoost, get tier() { return tier; } };
 })();
