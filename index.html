@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=88">
+  <link rel="stylesheet" href="walk.css?v=94">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=88"></script>
+  <script src="boot.js?v=94"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -127,12 +127,16 @@
         <div class="od-p"><span id="od-me-name"></span><div class="bar"><div id="od-me-hp"></div></div></div>
         <div class="od-p foe"><span id="od-foe-name"></span><div class="bar"><div id="od-foe-hp"></div></div></div>
       </div>
+      <div id="od-team"></div>
+      <p id="od-note"></p>
       <div class="od-bottom">
         <div class="bar od-st"><div id="od-st"></div></div>
         <p class="od-keys"><kbd>Space</kbd> swing · hold <kbd>Shift</kbd> block · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Esc</kbd> leave</p>
         <div class="tc-row"><button id="tc-oblock" type="button">Block</button><button id="tc-oattack" type="button">Swing</button></div>
       </div>
     </div>
+
+    <div id="drive-hud"><span id="drive-kmh">0</span> <small>km/h</small><p><kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out</p></div>
 
     <div id="race-hud">
       <div class="stats">
@@ -227,8 +231,8 @@
     <div class="box">
       <header><h2>Play real people</h2><button id="on-close" type="button" aria-label="Close">×</button></header>
       <p id="on-status"></p>
-      <div class="on-games"><button id="on-duel" type="button">⚔ Duel a real person</button><button id="on-race" type="button">🏁 Race real people</button></div>
-      <label id="on-botrow" class="ac-check"><input id="on-bot" type="checkbox" checked> <span>If nobody is around, play a practice bot</span></label>
+      <div class="on-games"><button id="on-duel" type="button">⚔ Duel a real person</button><button id="on-race" type="button">🏁 Race real people</button><button id="on-coop" type="button">🛡 Team up: beat 5 bots together</button></div>
+      <label id="on-botrow" class="ac-check"><input id="on-bot" type="checkbox" checked> <span>If nobody is around, let bots fill in (a practice opponent, or friendly teammates in the team battle)</span></label>
       <button id="on-cancel" type="button" hidden>Stop looking</button>
       <div class="on-links"><button id="on-login" type="button" hidden>Log in</button><button id="on-premium" type="button" hidden>★ See Premium</button></div>
     </div>
@@ -255,6 +259,7 @@
         <tr><th>Jump</th><td><kbd>Space</kbd></td></tr>
         <tr><th>Look around</th><td>Drag the mouse</td></tr>
         <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
+        <tr><th>Cars (Modern Rome)</th><td>Buy one in the Market, take it out, walk up and press <kbd>X</kbd> to get in. <kbd>W</kbd> gas, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer, <kbd>Space</kbd> handbrake, <kbd>Esc</kbd> or <kbd>X</kbd> to get out</td></tr>
         <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear, a hound or eagle companion, house decorations, healing supplies and training</td></tr>
         <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
         <tr><th>Ancient / Modern Rome</th><td><kbd>K</kbd> switches the whole city between 128 AD and today: the Colosseum and Forum weather into ruins, the Circus Maximus becomes a park, apartment blocks and citizens turn modern, and the Colossus (long gone) disappears. Only works while walking, not mid-game</td></tr>
@@ -297,28 +302,29 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=88"></script>
-  <script src="config.js?v=88"></script>
-  <script src="character.js?v=88"></script>
-  <script src="physics.js?v=88"></script>
-  <script src="vitals.js?v=88"></script>
-  <script src="narrator.js?v=88"></script>
-  <script src="audio.js?v=88"></script>
-  <script src="world.js?v=88"></script>
-  <script src="city.js?v=88"></script>
-  <script src="modern.js?v=88"></script>
-  <script src="home.js?v=88"></script>
-  <script src="spectators.js?v=88"></script>
-  <script src="fight.js?v=88"></script>
-  <script src="nav.js?v=88"></script>
-  <script src="show.js?v=88"></script>
-  <script src="naval.js?v=88"></script>
-  <script src="watch.js?v=88"></script>
-  <script src="race.js?v=88"></script>
-  <script src="account.js?v=88"></script>
-  <script src="online.js?v=88"></script>
-  <script src="pets.js?v=88"></script>
-  <script src="market.js?v=88"></script>
-  <script src="game.js?v=88"></script>
+  <script src="landmarks.js?v=94"></script>
+  <script src="config.js?v=94"></script>
+  <script src="character.js?v=94"></script>
+  <script src="physics.js?v=94"></script>
+  <script src="vitals.js?v=94"></script>
+  <script src="narrator.js?v=94"></script>
+  <script src="audio.js?v=94"></script>
+  <script src="world.js?v=94"></script>
+  <script src="city.js?v=94"></script>
+  <script src="modern.js?v=94"></script>
+  <script src="home.js?v=94"></script>
+  <script src="spectators.js?v=94"></script>
+  <script src="fight.js?v=94"></script>
+  <script src="nav.js?v=94"></script>
+  <script src="show.js?v=94"></script>
+  <script src="naval.js?v=94"></script>
+  <script src="watch.js?v=94"></script>
+  <script src="race.js?v=94"></script>
+  <script src="account.js?v=94"></script>
+  <script src="online.js?v=94"></script>
+  <script src="pets.js?v=94"></script>
+  <script src="car.js?v=94"></script>
+  <script src="market.js?v=94"></script>
+  <script src="game.js?v=94"></script>
 </body>
 </html>

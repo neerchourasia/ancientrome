@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
 import struct
 import sys
@@ -303,6 +304,102 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         m = await a.until(lambda m: m["t"] == "match", timeout=4)
         self.assertEqual(len(m["players"]), 4)
         self.assertTrue(all(p["name"].startswith("Practice bot") for p in m["players"][1:]))
+
+    # ---------------------------------------------------------------- co-op: a team against five bots
+
+    async def start_coop(self, bot=False):
+        server.CFG["coop_wait"] = 0.6
+        a, b = await self.player("Ann"), await self.player("Ben")
+        for w in (a, b):
+            w.send({"t": "queue", "mode": "coop", "bot": bot})
+        ma = await a.until(lambda m: m["t"] == "match", timeout=4)
+        mb = await b.until(lambda m: m["t"] == "match", timeout=4)
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        return a, b, ma, mb, room
+
+    async def test_coop_two_players_face_five_bots(self):
+        a, b, ma, mb, room = await self.start_coop()
+        self.assertEqual(ma["mode"], "coop")
+        self.assertEqual((ma["you"], mb["you"]), (0, 1))
+        roles = [p["role"] for p in ma["players"]]
+        self.assertEqual(roles, ["player", "player"] + ["enemy"] * 5)
+        self.assertEqual(ma["enemies"], 5)
+        room.step(0.05)
+        st = await a.until(lambda m: m["t"] == "coop")
+        self.assertEqual(len(st["p"]), 7)
+        self.assertEqual({row[9] for row in st["p"]}, {0, 1})     # both teams are in the state
+
+    async def test_coop_a_lone_player_gets_friendly_bots_when_they_ask(self):
+        server.CFG["bot_wait"] = 0.5
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "coop", "bot": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=4)
+        roles = [p["role"] for p in m["players"]]
+        self.assertEqual(roles.count("player"), 1)
+        self.assertEqual(roles.count("ally"), 2)
+        self.assertEqual(roles.count("enemy"), 5)
+        self.assertTrue(all("bot" in p["name"] for p in m["players"] if p["role"] != "player"))
+
+    async def test_coop_hits_come_from_the_server_and_only_hurt_enemies(self):
+        a, b, ma, mb, room = await self.start_coop()
+        ann, ben = room.fighters[0], room.fighters[1]
+        e = room.fighters[2]
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0                          # everyone out of the way ...
+        ann.x, ann.z, ann.yaw = 0.0, 0.0, -math.pi / 2     # ... Ann faces east
+        ben.x, ben.z = 0.0, 1.5                            # her teammate stands right beside her
+        e.x, e.z = 2.0, 0.0                                # an enemy is two metres ahead
+        ben.hp = 100.0
+        a.send({"t": "swing"})
+        await asyncio.sleep(0.2)
+        for _ in range(8):
+            room.step(0.05)
+        self.assertLess(e.hp, 80.0)                        # the enemy was hurt
+        self.assertEqual(ben.hp, 100.0)                    # friendly fire does not exist
+        self.assertEqual(ann.hp, 100.0)
+
+    async def test_coop_revive_win_and_lose(self):
+        a, b, ma, mb, room = await self.start_coop()
+        ann, ben = room.fighters[0], room.fighters[1]
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0
+            f.bot = False if f.role == "enemy" else f.bot
+        ann.x, ann.z, ben.x, ben.z = 0.0, 0.0, 1.5, 0.0
+        ben.down, ben.hp = True, 0.0
+        for _ in range(40):                                # 2 seconds: not enough
+            room.step(0.05)
+        self.assertTrue(ben.down)
+        for _ in range(30):                                # past three seconds: back on their feet
+            room.step(0.05)
+        self.assertFalse(ben.down)
+        self.assertEqual(ben.hp, 40.0)
+        # all five enemies down: the team wins
+        for f in room.fighters:
+            if f.role == "enemy":
+                f.down, f.hp = True, 0.0
+        room.step(0.05)
+        end = await a.until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["won"], end["reason"], end["kills"]), (True, "cleared", 5))
+
+    async def test_coop_team_wiped_out_loses(self):
+        a, b, ma, mb, room = await self.start_coop()
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0
+            if f.role != "enemy":
+                f.down, f.hp = True, 0.0
+        room.step(0.05)
+        end = await b.until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["won"], end["reason"]), (False, "defeated"))
+
+    async def test_coop_leaving_does_not_break_the_others(self):
+        a, b, ma, mb, room = await self.start_coop()
+        a.w.close()
+        await asyncio.sleep(0.4)
+        room.step(0.05)
+        st = await b.until(lambda m: m["t"] == "coop", timeout=3)
+        self.assertEqual(st["p"][0][8], 1)                 # Ann is shown as down; Ben plays on
+        self.assertFalse(room.over)
 
     # ---------------------------------------------------------------- payments
 

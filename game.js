@@ -97,6 +97,7 @@ function leaveMode() {
   else if (mode === "naval") Naval.stop();
   else if (mode === "watch") Watch.stop();
   else if (mode === "online") Online.leave();
+  else if (mode === "drive") Car.exit();
   else closePanels();
 }
 
@@ -121,6 +122,7 @@ function wireInput(canvas) {
     if (k === "KeyJ") toggleVoice();
     if (k === "KeyZ") toggleRest();
     if (k === "KeyK") toggleEra();
+    if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();
     if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
     if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
     if (k === "KeyG" && (mode === "walk" || mode === "watch")) toggleDirections();
@@ -175,6 +177,7 @@ function wireInput(canvas) {
   addEventListener("mouseup", (e) => { dragging = false; if (e.button === 2) Fight.mouseBlock = false; if (e.button === 0 && mode === "fight") Fight.release(); });
   $("#prompt").addEventListener("click", () => {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
+    if ($("#prompt").dataset.kind === "car") { Car.enter(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -368,6 +371,7 @@ function describeObstacle(tx, tz) {
   blockedAt(tx, tz, groundAt(player.x, player.z));
   const b = lastBlock;
   if (!b) return "a wall";
+  if (b.mine) return "your parked car";
   if (b.era === "modern" && b.t === 1) return "a lamp post";
   if (b.era === "modern" && b.y1 === 1.5) return "a parked car";
   if (b.t === 2) return "the huge stone wall";
@@ -907,7 +911,7 @@ function closePanels() {
   panelOpen = false;
 }
 function openPanel(id) {
-  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online") return;
+  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive") return;
   if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
@@ -936,6 +940,7 @@ function applyEra() {
   applyInsulaeEra(modern);
   applyCitizensEra(modern);
   Modern.apply(modern);
+  if (!modern) Car.stow(); // cars only exist in Modern Rome
   Crowd.setVisible(!modern);
   $("#era-badge").textContent = modern ? "Modern Rome" : "Ancient Rome";
   $("#era-badge").classList.toggle("ancient", !modern);
@@ -986,6 +991,7 @@ function updatePrompt() {
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
+    if (!text && Car.nearby()) { text = "Press X to get in your car"; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";
   }
@@ -1333,13 +1339,14 @@ function tick(dt) {
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
   updateNavHud(dt);
-  Sfx.update(dt, { mode, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
+  Sfx.update(dt, { mode, engine: Car.speed01(), driving: Car.driving, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
   placesTimer += dt;
   if (placesTimer > 0.6 && $("#places").classList.contains("show")) { placesTimer = 0; refreshPlaceDistances(); }
   if (mode === "fight") Fight.update(dt, keys);
   else if (mode === "race") Race.update(dt, keys);
   else if (mode === "naval") Naval.update(dt, keys);
   else if (mode === "online") Online.update(dt, keys);
+  else if (mode === "drive") Car.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (started && !panelOpen) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
@@ -1351,6 +1358,7 @@ function tick(dt) {
   document.body.classList.toggle("dueling", mode === "online");
   if (mode === "race") Race.camera(camera, dt);
   else if (mode === "naval") Naval.camera(camera, dt);
+  else if (mode === "drive") Car.camera(camera, dt);
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {
     if ((mode === "walk" && (viewId() !== "first" || creatorOpen)) || mode === "online") chaseCamera();

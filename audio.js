@@ -7,7 +7,7 @@
 const Sfx = (() => {
   const KEY = "rome-sound";
   let ctx = null, master = null, noise = null, brown = null, on = true, excite = 0, burst = 0, burstT = 4;
-  let stepPhase = 0, hoofT = 0, birdT = 3, cricketT = 1, clock = 0, rumble = null, wind = null;
+  let engine = null, stepPhase = 0, hoofT = 0, birdT = 3, cricketT = 1, clock = 0, rumble = null, wind = null;
   const tmp = { x: 0, y: 0, z: 0 };
   try { on = localStorage.getItem(KEY) !== "off"; } catch (e) { /* storage unavailable */ }
 
@@ -64,6 +64,11 @@ const Sfx = (() => {
     wl.type = "lowpass"; wl.frequency.value = 500; wg.gain.value = 0.05;
     ws.connect(wl); wl.connect(wg); wg.connect(master);
     wind = { g: wg, f: wl };
+    // a car engine: a low buzz that rises with your speed
+    const eo = ctx.createOscillator(), el = ctx.createBiquadFilter(), eg = ctx.createGain();
+    eo.type = "sawtooth"; eo.frequency.value = 50; el.type = "lowpass"; el.frequency.value = 420; eg.gain.value = 0;
+    eo.connect(el); el.connect(eg); eg.connect(master); eo.start();
+    engine = { o: eo, g: eg };
     // chariot wheels rumbling
     const rs = loop(brown), rl = ctx.createBiquadFilter(), rg = ctx.createGain();
     rl.type = "lowpass"; rl.frequency.value = 260; rg.gain.value = 0;
@@ -198,6 +203,11 @@ const Sfx = (() => {
       s.g.gain.setTargetAtTime(Math.min(1.3, vol), t, 0.12);
       s.pan.pan.setTargetAtTime(sp.pan, t, 0.12);
       s.lp.frequency.setTargetAtTime(cut, t, 0.12);
+    }
+    // the engine of your car, only while you drive
+    if (engine) {
+      engine.g.gain.setTargetAtTime(info.driving ? 0.035 + 0.05 * (info.engine || 0) : 0, t, 0.12);
+      engine.o.frequency.setTargetAtTime(48 + 120 * (info.engine || 0), t, 0.15);
     }
     const height = typeof heightAt === "function" ? heightAt(camera.position.x, camera.position.z) : 0;
     wind.g.gain.setTargetAtTime(0.04 + 0.006 * height + 0.02 * Math.sin(clock * 0.3), t, 0.5);

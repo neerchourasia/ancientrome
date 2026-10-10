@@ -68,6 +68,8 @@ function addPlatformRing(p) {
 // Obstacles can belong to one era only (`extra.era` = "ancient" or "modern"), or be switched off (`off`), so the
 // Ancient / Modern Rome switch can change what blocks you. The item is returned so it can be changed later.
 let modernEra = false;
+// Movable obstacles (like your parked car): circles that can be switched on and moved. Checked in blockedAt().
+const dynBlockers = [];
 const setPhysicsEra = (m) => { modernEra = !!m; };
 function addBlockerBox(x0, x1, z0, z1, y0, y1, extra) {
   const item = { t: 0, x0, x1, z0, z1, y0, y1, ...extra };
@@ -107,6 +109,10 @@ function groundAt(x, z) {
 }
 
 function blockedAt(x, z, feet) {
+  for (let i = 0; i < dynBlockers.length; i++) {
+    const d = dynBlockers[i];
+    if (d.on && feet < d.y1 - 0.9 && Math.hypot(x - d.x, z - d.z) < d.r + PLAYER_R) { lastBlock = d; return true; }
+  }
   const list = blockerGrid.at(x, z);
   for (let i = 0; i < list.length; i++) {
     const b = list[i];

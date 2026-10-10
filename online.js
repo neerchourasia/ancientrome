@@ -39,7 +39,7 @@ const Online = (() => {
     sock.onclose = () => {
       if (ws !== sock) return;
       ws = null; welcome = null; waiting = false; clearInterval(pingT);
-      if (duel) endDuel("The connection to the game server was lost.", "Disconnected");
+      if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
       setMsg(URL ? "Disconnected from the game server." : "");
       refreshLobby();
@@ -52,13 +52,13 @@ const Online = (() => {
   function onMessage(m) {
     switch (m.t) {
       case "welcome": welcome = m; setMsg(""); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "duel") startDuel(m); else Race.startOnline(m); break;
-      case "duel": onDuel(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else startFight(m); break;
+      case "duel": case "coop": onFight(m); break;
       case "race": Race.onlineState(m); break;
-      case "end": if (m.mode === "duel") onDuelEnd(m); else Race.onlineEnd(m); break;
+      case "end": if (m.mode === "race") Race.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -73,6 +73,7 @@ const Online = (() => {
     $o("on-status").textContent = !URL ? "Online play is not switched on yet." : (lobbyMsg || (premiumNeeded ? (welcome.account ? "Playing real people is a Premium feature." : "Log in with a Premium account to play real people.") : (welcome ? (waiting ? "" : "Pick a game.") : "Connecting...")));
     $o("on-duel").disabled = !ready;
     $o("on-race").disabled = !ready;
+    $o("on-coop").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
     $o("on-login").hidden = !(premiumNeeded && !welcome.account);
@@ -96,6 +97,7 @@ const Online = (() => {
   function bind() {
     $o("on-duel").addEventListener("click", () => queue("duel"));
     $o("on-race").addEventListener("click", () => queue("race"));
+    $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("on-login").addEventListener("click", () => { closePanels(); Account.open(); });
@@ -103,15 +105,17 @@ const Online = (() => {
     $o("btn-online").addEventListener("click", openLobby);
   }
 
-  // ------------------------------------------------------------------ duels
+  // ------------------------------------------------------------------ fights: duels and team battles
 
-  function label(text) {
+  const ENEMY_HP = 80; // what the server gives each enemy bot (used for the "enemies left" bar)
+
+  function label(text, color) {
     const c = document.createElement("canvas");
     c.width = 256; c.height = 64;
     const g = c.getContext("2d");
     g.font = "bold 30px sans-serif"; g.textAlign = "center";
     g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 8, 256, 48);
-    g.fillStyle = "#fff"; g.fillText(text, 128, 44);
+    g.fillStyle = color || "#fff"; g.fillText(text, 128, 44);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
     s.scale.set(2.4, 0.6, 1); s.position.y = 2.2; s.renderOrder = 10;
     return s;
@@ -126,132 +130,189 @@ const Online = (() => {
     parts.armL.rotation.x = block ? 1.3 : parts.armL.rotation.x;
   }
 
-  function startDuel(m) {
+  const near = (x, z, r) => Math.hypot(ARENA.cx + x - player.x, ARENA.cz + z - player.z) < r;
+
+  function startFight(m) {
     if (mode !== "walk") return;
     closePanels();
     Vitals.stopRest();
-    const me = m.you;
-    duel = { you: me, radius: m.radius, names: m.players.map((p) => p.name), figs: {}, st: m.players.map(() => ({ x: 0, z: 0, yaw: 0, hp: 100, st: 100, swing: -1, block: 0, prevSwing: -1 })), block: false, sendT: 0, over: false };
+    const me = m.you, coop = m.mode === "coop";
+    duel = { kind: m.mode, you: me, radius: m.radius, players: m.players, figs: {}, st: {}, block: false, sendT: 0, over: false, rev: {}, enemies: m.enemies || 0, notice: "" };
     for (const p of m.players) {
+      const x = p.x !== undefined ? p.x : (p.i === 0 ? -12 : 12), z = p.z || 0, yaw = p.yaw !== undefined ? p.yaw : (p.i === 0 ? -Math.PI / 2 : Math.PI / 2);
+      duel.st[p.i] = { x, z, yaw, hp: 100, st: 100, swing: -1, block: 0, down: 0, team: p.role === "enemy" ? 1 : 0 };
       if (p.i === me) continue;
       const f = createFigure();
       paintFigure(f.mats, p.look);
       applyAccessories(f, p.look.acc);
       f.sword.visible = true;
-      f.g.add(label(p.name));
-      f.g.position.set(ARENA.cx + (p.i === 0 ? -12 : 12), 0, ARENA.cz);
+      f.g.rotation.order = "YXZ";
+      f.g.add(label(p.name, p.role === "enemy" ? "#ff9d8c" : p.role === "ally" ? "#9fd8a8" : "#fff"));
+      f.g.position.set(ARENA.cx + x, 0, ARENA.cz + z);
+      f.g.rotation.y = yaw;
       scene.add(f.g);
       duel.figs[p.i] = f;
     }
     mode = "online";
     avFig.sword.visible = true;
-    placeAt(ARENA.cx + (me === 0 ? -12 : 12), ARENA.cz, me === 0 ? -Math.PI / 2 : Math.PI / 2);
+    avatar.rotation.order = "YXZ";
+    const mine = duel.st[me];
+    placeAt(ARENA.cx + mine.x, ARENA.cz + mine.z, mine.yaw);
     player.pitch = -0.05;
     Crowd.setCheer(true);
     $o("online-hud").classList.add("show");
+    $o("online-hud").classList.toggle("coop", coop);
     $o("od-me-name").textContent = m.players[me].name;
-    const other = m.players.find((p) => p.i !== me);
-    $o("od-foe-name").textContent = other ? other.name : "";
-    toast("Duel! Space swings, hold Shift to block");
+    const foe = m.players.find((p) => p.i !== me && p.role !== "enemy" && !coop);
+    $o("od-foe-name").textContent = coop ? "" : (foe ? foe.name : "");
+    const team = $o("od-team");
+    team.replaceChildren(...(coop ? m.players.filter((p) => p.i !== me && p.role !== "enemy").map((p) => {
+      const chip = document.createElement("div"), nm = document.createElement("span"), bar = document.createElement("div"), fill = document.createElement("div");
+      chip.className = "od-chip"; chip.dataset.i = p.i; nm.textContent = p.name.replace(" (ally bot)", ""); bar.className = "bar"; bar.append(fill);
+      chip.append(nm, bar);
+      return chip;
+    }) : []));
+    toast(coop ? "Team battle! Beat all 5 bots together. Stand next to a fallen teammate for 3 seconds to revive them." : "Duel! Space swings, hold Shift to block");
     Sfx.play("horn");
   }
 
   function swing() {
     if (!duel || duel.over) return;
     const s = duel.st[duel.you];
-    if (s.swing >= 0 || s.st < 14) return;
+    if (s.down || s.swing >= 0 || s.st < 14) return;
     send({ t: "swing" });
-    s.swing = 0; s.prevSwing = 0; Sfx.play("swing"); // show it at once; the server confirms
+    s.swing = 0; Sfx.play("swing"); // show it at once; the server confirms
   }
 
-  function onDuel(m) {
+  const nameOf = (i) => (duel.players.find((p) => p.i === i) || {}).name || "Someone";
+
+  function onFight(m) {
     if (!duel || duel.over) return;
-    for (const p of m.p) {
-      const [i, x, z, yaw, hp, st, sw, bl] = p;
+    for (const row of m.p) {
+      const [i, x, z, yaw, hp, st, sw, bl, down, team] = row;
       const s = duel.st[i];
-      if (i !== duel.you && s.swing < 0 && sw >= 0) Sfx.play("swing");
-      Object.assign(s, { x, z, yaw, hp, st, swing: sw, block: bl });
-      if (i === duel.you) {
+      if (!s) continue;
+      if (i !== duel.you && s.swing < 0 && sw >= 0 && near(x, z, 28)) Sfx.play("swing");
+      Object.assign(s, { x, z, yaw, hp, st, swing: sw, block: bl, down: down || 0 });
+      if (team !== undefined) s.team = team;
+      if (i === duel.you && !s.down) {
         const dx = ARENA.cx + x - player.x, dz = ARENA.cz + z - player.z;
         if (Math.hypot(dx, dz) > 2.2) { player.x = ARENA.cx + x; player.z = ARENA.cz + z; } // the server moved you back
       }
     }
+    duel.rev = Object.fromEntries(m.rev || []);
     for (const e of m.ev || []) {
       if (e[0] === "hit") {
         if (e[2] === duel.you) { Sfx.play("hurt"); player.shake = 0.7; $o("flash").style.opacity = 0.4; }
-        else Sfx.play("hit");
+        else { const t = duel.st[e[2]]; if (t && near(t.x, t.z, 28)) Sfx.play("hit"); }
       } else if (e[0] === "block") Sfx.play("clash");
+      else if (e[0] === "down" && duel.kind === "coop") {
+        const t = duel.st[e[1]];
+        if (e[1] === duel.you) toast("You are down! A teammate can revive you by standing next to you.");
+        else if (t && t.team === 0) toast(`${nameOf(e[1]).replace(" (ally bot)", "")} is down! Stand next to them for 3 seconds to revive.`);
+        else Sfx.play("cheer");
+      } else if (e[0] === "revive") { Sfx.play("discover"); toast(e[1] === duel.you ? "You are back on your feet!" : `${nameOf(e[1]).replace(" (ally bot)", "")} is back up!`); }
     }
   }
 
   function update(dt, keys) {
     if (!duel) return;
-    updatePlayer(dt);
-    const lx = player.x - ARENA.cx, lz = player.z - ARENA.cz, r = Math.hypot(lx, lz), max = duel.radius - 0.9;
-    if (r > max) { player.x = ARENA.cx + (lx * max) / r; player.z = ARENA.cz + (lz * max) / r; }
-    const blocking = keys.has("ShiftLeft") || keys.has("ShiftRight");
-    if (blocking !== duel.block) { duel.block = blocking; send({ t: "block", on: blocking }); }
-    duel.sendT -= dt;
-    if (duel.sendT <= 0) { duel.sendT = 0.066; send({ t: "pos", x: +(player.x - ARENA.cx).toFixed(2), z: +(player.z - ARENA.cz).toFixed(2), yaw: +player.yaw.toFixed(3) }); }
+    const me = duel.st[duel.you];
+    if (!me.down) {
+      updatePlayer(dt);
+      const lx = player.x - ARENA.cx, lz = player.z - ARENA.cz, r = Math.hypot(lx, lz), max = duel.radius - 0.9;
+      if (r > max) { player.x = ARENA.cx + (lx * max) / r; player.z = ARENA.cz + (lz * max) / r; }
+      const blocking = keys.has("ShiftLeft") || keys.has("ShiftRight");
+      if (blocking !== duel.block) { duel.block = blocking; send({ t: "block", on: blocking }); }
+      duel.sendT -= dt;
+      if (duel.sendT <= 0) { duel.sendT = 0.066; send({ t: "pos", x: +(player.x - ARENA.cx).toFixed(2), z: +(player.z - ARENA.cz).toFixed(2), yaw: +player.yaw.toFixed(3) }); }
+    } else { player.vx = player.vz = 0; duel.block = false; }
     const k = Math.min(1, dt * 12);
     for (const i of Object.keys(duel.figs)) {
       const f = duel.figs[i], s = duel.st[i];
       const tx = ARENA.cx + s.x, tz = ARENA.cz + s.z, px = f.g.position.x, pz = f.g.position.z;
-      f.g.position.x += (tx - px) * k; f.g.position.z += (tz - pz) * k; f.g.position.y = groundAt(tx, tz);
+      f.g.position.x += (tx - px) * k; f.g.position.z += (tz - pz) * k;
+      f.g.position.y += ((s.down ? groundAt(tx, tz) + 0.3 : groundAt(tx, tz)) - f.g.position.y) * k;
       let dy = s.yaw - f.g.rotation.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
       f.g.rotation.y += dy * k;
-      const speed = Math.hypot(tx - px, tz - pz) / Math.max(dt, 0.001);
+      f.g.rotation.x += ((s.down ? -Math.PI / 2 : 0) - f.g.rotation.x) * Math.min(1, dt * 8);   // fallen fighters lie down
+      const speed = s.down ? 0 : Math.hypot(tx - px, tz - pz) / Math.max(dt, 0.001);
       f.phase = (f.phase || 0) + dt * Math.min(speed, 8) * 1.1;
       const w = Math.min(1, speed / 5) * 0.7 * Math.sin(f.phase);
       f.parts.armL.rotation.x = -w; f.parts.armR.rotation.x = w; f.parts.legL.rotation.x = -w; f.parts.legR.rotation.x = w;
       pose(f.parts, s.swing, s.block);
-      if (s.swing < 0) s.prevSwing = -1;
     }
-    const me = duel.st[duel.you], foe = duel.st[1 - duel.you];
     if (me.swing >= 0) me.swing = Math.min(me.swing + dt, 0.69); // keep the animation moving between server updates
     $o("od-me-hp").style.width = `${me.hp}%`;
-    $o("od-foe-hp").style.width = `${foe.hp}%`;
     $o("od-st").style.width = `${me.st}%`;
+    if (duel.kind === "coop") {
+      const enemies = duel.players.filter((p) => p.role === "enemy"), alive = enemies.filter((p) => !duel.st[p.i].down);
+      const hpSum = enemies.reduce((t, p) => t + duel.st[p.i].hp, 0);
+      $o("od-foe-name").textContent = `Enemies left: ${alive.length} of ${enemies.length}`;
+      $o("od-foe-hp").style.width = `${Math.max(0, (hpSum / (enemies.length * ENEMY_HP)) * 100)}%`;
+      for (const chip of $o("od-team").children) {
+        const s = duel.st[chip.dataset.i];
+        chip.classList.toggle("down", !!s.down);
+        chip.lastChild.firstChild.style.width = `${s.hp}%`;
+      }
+      const reviving = Object.entries(duel.rev).filter(([, sec]) => sec > 0).map(([i, sec]) => (Number(i) === duel.you ? `A teammate is reviving you: ${Math.round((sec / 3) * 100)}%` : `Reviving ${nameOf(Number(i)).replace(" (ally bot)", "")}: ${Math.round((sec / 3) * 100)}%`));
+      $o("od-note").textContent = me.down && !reviving.length ? "You are down. Stay close to your teammates: one of them can revive you." : reviving.join("  ·  ");
+    } else {
+      const foe = duel.st[duel.players.find((p) => p.i !== duel.you).i];
+      $o("od-foe-hp").style.width = `${foe.hp}%`;
+      $o("od-note").textContent = "";
+    }
     const f = $o("flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
   }
 
-  // Your own figure uses the walking avatar; this lets game.js pose its arms during a duel.
+  // Your own figure uses the walking avatar; this lets game.js pose its arms (and lay it down if you are knocked out).
   function poseMine(parts) {
     if (!duel) return;
     const s = duel.st[duel.you];
     pose(parts, s.swing, duel.block);
+    avatar.rotation.x += ((s.down ? -Math.PI / 2 : 0) - avatar.rotation.x) * 0.2;
+    if (s.down) avatar.position.y += 0.3;
   }
 
-  function onDuelEnd(m) {
+  function onFightEnd(m) {
     if (!duel) return;
+    if (m.mode === "coop") {
+      const prize = m.won ? 50 : 0;
+      Vitals.coins += prize;
+      const why = { cleared: "All five bots are beaten. Well fought, team!", defeated: `Your whole team was knocked out. You beat ${m.kills} of ${m.enemies} bots.`, time: `Time ran out. You beat ${m.kills} of ${m.enemies} bots.`, empty: "Everyone left." }[m.reason] || "";
+      endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, m.won ? "Victory for the team!" : "Defeat");
+      return;
+    }
     const won = m.winner === duel.you, draw = m.winner === -1;
     const why = { ko: won ? "You knocked your opponent out." : "You were knocked out.", time: "Time ran out.", left: won ? "Your opponent left the arena." : "You left." }[m.reason] || "";
     const prize = won ? 30 : 0;
     Vitals.coins += prize;
-    endDuel(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, draw ? "A draw" : won ? "Victory in the arena!" : "Defeat");
+    endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, draw ? "A draw" : won ? "Victory in the arena!" : "Defeat");
   }
 
-  function endDuel(text, title) {
+  function endFight(text, title) {
     if (!duel) return;
+    const kind = duel.kind;
     duel.over = true;
     for (const i of Object.keys(duel.figs)) scene.remove(duel.figs[i].g);
     duel = null;
-    $o("online-hud").classList.remove("show");
+    $o("online-hud").classList.remove("show", "coop");
     avFig.sword.visible = false;
+    avatar.rotation.x = 0; avatar.rotation.order = "XYZ";
     Crowd.setCheer(false);
     mode = "walk";
     placeAt(ARENA.cx - 16, ARENA.cz, -Math.PI / 2);
     showResult(title, text, [
-      { label: "Duel again", fn: () => { closePanels(); openLobby(); } },
+      { label: kind === "coop" ? "Fight again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
       { label: "Leave the arena", fn: closePanels },
     ]);
   }
 
-  // Esc / Leave while in a duel (a race is left through Race.stop, which calls leaveGame)
+  // Esc / Leave while in a fight (a race is left through Race.stop, which calls leaveGame)
   function leave() {
     if (!duel) return;
     send({ t: "leave" });
-    endDuel("You left the duel.", "You left");
+    endFight("You left the battle.", "You left");
   }
 
   // ------------------------------------------------------------------ races (the rest lives in race.js)

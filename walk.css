@@ -387,3 +387,19 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .mk-items li span { display: flex; flex-direction: column; }
 .mk-items small { color: var(--muted); }
 .mk-items button.on { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.4); }
+
+/* team battle */
+#od-team { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.od-chip { min-width: 90px; font-size: .78rem; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.9); text-align: center; }
+.od-chip .bar { height: 7px; margin-top: 2px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 4px; overflow: hidden; }
+.od-chip .bar div { height: 100%; width: 100%; background: #3aa557; }
+.od-chip.down { opacity: .5; }
+#od-note { position: absolute; top: 130px; left: 50%; transform: translateX(-50%); margin: 0; max-width: 92vw; text-align: center; font-weight: 700; color: #ffe29a; text-shadow: 0 1px 4px rgba(0,0,0,.95); }
+#online-hud:not(.coop) #od-team { display: none; }
+
+/* driving */
+#drive-hud { display: none; position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+#drive-hud.show { display: block; }
+#drive-kmh { font: 700 2.6rem ui-monospace, Menlo, monospace; color: #fff; }
+#drive-hud small { font-size: 1rem; color: var(--muted); }
+#drive-hud p { margin: 2px 0 0; font-size: .8rem; }
