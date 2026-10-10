@@ -16,6 +16,8 @@ const Character = (() => {
   };
   // Premium cosmetics (Tyrian purple, imperial gold): shown as locked until paid extras exist.
   const PREMIUM = { skin: [], hair: [], toga: [5, 6], sash: [5] };
+  // Premium features that are not built yet: shown as "coming soon", never as if they worked.
+  const PREMIUM_FEATURES = ["Fight real people: live gladiator duels", "Race real people: live chariot races"];
   const PREMIUM_NAMES = { toga: { 5: "Tyrian purple toga", 6: "Imperial gold toga" }, sash: { 5: "Tyrian purple sash" } };
 
   // Where the "Get Premium" button sends people. Leave `checkoutUrl` empty until payments are set up; paste a
@@ -71,7 +73,7 @@ const Character = (() => {
   } catch (e) { /* storage unavailable */ }
 
   return {
-    COLORS, CLASSES, PREMIUM, PREMIUM_NAMES, SHOP, cleanName, owns,
+    COLORS, CLASSES, PREMIUM, PREMIUM_NAMES, PREMIUM_FEATURES, SHOP, cleanName, owns,
     get exists() { return saved; },
     get name() { return s.name; },
     get cls() { return s.cls; },

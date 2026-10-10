@@ -324,3 +324,4 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 #pr-buy:disabled { opacity: .5; cursor: not-allowed; }
 .pr-status { margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
 #cr-premium { width: 100%; margin-top: 10px; font: 700 .95rem inherit; cursor: pointer; padding: 9px; border-radius: 9px; border: 1px solid var(--gold); color: var(--gold); background: transparent; }
+#pr-items .soon { margin-left: auto; padding: 2px 9px; font-size: .72rem; border-radius: 999px; background: rgba(120,160,200,.25); color: #bcd0e6; white-space: nowrap; }

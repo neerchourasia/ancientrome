@@ -146,6 +146,7 @@ const Sfx = (() => {
     bump: () => { puff(0.18, 240, 0.7, 0.75); tone(85, 0.28, "sine", 0.6, 45); },
     oof: () => { tone(230, 0.2, "sawtooth", 0.14, 150); puff(0.12, 500, 0.8, 0.3); },
     beep: () => tone(880, 0.14, "square", 0.13),
+    honk: (o) => { tone(410, 0.3, "square", 0.09, null, o); tone(520, 0.3, "square", 0.07, null, o); },
     jump: () => { tone(300, 0.12, "triangle", 0.18, 520); puff(0.08, 900, 1, 0.12); },
     horn: () => { tone(196, 0.9, "sawtooth", 0.16); tone(294, 0.9, "sawtooth", 0.11); tone(392, 0.9, "sawtooth", 0.07); },
     discover: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.55, "sine", 0.16, null, null, i * 0.11)); },

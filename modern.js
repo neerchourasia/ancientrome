@@ -6,6 +6,8 @@
 
 const Modern = (() => {
   let group = null, windowTex = null, lampMat = null, built = false;
+  let traffic = [], trafficBody = null, trafficCabin = null;
+  const _o = new THREE.Object3D();
 
   const LAMP_DAY = new THREE.Color(0x8a8a80), LAMP_NIGHT = new THREE.Color(0xffe3a0);
   const CAR_COLORS = [0xb3b6ba, 0x2d3036, 0xe9e9e6, 0x8d1f24, 0x1f4f8a, 0x3a6b4a, 0xd4b34a, 0x6d737a].map((c) => new THREE.Color(c));
@@ -64,13 +66,13 @@ const Modern = (() => {
     const rg = rc.getContext("2d");
     rg.fillStyle = "#2f3134"; rg.fillRect(0, 0, 256, 32);
     rg.fillStyle = "#cfc9a6";
-    for (const d of [-14, 0, 14]) rg.fillRect(256 * (0.5 + d / 44.4) - 17, 14.5, 34, 3);
+    for (const d of [-14, 0, 14]) rg.fillRect(256 * (0.5 + d / 44.4) - 17, 15, 34, 2);
     const roadTex = new THREE.CanvasTexture(rc);
     roadTex.anisotropy = 4;
     const road = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map: roadTex }), roadPieces.length);
     roadPieces.forEach((p, i) => {
       o.rotation.set(0, p.alongX ? 0 : Math.PI / 2, 0); // the texture runs along the box's length
-      o.position.set(p.x, 0.05, p.z); o.scale.set(44.4, 0.1, 5.4); o.updateMatrix(); road.setMatrixAt(i, o.matrix);
+      o.position.set(p.x, 0.05, p.z); o.scale.set(44.4, 0.1, 7.6); o.updateMatrix(); road.setMatrixAt(i, o.matrix);
     });
     group.add(road);
 
@@ -79,7 +81,7 @@ const Modern = (() => {
     for (const p of roadPieces) {
       if (rand() > 0.24) continue;
       const side = rand() < 0.5 ? -1 : 1, along = (rand() - 0.5) * 24;
-      const cx = p.alongX ? p.x + along : p.x + side * 1.55, cz = p.alongX ? p.z + side * 1.55 : p.z + along;
+      const cx = p.alongX ? p.x + along : p.x + side * 2.7, cz = p.alongX ? p.z + side * 2.7 : p.z + along;
       const hx = p.alongX ? 2.1 : 0.9, hz = p.alongX ? 0.9 : 2.1;
       if (blockedAt(cx, cz, 0) || blockedAt(cx + (p.alongX ? 2.2 : 0), cz + (p.alongX ? 0 : 2.2), 0) || blockedAt(cx - (p.alongX ? 2.2 : 0), cz - (p.alongX ? 0 : 2.2), 0)) continue;
       cars.push({ x: cx, z: cz, alongX: p.alongX, color: CAR_COLORS[Math.floor(rand() * CAR_COLORS.length)] });
@@ -118,14 +120,92 @@ const Modern = (() => {
     });
     group.add(poles, heads);
 
+
+    // moving traffic: cars drive from crossing to crossing along the streets, on the right-hand side
+    const nodes = new Map();
+    const node = (x, z) => { const k = x + "," + z; if (!nodes.has(k)) nodes.set(k, { x, z, next: [] }); return nodes.get(k); };
+    for (const p of roadPieces) {
+      const a = p.alongX ? node(p.x - 22, p.z) : node(p.x, p.z - 22), b = p.alongX ? node(p.x + 22, p.z) : node(p.x, p.z + 22);
+      a.next.push(b); b.next.push(a);
+    }
+    const starts = [...nodes.values()].filter((n) => n.next.length);
+    const TRAFFIC = Math.min(110, starts.length);
+    for (let i = 0; i < TRAFFIC; i++) {
+      const A = starts[Math.floor(rand() * starts.length)], B = A.next[Math.floor(rand() * A.next.length)];
+      traffic.push({ id: i, A, B, s: rand() * 44, v: 0, vmax: 6 + rand() * 5, yaw: 0, ox: 0, oz: 0, x: A.x, z: A.z, dx: 1, dz: 0, honkT: 0, color: CAR_COLORS[Math.floor(rand() * CAR_COLORS.length)] });
+    }
+    trafficBody = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), traffic.length);
+    trafficCabin = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x1d2a33 }), traffic.length);
+    traffic.forEach((c, i) => trafficBody.setColorAt(i, c.color));
+    if (traffic.length) trafficBody.instanceColor.needsUpdate = true;
+    trafficBody.castShadow = trafficCabin.castShadow = true;
+    group.add(trafficBody, trafficCabin);
+
     windowTex = makeWindowTex();
     scene.add(group);
   }
 
-  // `night` is 0 by day and 1 at night: the lamps glow after dark.
-  function update(night) {
+  // `night` is 0 by day and 1 at night: the lamps glow after dark. Also drives the traffic (px, pz: where you are).
+  function update(night, dt, px, pz) {
     if (!lampMat || !group || !group.visible) return;
     lampMat.color.copy(LAMP_DAY).lerp(LAMP_NIGHT, Math.min(1, Math.max(0, (night - 0.3) * 2)));
+    if (dt) drive(Math.min(dt, 0.05), px, pz);
+  }
+
+  function drive(dt, px, pz) {
+    for (const c of traffic) {
+      const L = Math.hypot(c.B.x - c.A.x, c.B.z - c.A.z);
+      c.dx = (c.B.x - c.A.x) / L; c.dz = (c.B.z - c.A.z) / L;
+      const rx = -c.dz, rz = c.dx; // right-hand side
+      // slow down for you and for other cars ahead in the same lane (or, at a crossing, for the lower-numbered car)
+      let brake = false;
+      const pxr = px - c.x, pzr = pz - c.z, pa = pxr * c.dx + pzr * c.dz, pl = pxr * rx + pzr * rz;
+      if (pa > 0 && pa < 9 && Math.abs(pl) < 1.5) {
+        brake = true;
+        if (pa < 7 && c.honkT <= 0) { c.honkT = 4; Sfx.play("honk", { x: c.x, z: c.z, range: 90 }); }
+      }
+      c.honkT -= dt;
+      if (!brake) {
+        for (const o of traffic) {
+          if (o === c) continue;
+          const ex = o.x - c.x, ez = o.z - c.z;
+          if (ex > 10 || ex < -10 || ez > 10 || ez < -10) continue;
+          const a = ex * c.dx + ez * c.dz, l = ex * rx + ez * rz;
+          if (a > 0 && a < 7 && Math.abs(l) < 1.3 && (o.dx * c.dx + o.dz * c.dz > 0.5 || o.id < c.id)) { brake = true; break; }
+        }
+      }
+      c.v += Math.max(-12 * dt, Math.min(4 * dt, (brake ? 0 : c.vmax) - c.v));
+      c.s += c.v * dt;
+      if (c.s >= L) { // reached the crossing: carry on, turn, or (at a dead end) turn round
+        const options = c.B.next.filter((n) => n !== c.A), next = options.length ? options[Math.floor(Math.random() * options.length)] : c.A;
+        c.s -= L; c.A = c.B; c.B = next;
+      }
+      const k = Math.min(1, dt * 4);
+      c.ox += (rx * 1.0 - c.ox) * k; c.oz += (rz * 1.0 - c.oz) * k; // keep to the right, easing across when the direction changes
+      c.x = c.A.x + c.dx * c.s + c.ox; c.z = c.A.z + c.dz * c.s + c.oz;
+      let dy = Math.atan2(-c.dz, c.dx) - c.yaw;
+      dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      c.yaw += dy * Math.min(1, dt * 6);
+    }
+    traffic.forEach((c, i) => {
+      _o.rotation.set(0, c.yaw, 0);
+      _o.position.set(c.x, 0.55, c.z); _o.scale.set(4.2, 0.75, 1.8); _o.updateMatrix(); trafficBody.setMatrixAt(i, _o.matrix);
+      _o.position.set(c.x - 0.2 * Math.cos(c.yaw), 1.22, c.z + 0.2 * Math.sin(c.yaw)); _o.scale.set(2.3, 0.62, 1.6); _o.updateMatrix(); trafficCabin.setMatrixAt(i, _o.matrix);
+    });
+    trafficBody.instanceMatrix.needsUpdate = trafficCabin.instanceMatrix.needsUpdate = true;
+  }
+
+  // A moving car that is touching you, if any: { v, rx, rz, side } (side: which way it should throw you).
+  function hits(px, pz) {
+    if (!group || !group.visible) return null;
+    for (const c of traffic) {
+      if (c.v < 0.8) continue;
+      const ex = px - c.x, ez = pz - c.z;
+      if (ex > 4 || ex < -4 || ez > 4 || ez < -4) continue;
+      const a = ex * c.dx + ez * c.dz, rx = -c.dz, rz = c.dx, l = ex * rx + ez * rz;
+      if (Math.abs(a) < 2.5 && Math.abs(l) < 1.3) return { v: c.v, rx, rz, side: l >= 0 ? 1 : -1 };
+    }
+    return null;
   }
 
   function apply(modern) {
@@ -136,5 +216,5 @@ const Modern = (() => {
     }
   }
 
-  return { build, update, apply };
+  return { build, update, apply, hits };
 })();

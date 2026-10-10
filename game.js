@@ -368,6 +368,20 @@ function describeObstacle(tx, tz) {
   return "a wall";
 }
 
+// A moving car hits you: it hurts more the faster it was going, and throws you to the side.
+function carHit(h) {
+  crashCd = 1.4;
+  const dmg = Math.min(30, 6 + h.v * 2.2);
+  Vitals.hp = Math.max(5, Vitals.hp - dmg);
+  player.stun = 0.9; player.shake = 1;
+  $("#flash").style.opacity = 0.6;
+  const kx = h.rx * h.side * 2.6, kz = h.rz * h.side * 2.6;
+  if (canMove(player.x, player.z, player.x + kx, player.z + kz)) { player.x += kx; player.z += kz; }
+  player.vx = player.vz = 0;
+  Sfx.play("bump");
+  toast(`A car hit you! (-${Math.round(dmg)} health)`);
+}
+
 function crash(impact, dx, dz, tx, tz) {
   crashCd = 0.8;
   const hard = impact > 9; // running into it
@@ -596,6 +610,12 @@ function buildPremium() {
       li.append(dot, document.createTextNode(Character.PREMIUM_NAMES[part][i]));
       $("#pr-items").append(li);
     }
+  }
+  for (const name of Character.PREMIUM_FEATURES) {
+    const li = document.createElement("li"), badge = document.createElement("span");
+    badge.className = "soon"; badge.textContent = "Coming soon";
+    li.append(document.createTextNode(name), badge);
+    $("#pr-items").append(li);
   }
   const shop = Character.SHOP, live = /^https:\/\//.test(shop.checkoutUrl);
   $("#pr-price").textContent = shop.price ? `Price: ${shop.price}` : "";
@@ -1166,7 +1186,8 @@ function updateTime(dt) {
   if (started && !sleeping) Time.advance(dt);
   sky.setHour(Time.hour);
   Home.update(sky.night);
-  Modern.update(sky.night);
+  Modern.update(sky.night, dt, player.x, player.z);
+  if (started && mode === "walk" && !creatorOpen && !panelOpen && crashCd <= 0) { const h = Modern.hits(player.x, player.z); if (h) carHit(h); }
 
   const label = Time.label() + (Time.late && !sleeping ? " · sleepy: sleep before 4:00" : "");
   if (label !== lastClock) { lastClock = label; $("#clock").textContent = label; }
