@@ -403,3 +403,32 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #drive-kmh { font: 700 2.6rem ui-monospace, Menlo, monospace; color: #fff; }
 #drive-hud small { font-size: 1rem; color: var(--muted); }
 #drive-hud p { margin: 2px 0 0; font-size: .8rem; }
+
+/* Games of Old Delhi */
+.dpanel { position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.7); }
+.dpanel.show { display: flex; }
+.dpanel .box { width: min(480px, 100%); max-height: 92vh; overflow-y: auto; background: rgba(28,22,16,.97); border: 1px solid rgba(226,185,85,.45); border-radius: 12px; padding: 6px 18px 18px; }
+.dpanel header { display: flex; justify-content: space-between; align-items: center; }
+.dpanel h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
+.dpanel .dclose, .dpanel button { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 6px 12px; }
+.dpanel button:disabled { opacity: .45; cursor: default; }
+.dpanel button:hover:not(:disabled) { border-color: var(--gold); }
+.dlist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.dlist li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 9px 11px; background: rgba(255,255,255,.05); border-radius: 8px; }
+.dlist li span { display: grid; gap: 3px; }
+.dlist li small { color: var(--muted); }
+.dnote { margin: 8px 0; color: var(--ink); }
+.dnote.small { font-size: .78rem; color: var(--muted); }
+.dbtns { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+#pc-board { display: block; width: 100%; max-width: 340px; margin: 6px auto; background: #3a2a1a; border-radius: 10px; }
+.dtable { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.dtable th, .dtable td { padding: 6px 4px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.1); font-size: .9rem; }
+.dtable td button { padding: 3px 8px; margin-right: 4px; }
+.dtable .up { color: #e47a6d; } .dtable .down { color: #7fcf8a; }
+#dg-hud { position: fixed; top: 54px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; flex-direction: column; align-items: center; gap: 4px; padding: 8px 18px; background: rgba(28,22,16,.82); border: 1px solid rgba(226,185,85,.45); border-radius: 10px; color: var(--ink); text-align: center; pointer-events: none; }
+#dg-hud.show { display: flex; }
+#dg-hud strong { font: 700 1rem Georgia, serif; color: var(--gold); }
+#dg-hud .bar { width: 200px; height: 8px; background: rgba(255,255,255,.15); border-radius: 4px; overflow: hidden; }
+#dg-hud .bar > div { height: 100%; background: var(--gold); width: 0; }
+#dg-hud .bar[hidden] { display: none; }
+#dg-hud p { margin: 0; font-size: .75rem; color: var(--muted); }

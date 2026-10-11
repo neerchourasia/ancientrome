@@ -255,8 +255,16 @@ const Car = (() => {
     const f = $("#flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
   }
 
+  // A fresh model of a vehicle for the Delhi games, in another colour (the body and the cloth or canopy take the colour).
+  function model(id, color) {
+    const M = MODELS[id], m = build(id), accents = id === "elephant" ? [0xa8282b] : [M.color, 0xe8c13a];
+    if (color !== undefined) m.g.traverse((o) => { if (o.isMesh && o.material && o.material.color && accents.includes(o.material.color.getHex())) o.material = lam(color); });
+    m.g.userData.wheels = m.wheels; m.g.userData.legs = m.legs;
+    return m.g;
+  }
+
   return {
-    MODELS, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
+    MODELS, model, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
     get motor() { return !car || car.M.motor !== false; },
     get verb() { return car ? car.M.verb || "get in" : "get in"; },
     get current() { return car ? car.id : null; },

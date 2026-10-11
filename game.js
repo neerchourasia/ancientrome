@@ -57,6 +57,7 @@ function init() {
   Naval.init(scene);
   Show.init(scene);
   Nav.init(scene);
+  DGames.init(scene);
   scene.traverse((o) => { if (o.isInstancedMesh) o.frustumCulled = false; });
   applyEra();
 
@@ -100,6 +101,7 @@ function leaveMode() {
   else if (mode === "watch") Watch.stop();
   else if (mode === "online") Online.leave();
   else if (mode === "drive") Car.exit();
+  else if (mode === "dgame" || DGames.running) DGames.stop();
   else closePanels();
 }
 
@@ -126,6 +128,7 @@ function wireInput(canvas) {
     if (k === "KeyZ") toggleRest();
     if (k === "KeyK") toggleEra();
     if (k === "KeyB") travel(city === "rome" ? "delhi" : "rome");
+    if (k === "KeyN" && city === "delhi" && mode === "walk" && !panelOpen && canStart()) DGames.open();
     if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();
     if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
     if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
@@ -143,7 +146,7 @@ function wireInput(canvas) {
       else if (k === "KeyN") Watch.nextAct();
       else { const m = /^(?:Digit|Key|Numpad)([1-5])$/.exec(k); if (m) Watch.setAct(Number(m[1]) - 1); }
     } else if (mode === "walk" && canStart()) {
-      if (era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
+      if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
       else if (k === "KeyL" && inArena(player.x, player.z)) Fight.start({ lion: true });
       else if (k === "KeyU" && inArena(player.x, player.z)) Fight.start({ hunt: true });
@@ -176,6 +179,7 @@ function wireInput(canvas) {
   canvas.addEventListener("mousedown", (e) => {
     if (mode === "fight") { if (e.button === 2) Fight.mouseBlock = true; else Fight.attack(); return; }
     if (mode === "naval") { Naval.fire("Space"); return; }
+    if (mode === "dgame") { DGames.fire(); return; }
     if (started && mode === "walk" && !panelOpen) dragging = true;
   });
   addEventListener("mouseup", (e) => { dragging = false; if (e.button === 2) Fight.mouseBlock = false; if (e.button === 0 && mode === "fight") Fight.release(); });
@@ -208,6 +212,8 @@ function wireInput(canvas) {
     $("#help").classList.add("show");
     setTimeout(() => $("#help").classList.remove("show"), 9000);
   });
+  $("#btn-dgames").addEventListener("click", () => DGames.open());
+  for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", () => travel(city === "rome" ? "delhi" : "rome"));
   $("#btn-map").addEventListener("click", toggleBigMap);
   $("#btn-places").addEventListener("click", togglePlaces);
@@ -395,6 +401,7 @@ function carHit(h) {
   const kx = h.rx * h.side * 2.6, kz = h.rz * h.side * 2.6;
   if (canMove(player.x, player.z, player.x + kx, player.z + kz)) { player.x += kx; player.z += kz; }
   player.vx = player.vz = 0;
+  DGames.bumped();
   Sfx.play("bump");
   toast(`${h.what ? h.what[0].toUpperCase() + h.what.slice(1) : "A car"} hit you! (-${Math.round(dmg)} health)`);
 }
@@ -434,6 +441,7 @@ function bumpCitizens(pace) {
       player.shake = Math.max(player.shake || 0, hard ? 0.6 : 0.3);
       if (hard) Vitals.hp = Math.max(5, Vitals.hp - 1.5);
       toast(hard ? "Crash! You knocked over a citizen" : "Oops! You bumped into a citizen");
+      DGames.bumped();
     }
     break;
   }
@@ -907,6 +915,7 @@ const bigMapOpen = () => $("#bigmap").classList.contains("show");
 function closePanels() {
   $("#account").classList.remove("show");
   $("#online").classList.remove("show");
+  for (const p of document.querySelectorAll(".dpanel.show")) p.classList.remove("show");
   $("#market").classList.remove("show");
   if (premiumOpen) { closePremium(); return; }
   if (creatorOpen) { if (!Character.exists) return; closeCreator(); } // the first-time screen cannot be skipped
@@ -917,7 +926,7 @@ function closePanels() {
   panelOpen = false;
 }
 function openPanel(id) {
-  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive") return;
+  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive" || mode === "dgame") return;
   if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
@@ -967,6 +976,7 @@ function applyEra() {
   $("#btn-era").innerHTML = modern ? `${oldName} <kbd>K</kbd>` : `${newName} <kbd>K</kbd>`;
   $("#btn-city").innerHTML = city === "rome" ? "✈ Travel to Delhi <kbd>B</kbd>" : "✈ Travel to Rome <kbd>B</kbd>";
   $("#hud .top-left h1").innerHTML = city === "rome" ? "Walk Ancient Rome <small>c. 128 AD</small>" : (modern ? "Walk Modern Delhi <small>today</small>" : "Walk Mughal Delhi <small>c. 1650</small>");
+  $("#btn-dgames").hidden = city !== "delhi";
   $("#map-title").textContent = city === "rome" ? "Map of Rome" : "Map of Old Delhi";
   refreshLandmarks();
 }
@@ -1410,6 +1420,7 @@ function tick(dt) {
   else if (mode === "naval") Naval.update(dt, keys);
   else if (mode === "online") Online.update(dt, keys);
   else if (mode === "drive") Car.update(dt, keys);
+  else if (mode === "dgame") DGames.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (started && !panelOpen) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
@@ -1422,6 +1433,7 @@ function tick(dt) {
   if (mode === "race") Race.camera(camera, dt);
   else if (mode === "naval") Naval.camera(camera, dt);
   else if (mode === "drive") Car.camera(camera, dt);
+  else if (mode === "dgame" && DGames.camera(camera, dt)) { /* the game's own camera */ }
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {
     if ((mode === "walk" && (viewId() !== "first" || creatorOpen)) || mode === "online") chaseCamera();
@@ -1441,6 +1453,7 @@ function tick(dt) {
   sky.follow(camera.position);
   updateCitizens(dt, clock);
   if (city === "delhi") Delhi.update(dt, player.x, player.z);
+  DGames.tickRun(dt);
   updateAvatar(dt);
   Pets.update(dt);
   Crowd.update(dt, clock);
