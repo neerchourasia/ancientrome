@@ -25,6 +25,9 @@ Open the game, click **🌐 Play online**, tick "practice bot" and press **Duel*
 
 ## Putting it online (Render, free to start)
 
+Quick way: this repo has a `render.yaml`. On render.com choose **New > Blueprint**, pick the repo and click **Apply**; it fills in everything below for you. Then copy the address Render gives you into `config.js` as `serverUrl: "wss://YOUR-NAME.onrender.com/play"`.
+
+
 1. Make sure your code is on GitHub (`git push`).
 2. On **render.com** sign up, then **New > Web Service**, pick your repo.
 3. **Runtime:** Python 3. **Build command:** leave empty. **Start command:** `python3 server/server.py`.

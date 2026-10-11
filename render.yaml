@@ -1,0 +1,20 @@
+# One-click setup for Render (https://render.com): New > Blueprint > pick this repo.
+# This starts the game server (server/server.py) that referees online duels, races and naval battles.
+# Nothing secret is in this file: the Supabase address and anon key are public, like in config.js.
+services:
+  - type: web
+    name: ancientrome-game
+    runtime: python
+    plan: free
+    buildCommand: echo "nothing to build"
+    startCommand: python3 server/server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SUPABASE_URL
+        value: https://gqxugubkcjfrvdyhncyp.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxeHVndWJrY2pmcnZkeWhuY3lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NDYxMDAsImV4cCI6MjEwNzMyMjEwMH0.JsZ0BG6nRBAvcgdkvYw_smbUrBkbEuS1jKB3RIjyrjo
+      - key: ALLOWED_ORIGINS
+        value: https://ancientrome-gold.vercel.app
