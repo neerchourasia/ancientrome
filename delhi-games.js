@@ -123,7 +123,7 @@ const DGames = (() => {
     game.update(Math.min(dt, 0.05), keys);
     const f = $d("flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
   }
-  function camera(cam, dt) { if (!game || !game.camera) return false; game.camera(cam, dt); return true; }
+  function gameCamera(cam, dt) { if (!game || !game.camera) return false; game.camera(cam, dt); return true; }
   function stop() {
     if (game) { const g = game; leaveGame(); if (g.back) placeAt(g.back.x, g.back.z, g.back.yaw); toast("You left the game."); }
     else if (runGame) { endRun(false, "You gave up the food run."); }
@@ -257,8 +257,13 @@ const DGames = (() => {
     const hat = new THREE.InstancedMesh(hatGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), MAXR);
     for (const m of [body, head, hat]) { m.frustumCulled = false; m.castShadow = true; group.add(m); }
     const cols = [0x2a2a2a, 0x8a1f1f, 0x1f3a6a].map((c) => new THREE.Color(c));
+    // a bright red arrow floats over every raider so they can be seen from the top of the wall (it shows through buildings too)
+    const arrowGeo = new THREE.ConeGeometry(1.1, 2.6, 6); arrowGeo.rotateX(Math.PI);
+    const marks = new THREE.InstancedMesh(arrowGeo, new THREE.MeshBasicMaterial({ color: 0xff3b1f, depthTest: false, transparent: true, opacity: 0.95, fog: false }), MAXR);
+    marks.frustumCulled = false; marks.renderOrder = 20; group.add(marks);
     const raiders = [];
-    const ret = new THREE.Mesh(new THREE.RingGeometry(6.2, 7.4, 28), new THREE.MeshBasicMaterial({ color: 0xffd45a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+    const ret = new THREE.Mesh(new THREE.RingGeometry(6.2, 7.4, 28), new THREE.MeshBasicMaterial({ color: 0xffd45a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false })); ret.renderOrder = 19;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 60, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd45a, transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide })); beam.position.y = 30; group.add(beam);
     ret.rotation.x = -Math.PI / 2; group.add(ret);
     const dot = new THREE.Mesh(new THREE.CircleGeometry(0.9, 12), new THREE.MeshBasicMaterial({ color: 0xffd45a, side: THREE.DoubleSide })); dot.rotation.x = -Math.PI / 2; group.add(dot);
     const gun = new THREE.Group(), barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 5, 12), lam(0x2e2e30)); barrel.rotation.x = Math.PI / 2; barrel.position.z = 2.2;
@@ -288,7 +293,7 @@ const DGames = (() => {
         if (keys.has("KeyD") || keys.has("ArrowRight")) az -= 16 * dt;
         if (keys.has("Space")) this.fire();
         d = clamp(d, 30, 290); az = clamp(az, -14, 14);
-        ret.position.set(X(-d), 0.25, az); dot.position.set(X(-d), 0.26, az);
+        ret.position.set(X(-d), 0.25, az); dot.position.set(X(-d), 0.26, az); beam.position.set(X(-d), 30, az);
         gun.lookAt(X(-d * 0.7), 8, az * 0.8);
         // the shell in flight
         if (shot) {
@@ -319,13 +324,18 @@ const DGames = (() => {
             r.x += r.v * dt; r.z += Math.sin(t * 1.4 + r.ph) * 0.6 * dt; r.z = clamp(r.z, -14, 14);
             if (r.x - DELHI_X > -6) { r.alive = false; r.gone = true; gate -= 4; player.shake = 0.5; $d("flash").style.opacity = 0.35; Sfx.play("bump"); puff(r.x, 2, r.z, 2, 0.4, 0xff7a5a, 6); }
           } else r.gone = true;
+          o.scale.set(1.6, 1.6, 1.6);
           o.position.set(r.x, r.alive ? groundAt(r.x, r.z) + Math.abs(Math.sin(t * 6 + r.ph)) * 0.08 : -50, r.z); o.rotation.y = -Math.PI / 2; o.updateMatrix();
           body.setMatrixAt(i, o.matrix); head.setMatrixAt(i, o.matrix); hat.setMatrixAt(i, o.matrix); body.setColorAt(i, cols[r.ci]); hat.setColorAt(i, cols[(r.ci + 1) % 3]);
+          const far = Math.hypot(r.x - camera.position.x, r.z - camera.position.z), ms = clamp(far / 38, 1, 9);
+          o.scale.set(ms, ms, ms); o.position.y = r.alive ? 3.2 + 1.3 * ms + Math.sin(t * 5 + r.ph) * 0.3 : -50; o.updateMatrix(); marks.setMatrixAt(i, o.matrix);
         });
-        for (let i = raiders.length; i < MAXR; i++) { o.position.set(0, -50, 0); o.updateMatrix(); body.setMatrixAt(i, o.matrix); head.setMatrixAt(i, o.matrix); hat.setMatrixAt(i, o.matrix); }
+        for (let i = raiders.length; i < MAXR; i++) { o.scale.set(1, 1, 1); o.position.set(0, -50, 0); o.updateMatrix(); body.setMatrixAt(i, o.matrix); head.setMatrixAt(i, o.matrix); hat.setMatrixAt(i, o.matrix); marks.setMatrixAt(i, o.matrix); }
+        marks.instanceMatrix.needsUpdate = true;
         for (const m of [body, head, hat]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
         const left = alive() + toSpawn;
-        hud("Defend the Red Fort", `Wave ${Math.min(wave + 1, WAVES.length)} of ${WAVES.length} · raiders left ${left} · gate ${Math.max(0, Math.round(gate))}%`, undefined, gate / 100);
+        const nearest = raiders.filter((r) => r.alive).reduce((m, r) => Math.max(m, r.x - DELHI_X), -Infinity);
+        hud("Defend the Red Fort", `Wave ${Math.min(wave + 1, WAVES.length)} of ${WAVES.length} · raiders left ${left}${nearest > -1e6 ? ` · nearest ${Math.max(0, Math.round(-nearest))} m from the gate` : ""} · gate ${Math.max(0, Math.round(gate))}%`, undefined, gate / 100);
         if (gate <= 0 && !over) { over = true; finish("defend", "The gate has fallen", `The raiders broke through the Lahori Gate. You stopped ${kills} of them.`, 0, game.back); }
         else if (wave >= WAVES.length && alive() === 0 && over && gate > 0) { over = false; const prize = 50 + Math.round(gate * 0.3); wave = 99; finish("defend", "The gate holds!", `All three waves are beaten (${kills} raiders stopped) and the Lahori Gate is ${Math.round(gate)}% intact.`, prize, game.back); }
       },
@@ -703,5 +713,5 @@ const DGames = (() => {
   }
 
 
-  return { get game() { return game; }, key, playHere, init, open, play, update, camera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
+  return { get game() { return game; }, key, playHere, init, open, play, update, camera: gameCamera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
 })();
