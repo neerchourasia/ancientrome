@@ -821,6 +821,7 @@ function confirmCreator() {
 
 let currentLm = null, lastCheck = 0;
 let DISCOVERABLE = LANDMARKS.filter((l) => !l.home && !l.game); // your house is on the map but is not a sight to discover
+const DISCOVER_REWARD = 50;
 const seenCount = () => DISCOVERABLE.filter((l) => discovered.has(l.id)).length;
 
 function checkLandmarks(t) {
@@ -838,7 +839,8 @@ function checkLandmarks(t) {
       discovered.add(best.id);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
-      toast(seenCount() === DISCOVERABLE.length ? (city === "delhi" ? "You have discovered all of Old Delhi. Wah!" : "You have discovered all of Rome. Ave!") : `Discovered: ${best.name}`);
+      Vitals.coins += DISCOVER_REWARD; // every new sight pays 50 denarii, once
+      toast(seenCount() === DISCOVERABLE.length ? (city === "delhi" ? "You have discovered all of Old Delhi. Wah!" : "You have discovered all of Rome. Ave!") + ` (+${DISCOVER_REWARD} denarii)` : `Discovered: ${best.name} (+${DISCOVER_REWARD} denarii)`);
       Sfx.play("discover");
     }
   }
