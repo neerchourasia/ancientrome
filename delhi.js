@@ -450,22 +450,100 @@ const Delhi = (() => {
     chhatri(scene, X(-424), 15, -23, 0.8, D.marble); chhatri(scene, X(-416), 15, -23, 0.8, D.marble);
     MAP_SHAPES.push({ k: "r", x0: X(-423), x1: X(-417), z0: -340, z1: -28, c: "#d6c8a8" });
 
-    // your haveli: a courtyard house with a gate to the street, a fountain and a bedroom
-    const hx = -100, hz0 = -90, hz1 = -18;
-    mbox(scene, X(hx - 17), 0, (hz0 + hz1) / 2, 2, 7.5, hz1 - hz0, D.cream, { solid: true, map: "#d8c79a" });
-    mbox(scene, X(hx + 33), 0, (hz0 + hz1) / 2, 2, 7.5, hz1 - hz0, D.cream, { solid: true });
-    mbox(scene, X(hx + 8), 0, hz0 + 1, 52, 7.5, 2, D.cream, { solid: true });
-    mbox(scene, X(hx - 10), 0, hz1 - 1, 14, 7.5, 2, D.cream, { solid: true }); mbox(scene, X(hx + 22), 0, hz1 - 1, 22, 7.5, 2, D.cream, { solid: true });
-    mbox(scene, X(-96), 5.5, hz1 - 1, 14, 2.5, 2, D.cream, { solid: false });
-    mbox(scene, X(hx + 8), 0.04, (hz0 + hz1) / 2, 48, 0.06, 68, lambert(0xc9b58a), { cast: false });
-    mcyl(scene, X(hx + 8), 0, -54, 3.2, 0.7, D.marble, { solid: true }); mcyl(scene, X(hx + 8), 0.6, -54, 2.6, 0.1, D.water);
-    // the bedroom: walls on three sides and a roof, open to the courtyard
-    const bx = hx - 8, bz = -82;
-    mbox(scene, X(bx - 6), 0, bz, 1, 6, 12, D.cream, { solid: true }); mbox(scene, X(bx), 0, bz - 6, 12, 6, 1, D.cream, { solid: true }); mbox(scene, X(bx), 0, bz + 6, 12, 6, 1, D.cream, { solid: true });
-    mbox(scene, X(bx), 6, bz, 13, 0.5, 13, D.redDark);
-    mbox(scene, X(bx - 3), 0, bz - 2, 2.4, 0.8, 5, lambert(0x9a2f2f)); mbox(scene, X(bx - 3), 0.8, bz - 2, 2.4, 0.3, 5, D.white);
-    mbox(scene, X(bx + 3), 0, bz - 4, 1.4, 0.9, 1.4, D.wood);
-    MAP_SHAPES.push({ k: "r", x0: X(-118), x1: X(-67), z0: -90, z1: -18, c: "#e0cfa4" });
+    buildHouses();
+  }
+
+
+  // ---------- your house: a plot off Chandni Chowk that grows as you buy (Market) ----------
+
+  const houses = [0, 1, 2, 3].map(() => ({ g: new T.Group(), blockers: [] }));
+  let houseTier = 0;
+  // the bedroom of each size of house, where Z puts you to sleep: centre and half-sizes
+  const ROOMS = [{ x: -100, z: -34, hw: 4, hd: 3.6 }, { x: -100, z: -44, hw: 7, hd: 5 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }];
+  const PLOT = { x0: -118, x1: -66, z0: -90, z1: -18 };
+
+  function hb(t, cx, y0, cz, w, h, d, m, solid = true) { // a box in house `t`
+    const mesh = mbox(houses[t].g, X(cx), y0, cz, w, h, d, m);
+    if (solid) houses[t].blockers.push(addBlockerBox(X(cx) - w / 2, X(cx) + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h));
+    return mesh;
+  }
+  function hc(t, cx, y0, cz, r, h, m, solid = true, sides = 16) {
+    const mesh = mcyl(houses[t].g, X(cx), y0, cz, r, h, m, { sides: sides === 8 ? 8 : undefined });
+    if (solid) houses[t].blockers.push(addBlockerCircle(X(cx), cz, r, y0, y0 + h));
+    return mesh;
+  }
+  function hdome(t, cx, y0, cz, r, h, m, drum = 0) { dome(houses[t].g, X(cx), y0, cz, r, h, m, drum); }
+  function htree(t, cx, cz, s = 1) { hc(t, cx, 0, cz, 0.3 * s, 3.2 * s, lambert(0x5a4630), true); const c = new T.Mesh(new T.SphereGeometry(1.8 * s, 9, 7), lambert(0x4a7a36)); c.position.set(X(cx), 4.2 * s, cz); c.castShadow = true; houses[t].g.add(c); }
+  function hlawn(t, cx, cz, w, d) { mbox(houses[t].g, X(cx), 0.04, cz, w, 0.06, d, D.lawn, { cast: false }); }
+  function hfountain(t, cx, cz, r = 2.6) { hc(t, cx, 0, cz, r, 0.7, D.marble, true); hc(t, cx, 0.6, cz, r * 0.82, 0.1, D.water, false); hc(t, cx, 0.7, cz, 0.35, 1.6, D.marble, false); }
+
+  // a room with the door on its south side: four walls, a roof and a bed
+  function hroom(t, cx, cz, w, d, h, doorX, doorW) {
+    const k = 0.6;
+    hb(t, cx, 0, cz - d / 2 + k / 2, w, h, k, D.cream);
+    hb(t, cx - w / 2 + k / 2, 0, cz, k, h, d, D.cream); hb(t, cx + w / 2 - k / 2, 0, cz, k, h, d, D.cream);
+    const left = (doorX - doorW / 2) - (cx - w / 2), right = (cx + w / 2) - (doorX + doorW / 2);
+    hb(t, cx - w / 2 + left / 2, 0, cz + d / 2 - k / 2, left, h, k, D.cream);
+    hb(t, cx + w / 2 - right / 2, 0, cz + d / 2 - k / 2, right, h, k, D.cream);
+    hb(t, doorX, h - 1.4, cz + d / 2 - k / 2, doorW, 1.4, k, D.cream, false);
+    hb(t, cx, h, cz, w + 1, 0.45, d + 1, D.redDark, false);
+    hb(t, cx - w / 2 + 2.2, 0, cz - d / 2 + 2.6, 1.3, 0.55, 2.6, lambert(0x9a2f2f), false);
+    hb(t, cx - w / 2 + 2.2, 0.55, cz - d / 2 + 2.6, 1.3, 0.2, 2.6, D.white, false);
+  }
+
+  function grandHouse(t) { // a haveli built round a courtyard, with ranges of rooms on three sides
+    for (const [cx, cz, w, d] of [[-92, -85, 48, 8], [-112, -63, 8, 36], [-72, -63, 8, 36]]) {
+      hb(t, cx, 0, cz, w, 8, d, D.cream);
+      hb(t, cx, 8, cz, w + 0.8, 0.8, d + 0.8, D.redDark, false);
+      for (let k = -1; k <= 1; k++) hb(t, w > d ? cx + k * 14 : cx + (cx < -92 ? 4.1 : -4.1), 0.1, w > d ? cz + 4.1 : cz + k * 10, w > d ? 3.4 : 0.3, 4, w > d ? 0.3 : 3.4, D.dark, false);
+    }
+    hlawn(t, -92, -48, 30, 54);
+    hfountain(t, -92, -62, 3);
+    for (const [cx, cz] of [[-110, -85], [-74, -85], [-114, -44], [-70, -44]]) chhatri(houses[t].g, X(cx), 8.8, cz, 0.9, D.marble);
+    // the bedroom: three walls, a roof and a bed, open to the courtyard
+    const bx = -82, bz = -72;
+    hb(t, bx + 5.8, 0, bz, 0.6, 5, 11.6, D.cream); hb(t, bx, 0, bz - 5.8, 11.6, 5, 0.6, D.cream); hb(t, bx, 0, bz + 5.8, 11.6, 5, 0.6, D.cream);
+    hb(t, bx, 5, bz, 12.4, 0.45, 12.4, D.redDark, false);
+    hb(t, bx + 3, 0, bz - 2, 2.4, 0.55, 5, lambert(0x9a2f2f), false); hb(t, bx + 3, 0.55, bz - 2, 2.4, 0.2, 5, D.white, false);
+    hb(t, bx - 1, 0, bz + 3.5, 1.4, 0.9, 1.4, D.wood, false);
+  }
+
+  function buildHouses() {
+    // the plot's own wall, always there: low and plain, with a gate on the street
+    const wall = new T.Group(); scene.add(wall);
+    const w = (cx, cz, ww, dd) => mbox(wall, X(cx), 0, cz, ww, 3.5, dd, D.stone, { solid: true });
+    w(-92, -89.5, 52, 1); w(-117.5, -54, 1, 72); w(-66.5, -54, 1, 72); w(-110.5, -18.5, 14, 1); w(-83, -18.5, 33, 1);
+    mbox(wall, X(-100), 3.5, -18.5, 6.4, 0.8, 1.2, D.redDark, { cast: false });
+    mbox(wall, X(-92), 0.03, -54, 50, 0.04, 70, lambert(0xc9b58a), { cast: false });
+    MAP_SHAPES.push({ k: "r", x0: X(PLOT.x0), x1: X(PLOT.x1), z0: PLOT.z0, z1: PLOT.z1, c: "#e0cfa4" });
+
+    // 0: a small one-room house, a well and a tree
+    hroom(0, -100, -34, 9, 8, 4.2, -100, 3);
+    hc(0, -88, 0, -26, 1, 1.1, D.stone); htree(0, -110, -24, 1);
+    // 1: a bigger house with a veranda, and a garden with a fountain
+    hroom(1, -100, -44, 16, 12, 5.5, -100, 4);
+    for (const sx of [-1, 1]) hb(1, -100 + sx * 5, 0, -37.6, 0.5, 4.4, 0.5, D.wood, false);
+    hb(1, -100, 4.4, -36.3, 13, 0.4, 3.4, D.redDark, false);
+    hlawn(1, -100, -26, 36, 14); hfountain(1, -100, -24, 2.2);
+    for (const [cx, cz] of [[-112, -28], [-88, -28], [-112, -70], [-88, -70], [-100, -75]]) htree(1, cx, cz, 1.1);
+    // 2: the grand haveli; 3: the same, with a tower, a pavilion in a pool and a gate
+    grandHouse(2);
+    grandHouse(3);
+    hc(3, -72, 0, -85, 5.5, 24, D.cream, true, 8);
+    hc(3, -72, 24, -85, 6.4, 0.6, D.marble, false, 8);
+    hdome(3, -72, 24.6, -85, 4, 5, D.gold, 0.8);
+    hc(3, -92, 0, -62, 8.5, 0.6, D.marble, false); hc(3, -92, 0.55, -62, 7.8, 0.08, D.water, false);
+    for (const [dx, dz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) hb(3, -92 + dx, 0.6, -62 + dz, 0.5, 4, 0.5, D.marble, false);
+    hb(3, -92, 4.6, -62, 6, 0.4, 6, D.marble, false);
+    hdome(3, -92, 5, -62, 2.4, 3, D.gold, 0.4);
+    for (const sx of [-1, 1]) hb(3, -100 + sx * 4.2, 0, -19, 1.2, 8, 1.2, D.marble, false);
+    for (const h of houses) scene.add(h.g);
+    setTier(pendingTier);
+  }
+  let pendingTier = 0;
+  function setTier(t) {
+    pendingTier = t; houseTier = t;
+    houses.forEach((h, i) => { h.g.visible = i === t; h.blockers.forEach((b) => { b.off = i !== t; }); });
   }
 
   // ---------- the mosques ----------
@@ -753,10 +831,11 @@ const Delhi = (() => {
   }
 
   // the haveli's bedroom, for sleeping
-  const homeInside = (x, z) => Math.abs(x - X(-108)) < 5.6 && Math.abs(z + 82) < 5.6;
-  const homeSpot = () => ({ x: X(-100), z: -60 });
+  const homeInside = (x, z) => { const r = ROOMS[houseTier]; return Math.abs(x - X(r.x)) < r.hw && Math.abs(z - r.z) < r.hd; };
+  const inPlot = (x, z) => x > X(PLOT.x0) && x < X(PLOT.x1) && z > PLOT.z0 && z < PLOT.z1;
+  const homeSpot = () => ({ x: X(-100), z: -22 });
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, update, hits, homeInside, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, setTier, update, hits, homeInside, inPlot, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();

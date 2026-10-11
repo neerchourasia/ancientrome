@@ -10,9 +10,9 @@ const dl = (o) => ({ ...o, x: DELHI_X + o.x, stand: [DELHI_X + o.stand[0], o.sta
 
 const DELHI_LANDMARKS = [
   dl({
-    id: "d-haveli", home: true, name: "Your Haveli", sub: "Your home in Shahjahanabad",
-    x: -100, z: -55, r: 14, stand: [-100, -8],
-    text: "A courtyard house just north of Chandni Chowk. A quiet room opens off the courtyard, with your bed. When night falls, come home and press Z to sleep until morning.",
+    id: "d-haveli", home: true, name: "Your House", sub: "Your plot off Chandni Chowk",
+    x: -100, z: -50, r: 22, stand: [-100, -8],
+    text: "A walled plot just north of Chandni Chowk. You start with a small one-room house; as you earn denarii, the Market sells you a bigger house, then a grand haveli and finally a mahal with a tower. Come home after dark and press Z in your bedroom to sleep until morning.",
     fact: "The French doctor François Bernier, who lived in Delhi in the 1660s, described good houses with courtyards, gardens, trees, basins of water and cool cellars with large fans.",
   }),
   dl({

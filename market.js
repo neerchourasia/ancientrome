@@ -14,6 +14,16 @@ const Market = (() => {
     { name: "Villa with a tower", price: 1000, rest: 3, rent: 40, perk: "A tower, a pool behind the house and a gilded pavilion. Resting heals 3 times faster, and rent is 40 denarii each morning." },
   ];
 
+  // Your home in Old Delhi: a small house on a plot off Chandni Chowk that you build up the same way.
+  const HOUSES_D = [
+    { name: "Small house", price: 0, rest: 1, rent: 0, perk: "A one-room house in a walled plot off Chandni Chowk. Sleep here after dark." },
+    { name: "House with a garden", price: 150, rest: 1.5, rent: 0, perk: "A bigger house with a veranda, a garden with trees and a fountain. Resting at home heals 1.5 times faster." },
+    { name: "Grand haveli", price: 400, rest: 2, rent: 15, perk: "A haveli built round a courtyard, with a fountain and carved ranges. Resting heals twice as fast, and your tenants pay you 15 denarii each morning." },
+    { name: "Mahal with a tower", price: 1000, rest: 3, rent: 40, perk: "A tower with a golden dome, a marble pavilion in a pool and a gate. Resting heals 3 times faster, and rent is 40 denarii each morning." },
+  ];
+  const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : HOUSES);
+  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : s.house);
+
   // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
   // supply (used up at once) or perk (a permanent bonus in single-player games).
   const ITEMS = {
@@ -46,7 +56,7 @@ const Market = (() => {
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
-  let s = { house: 0, items: [], worn: [] };
+  let s = { house: 0, dhouse: 0, items: [], worn: [] };
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw) s = sanitize(raw);
@@ -54,8 +64,9 @@ const Market = (() => {
 
   // Anything odd in saved data (edited, or from an older version) is dropped.
   function sanitize(raw) {
-    const out = { house: 0, items: [], worn: [] };
+    const out = { house: 0, dhouse: 0, items: [], worn: [] };
     if (raw && Number.isInteger(raw.house) && raw.house >= 0 && raw.house < HOUSES.length) out.house = raw.house;
+    if (raw && Number.isInteger(raw.dhouse) && raw.dhouse >= 0 && raw.dhouse < HOUSES_D.length) out.dhouse = raw.dhouse;
     const items = Array.isArray(raw && raw.items) ? raw.items : [], worn = Array.isArray(raw && raw.worn) ? raw.worn : [];
     out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply"))];
     const slots = new Set();
@@ -72,6 +83,7 @@ const Market = (() => {
   // Put what you own on show: the house, what is in it, what you wear and who follows you.
   function applyAll() {
     Home.setTier(s.house);
+    Delhi.setTier(s.dhouse);
     Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic") });
     if (avFig) applyAccessories(avFig, s.worn.filter((id) => ITEMS[id].type === "wear"));
     Pets.set(s.worn.find((id) => ITEMS[id].type === "pet"));
@@ -79,12 +91,13 @@ const Market = (() => {
   }
 
   function buyHouse() {
-    const next = HOUSES[s.house + 1];
+    const next = homes()[tier() + 1];
     if (!next) return;
     if (Vitals.coins < next.price) { toast(`You need ${next.price} denarii for the ${next.name.toLowerCase()} (you have ${Vitals.coins}).`); return; }
     Vitals.coins -= next.price;
-    s.house += 1; save(); applyAll(); Sfx.play("coin");
-    toast(`You bought the ${next.name.toLowerCase()}! Go and see it near the Colosseum road.`);
+    if (homes() === HOUSES_D) s.dhouse += 1; else s.house += 1;
+    save(); applyAll(); Sfx.play("coin");
+    toast(homes() === HOUSES_D ? `You bought the ${next.name.toLowerCase()}! It stands on your plot off Chandni Chowk.` : `You bought the ${next.name.toLowerCase()}! Go and see it near the Colosseum road.`);
     Narrator.say(`You bought the ${next.name}.`, { interrupt: true });
   }
 
@@ -120,7 +133,7 @@ const Market = (() => {
     const box = $m("market");
     if (!box) return;
     $m("mk-coins").textContent = Vitals.coins;
-    const cur = HOUSES[s.house], next = HOUSES[s.house + 1];
+    const cur = homes()[tier()], next = homes()[tier() + 1];
     $m("mk-house-name").textContent = cur.name;
     $m("mk-house-perk").textContent = cur.perk;
     $m("mk-house-buy").hidden = !next;
@@ -129,7 +142,7 @@ const Market = (() => {
       $m("mk-house-next").textContent = `Next: ${next.name}. ${next.perk}`;
       $m("mk-house-buy").textContent = `Buy for ${next.price} denarii`;
       $m("mk-house-buy").disabled = Vitals.coins < next.price;
-    } else $m("mk-house-perk").textContent += " It is the finest house in Rome.";
+    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : " It is the finest house in Rome.";
 
     $m("mk-sections").replaceChildren(...SECTIONS.flatMap(([title, type]) => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
@@ -180,9 +193,10 @@ const Market = (() => {
     get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },
     owns: (id) => s.items.includes(id),
     perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),
-    rent: () => HOUSES[s.house].rent,
-    houseName: () => HOUSES[s.house].name,
-    snapshot: () => ({ house: s.house, items: s.items.slice(), worn: s.worn.slice() }),
+    rent: () => homes()[tier()].rent,
+    houseName: () => homes()[tier()].name,
+    houseRest: () => homes()[tier()].rest,
+    snapshot: () => ({ house: s.house, dhouse: s.dhouse, items: s.items.slice(), worn: s.worn.slice() }),
     restore(raw) { s = sanitize(raw); save(); applyAll(); },
   };
 })();
