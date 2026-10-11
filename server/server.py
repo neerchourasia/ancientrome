@@ -52,6 +52,7 @@ def load_config():
         "bot_wait": float(e("BOT_WAIT", "6")),        # seconds alone in the queue before a practice bot joins
         "race_wait": float(e("RACE_WAIT", "6")),      # seconds to wait for more racers once two are queued
         "coop_wait": float(e("COOP_WAIT", "8")),      # seconds to wait for more teammates once two are queued
+        "naval_wait": float(e("NAVAL_WAIT", "8")),    # seconds to wait for more captains once two are queued
         "origins": [o.strip() for o in e("ALLOWED_ORIGINS", "").split(",") if o.strip()],
         "max_conns": int(e("MAX_CONNS", "400")),
         "max_per_ip": int(e("MAX_PER_IP", "8")),
@@ -741,10 +742,315 @@ class RaceRoom:
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# naval battle: every ship for itself (no teams). Players steer their own galley (the browser sends where it is, as
+# with duels, and the server clamps how fast it can move); the SERVER owns cannonballs, hits, rams, hull and the winner.
+
+NAVAL_RX, NAVAL_RZ = 29.0, 23.5      # sailable ellipse, in metres around the flooded arena's centre
+NAVAL_SPEED = 6.6                    # a galley's top speed (m/s); a little more is allowed for lag, the rest is clamped
+NAVAL_COUNTDOWN = 5.0                # the arena floods while this runs down
+NAVAL_TIME = 240.0
+NAVAL_CD = 2.2                       # seconds before the same side can fire again
+NAVAL_BALL_DMG = 8.0
+NAVAL_RAM_DMG = 12.0
+NAVAL_LEVEL = 0.9                    # water level when flooded
+NAVAL_GRAVITY = 14.0
+BOT_SHIP_NAMES = ("Corvus", "Neptunus", "Fortuna")
+
+
+class Ship:
+    def __init__(self, conn, index, count, bot=False):
+        self.conn, self.i, self.bot = conn, index, bot
+        self.name = conn.name if conn else "%s (practice ship)" % BOT_SHIP_NAMES[index % len(BOT_SHIP_NAMES)]
+        self.cls = conn.cls if conn else "gladiator"
+        self.look = conn.look if conn else clean_look({"toga": index, "sash": index}, False)
+        a = 2 * math.pi * index / max(1, count)
+        self.x, self.z = 19.0 * math.cos(a), 15.5 * math.sin(a)
+        self.yaw = math.atan2(-self.x, -self.z)          # facing the middle
+        self.v = 0.0
+        self.hp = 60.0 if bot else 100.0
+        self.max_speed = 5.4 if bot else NAVAL_SPEED
+        self.cd = {1: 0.3, -1: 0.3}
+        self.ram = 0.0
+        self.dead_at = None                               # when it sank (for the final order)
+        self.last_t = None
+        self.queue = []                                   # cannons waiting to go off: [delay, side]
+        self.fire_cd = random.random() * 2.5 + 2.0        # bots: first broadside
+
+    @property
+    def dead(self):
+        return self.dead_at is not None
+
+    def row(self):
+        return [self.i, round(self.x, 2), round(self.z, 2), round(self.yaw, 3), round(self.v, 1), round(self.hp, 1),
+                round(self.cd[1], 1), round(self.cd[-1], 1), 1 if self.dead else 0]
+
+
+def ship_fwd(s):
+    return math.sin(s.yaw), math.cos(s.yaw)
+
+
+def ship_side(s, side):
+    """Unit vector out of the port (+1) or starboard (-1) side."""
+    return (math.cos(s.yaw), -math.sin(s.yaw)) if side > 0 else (-math.cos(s.yaw), math.sin(s.yaw))
+
+
+def ang_diff(a, b):
+    return (b - a + math.pi) % (2 * math.pi) - math.pi
+
+
+class NavalRoom:
+    kind = "naval"
+    TICK = 0.05
+
+    def __init__(self, conns, bots=0):
+        self.id = os.urandom(3).hex()
+        n = len(conns) + bots
+        self.ships = [Ship(c, i, n) for i, c in enumerate(conns)]
+        for _ in range(bots):
+            self.ships.append(Ship(None, len(self.ships), n, bot=True))
+        self.balls, self.next_ball, self.events = [], 1, []
+        self.start_at = now() + NAVAL_COUNTDOWN
+        self.over = False
+        self.out = 0                                      # how many have sunk so far
+        for s in self.ships:
+            if s.conn:
+                s.conn.room, s.conn.me, s.conn.queue = self, s, None
+        for s in self.ships:
+            if s.conn:
+                s.conn.send({"t": "match", "mode": "naval", "room": self.id, "you": s.i, "countdown": NAVAL_COUNTDOWN,
+                             "rx": NAVAL_RX, "rz": NAVAL_RZ,
+                             "players": [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look, "bot": q.bot,
+                                          "x": round(q.x, 2), "z": round(q.z, 2), "yaw": round(q.yaw, 3)} for q in self.ships]})
+        self.task = asyncio.ensure_future(self.run())
+
+    # ---- what the players send: where the ship is, and which side to fire
+    def on_msg(self, conn, m):
+        s = conn.me
+        if self.over or s is None or m.get("t") != "naval" or s.dead:
+            return
+        t = now()
+        if t < self.start_at:
+            return
+        if s.last_t is None:
+            s.last_t = max(self.start_at, t - 0.05)
+        dt = max(0.03, min(0.5, t - s.last_t))
+        s.last_t = t
+        if "x" in m and "z" in m:
+            nx, nz = num(m.get("x"), -60, 60, s.x), num(m.get("z"), -60, 60, s.z)
+            step = math.hypot(nx - s.x, nz - s.z)
+            lim = NAVAL_SPEED * 1.25 * dt + 0.4           # cannot sail faster than a galley can
+            if step > lim:
+                nx, nz = s.x + (nx - s.x) * lim / step, s.z + (nz - s.z) * lim / step
+                step = lim
+            e = (nx / NAVAL_RX) ** 2 + (nz / NAVAL_RZ) ** 2
+            if e > 1:
+                k = 1 / math.sqrt(e)
+                nx, nz = nx * k, nz * k
+            yaw = num(m.get("yaw"), -50, 50, s.yaw)
+            fx, fz = math.sin(yaw), math.cos(yaw)
+            along = ((nx - s.x) * fx + (nz - s.z) * fz) / dt   # speed along the bow, for rams
+            s.v = max(-3.0, min(NAVAL_SPEED, 0.5 * s.v + 0.5 * along))
+            s.x, s.z, s.yaw = nx, nz, yaw
+        side = m.get("fire")
+        if side in (1, -1):
+            self.fire(s, side)
+
+    def fire(self, s, side):
+        if s.dead or s.cd[side] > 0 or now() < self.start_at:
+            return False
+        s.cd[side] = NAVAL_CD if not s.bot else 4.5 + random.random() * 2
+        for k in range(3):
+            s.queue.append([k * 0.13 + random.random() * 0.05, side, (-2.4, 0.0, 2.4)[k]])
+        return True
+
+    def shoot(self, s, side, cz):
+        fx, fz = ship_fwd(s)
+        nx, nz = ship_side(s, side)
+        sc = 0.8
+        x, z, y = s.x + fx * cz * sc + nx * 1.9 * sc, s.z + fz * cz * sc + nz * 1.9 * sc, NAVAL_LEVEL + 1.3 * sc
+        spread = 4.2 if s.bot else 1.5
+        along = (random.random() - 0.5) * spread
+        sp = 24.0 * (0.95 + random.random() * 0.1)
+        self.balls.append({"id": self.next_ball, "x": x, "y": y, "z": z, "vx": nx * sp + fx * (s.v + along),
+                           "vz": nz * sp + fz * (s.v + along), "vy": 5.5 + random.random(), "by": s})
+        self.next_ball += 1
+        self.events.append(["f", round(x, 1), round(y, 1), round(z, 1), round(nx, 2), round(nz, 2)])
+
+    def leave(self, conn):
+        s = conn.me
+        if s is not None:
+            s.conn = None
+            if not s.dead:
+                self.sink(s)
+        if not any(q.conn for q in self.ships):
+            self.finish("empty")
+
+    # ---- the simulation
+    async def run(self):
+        try:
+            while not self.over:
+                await asyncio.sleep(self.TICK)
+                self.step(self.TICK)
+        except asyncio.CancelledError:
+            pass
+
+    def sink(self, s):
+        s.hp, s.dead_at, s.v = 0.0, self.out, 0.0
+        self.out += 1
+        s.queue = []
+        self.events.append(["d", s.i])
+
+    def hurt(self, s, dmg, x, y, z, by=None):
+        s.hp -= dmg
+        self.events.append(["h", s.i, round(x, 1), round(y, 1), round(z, 1)])
+        if s.hp <= 0 and not s.dead:
+            self.sink(s)
+
+    def bot_think(self, b, dt):
+        targets = [q for q in self.ships if q is not b and not q.dead]
+        humans = [q for q in targets if not q.bot]
+        pool = humans or targets
+        if not pool:
+            return
+        t = min(pool, key=lambda q: math.hypot(q.x - b.x, q.z - b.z))
+        dx, dz = t.x - b.x, t.z - b.z
+        dist = math.hypot(dx, dz) or 1.0
+        bearing = math.atan2(dx, dz)
+        if dist > 17:
+            want = bearing
+        elif dist < 8:
+            want = bearing + math.pi
+        else:
+            a1, a2 = bearing + math.pi / 2, bearing - math.pi / 2
+            want = a1 if abs(ang_diff(b.yaw, a1)) < abs(ang_diff(b.yaw, a2)) else a2
+        turn = max(-1.0, min(1.0, ang_diff(b.yaw, want) * 2))
+        thr = 1.0 if dist > 17 else 0.8 if dist < 8 else 0.45
+        self.move(b, dt, thr, turn)
+        if dist < 22:
+            fx, fz = ship_fwd(b)
+            if abs((dx * fx + dz * fz) / dist) < 0.5:
+                lx, lz = ship_side(b, 1)
+                self.fire(b, 1 if dx * lx + dz * lz > 0 else -1)
+
+    def move(self, s, dt, throttle, turn):
+        target = s.max_speed * throttle if throttle > 0 else (-2.2 if throttle < 0 else 0.0)
+        s.v += max(-5 * dt, min(3.2 * dt, target - s.v))
+        s.yaw += turn * (0.35 + min(1.0, abs(s.v) / s.max_speed) * 0.65) * dt * (-1 if s.v < -0.1 else 1)
+        s.x += math.sin(s.yaw) * s.v * dt
+        s.z += math.cos(s.yaw) * s.v * dt
+        e = (s.x / NAVAL_RX) ** 2 + (s.z / NAVAL_RZ) ** 2
+        if e > 1:
+            k = 1 / math.sqrt(e)
+            s.x, s.z, s.v = s.x * k, s.z * k, s.v * 0.7
+
+    def step(self, dt):
+        t = now()
+        live = t >= self.start_at
+        for s in self.ships:
+            s.cd[1] = max(0.0, s.cd[1] - dt)
+            s.cd[-1] = max(0.0, s.cd[-1] - dt)
+            s.ram = max(0.0, s.ram - dt)
+            if live and s.bot and not s.dead:
+                self.bot_think(s, dt)
+            for q in s.queue:
+                q[0] -= dt
+            for q in [q for q in s.queue if q[0] <= 0]:
+                s.queue.remove(q)
+                if not s.dead:
+                    self.shoot(s, q[1], q[2])
+        if live:
+            self.collide_all()
+        # cannonballs
+        for b in self.balls[:]:
+            b["vy"] -= NAVAL_GRAVITY * dt
+            b["x"] += b["vx"] * dt
+            b["y"] += b["vy"] * dt
+            b["z"] += b["vz"] * dt
+            done = False
+            for s in self.ships:
+                if s is b["by"] or s.dead or (s.bot and b["by"].bot):   # practice ships do not shoot each other
+                    continue
+                dx, dz = b["x"] - s.x, b["z"] - s.z
+                sn, cs = math.sin(s.yaw), math.cos(s.yaw)
+                along, lateral = dx * sn + dz * cs, dx * cs - dz * sn
+                if abs(lateral) < 1.52 and abs(along) < 4.0 and NAVAL_LEVEL - 0.3 < b["y"] < NAVAL_LEVEL + 2.4:
+                    self.hurt(s, NAVAL_BALL_DMG, b["x"], b["y"], b["z"], b["by"])
+                    done = True
+                    break
+            if not done and b["y"] <= NAVAL_LEVEL + 0.05:
+                self.events.append(["w", round(b["x"], 1), round(b["z"], 1)])
+                done = True
+            if done:
+                self.balls.remove(b)
+        payload = {"t": "naval", "l": 1 if live else 0, "s": [s.row() for s in self.ships],
+                   "b": [[b["id"], round(b["x"], 1), round(b["y"], 1), round(b["z"], 1), round(b["vx"], 1), round(b["vy"], 1), round(b["vz"], 1)] for b in self.balls],
+                   "e": self.events}
+        self.events = []
+        for s in self.ships:
+            if s.conn:
+                s.conn.send(payload)
+        alive = [s for s in self.ships if not s.dead]
+        humans = [s for s in self.ships if s.conn and not s.dead]
+        if live and len(alive) <= 1:
+            self.finish("last")
+        elif live and not humans:
+            self.finish("last")
+        elif t - self.start_at > NAVAL_TIME:
+            self.finish("time")
+
+    def collide_all(self):
+        live = [s for s in self.ships if not s.dead]
+        r = 1.9 * 0.8 * 0.9
+        pts = lambda s: [(s.x + math.sin(s.yaw) * z * 0.8, s.z + math.cos(s.yaw) * z * 0.8) for z in (-2.6, 0.0, 2.6)]
+        for ai in range(len(live)):
+            for bi in range(ai + 1, len(live)):
+                a, b = live[ai], live[bi]
+                hit = None
+                for p in pts(a):
+                    for q in pts(b):
+                        dx, dz = q[0] - p[0], q[1] - p[1]
+                        d = math.hypot(dx, dz)
+                        if d < r * 2 and d > 0.001:
+                            hit = hit or (p, q, dx, dz, d)
+                            if a.bot:        # bots are pushed apart here; people push themselves in their own browser
+                                push = (r * 2 - d) * 0.25
+                                a.x -= dx / d * push
+                                a.z -= dz / d * push
+                            if b.bot:
+                                push = (r * 2 - d) * 0.25
+                                b.x += dx / d * push
+                                b.z += dz / d * push
+                if not hit:
+                    continue
+                _, _, dx, dz, _ = hit
+                for rammer, target, sgn in ((a, b, 1), (b, a, -1)):
+                    fx, fz = ship_fwd(rammer)
+                    if rammer.v > 3.5 and rammer.ram <= 0 and sgn * (dx * fx + dz * fz) > 0 and not (rammer.bot and target.bot):
+                        rammer.ram = 1.2
+                        rammer.v *= 0.4
+                        self.events.append(["r", rammer.i, target.i])
+                        self.hurt(target, NAVAL_RAM_DMG, (a.x + b.x) / 2, NAVAL_LEVEL + 0.8, (a.z + b.z) / 2, rammer)
+
+    def finish(self, reason):
+        if self.over:
+            return
+        self.over = True
+        # winner first: whoever is still afloat (most hull first), then the others in reverse order of sinking
+        order = sorted(self.ships, key=lambda s: (0, -s.hp) if not s.dead else (1, -s.dead_at))
+        msg = {"t": "end", "mode": "naval", "reason": reason,
+               "order": [{"i": s.i, "name": s.name, "hp": round(s.hp), "bot": s.bot} for s in order]}
+        for s in self.ships:
+            if s.conn:
+                s.conn.send(msg)
+                s.conn.room = s.conn.me = None
+        self.task.cancel()
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -792,6 +1098,15 @@ def match_once():
     if team:
         # friendly bots fill a small team up to three, when someone asked for bots
         CoopRoom(team, allies=max(0, 3 - len(team)) if any(c.want_bot for c in team) else 0)
+
+    q = QUEUES["naval"]
+    q[:] = [c for c in q if not c.closed]
+    if len(q) >= 4:
+        NavalRoom([q.pop(0) for _ in range(4)])
+    elif len(q) >= 2 and t - q[1].queued_at >= CFG["naval_wait"]:
+        NavalRoom([q.pop(0) for _ in range(min(4, len(q)))])
+    elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        NavalRoom([q.pop(0)], bots=2)   # two practice ships to fight
 
 
 async def matchmaker():

@@ -12,6 +12,7 @@ const Naval = (() => {
 
   let scene, active = false, phase = "idle", phaseT = 0, wave = 0, flood = 0, floodTarget = 0, clock = 0, msgTimer, camYaw = 0;
   let water, rippleTex, me = null, foes = [], balls = [], fx = [], queue = [];
+  let online = null; // a live battle against real people (free-for-all): { ships, balls, sendT, n, humans, over }
   const el = (id) => document.getElementById(id);
   const TEX = {};
 
@@ -274,12 +275,19 @@ const Naval = (() => {
     me = null; foes = []; balls = []; fx = []; queue = [];
   }
 
-  function stop(win, title, text) {
+  function stop(win, title, text, buttons) {
     if (!active) return;
+    const live = online;                     // leaving a live battle tells the server (it sinks your ship)
+    if (live) {
+      online = null;
+      if (!live.over) Online.leaveGame();
+      for (const b of live.balls.values()) { scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh.geometry.dispose(); }
+    }
     // Damage to your ship costs you: the crew (you) are hurt in proportion, and a lost battle costs money.
     const hullLost = me ? 100 - me.hp : 0, defeat = !!title && !win;
-    Vitals.hp = defeat ? 15 : Math.max(5, Vitals.hp - hullLost * 0.35);
-    if (defeat) {
+    if (!live) Vitals.hp = defeat ? 15 : Math.max(5, Vitals.hp - hullLost * 0.35);
+    if (live) { /* no fines or wounds against real people: only the prize (added by the caller) */ }
+    else if (defeat) {
       const fine = Math.min(40, Vitals.coins);
       Vitals.coins -= fine;
       text += ` You lose ${fine} denarii for the wrecked ship and are left badly wounded. Rest with Z before sailing again.`;
@@ -295,7 +303,7 @@ const Naval = (() => {
     Crowd.setCheer(false);
     placeAt(CX, CZ, -Math.PI / 2);
     camera.fov = 70; camera.updateProjectionMatrix();
-    if (title) showResult(title, text, [
+    if (title) showResult(title, text, buttons || [
       { label: win ? "Sail again" : "Try again", fn: () => { closePanels(); start(); } },
       { label: "Leave the arena", fn: closePanels },
     ]);
@@ -305,6 +313,7 @@ const Naval = (() => {
   // Q = port, E = starboard, Space/click = the side facing the nearest enemy.
   function fire(k) {
     if (!active || !me || me.dead || phase !== "battle") return;
+    if (online) return fireOnline(k);
     if (k === "KeyQ") fireSide(me, 1);
     else if (k === "KeyE") fireSide(me, -1);
     else {
@@ -316,10 +325,207 @@ const Naval = (() => {
     }
   }
 
+
+  // ---------- online: every ship for itself against real people (the server decides hits, rams and the winner) ----------
+
+  const SAILS = [0x2f8f4a, 0xb3262b, 0x6b3fa0, 0x2f6b8f, 0xc7a21a];
+
+  function nameTag(text) {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 64;
+    const g = c.getContext("2d");
+    g.font = "bold 28px sans-serif"; g.textAlign = "center";
+    g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 8, 256, 48);
+    g.fillStyle = "#fff"; g.fillText(text.replace(" (practice ship)", " (bot)").slice(0, 20), 128, 44);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+    sp.scale.set(7, 1.75, 1); sp.position.set(0, 8.5, 0); sp.renderOrder = 10;
+    return sp;
+  }
+
+  function startOnline(m) {
+    if (active) return;
+    active = true; mode = "naval"; phase = "flooding"; phaseT = m.countdown || 5; wave = 0; flood = 0; floodTarget = 1;
+    fx = []; balls = []; queue = [];
+    const ships = {};
+    for (const p of m.players) {
+      const s = makeShip({ hp: 100, scale: 0.8, max: 6.6, sail: SAILS[p.i % SAILS.length] }, CX + p.x, CZ + p.z, p.yaw, p.i === m.you);
+      s.idx = p.i; s.name = p.name; s.bot = !!p.bot; s.tx = s.x; s.tz = s.z; s.tyaw = s.yaw;
+      s.cd = { 1: 0, "-1": 0 };
+      s.model.g.visible = false;
+      if (p.i !== m.you) s.model.g.add(nameTag(p.name));
+      ships[p.i] = s;
+    }
+    online = { you: m.you, ships, balls: new Map(), sendT: 0, n: m.players.length, humans: m.players.filter((p) => !p.bot).length, over: false, notice: false };
+    me = ships[m.you];
+    foes = m.players.filter((p) => p.i !== m.you).map((p) => ships[p.i]);
+    camYaw = me.yaw;
+    el("naval-hud").classList.add("show");
+    Crowd.setCheer(true);
+    closePanels();
+    msg("Naumachia! The arena floods... every ship for itself!", 3600);
+    Sfx.play("horn");
+  }
+
+  // The nearest ship that is still afloat (the camera follows it once yours has sunk).
+  function focus() {
+    if (!online || !me || !me.dead) return me;
+    let best = me, bd = Infinity;
+    for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
+    return best;
+  }
+
+  function fireOnline(k) {
+    let side = k === "KeyQ" ? 1 : k === "KeyE" ? -1 : 0;
+    if (!side) {
+      let best = null, bd = Infinity;
+      for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
+      if (!best) return;
+      const [lx, lz] = sideNormal(me, 1);
+      side = (best.x - me.x) * lx + (best.z - me.z) * lz > 0 ? 1 : -1;
+    }
+    Online.navalSend({ t: "naval", fire: side });
+  }
+
+  function onlineState(m) {
+    if (!online || online.over) return;
+    if (m.l && phase === "flooding") { phase = "battle"; for (const s of Object.values(online.ships)) s.model.g.visible = true; msg("Fire!", 900); } // the server says when the battle starts
+    for (const [i, x, z, yaw, v, hp, c1, c2, dead] of m.s) {
+      const s = online.ships[i];
+      if (!s) continue;
+      if (s === me) { me.hp = hp; me.cd = { 1: c1, "-1": c2 }; }
+      else { s.tx = CX + x; s.tz = CZ + z; s.tyaw = yaw; s.v = v; s.hp = hp; }
+      if (dead && !s.dead) sinkShip(s);
+    }
+    const seen = new Set();
+    for (const [id, x, y, z, vx, vy, vz] of m.b) {
+      seen.add(id);
+      let b = online.balls.get(id);
+      if (!b) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lambert(0x1a1a1c));
+        scene.add(mesh);
+        b = { mesh }; online.balls.set(id, b);
+      }
+      b.x = CX + x; b.y = y; b.z = CZ + z; b.vx = vx; b.vy = vy; b.vz = vz;
+    }
+    for (const [id, b] of online.balls) if (!seen.has(id)) { scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh.geometry.dispose(); online.balls.delete(id); }
+    for (const e of m.e || []) {
+      if (e[0] === "f") {
+        const x = CX + e[1], y = e[2], z = CZ + e[3], nx = e[4], nz = e[5];
+        puff("fire", x + nx * 0.8, y, z + nz * 0.8, { size: 1.6, life: 0.25, grow: 6 });
+        Sfx.play("cannon", { x, z });
+        for (let k = 0; k < 2; k++) puff("smoke", x + nx * 1.2, y + 0.2, z + nz * 1.2, { size: 1.2, life: 1.6, vx: nx * 1.5 + (Math.random() - 0.5), vy: 0.8, vz: nz * 1.5 + (Math.random() - 0.5), grow: 1.8, opacity: 0.7 });
+      } else if (e[0] === "h") {
+        const t = online.ships[e[1]], x = CX + e[2], y = e[3], z = CZ + e[4];
+        Sfx.play("crash", { x, z, range: 160 });
+        if (t) t.flash = 0.18;
+        for (let k = 0; k < 3; k++) puff("fire", x, y, z, { size: 1.4, life: 0.35, vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 2, vz: (Math.random() - 0.5) * 3, grow: 4 });
+        puff("smoke", x, y, z, { size: 1.6, life: 1.6, vy: 1.5, grow: 2.5, opacity: 0.8 });
+        if (t === me) el("flash").style.opacity = 0.5;
+      } else if (e[0] === "w") splash(CX + e[1], CZ + e[2]);
+      else if (e[0] === "r") {
+        if (e[1] === online.you) { me.v *= 0.4; msg("Ram!", 900); }
+        else if (e[2] === online.you) msg("You have been rammed!", 900);
+      }
+    }
+  }
+
+  function sinkShip(s) {
+    s.dead = true; s.hp = 0;
+    for (let k = 0; k < 5; k++) puff("fire", s.x + (Math.random() - 0.5) * 4, level() + 1.5, s.z + (Math.random() - 0.5) * 4, { size: 2.4, life: 0.6, vy: 3, grow: 5 });
+    Sfx.play("crash", { x: s.x, z: s.z, range: 160 });
+    if (s === me) msg("Your ship is sinking! Watch the rest of the battle.", 3200);
+    else msg(`${s.name} is sunk!`, 1600);
+  }
+
+  function updateOnline(dt, keys) {
+    clock += dt;
+    flood += Math.max(-dt * 0.6, Math.min(dt * 0.3, floodTarget - flood));
+    water.visible = flood > 0.02;
+    water.position.y = level();
+    rippleTex.offset.x = (clock * 0.02) % 1; rippleTex.offset.y = (clock * 0.013) % 1;
+    phaseT -= dt;
+    if (phase === "flooding") {
+      if (flood > 0.7) for (const s of Object.values(online.ships)) s.model.g.visible = true;
+    }
+    if (phase === "battle" && !me.dead) {
+      const gas = keys.has("KeyW") || keys.has("ArrowUp"), back = keys.has("KeyS") || keys.has("ArrowDown");
+      const turn = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+      stepShip(me, dt, gas ? 1 : back ? -1 : 0, turn);
+      for (const f of foes) if (!f.dead) shove(me, f);
+      online.sendT -= dt;
+      if (online.sendT <= 0) { online.sendT = 0.05; Online.navalSend({ t: "naval", x: +(me.x - CX).toFixed(2), z: +(me.z - CZ).toFixed(2), yaw: +me.yaw.toFixed(3) }); }
+    } else {
+      me.cd[1] = Math.max(0, me.cd[1] - dt); me.cd[-1] = Math.max(0, me.cd[-1] - dt);
+    }
+    me.flash -= dt;
+    const k = Math.min(1, dt * 12);
+    for (const f of foes) {
+      f.x += (f.tx - f.x) * k; f.z += (f.tz - f.z) * k;
+      f.yaw += angDiff(f.yaw, f.tyaw) * k;
+      f.flash -= dt;
+    }
+    for (const b of online.balls.values()) {
+      b.vy -= GRAVITY * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.mesh.position.set(b.x, b.y, b.z);
+    }
+    updateFx(dt);
+    animateShips(dt);
+    player.x = me.x; player.z = me.z; player.feet = 0;
+    const afloat = Object.values(online.ships).filter((s) => !s.dead).length;
+    el("nv-wave").textContent = "Free-for-all";
+    el("nv-enemies").textContent = `Ships afloat: ${afloat} of ${online.n}`;
+    el("nv-hull").style.width = `${me.hp}%`;
+    el("nv-port").classList.toggle("ready", !me.dead && me.cd[1] <= 0);
+    el("nv-star").classList.toggle("ready", !me.dead && me.cd[-1] <= 0);
+    const fl = el("flash");
+    fl.style.opacity = Math.max(0, parseFloat(fl.style.opacity || 0) - dt * 1.5);
+  }
+
+  // Your ship cannot sail through another one: you are pushed out (the server decides about rams).
+  function shove(a, b) {
+    const pts = (s) => [-2.6, 0, 2.6].map((z) => ({ x: s.x + Math.sin(s.yaw) * z * s.sc, z: s.z + Math.cos(s.yaw) * z * s.sc }));
+    const r = 1.9 * 0.8 * 0.9;
+    for (const p of pts(a)) for (const q of pts(b)) {
+      const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
+      if (d < r * 2 && d > 0.001) { const push = (r * 2 - d) * 0.5; a.x -= (dx / d) * push; a.z -= (dz / d) * push; }
+    }
+  }
+
+  function onlineEnd(m) {
+    if (!active || !online) return;
+    online.over = true;
+    const rank = m.order.findIndex((o) => o.i === online.you) + 1, ords = ["", "1st", "2nd", "3rd", "4th", "5th"];
+    const alone = online.humans < 2, prize = rank === 1 ? (alone ? 40 : 80) : rank === 2 && online.n > 2 && !alone ? 30 : 0;
+    Vitals.coins += prize;
+    const table = m.order.map((o, k) => `${k + 1}. ${o.name}`).join("  ·  ");
+    const why = { last: rank === 1 ? "Yours is the last ship afloat!" : "Another ship is the last one afloat.", time: "Time ran out: the ship with the most hull left wins.", empty: "Everyone else left." }[m.reason] || "";
+    stop(rank === 1, rank === 1 ? "Victory in the naumachia!" : `You finished ${ords[rank] || "last"}`, `${why} ${table}.${prize ? ` Prize: +${prize} denarii.` : ""}`, [
+      { label: "Sail again", fn: () => { closePanels(); Online.openLobby(); } },
+      { label: "Leave the arena", fn: closePanels },
+    ]);
+  }
+
   // ---------- per-frame ----------
+
+  // Ship visuals: float, roll gently, sink when dead.
+  function animateShips(dt) {
+    for (const s of [me, ...foes]) {
+      if (!s) continue;
+      const g = s.model.g;
+      let y = level() + 0.05 + Math.sin(clock * 1.4 + s.x * 0.1) * 0.08;
+      if (s.dead) { s.sink += dt; y -= s.sink * 0.9; g.rotation.z = Math.min(0.5, s.sink * 0.25); }
+      else g.rotation.z = Math.sin(clock * 1.1 + s.z * 0.1) * 0.03;
+      g.position.set(s.x, y, s.z);
+      g.rotation.y = s.yaw;
+      s.model.hull.material.emissive.setHex(s.flash > 0 ? 0x661111 : 0);
+      if (s.dead && s.sink > 4) g.visible = false;
+    }
+  }
 
   function update(dt, keys) {
     if (!active) return;
+    if (online) return updateOnline(dt, keys);
     clock += dt;
     flood += Math.max(-dt * 0.6, Math.min(dt * 0.3, floodTarget - flood));
     water.visible = flood > 0.02;
@@ -346,18 +552,7 @@ const Naval = (() => {
     updateBalls(dt);
     updateFx(dt);
 
-    // ship visuals: float, roll gently, sink when dead
-    for (const s of [me, ...foes]) {
-      if (!s) continue;
-      const g = s.model.g;
-      let y = level() + 0.05 + Math.sin(clock * 1.4 + s.x * 0.1) * 0.08;
-      if (s.dead) { s.sink += dt; y -= s.sink * 0.9; g.rotation.z = Math.min(0.5, s.sink * 0.25); }
-      else g.rotation.z = Math.sin(clock * 1.1 + s.z * 0.1) * 0.03;
-      g.position.set(s.x, y, s.z);
-      g.rotation.y = s.yaw;
-      s.model.hull.material.emissive.setHex(s.flash > 0 ? 0x661111 : 0);
-      if (s.dead && s.sink > 4) g.visible = false;
-    }
+    animateShips(dt);
 
     // wave and end conditions
     if (phase === "battle" && foes.every((f) => f.dead)) { phase = "wavewon"; phaseT = 3; }
@@ -387,11 +582,12 @@ const Naval = (() => {
 
   function camera_(cam, dt) {
     if (!active || !me) return;
-    camYaw += angDiff(camYaw, me.yaw) * Math.min(1, dt * 3);
+    const f = focus();
+    camYaw += angDiff(camYaw, f.yaw) * Math.min(1, dt * 3);
     const fx_ = Math.sin(camYaw), fz_ = Math.cos(camYaw), L = level();
-    cam.position.set(me.x - fx_ * 12, L + 7.5, me.z - fz_ * 12);
-    cam.lookAt(me.x + fx_ * 6, L + 1.2, me.z + fz_ * 6);
+    cam.position.set(f.x - fx_ * 12, L + 7.5, f.z - fz_ * 12);
+    cam.lookAt(f.x + fx_ * 6, L + 1.2, f.z + fz_ * 6);
   }
 
-  return { init, start, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length }) };
+  return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length }) };
 })();

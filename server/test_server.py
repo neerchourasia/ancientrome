@@ -401,6 +401,142 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(st["p"][0][8], 1)                 # Ann is shown as down; Ben plays on
         self.assertFalse(room.over)
 
+
+    # ---------------------------------------------------------------- naval battle (every ship for itself)
+
+    async def start_naval(self, n=2):
+        server.CFG["naval_wait"] = 0.6
+        ws = [await self.player(nm) for nm in ("Ann", "Ben", "Cyd", "Dee")[:n]]
+        for w in ws:
+            w.send({"t": "queue", "mode": "naval"})
+        ms = [await w.until(lambda m: m["t"] == "match", timeout=4) for w in ws]
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        room.start_at = 0                     # the countdown is over
+        return ws, ms, room
+
+    def place(self, ship, x, z, yaw):
+        ship.x, ship.z, ship.yaw, ship.v = x, z, yaw, 0.0
+
+    async def test_naval_is_every_ship_for_itself(self):
+        ws, ms, room = await self.start_naval(3)
+        self.assertEqual([m["you"] for m in ms], [0, 1, 2])
+        self.assertEqual(len(ms[0]["players"]), 3)
+        self.assertFalse(any("team" in p or "role" in p for p in ms[0]["players"]))   # no teams
+        room.step(0.05)
+        st = await ws[0].until(lambda m: m["t"] == "naval")
+        self.assertEqual(len(st["s"]), 3)
+
+    async def test_naval_cannons_hit_other_ships_not_your_own_and_cool_down(self):
+        ws, ms, room = await self.start_naval(2)
+        a, b = room.ships
+        self.place(a, -8, 0, 0.0)             # a sails along +z; its port side (left) faces -x... b is to the port side
+        self.place(b, 8, 0, 0.0)              # starboard (-1) of a is -x? side(-1) = (-cos, sin) -> -x; port (+1) = +x
+        room.start_at = server.now() + 5      # not yet: nothing can fire
+        a_conn = ws[0]
+        a_conn.send({"t": "naval", "x": -8, "z": 0, "yaw": 0, "fire": 1})
+        await asyncio.sleep(0.2)
+        self.assertEqual(a.queue, [])
+        room.start_at = 0
+        for _ in range(8):
+            room.step(0.05)                   # the guns finish loading
+        a_conn.send({"t": "naval", "x": -8, "z": 0, "yaw": 0, "fire": 1})
+        await asyncio.sleep(0.2)
+        self.assertEqual(len(a.queue), 3)     # three cannons on a side
+        a_conn.send({"t": "naval", "x": -8, "z": 0, "yaw": 0, "fire": 1})
+        await asyncio.sleep(0.2)
+        self.assertEqual(len(a.queue), 3)     # that side is still reloading
+        self.assertGreater(a.cd[1], 2.0)
+        for _ in range(60):
+            room.step(0.05)
+        self.assertLess(b.hp, 100)            # the server dealt the damage
+        self.assertEqual(a.hp, 100)           # your own cannonballs do not hurt you
+
+    async def test_naval_cannot_sail_faster_than_a_galley(self):
+        ws, ms, room = await self.start_naval(2)
+        a = room.ships[0]
+        x0, z0 = a.x, a.z
+        ws[0].send({"t": "naval", "x": 0, "z": 0, "yaw": 0})
+        await asyncio.sleep(0.3)
+        self.assertLess(math.hypot(a.x - x0, a.z - z0), 6.6 * 1.25 * 0.5 + 1.0)
+        ws[0].send({"t": "naval", "x": 9999, "z": "x", "yaw": float("nan")})
+        await asyncio.sleep(0.2)
+        self.assertLessEqual((a.x / 29) ** 2 + (a.z / 23.5) ** 2, 1.0001)   # and stays inside the flooded arena
+
+    async def test_naval_ram_hurts_once_and_last_ship_afloat_wins(self):
+        ws, ms, room = await self.start_naval(3)
+        a, b, c = room.ships
+        self.place(a, 0, -3, 0.0)             # a's bow touches b
+        self.place(b, 0, 2, math.pi)
+        self.place(c, -20, 10, 0.0)
+        a.v = 5.0
+        room.collide_all()
+        self.assertEqual(b.hp, 88)
+        a.v = 5.0
+        room.collide_all()
+        self.assertEqual(b.hp, 88)            # the ram needs a moment to recover
+        room.sink(b)
+        self.assertFalse(room.over)
+        room.hurt(c, 1000, 0, 1, 0)
+        room.step(0.05)
+        self.assertTrue(room.over)
+        end = await ws[0].until(lambda m: m["t"] == "end")
+        self.assertEqual(end["mode"], "naval")
+        self.assertEqual([o["i"] for o in end["order"]], [0, 2, 1])   # winner, then the later sinking, then the first
+
+    async def test_naval_a_lone_player_gets_practice_ships_when_they_ask(self):
+        server.CFG["bot_wait"] = 0.5
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "naval", "bot": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertEqual(len(m["players"]), 3)
+        self.assertEqual(sum(1 for p in m["players"] if p["bot"]), 2)
+        server.CFG["allow_bots"] = False
+        b = await self.player("Solo2")
+        b.send({"t": "queue", "mode": "naval", "bot": True})
+        with self.assertRaises(asyncio.TimeoutError):
+            await b.until(lambda m: m["t"] == "match", timeout=1.5)
+
+    async def test_naval_practice_ships_fight_back_but_can_be_beaten(self):
+        server.CFG["bot_wait"] = 0.3
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "naval", "bot": True})
+        await a.until(lambda m: m["t"] == "match", timeout=4)
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.start_at = 0
+        me, b1, b2 = room.ships
+        for _ in range(800):                  # 40 seconds with a captain who does nothing
+            room.step(0.05)
+        self.assertLess(me.hp, 100)           # the bots do shoot
+        room2_bots_alive = [s for s in room.ships if s.bot and not s.dead]
+        self.assertTrue(room2_bots_alive)
+        # a stationary target at point blank range is beaten by the player's guns
+        room.over = False
+        for s in (b1, b2):
+            s.hp = 5
+        self.place(b1, 6, 0, 0.0)
+        self.place(me, 0, 0, 0.0)
+        me.hp = 100
+        me.dead_at = None
+        me.cd = {1: 0, -1: 0}
+        room.fire(me, 1)
+        for _ in range(40):
+            room.step(0.05)
+        self.assertTrue(b1.dead or b1.hp < 5)
+
+    async def test_naval_leaving_sinks_your_ship_and_the_others_play_on_or_win(self):
+        ws, ms, room = await self.start_naval(3)
+        ws[0].w.close()
+        await asyncio.sleep(0.4)
+        room.step(0.05)
+        self.assertTrue(room.ships[0].dead)
+        self.assertFalse(room.over)           # two captains remain
+        ws[1].w.close()
+        await asyncio.sleep(0.4)
+        room.step(0.05)
+        self.assertTrue(room.over)            # the last captain is alone: the battle is over
+
     # ---------------------------------------------------------------- payments
 
     def webhook(self, event, secret="whsec_test", at=None, tamper=False):

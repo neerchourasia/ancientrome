@@ -6,7 +6,7 @@ receives Stripe's "payment completed" message.
 
 ```bash
 python3 server/server.py          # listens on port 8765 (or $PORT)
-python3 server/test_server.py     # 21 tests: duels, team battles, races, cheating, payments, abuse
+python3 server/test_server.py     # 28 tests: duels, team battles, naval battles, races, cheating, payments, abuse
 python3 server/mock_supabase.py   # a fake Supabase, only for testing logins on your own computer
 ```
 
@@ -25,7 +25,7 @@ Open the game, click **🌐 Play online**, tick "practice bot" and press **Duel*
 | `REQUIRE_PREMIUM` | `1` (default when Supabase is set) or `0` |
 | `ALLOW_BOTS` | `1` (default) lets a lone player face a practice bot |
 | `PORT` | default 8765 (hosts like Render set this for you) |
-| `RACE_LAPS`, `BOT_WAIT`, `RACE_WAIT`, `COOP_WAIT`, `MAX_CONNS`, `MAX_PER_IP` | fine tuning |
+| `RACE_LAPS`, `BOT_WAIT`, `RACE_WAIT`, `COOP_WAIT`, `NAVAL_WAIT`, `MAX_CONNS`, `MAX_PER_IP` | fine tuning |
 
 ## Putting it online (Render, free to start)
 
@@ -55,6 +55,7 @@ cannot grant it to themselves: the database refuses (`supabase.sql`).
 ## How the server protects the game
 
 - Health, damage, stamina, range and facing in duels are decided here; positions are speed-limited and kept in the arena.
+- Naval battle: free-for-all, no teams, 2-4 captains (two practice ships if you play alone and ask for bots). Browsers send where their ship is (speed and the flooded arena's edge are enforced); the server fires every cannonball and decides every hit, ram and who is the last ship afloat.
 - Team battles: the server runs the five enemy bots, the friendly bots, every hit and every revive; players still cannot hurt each other or heal themselves.
 - Race progress is capped to what a chariot can really do, and the order of finishing is decided here.
 - Names, classes and looks sent by players are cleaned; premium colours are removed for non-premium players.

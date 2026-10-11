@@ -41,6 +41,7 @@ const Online = (() => {
       ws = null; welcome = null; waiting = false; clearInterval(pingT);
       if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
+      else if (Naval.isOnline()) Naval.stop();
       setMsg(URL ? "Disconnected from the game server." : "");
       refreshLobby();
     };
@@ -52,13 +53,14 @@ const Online = (() => {
   function onMessage(m) {
     switch (m.t) {
       case "welcome": welcome = m; setMsg(""); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": onFight(m); break;
       case "race": Race.onlineState(m); break;
-      case "end": if (m.mode === "race") Race.onlineEnd(m); else onFightEnd(m); break;
+      case "naval": Naval.onlineState(m); break;
+      case "end": if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -74,6 +76,7 @@ const Online = (() => {
     $o("on-duel").disabled = !ready;
     $o("on-race").disabled = !ready;
     $o("on-coop").disabled = !ready;
+    $o("on-naval").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
     $o("on-login").hidden = !(premiumNeeded && !welcome.account);
@@ -98,6 +101,7 @@ const Online = (() => {
     $o("on-duel").addEventListener("click", () => queue("duel"));
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
+    $o("on-naval").addEventListener("click", () => queue("naval"));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("on-login").addEventListener("click", () => { closePanels(); Account.open(); });
@@ -326,5 +330,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, poseMine, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();
