@@ -14,22 +14,6 @@ const Character = (() => {
     toga: [0xf3e6c8, 0xd8d2c0, 0x4f6f8f, 0x7d8f5b, 0xb0473a, 0x6a1b5e, 0xd4a82a],
     sash: [0x9c3a2e, 0x2f6b8f, 0x3d7a4a, 0x2a2118, 0xe0c070, 0x6a1b5e],
   };
-  // Premium cosmetics (Tyrian purple, imperial gold): shown as locked until paid extras exist.
-  const PREMIUM = { skin: [], hair: [], toga: [5, 6], sash: [5] };
-  // Premium features that are not built yet: shown as "coming soon", never as if they worked.
-  const PREMIUM_FEATURES = ["Fight real people: live gladiator duels", "Race real people: live chariot races"];
-  const PREMIUM_NAMES = { toga: { 5: "Tyrian purple toga", 6: "Imperial gold toga" }, sash: { 5: "Tyrian purple sash" } };
-
-  // Where the "Get Premium" button sends people. Leave `checkoutUrl` empty until payments are set up; paste a
-  // Stripe Payment Link (https://buy.stripe.com/...) here to turn the button on. Unlocking after payment still
-  // needs a server (accounts + a Stripe webhook), because anything the browser decides can be edited.
-  const cfg = window.ROME_CONFIG || {};
-  const SHOP = { price: String(cfg.price || ""), checkoutUrl: String(cfg.checkoutUrl || "") };
-  // Whether this player has Premium (set from their account; cached so saved premium colours survive a reload).
-  // Only cosmetics depend on this in the browser; online play re-checks it on the server.
-  let premiumOwned = false;
-  try { premiumOwned = localStorage.getItem("rome-premium") === "1"; } catch (e) { /* storage unavailable */ }
-
   // `mods` are multipliers (1 = no change) read by the fights and races.
   const CLASSES = {
     gladiator: {
@@ -57,8 +41,7 @@ const Character = (() => {
   const DEFAULT = { name: "", cls: "gladiator", look: { skin: 1, hair: 1, toga: 0, sash: 0 } };
 
   const cleanName = (v) => String(v == null ? "" : v).replace(/[^A-Za-z0-9 '\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 16);
-  const owns = (part, i) => premiumOwned || !PREMIUM[part].includes(i);
-  const validIndex = (part, i) => Number.isInteger(i) && i >= 0 && i < COLORS[part].length && owns(part, i);
+  const validIndex = (part, i) => Number.isInteger(i) && i >= 0 && i < COLORS[part].length;
 
   // Anything that is not valid falls back to the default, so edited or corrupted storage cannot do harm.
   function sanitize(raw) {
@@ -78,7 +61,7 @@ const Character = (() => {
   } catch (e) { /* storage unavailable */ }
 
   return {
-    COLORS, CLASSES, PREMIUM, PREMIUM_NAMES, PREMIUM_FEATURES, SHOP, cleanName, owns,
+    COLORS, CLASSES, cleanName,
     get exists() { return saved; },
     get name() { return s.name; },
     get cls() { return s.cls; },
@@ -86,7 +69,6 @@ const Character = (() => {
     get look() { return s.look; },
     color: (part, i) => COLORS[part][validIndex(part, i) ? i : 0],
     mod: (key) => { const m = CLASSES[s.cls].mods[key]; return (m === undefined ? 1 : m) * (typeof Market !== "undefined" ? Market.perk(key) : 1); }, // class bonus x anything bought in the Market
-    setPremium(v) { premiumOwned = !!v; try { localStorage.setItem("rome-premium", v ? "1" : "0"); } catch (e) { /* ignore */ } },
     set(next) {
       s = sanitize(next);
       saved = s.name.length >= 2;

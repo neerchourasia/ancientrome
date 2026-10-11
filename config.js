@@ -8,7 +8,4 @@ window.ROME_CONFIG = {
   // The game server for playing real people (see server/README.md), e.g. "wss://rome-game.onrender.com/play".
   // Leave empty to use ws://localhost:8765/play when you test on your own computer.
   serverUrl: "",
-  // Premium: a Stripe Payment Link (https://buy.stripe.com/...) and the price to show, e.g. "$4.99".
-  checkoutUrl: "",
-  price: "",
 };

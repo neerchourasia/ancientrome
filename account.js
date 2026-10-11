@@ -1,20 +1,19 @@
 "use strict";
 // Accounts and saving, through Supabase (https://supabase.com): sign up, log in, your character and progress saved
-// in the cloud, and whether you have Premium. Talks to Supabase's web API directly, so there is nothing to install.
+// in the cloud. Talks to Supabase's web API directly, so there is nothing to install.
 //
 // It stays switched off until supabaseUrl and supabaseAnonKey are filled in in config.js. The anon key is meant to be
 // public: what a player can read or change is limited by the row-level-security rules in supabase.sql, not by hiding it.
-// Whether you have Premium is only ever READ here; it can only be written by the game server (see server/server.py).
 
 const Account = (() => {
   const cfg = window.ROME_CONFIG || {};
-  const SESSION_KEY = "rome-session", PREMIUM_KEY = "rome-premium";
+  const SESSION_KEY = "rome-session";
   const base = String(cfg.supabaseUrl || "").replace(/\/+$/, "");
   const anon = String(cfg.supabaseAnonKey || "");
   const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(base) ? anon.length > 10 : false;
   const $a = (id) => document.getElementById(id);
 
-  let session = null, premium = false, lastSaved = "", listeners = [], busy = false;
+  let session = null, lastSaved = "", listeners = [], busy = false;
 
   try {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
@@ -58,7 +57,7 @@ const Account = (() => {
       storeSession(s);
       return s.access_token;
     } catch (e) {
-      if (e.status === 400 || e.status === 401) { storeSession(null); premium = false; changed(); }
+      if (e.status === 400 || e.status === 401) { storeSession(null); changed(); }
       return null;
     }
   }
@@ -127,21 +126,6 @@ const Account = (() => {
         toast("Account ready: your game is now saved online");
       }
     } catch (e) { toast("Could not load your saved game: " + e.message); }
-    await loadPremium();
-  }
-
-  async function loadPremium() {
-    const token = await freshToken();
-    let p = false;
-    if (token) {
-      try {
-        const rows = await api("/rest/v1/entitlements?select=premium&user_id=eq." + encodeURIComponent(session.id), { token });
-        p = !!(rows && rows[0] && rows[0].premium);
-      } catch (e) { p = premium; }
-    }
-    if (p !== premium) { premium = p; Character.setPremium(p); }
-    changed();
-    return p;
   }
 
   // ------------------------------------------------------------------ sign up / log in / log out
@@ -177,7 +161,7 @@ const Account = (() => {
   async function logOut() {
     await saveNow(true);
     const token = session && session.access_token;
-    storeSession(null); premium = false; lastSaved = ""; Character.setPremium(false);
+    storeSession(null); lastSaved = "";
     if (token) { try { await api("/auth/v1/logout", { token, body: {} }); } catch (e) { /* the token is dropped here either way */ } }
     changed();
     toast("Logged out");
@@ -194,7 +178,6 @@ const Account = (() => {
     $a("ac-in").hidden = !configured || !on;
     if (on) {
       $a("ac-who").textContent = session.email;
-      $a("ac-plan").textContent = premium ? "★ Premium" : "Free";
     }
     $a("btn-account").textContent = on ? `Account: ${session.email.split("@")[0].slice(0, 10)}` : "Log in";
   }
@@ -204,7 +187,6 @@ const Account = (() => {
     if (creatorOpen) closeCreator();
     openPanel("#account");
     renderAccount();
-    if (session) loadPremium();
   }
 
   function bind() {
@@ -216,20 +198,18 @@ const Account = (() => {
     $a("ac-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit("in"); });
     $a("ac-save").addEventListener("click", () => saveNow(false));
     $a("ac-logout").addEventListener("click", logOut);
-    $a("ac-refresh").addEventListener("click", async () => { const p = await loadPremium(); toast(p ? "Premium is active. Thank you!" : "No Premium on this account yet"); });
     renderAccount();
-    if (session) { freshToken().then((t) => { if (t) { loadPremium(); } }); }
+    if (session) freshToken();
     setInterval(() => { if (session && !document.hidden) saveNow(true); }, 30000);
     document.addEventListener("visibilitychange", () => { if (document.hidden && session) saveNow(true); });
   }
 
   return {
-    configured, bind, open, saveNow, loadPremium,
+    configured, bind, open, saveNow,
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
     get loggedIn() { return !!session; },
     get email() { return session ? session.email : ""; },
     get userId() { return session ? session.id : ""; },
-    get premium() { return premium; },
     onChange(f) { listeners.push(f); },
   };
 })();

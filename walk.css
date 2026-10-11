@@ -298,8 +298,6 @@ body.touch #card { bottom: 200px; max-height: 34vh; overflow-y: auto; }
 .swatches { display: flex; flex-wrap: wrap; gap: 7px; }
 .swatch { width: 30px; height: 30px; padding: 0; cursor: pointer; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); position: relative; }
 .swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--gold); }
-.swatch.premium { opacity: .55; }
-.swatch.premium::after { content: "\2605"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: .8rem; color: #fff; text-shadow: 0 1px 3px #000; }
 .cr-note { margin: 10px 0 0; min-height: 2.4em; font-size: .8rem; color: var(--muted); }
 .cr-actions { display: flex; gap: 10px; margin-top: 12px; }
 .cr-actions button { flex: 1; font: 700 1rem inherit; cursor: pointer; padding: 10px; border-radius: 9px; border: 0; color: #2a2118; background: var(--gold); }
@@ -309,22 +307,6 @@ body.touch #card { bottom: 200px; max-height: 34vh; overflow-y: auto; }
 #v-char:empty { display: none; }
 @media (max-width: 700px) { #creator { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 56vh; } }
 body.creating .top-right, body.creating .top-left, body.creating .top-center, body.creating #vitals, body.creating #card, body.creating #help, body.creating #prompt, body.creating #touch-controls { display: none !important; }
-
-/* premium */
-#premium { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.75); }
-#premium.show { display: flex; }
-#premium .box { width: min(420px, 100%); background: rgba(28,22,16,.97); border: 1px solid rgba(226,185,85,.55); border-radius: 12px; padding: 6px 18px 18px; }
-#premium header { display: flex; justify-content: space-between; align-items: center; }
-#premium h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
-#premium-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
-#pr-items { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
-#pr-items li { display: flex; align-items: center; gap: 10px; }
-#pr-items .dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); flex: none; }
-#pr-buy { width: 100%; font: 700 1rem inherit; cursor: pointer; padding: 11px; border: 0; border-radius: 9px; color: #2a2118; background: var(--gold); }
-#pr-buy:disabled { opacity: .5; cursor: not-allowed; }
-.pr-status { margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
-#cr-premium { width: 100%; margin-top: 10px; font: 700 .95rem inherit; cursor: pointer; padding: 9px; border-radius: 9px; border: 1px solid var(--gold); color: var(--gold); background: transparent; }
-#pr-items .soon { margin-left: auto; padding: 2px 9px; font-size: .72rem; border-radius: 999px; background: rgba(120,160,200,.25); color: #bcd0e6; white-space: nowrap; }
 
 /* ---------- account and online play ---------- */
 #account, #online { position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.7); }

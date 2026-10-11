@@ -15,13 +15,13 @@ const DGames = (() => {
   let puffTex = null;
 
   const GAMES = [
-    { id: "race", name: "Race down Chandni Chowk", text: "Rickshaws (Modern Delhi) or elephants (Mughal Delhi) race from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · Space boost" },
-    { id: "defend", name: "Defend the Red Fort", text: "Raiders march down Chandni Chowk at the Lahori Gate. Aim the cannon on the gate and break up their ranks before they reach it. Three waves. Win 80 denarii.", keys: "W S farther or nearer · A D left or right · Space or click fire" },
-    { id: "kushti", name: "Kushti wrestling", text: "Pehlwani wrestling in a mud pit. Get to grips with your opponent, then fight for the throw by pressing Space as fast as you can. First to two throws wins 40 denarii.", keys: "WASD move · Space grip, then mash Space to throw" },
-    { id: "kites", name: "Kite fights", text: "A tradition in Old Delhi: fly your kite, cross strings with the others and saw through theirs before they saw through yours. Cut all three kites for 60 denarii.", keys: "WASD fly the kite · hold Space to saw while the strings cross" },
-    { id: "run", name: "Chaat run", text: "Carry hot street food through the crowded lanes to three hungry customers. It cools as you go and spills when you bump into people. Earn up to 90 denarii.", keys: "walk as usual · Esc to give up" },
-    { id: "pachisi", name: "Pachisi", text: "The Mughal court's board game of cowrie shells and racing pawns, against a rival. Win 25 denarii.", keys: "" },
-    { id: "bazaar", name: "Bazaar trader", text: "Buy goods where they are cheap and sell them where they are dear, over six market days across Old Delhi's bazaars. Keep the profit.", keys: "" },
+    { id: "race", where: "the start arch at the Fatehpuri Masjid end of Chandni Chowk", name: "Race down Chandni Chowk", text: "Rickshaws (Modern Delhi) or elephants (Mughal Delhi) race from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · Space boost" },
+    { id: "defend", where: "the cannon on the rampart: climb the long ramp inside the west wall of the Red Fort", name: "Defend the Red Fort", text: "Raiders march down Chandni Chowk at the Lahori Gate. Aim the cannon on the gate and break up their ranks before they reach it. Three waves. Win 80 denarii.", keys: "W S farther or nearer · A D left or right · Space or click fire" },
+    { id: "kushti", where: "the akhara on the open square in front of the Lahori Gate", name: "Kushti wrestling", text: "Pehlwani wrestling in a mud pit. Get to grips with your opponent, then fight for the throw by pressing Space as fast as you can. First to two throws wins 40 denarii.", keys: "WASD move · Space grip, then mash Space to throw" },
+    { id: "kites", where: "the kite stall on the open square in front of the Lahori Gate", name: "Kite fights", text: "A tradition in Old Delhi: fly your kite, cross strings with the others and saw through theirs before they saw through yours. Cut all three kites for 60 denarii.", keys: "WASD fly the kite · hold Space to saw while the strings cross" },
+    { id: "run", where: "the chaat stall on Chandni Chowk, near the Metro", name: "Chaat run", text: "Carry hot street food through the crowded lanes to three hungry customers. It cools as you go and spills when you bump into people. Earn up to 90 denarii.", keys: "walk as usual · Esc to give up" },
+    { id: "pachisi", where: "the pavilion in the Red Fort courtyard", name: "Pachisi", text: "The Mughal court's board game of cowrie shells and racing pawns, against a rival. Win 25 denarii.", keys: "" },
+    { id: "bazaar", where: "the bazaar stall beside the pool on Chandni Chowk", name: "Bazaar trader", text: "Buy goods where they are cheap and sell them where they are dear, over six market days across Old Delhi's bazaars. Keep the profit.", keys: "" },
   ];
 
   // ------------------------------------------------------------------ shared pieces
@@ -91,7 +91,7 @@ const DGames = (() => {
     ul.replaceChildren(...GAMES.map((g) => {
       const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
       const name = document.createElement("strong"), note = document.createElement("small");
-      name.textContent = g.name; note.textContent = g.text;
+      name.textContent = g.name; note.textContent = `${g.text} Where: ${g.where}.`;
       txt.append(name, note);
       b.type = "button"; b.textContent = "Play"; b.addEventListener("click", () => play(g.id));
       li.append(txt, b);
@@ -129,6 +129,10 @@ const DGames = (() => {
     else if (runGame) { endRun(false, "You gave up the food run."); }
   }
   function fire() { if (game && game.fire) game.fire(); }
+  function playHere() {
+    const v = Delhi.venueAt(player.x, player.z, player.feet);
+    if (v) play(v.id); else toast("Walk to one of the game spots in Old Delhi, or press N for the list.");
+  }
 
   // ------------------------------------------------------------------ 1. the race down Chandni Chowk
 
@@ -244,7 +248,7 @@ const DGames = (() => {
     const dot = new THREE.Mesh(new THREE.CircleGeometry(0.9, 12), new THREE.MeshBasicMaterial({ color: 0xffd45a, side: THREE.DoubleSide })); dot.rotation.x = -Math.PI / 2; group.add(dot);
     const gun = new THREE.Group(), barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 5, 12), lam(0x2e2e30)); barrel.rotation.x = Math.PI / 2; barrel.position.z = 2.2;
     const cradle = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.2, 3), lam(0x6b4a2b)); cradle.position.y = -0.9;
-    gun.add(barrel, cradle); gun.position.set(X(9), 33.6, 7); group.add(gun);
+    gun.add(barrel, cradle); gun.position.set(X(2.6), 27.1, 45); group.add(gun); Delhi.cannonShow(false);
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), lam(0x1a1a1c)); ball.visible = false; group.add(ball);
     let d = 140, az = 0, cool = 0, wave = -1, toSpawn = 0, spawnT = 0, rest = 2, gate = 100, kills = 0, shot = null, over = false, t = 0;
     const o = new THREE.Object3D();
@@ -311,11 +315,11 @@ const DGames = (() => {
         else if (wave >= WAVES.length && alive() === 0 && over && gate > 0) { over = false; const prize = 50 + Math.round(gate * 0.3); wave = 99; finish("defend", "The gate holds!", `All three waves are beaten (${kills} raiders stopped) and the Lahori Gate is ${Math.round(gate)}% intact.`, prize, game.back); }
       },
       camera(cam, dt) {
-        cam.position.set(X(18), 40, 7);
-        cam.lookAt(X(-d * 0.6 - 20), 2, az * 0.4 + 2);
+        cam.position.set(X(14), 31, 49);
+        cam.lookAt(X(-d * 0.55 - 10), 2, az * 0.6 + 20);
         if (player.shake > 0) { cam.position.x += (Math.random() - 0.5) * player.shake * 0.6; cam.position.y += (Math.random() - 0.5) * player.shake * 0.4; player.shake = Math.max(0, player.shake - dt * 2.4); }
       },
-      cleanup() { sc.remove(group); },
+      cleanup() { sc.remove(group); Delhi.cannonShow(true); },
     };
   }
 
@@ -324,8 +328,6 @@ const DGames = (() => {
   function kushtiGame() {
     const C = { x: X(-45), z: 35 }, R = 7.5;
     const group = new THREE.Group(); sc.add(group);
-    const pit = new THREE.Mesh(new THREE.CircleGeometry(R, 40), lam(0xb08a5a)); pit.rotation.x = -Math.PI / 2; pit.position.set(C.x, 0.07, C.z); pit.receiveShadow = true; group.add(pit);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.28, 8, 48), lam(0x8a7a62)); rim.rotation.x = -Math.PI / 2; rim.position.set(C.x, 0.2, C.z); group.add(rim);
     const mk = (look, worn) => { const f = createFigure(); paintFigure(f.mats, look); applyAccessories(f, worn || []); f.g.rotation.order = "YXZ"; group.add(f.g); return f; };
     const fm = mk(Character.look, Market.worn), ff = mk({ skin: 3, hair: 0, toga: 4, sash: 2 }, ["armbands"]);
     const me = { f: fm, x: -3.5, z: 0, yaw: -Math.PI / 2, lie: 0 }, foe = { f: ff, x: 3.5, z: 0, yaw: Math.PI / 2, lie: 0 };
@@ -483,7 +485,7 @@ const DGames = (() => {
   function startRun() {
     const spots = [{ n: "Katra Neel", x: -420, z: -12 }, { n: "the Chandni Chowk pool", x: -310, z: 12 }, { n: "the Fatehpuri Masjid", x: -596, z: 0 }, { n: "the Meena Bazaar lane", x: -150, z: 40 }, { n: "the Begum ki Serai", x: -240, z: -16 }, { n: "the Lahori Gate", x: -38, z: 0 }]
       .sort(() => Math.random() - 0.5).slice(0, 3);
-    placeAt(X(-215), 14, Math.PI / 2); player.pitch = -0.02;
+    placeAt(X(-215), 8, Math.PI / 2); player.pitch = -0.02;
     const run = { idx: 0, time: 150, q: 100, earned: 0, cool: 0 };
     const target = () => spots[run.idx];
     const go = () => { const s = target(); Nav.set({ name: s.n, x: X(s.x), z: s.z, stand: [X(s.x), s.z] }); };
@@ -686,5 +688,5 @@ const DGames = (() => {
   }
 
 
-  return { get game() { return game; }, init, open, play, update, camera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
+  return { get game() { return game; }, playHere, init, open, play, update, camera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
 })();

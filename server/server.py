@@ -3,9 +3,8 @@
 
 Standard library only (Python 3.9+), so there is nothing to install:    python3 server/server.py
 
-One port serves three things:
+One port serves two things:
   GET  /health            a status page for the host's health check
-  POST /stripe-webhook    Stripe tells us a payment went through; we grant Premium (signature checked)
   WS   /play              the game connection (JSON text messages)
 
 Who decides what (this is the whole point of having a server):
@@ -14,15 +13,12 @@ Who decides what (this is the whole point of having a server):
     own health or one-shot the other player. Movement speed and arena bounds are enforced too.
   * Races: each client drives its own chariot, but the server limits how fast the distance can grow, and it alone
     decides the finishing order.
-  * Premium: online play needs Premium. Premium comes from the `entitlements` table, which only this server (with
-    the service key) can write, never the player.
 
 Settings are environment variables (see server/README.md).
 """
 import asyncio
 import base64
 import hashlib
-import hmac
 import json
 import math
 import os
@@ -44,10 +40,6 @@ def load_config():
         "port": int(e("PORT", "8765")),
         "supabase_url": supa,
         "anon_key": e("SUPABASE_ANON_KEY", ""),
-        "service_key": e("SUPABASE_SERVICE_KEY", ""),
-        "stripe_secret": e("STRIPE_WEBHOOK_SECRET", ""),
-        # Premium is required online as soon as accounts are configured; with no Supabase it is a free dev server.
-        "require_premium": e("REQUIRE_PREMIUM", "1" if supa else "0") == "1",
         "allow_bots": e("ALLOW_BOTS", "1") == "1",
         "bot_wait": float(e("BOT_WAIT", "6")),        # seconds alone in the queue before a practice bot joins
         "race_wait": float(e("RACE_WAIT", "6")),      # seconds to wait for more racers once two are queued
@@ -71,7 +63,6 @@ CLASS_MODS = {  # only what a duel needs
     "merchant": {"melee": 0.85, "taken": 1.1},
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
-PREMIUM_LOOK = {"toga": (5, 6), "sash": (5,)}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
@@ -96,13 +87,11 @@ def clean_name(v):
     return re.sub(r"\s+", " ", v).strip()[:16] or "Player"
 
 
-def clean_look(look, premium):
+def clean_look(look):
     out = {}
     for part, n in LOOK_COUNTS.items():
         i = look.get(part) if isinstance(look, dict) else None
         ok = isinstance(i, int) and not isinstance(i, bool) and 0 <= i < n
-        if ok and not premium and i in PREMIUM_LOOK.get(part, ()):
-            ok = False   # premium colours only for premium players
         out[part] = i if ok else 0
     acc = look.get("acc") if isinstance(look, dict) else None
     out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:5] if isinstance(acc, list) else []
@@ -120,7 +109,7 @@ def num(v, lo, hi, default=0.0):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# Supabase (accounts and what has been paid for). Replaced by fakes in the tests.
+# Supabase (accounts). Replaced by fakes in the tests.
 
 def _http_json(url, headers, body=None, method=None, timeout=8):
     data = json.dumps(body).encode() if body is not None else None
@@ -140,39 +129,6 @@ async def verify_token(token):
         return user.get("id") if isinstance(user, dict) else None
     except Exception:
         return None
-
-
-async def lookup_premium(uid):
-    if not CFG["supabase_url"] or not uid:
-        return False
-    hdr = {"apikey": CFG["service_key"], "Authorization": "Bearer " + CFG["service_key"]}
-    url = CFG["supabase_url"] + "/rest/v1/entitlements?select=premium&user_id=eq." + urllib.parse.quote(str(uid), safe="")
-    try:
-        rows = await asyncio.to_thread(_http_json, url, hdr)
-        return bool(rows and rows[0].get("premium"))
-    except Exception:
-        return False
-
-
-async def grant_premium(uid):
-    hdr = {"apikey": CFG["service_key"], "Authorization": "Bearer " + CFG["service_key"], "Content-Type": "application/json",
-           "Prefer": "resolution=merge-duplicates,return=minimal"}
-    body = [{"user_id": uid, "premium": True, "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}]
-    await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/entitlements?on_conflict=user_id", hdr, body, "POST")
-
-
-def stripe_signature_ok(payload, header, secret, tolerance=300, at=None):
-    """Checks a Stripe-Signature header: 't=...,v1=...' where v1 = HMAC-SHA256(secret, f'{t}.{payload}')."""
-    if not secret or not header:
-        return False
-    parts = dict(p.split("=", 1) for p in header.split(",") if "=" in p)
-    t, sig = parts.get("t"), parts.get("v1")
-    if not t or not sig or not t.isdigit():
-        return False
-    if abs((at if at is not None else time.time()) - int(t)) > tolerance:
-        return False
-    want = hmac.new(secret.encode(), t.encode() + b"." + payload, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(want, sig)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -228,8 +184,7 @@ class Conn:
         self.closed = False
         self.hello = False
         self.uid = None
-        self.premium = False
-        self.name, self.cls, self.look = "Player", "gladiator", clean_look({}, False)
+        self.name, self.cls, self.look = "Player", "gladiator", clean_look({})
         self.queue = None          # "duel" / "race" while waiting
         self.queued_at = 0.0
         self.want_bot = False
@@ -275,7 +230,7 @@ class Duelist:
         self.conn, self.i, self.bot = conn, index, bot
         self.name = name or (conn.name if conn else "Brutus")
         self.cls = conn.cls if conn else "gladiator"
-        self.look = conn.look if conn else clean_look({"toga": 2, "sash": 1}, False)
+        self.look = conn.look if conn else clean_look({"toga": 2, "sash": 1})
         self.melee = CLASS_MODS.get(self.cls, CLASS_MODS["gladiator"])["melee"]
         self.taken = CLASS_MODS.get(self.cls, CLASS_MODS["gladiator"])["taken"]
         self.x, self.z = (-12.0, 12.0)[index], 0.0
@@ -456,11 +411,11 @@ class Fighter(Duelist):
         self.team = 1 if role == "enemy" else 0
         self.down, self.rev = False, 0.0
         if role == "enemy":                 # weaker one by one, dangerous together
-            self.look = clean_look({"toga": 4, "sash": 3, "hair": 0}, False)
+            self.look = clean_look({"toga": 4, "sash": 3, "hair": 0})
             self.cls, self.melee, self.taken, self.hp = "gladiator", 0.8, 1.0, 80.0
             self.speed, self.cool, self.cool_span = 3.0, 1.8, 1.2
         elif role == "ally":
-            self.look = clean_look({"toga": 2 + index % 3, "sash": 1}, False)
+            self.look = clean_look({"toga": 2 + index % 3, "sash": 1})
             self.speed, self.cool, self.cool_span = 3.2, 1.5, 1.2
 
     def state(self):
@@ -637,7 +592,7 @@ class Racer:
         self.conn, self.i, self.bot = conn, index, bot
         self.name = conn.name if conn else "Practice bot %d" % index
         self.cls = conn.cls if conn else "charioteer"
-        self.look = conn.look if conn else clean_look({"toga": index, "sash": index}, False)
+        self.look = conn.look if conn else clean_look({"toga": index, "sash": index})
         self.s, self.d, self.v = 0.0, (10.0, -8.0, 2.0, 20.0)[index % 4], 0.0
         self.last_t = None
         self.fin = None
@@ -762,7 +717,7 @@ class Ship:
         self.conn, self.i, self.bot = conn, index, bot
         self.name = conn.name if conn else "%s (practice ship)" % BOT_SHIP_NAMES[index % len(BOT_SHIP_NAMES)]
         self.cls = conn.cls if conn else "gladiator"
-        self.look = conn.look if conn else clean_look({"toga": index, "sash": index}, False)
+        self.look = conn.look if conn else clean_look({"toga": index, "sash": index})
         a = 2 * math.pi * index / max(1, count)
         self.x, self.z = 19.0 * math.cos(a), 15.5 * math.sin(a)
         self.yaw = math.atan2(-self.x, -self.z)          # facing the middle
@@ -1130,12 +1085,10 @@ async def handle_msg(conn, m):
             return
         conn.hello = True
         conn.uid = await verify_token(m.get("token"))
-        conn.premium = bool(conn.uid) and await lookup_premium(conn.uid)
         conn.name = clean_name(m.get("name"))
         conn.cls = m.get("cls") if m.get("cls") in CLASS_MODS else "gladiator"
-        conn.look = clean_look(m.get("look"), conn.premium or not CFG["require_premium"])
-        return conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "premium": conn.premium,
-                          "premiumRequired": CFG["require_premium"], "bots": CFG["allow_bots"]})
+        conn.look = clean_look(m.get("look"))
+        return conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "bots": CFG["allow_bots"]})
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "queue":
@@ -1144,8 +1097,6 @@ async def handle_msg(conn, m):
             return conn.send({"t": "error", "code": "mode", "msg": "Unknown game"})
         if conn.room:
             return conn.send({"t": "error", "code": "busy", "msg": "You are already in a game"})
-        if CFG["require_premium"] and not conn.premium:
-            return conn.send({"t": "error", "code": "premium", "msg": "Playing real people is a Premium feature" if conn.uid else "Log in with a Premium account to play real people"})
         return enqueue(conn, mode, m.get("bot"))
     if t == "leave":
         leave_queue(conn)
@@ -1207,28 +1158,6 @@ async def handle_http(reader, writer):
     if path == "/health":
         return await reply(writer, 200, json.dumps({"ok": True, "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
 
-    if path == "/stripe-webhook" and method == "POST":
-        try:
-            n = int(hdr.get("content-length", "0"))
-            if n > 65536:
-                return await reply(writer, 413)
-            payload = await asyncio.wait_for(reader.readexactly(n), timeout=10)
-        except Exception:
-            return await reply(writer, 400)
-        if not stripe_signature_ok(payload, hdr.get("stripe-signature", ""), CFG["stripe_secret"]):
-            return await reply(writer, 400, b"bad signature")
-        try:
-            event = json.loads(payload)
-            if event.get("type") == "checkout.session.completed":
-                obj = event["data"]["object"]
-                uid = obj.get("client_reference_id")
-                if uid and obj.get("payment_status") in ("paid", "no_payment_required") and re.fullmatch(r"[0-9a-fA-F-]{36}", uid):
-                    await grant_premium(uid)
-        except Exception as e:
-            print("webhook error:", repr(e))
-            return await reply(writer, 503)   # Stripe will retry
-        return await reply(writer, 200, b"ok")
-
     if path == "/play" and hdr.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in hdr:
         if not origin_ok(hdr.get("origin")):
             return await reply(writer, 403, b"origin not allowed")
@@ -1279,11 +1208,9 @@ async def main():
     srv = await serve()
     port = srv.sockets[0].getsockname()[1]
     print("Walk Ancient Rome game server on port %d" % port)
-    print("  accounts: %s | premium required: %s | bots: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["require_premium"], CFG["allow_bots"]))
+    print("  accounts: %s | bots: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["allow_bots"]))
     if not CFG["origins"]:
         print("  WARNING: ALLOWED_ORIGINS is not set, so only pages on localhost can connect. Set it to your site's address.")
-    if CFG["supabase_url"] and not CFG["stripe_secret"]:
-        print("  note: STRIPE_WEBHOOK_SECRET is not set, so payments cannot unlock Premium yet.")
     async with srv:
         await srv.serve_forever()
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Tests for server.py. Run:  python3 server/test_server.py
-Plays the part of real browsers (WebSocket clients) and of Stripe, including cheating and abusive ones."""
+Plays the part of real browsers (WebSocket clients), including cheating and abusive ones."""
 import asyncio
 import base64
 import hashlib
-import hmac
 import json
 import math
 import os
@@ -92,8 +91,8 @@ class WS:
 class ServerTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.cfg = dict(server.CFG)
-        self.saved = (server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE)
-        server.CFG.update(require_premium=False, bot_wait=0.6, race_wait=0.6, origins=[], supabase_url="", stripe_secret="")
+        self.saved = (server.verify_token, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE)
+        server.CFG.update(bot_wait=0.6, race_wait=0.6, origins=[], supabase_url="")
         self.srv = await server.serve("127.0.0.1", 0)
         self.port = self.srv.sockets[0].getsockname()[1]
         self.clients = []
@@ -107,7 +106,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             q.clear()
         server.CFG.clear()
         server.CFG.update(self.cfg)
-        server.verify_token, server.lookup_premium, server.grant_premium, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE = self.saved
+        server.verify_token, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE = self.saved
         for t in asyncio.all_tasks():
             if t is not asyncio.current_task() and "matchmaker" in repr(t):
                 t.cancel()
@@ -142,48 +141,17 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_hello_cleans_everything_the_client_claims(self):
         a = await self.player(name="<script>alert(1)</script>Bob", cls="god-mode", look={"toga": 99, "skin": -3, "sash": "x"})
-        self.assertFalse(a.welcome["premium"])
+        self.assertNotIn("premium", a.welcome)
         self.assertEqual(server.clean_name("<b>Mara</b>"), "bMarab")
-        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}, True), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": []})
-        self.assertEqual(server.clean_look({"acc": ["cloak", "cloak", "<script>", 7, "helmet"]}, False)["acc"], ["cloak", "helmet"])
-        # premium colours are only for premium players
-        self.assertEqual(server.clean_look({"toga": 5, "sash": 5}, False), {"skin": 0, "hair": 0, "toga": 0, "sash": 0, "acc": []})
-        self.assertEqual(server.clean_look({"toga": 5, "sash": 5}, True)["toga"], 5)
+        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": []})
+        self.assertEqual(server.clean_look({"acc": ["cloak", "cloak", "<script>", 7, "helmet"]})["acc"], ["cloak", "helmet"])
+        self.assertEqual(server.clean_look({"toga": 5, "sash": 5})["toga"], 5)   # every colour is free
 
     async def test_must_say_hello_first(self):
         ws = await WS.connect(self.port)
         ws.send({"t": "queue", "mode": "duel"})
         m = await ws.until(lambda m: m["t"] == "error")
         self.assertEqual(m["code"], "hello")
-
-    # ---------------------------------------------------------------- premium
-
-    async def test_online_play_needs_premium(self):
-        server.CFG.update(require_premium=True, supabase_url="https://example.supabase.co")
-
-        async def fake_verify(token):
-            return {"free": "user-free", "paid": "user-paid"}.get(token)
-
-        async def fake_premium(uid):
-            return uid == "user-paid"
-        server.verify_token, server.lookup_premium = fake_verify, fake_premium
-
-        guest = await self.player(token=None)
-        guest.send({"t": "queue", "mode": "duel"})
-        self.assertEqual((await guest.until(lambda m: m["t"] == "error"))["code"], "premium")
-
-        free = await self.player(token="free")
-        self.assertFalse(free.welcome["premium"])
-        free.send({"t": "queue", "mode": "race"})
-        self.assertEqual((await free.until(lambda m: m["t"] == "error"))["code"], "premium")
-
-        paid = await self.player(token="paid")
-        self.assertTrue(paid.welcome["premium"])
-        paid.send({"t": "queue", "mode": "duel"})
-        self.assertEqual((await paid.until(lambda m: m["t"] in ("queued", "error")))["t"], "queued")
-
-        forged = await self.player(token="a-forged-token")
-        self.assertFalse(forged.welcome["account"])
 
     # ---------------------------------------------------------------- duels
 
@@ -536,43 +504,6 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.4)
         room.step(0.05)
         self.assertTrue(room.over)            # the last captain is alone: the battle is over
-
-    # ---------------------------------------------------------------- payments
-
-    def webhook(self, event, secret="whsec_test", at=None, tamper=False):
-        body = json.dumps(event).encode()
-        t = str(int(at if at is not None else time.time()))
-        sig = hmac.new(secret.encode(), t.encode() + b"." + body, hashlib.sha256).hexdigest()
-        if tamper:
-            body = body.replace(b"paid", b"unpaid")
-        return body, "t=%s,v1=%s" % (t, sig)
-
-    async def post_webhook(self, body, sig):
-        r, w = await asyncio.open_connection("127.0.0.1", self.port)
-        w.write(b"POST /stripe-webhook HTTP/1.1\r\nHost: x\r\nStripe-Signature: " + sig.encode() + b"\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
-        return int((await r.read()).decode().split(" ")[1])
-
-    async def test_stripe_webhook_grants_premium_only_when_genuine(self):
-        granted = []
-
-        async def fake_grant(uid):
-            granted.append(uid)
-        server.grant_premium = fake_grant
-        server.CFG["stripe_secret"] = "whsec_test"
-        uid = "123e4567-e89b-12d3-a456-426614174000"
-        event = {"type": "checkout.session.completed", "data": {"object": {"client_reference_id": uid, "payment_status": "paid"}}}
-
-        self.assertEqual(await self.post_webhook(*self.webhook(event)), 200)
-        self.assertEqual(granted, [uid])
-        granted.clear()
-        self.assertEqual(await self.post_webhook(*self.webhook(event, secret="wrong-secret")), 400)      # forged
-        self.assertEqual(await self.post_webhook(*self.webhook(event, tamper=True)), 400)                  # altered after signing
-        self.assertEqual(await self.post_webhook(*self.webhook(event, at=time.time() - 3600)), 400)       # replayed an hour later
-        unpaid = {"type": "checkout.session.completed", "data": {"object": {"client_reference_id": uid, "payment_status": "unpaid"}}}
-        self.assertEqual(await self.post_webhook(*self.webhook(unpaid)), 200)
-        bad_id = {"type": "checkout.session.completed", "data": {"object": {"client_reference_id": "../../x", "payment_status": "paid"}}}
-        self.assertEqual(await self.post_webhook(*self.webhook(bad_id)), 200)
-        self.assertEqual(granted, [])                                                                       # nothing granted by any of those
 
     # ---------------------------------------------------------------- abuse
 

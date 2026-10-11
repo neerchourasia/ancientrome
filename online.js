@@ -22,7 +22,7 @@ const Online = (() => {
 
   function connect() {
     if (!URL) return;
-    const key = [accountToken(), Account.premium, Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join()].join("|");
+    const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join()].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is
       ws.close();                                         // you logged in or changed character: connect again
@@ -70,17 +70,14 @@ const Online = (() => {
   function refreshLobby() {
     const box = $o("online");
     if (!box) return;
-    const premiumNeeded = !!(welcome && welcome.premiumRequired && !welcome.premium);
-    const ready = !!welcome && !premiumNeeded && !waiting;
-    $o("on-status").textContent = !URL ? "Online play is not switched on yet." : (lobbyMsg || (premiumNeeded ? (welcome.account ? "Playing real people is a Premium feature." : "Log in with a Premium account to play real people.") : (welcome ? (waiting ? "" : "Pick a game.") : "Connecting...")));
+    const ready = !!welcome && !waiting;
+    $o("on-status").textContent = !URL ? "Online play is not switched on yet." : (lobbyMsg || (welcome ? (waiting ? "" : "Pick a game.") : "Connecting..."));
     $o("on-duel").disabled = !ready;
     $o("on-race").disabled = !ready;
     $o("on-coop").disabled = !ready;
     $o("on-naval").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
-    $o("on-login").hidden = !(premiumNeeded && !welcome.account);
-    $o("on-premium").hidden = !premiumNeeded;
   }
 
   function openLobby() {
@@ -105,8 +102,6 @@ const Online = (() => {
     $o("on-naval").addEventListener("click", () => queue("naval"));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
-    $o("on-login").addEventListener("click", () => { closePanels(); Account.open(); });
-    $o("on-premium").addEventListener("click", () => { closePanels(); openPremium(); });
     $o("btn-online").addEventListener("click", openLobby);
   }
 

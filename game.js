@@ -45,7 +45,6 @@ function init() {
   Modern.build(scene);
   buildAvatar();
   buildCreator();
-  buildPremium();
   Account.bind();
   Online.bind();
   Market.bind();
@@ -117,7 +116,7 @@ function wireInput(canvas) {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // typing a name: leave the keys alone
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(k)) e.preventDefault();
     if (!started) return;
-    if (creatorOpen || premiumOpen) return; // the character or premium screen is open
+    if (creatorOpen) return; // the character screen is open
     keys.add(k);
     if (Vitals.resting && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(k)) Vitals.stopRest(); // moving stands you up
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
@@ -147,6 +146,7 @@ function wireInput(canvas) {
       else { const m = /^(?:Digit|Key|Numpad)([1-5])$/.exec(k); if (m) Watch.setAct(Number(m[1]) - 1); }
     } else if (mode === "walk" && canStart()) {
       if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
+      else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
       else if (k === "KeyL" && inArena(player.x, player.z)) Fight.start({ lion: true });
       else if (k === "KeyU" && inArena(player.x, player.z)) Fight.start({ hunt: true });
@@ -186,6 +186,7 @@ function wireInput(canvas) {
   $("#prompt").addEventListener("click", () => {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
     if ($("#prompt").dataset.kind === "car") { Car.enter(); return; }
+    if ($("#prompt").dataset.kind === "dgame") { DGames.playHere(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -692,68 +693,6 @@ function chaseCamera() {
 
 // ---------- your character: name, class and look ----------
 
-let premiumOpen = false;
-
-function buildPremium() {
-  for (const part of Object.keys(Character.PREMIUM_NAMES)) {
-    for (const i of Object.keys(Character.PREMIUM_NAMES[part])) {
-      const li = document.createElement("li"), dot = document.createElement("span");
-      dot.className = "dot"; dot.style.background = "#" + Character.COLORS[part][i].toString(16).padStart(6, "0");
-      li.append(dot, document.createTextNode(Character.PREMIUM_NAMES[part][i]));
-      $("#pr-items").append(li);
-    }
-  }
-  for (const name of Character.PREMIUM_FEATURES) {
-    const li = document.createElement("li"), badge = document.createElement("span");
-    badge.className = "soon"; badge.textContent = Online.available ? "Included" : "Coming soon";
-    li.append(document.createTextNode(name), badge);
-    $("#pr-items").append(li);
-  }
-  $("#pr-price").textContent = Character.SHOP.price ? `Price: ${Character.SHOP.price}` : "";
-  $("#pr-buy").addEventListener("click", () => {
-    const shop = Character.SHOP;
-    if (!/^https:\/\//.test(shop.checkoutUrl) || Account.premium) return;
-    if (!Account.loggedIn) { closePremium(); Account.open(); return; }
-    const u = new URL(shop.checkoutUrl); // the payment is tagged with your account, so the server knows who paid
-    u.searchParams.set("client_reference_id", Account.userId);
-    if (Account.email) u.searchParams.set("prefilled_email", Account.email);
-    window.open(u.toString(), "_blank", "noopener");
-    watchPremium();
-  });
-  Account.onChange(() => { renderPremium(); refreshLocks(); });
-  renderPremium();
-  $("#premium-close").addEventListener("click", closePremium);
-  $("#premium").addEventListener("click", (e) => { if (e.target.id === "premium") closePremium(); });
-  $("#cr-premium").addEventListener("click", openPremium);
-  $("#btn-premium").addEventListener("click", () => { if (mode === "walk" && !panelOpen && canStart()) openPremium(); else toast("Close what is open and stop the game first"); });
-}
-function renderPremium() {
-  const shop = Character.SHOP, live = /^https:\/\//.test(shop.checkoutUrl), btn = $("#pr-buy"), st = $("#pr-status");
-  if (Account.premium) { btn.disabled = true; btn.textContent = "You have Premium ★"; st.textContent = "Thank you! Your premium colours are unlocked and you can play real people."; return; }
-  if (!live) { btn.disabled = true; btn.textContent = "Not on sale yet"; st.textContent = "Payments are not switched on yet. When they are, this button takes you to a secure checkout, and Premium unlocks once the payment is confirmed."; return; }
-  btn.disabled = false;
-  if (!Account.loggedIn) { btn.textContent = "Log in to get Premium"; st.textContent = "Premium belongs to your account, so log in (or create an account) first."; }
-  else { btn.textContent = "Get Premium"; st.textContent = "You will be taken to a secure payment page. Premium unlocks here once the payment is confirmed, usually within a minute."; }
-}
-
-// After sending you to pay, keep checking for a few minutes so Premium appears as soon as the payment is confirmed.
-function watchPremium() {
-  let n = 0;
-  const iv = setInterval(async () => { if (Account.premium || ++n > 60) { clearInterval(iv); return; } await Account.loadPremium(); }, 5000);
-}
-
-function refreshLocks() {
-  for (const s of document.querySelectorAll(".swatch")) {
-    const locked = !Character.owns(s.dataset.part, Number(s.dataset.i));
-    s.classList.toggle("premium", locked);
-    s.title = locked ? "Premium cosmetic" : "";
-  }
-}
-
-function openPremium() { premiumOpen = true; panelOpen = true; renderPremium(); $("#premium").classList.add("show"); if (Account.loggedIn) Account.loadPremium(); }
-function closePremium() { premiumOpen = false; panelOpen = creatorOpen; $("#premium").classList.remove("show"); }
-
-
 let creatorOpen = false, draft = null;
 
 function applyLook(look) {
@@ -791,10 +730,8 @@ function buildCreator() {
       const s = mk("button", "swatch");
       s.type = "button"; s.dataset.part = part; s.dataset.i = i;
       s.style.background = "#" + hex.toString(16).padStart(6, "0");
-      s.setAttribute("aria-label", `${part} colour ${i + 1}${Character.owns(part, i) ? "" : " (premium, locked)"}`);
-      if (!Character.owns(part, i)) { s.classList.add("premium"); s.title = "Premium cosmetic"; }
+      s.setAttribute("aria-label", `${part} colour ${i + 1}`);
       s.addEventListener("click", () => {
-        if (!Character.owns(part, i)) { openPremium(); return; }
         draft.look[part] = i; $("#cr-note").textContent = ""; refreshCreator();
       });
       $(`#cr-${part}`).append(s);
@@ -824,7 +761,7 @@ function openCreator(first) {
   $("#cr-name").value = draft.name;
   $("#cr-cancel").hidden = !Character.exists;
   $("#cr-ok").textContent = first ? "Begin" : "Save";
-  $("#cr-note").textContent = "Pick a name, a class and your look. Locked colours (★) are Premium: tap one to see what Premium includes.";
+  $("#cr-note").textContent = "Pick a name, a class and your look.";
   if (document.pointerLockElement) document.exitPointerLock();
   creatorCamera(true);
   refreshCreator();
@@ -917,7 +854,6 @@ function closePanels() {
   $("#online").classList.remove("show");
   for (const p of document.querySelectorAll(".dpanel.show")) p.classList.remove("show");
   $("#market").classList.remove("show");
-  if (premiumOpen) { closePremium(); return; }
   if (creatorOpen) { if (!Character.exists) return; closeCreator(); } // the first-time screen cannot be skipped
   $("#bigmap").classList.remove("show");
   $("#places").classList.remove("show");
@@ -1062,6 +998,7 @@ function updatePrompt() {
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
+    if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";

@@ -611,6 +611,138 @@ const Delhi = (() => {
     MAP_SHAPES.push({ k: "r", x0: X(-702), x1: X(-620), z0: -40, z1: 40, c: "#cdbb94" }, { k: "r", x0: X(wx - 12), x1: X(wx + 12), z0: -30, z1: 30, c: "#b55a40" });
   }
 
+
+  // ---------- the places for the games ----------
+
+  const VENUES = [
+    { id: "kushti", x: -45, z: 35, r: 11, text: "F: wrestle in the akhara (kushti)" },
+    { id: "race", x: -572, z: 0, r: 18, text: "F: race down Chandni Chowk" },
+    { id: "defend", x: 4, z: 45, r: 10, top: true, text: "F: man the cannon and defend the Red Fort" },
+    { id: "kites", x: -18, z: -42, r: 8, text: "F: fly kites at the kite stall" },
+    { id: "pachisi", x: 112, z: -45, r: 9, text: "F: play pachisi" },
+    { id: "bazaar", x: -352, z: -12, r: 8, text: "F: trade at the bazaar stall" },
+    { id: "run", x: -215, z: 13, r: 7, text: "F: take a tray of chaat and deliver it" },
+  ];
+  let cannonG = null;
+  const venueAt = (x, z, feet) => VENUES.find((v) => Math.hypot(x - X(v.x), z - v.z) < v.r && (v.top ? feet > 18 : feet < 6)) || null;
+
+  function boardSign(parent, cx, y, cz, w, h, text, sub, rotY = 0, bg = "#3a2a1a", fg = "#f2d98a") {
+    const tex = canvasTex(256, 64, (g, ww, hh) => {
+      g.fillStyle = bg; g.fillRect(0, 0, ww, hh); g.strokeStyle = fg; g.lineWidth = 3; g.strokeRect(3, 3, ww - 6, hh - 6);
+      g.fillStyle = fg; g.textAlign = "center"; g.textBaseline = "middle";
+      g.font = `bold ${sub ? 28 : 34}px sans-serif`; g.fillText(text, ww / 2, sub ? 25 : 34);
+      if (sub) { g.font = "bold 16px sans-serif"; g.fillText(sub, ww / 2, 49); }
+    });
+    const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: tex, side: T.DoubleSide, emissive: 0x201808 }));
+    m.position.set(cx, y, cz); m.rotation.y = rotY; parent.add(m);
+    return m;
+  }
+  const stripeTex = (a, b) => canvasTex(64, 64, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? b : a; g.fillRect(i * 8, 0, 8, h); } });
+  const checkTex = () => canvasTex(64, 64, (g, w, h) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? "#161616" : "#f4f4f4"; g.fillRect(i * 8, j * 8, 8, 8); } });
+
+  function buildVenues() {
+    const vg = new T.Group(); scene.add(vg);
+    const flagCols = [0xe23b3b, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b];
+
+    // the akhara: a mud pit with a stone rim, bunting on poles, clubs and a sign
+    const pitC = { x: X(-45), z: 35 }, R = 7.5;
+    const pit = new T.Mesh(new T.CircleGeometry(R, 40), lambert(0xb08a5a)); pit.rotation.x = -Math.PI / 2; pit.position.set(pitC.x, 0.07, pitC.z); pit.receiveShadow = true; vg.add(pit);
+    const rim = new T.Mesh(new T.TorusGeometry(R, 0.28, 8, 48), lambert(0x8a7a62)); rim.rotation.x = -Math.PI / 2; rim.position.set(pitC.x, 0.2, pitC.z); vg.add(rim);
+    MAP_SHAPES.push({ k: "e", cx: pitC.x, cz: pitC.z, ax: R + 1, az: R + 1, c: "#c9a46a" });
+    const polePos = [[-9.5, -9.5], [9.5, -9.5], [9.5, 9.5], [-9.5, 9.5]];
+    polePos.forEach(([px, pz], i) => {
+      mcyl(vg, pitC.x + px, 0, pitC.z + pz, 0.15, 5.4, lambert(0x8a6a3a), { solid: true });
+      const [qx, qz] = polePos[(i + 1) % 4];
+      for (let k = 1; k < 7; k++) { // little flags along the string between two poles
+        const t = k / 7, fx = pitC.x + px + (qx - px) * t, fz = pitC.z + pz + (qz - pz) * t;
+        mbox(vg, fx, 4.3 + Math.sin(t * Math.PI) * -0.6, fz, 0.9, 0.9, 0.05, lambert(flagCols[(i + k) % 5]), { cast: false });
+      }
+    });
+    boardSign(vg, pitC.x, 3.3, pitC.z - 11.2, 5.5, 1.4, "AKHARA", "kushti wrestling");
+    mcyl(vg, pitC.x + 10.5, 0, pitC.z + 4, 0.5, 1.4, lambert(0x7a5a32), { solid: true }); mcyl(vg, pitC.x + 10.5, 0, pitC.z - 4, 0.5, 1.4, lambert(0x7a5a32), { solid: true }); // the heavy clubs (mugdar)
+
+    // the race: an arch of banners at the start line and another at the finish, with chequered lines
+    function raceArch(rx, label, sub) {
+      const wx = X(rx);
+      for (const sz of [-1, 1]) mbox(vg, wx, 0, sz * 15.5, 0.7, 8, 0.7, lambert(0x6b4a2b), { solid: true });
+      mbox(vg, wx, 8, 0, 0.6, 1.6, 32.4, lambert(0x6b4a2b));
+      boardSign(vg, wx - 0.35, 8.8, 0, 12, 1.6, label, sub, -Math.PI / 2, "#a8282b", "#fff3c4");
+      boardSign(vg, wx + 0.35, 8.8, 0, 12, 1.6, label, sub, Math.PI / 2, "#a8282b", "#fff3c4");
+      for (let k = -3; k <= 3; k++) mbox(vg, wx, 9.6, k * 4.6, 0.1, 1.1, 1.4, lambert(flagCols[(k + 3) % 5]), { cast: false });
+      const line = new T.Mesh(new T.PlaneGeometry(2.4, 28), new T.MeshLambertMaterial({ map: checkTex() })); line.material.map.repeat.set(2, 8);
+      line.rotation.x = -Math.PI / 2; line.position.set(wx, 0.06, 0); vg.add(line);
+    }
+    raceArch(-583, "START", "Chandni Chowk race"); raceArch(-30, "FINISH", "the Lahori Gate");
+
+    // the cannon on the rampart: a long ramp up the inside of the west wall, a walkway on top and a cannon facing the street
+    const steps_ = 48, RISE = 24.8 / 48, stepGeo = new T.BoxGeometry(12, 1, 1.5);
+    const ramp = new T.InstancedMesh(stepGeo, D.stone, steps_), side = new T.InstancedMesh(BOX, D.red, steps_), o = new T.Object3D();
+    for (let k = 1; k <= steps_; k++) {
+      const top = k * RISE, z1 = 100 - 1.5 * (k - 1), z0 = 100 - 1.5 * k;
+      addPlatformBox(X(8), X(20), 27, z1, top);                       // each step's surface reaches back to the top of the ramp, so the highest one under you counts
+      o.rotation.set(0, 0, 0); o.position.set(X(14), top / 2, (z0 + z1) / 2); o.scale.set(1, top, 1); o.updateMatrix(); ramp.setMatrixAt(k - 1, o.matrix);
+      o.position.set(X(20.3), (top + 1.2) / 2, (z0 + z1) / 2); o.scale.set(0.6, top + 1.2, 1.5); o.updateMatrix(); side.setMatrixAt(k - 1, o.matrix);
+      addBlockerBox(X(20), X(20.6), z0, z1, 0, top + 1.2);
+    }
+    for (const m of [ramp, side]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = m.receiveShadow = true; vg.add(m); }
+    addPlatformBox(X(0), X(8), 27, 270, 24.8);                         // the walkway along the top of the wall
+    addBlockerBox(X(0), X(1.2), 27, 270, 24.8, 27.2); addBlockerBox(X(6.8), X(8), 27, 270, 24.8, 27.2);
+    addBlockerBox(X(0), X(8), 26, 27, 24.8, 27.2);
+    mbox(vg, X(4), 24.8, 148.5, 7, 0.05, 243, lambert(0xb9ad94), { cast: false });
+    cannonG = new T.Group(); cannonG.position.set(X(4), 24.85, 45); vg.add(cannonG);
+    const iron = lambert(0x2e2e30);
+    const cb = new T.Mesh(new T.CylinderGeometry(0.55, 0.8, 4.4, 12), iron); cb.rotation.z = Math.PI / 2 + 0.06; cb.position.set(-1.2, 1.5, 0); cb.castShadow = true; cannonG.add(cb);
+    const carriage = new T.Mesh(BOX, D.wood); carriage.scale.set(3.2, 0.8, 1.6); carriage.position.set(-0.2, 0.9, 0); cannonG.add(carriage);
+    for (const sz of [-1, 1]) { const w = new T.Mesh(new T.CylinderGeometry(0.8, 0.8, 0.25, 12), D.wood); w.rotation.x = Math.PI / 2; w.position.set(-0.2, 0.8, sz * 1.0); cannonG.add(w); }
+    for (let i = 0; i < 6; i++) { const b = new T.Mesh(new T.SphereGeometry(0.35, 8, 6), iron); b.position.set(2.2 + (i % 3) * 0.7, 0.35, -2 + Math.floor(i / 3) * 0.7); cannonG.add(b); }
+    addBlockerCircle(X(4), 45, 1.4, 24.8, 27);
+    boardSign(vg, X(6.9), 27.4, 37, 4.2, 1.1, "CANNON", "defend the gate", -Math.PI / 2);
+    MAP_SHAPES.push({ k: "r", x0: X(8), x1: X(20), z0: 28, z1: 100, c: "#9a9080" });
+
+    // the kite stall: a counter, a canopy and kites on a rack
+    const kx = X(-18), kz = -42;
+    mbox(vg, kx, 0, kz, 6, 1.1, 1.6, D.wood, { solid: true });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(vg, kx + sx * 3, 0, kz + sz * 1.3, 0.25, 3.4, 0.25, D.wood);
+    mbox(vg, kx, 3.4, kz, 6.8, 0.2, 3.4, lambert(0xe8c13a), { cast: false });
+    const kshape = new T.Shape(); kshape.moveTo(0, 0.9); kshape.lineTo(0.65, 0.1); kshape.lineTo(0, -0.8); kshape.lineTo(-0.65, 0.1); kshape.closePath();
+    const kgeo = new T.ShapeGeometry(kshape);
+    for (let i = 0; i < 7; i++) { const m = new T.Mesh(kgeo, new T.MeshLambertMaterial({ color: flagCols[i % 5], side: T.DoubleSide })); m.position.set(kx - 2.7 + i * 0.9, 2.4 - (i % 2) * 0.5, kz - 1.15); vg.add(m); }
+    boardSign(vg, kx, 4.3, kz - 1.8, 5, 1.1, "PATANG", "kites for sale");
+    MAP_SHAPES.push({ k: "r", x0: kx - 3.4, x1: kx + 3.4, z0: kz - 1.8, z1: kz + 1.8, c: "#e8c13a" });
+
+    // the pachisi pavilion: a low platform with the painted cloth, cushions and a canopy
+    const px = X(112), pz = -45;
+    mbox(vg, px, 0, pz, 13, 0.4, 13, D.stone, { walk: true });
+    const cloth = lambert(0xb3262b);
+    mbox(vg, px, 0.41, pz, 4, 0.04, 4, lambert(0xe8c13a), { cast: false }); for (const [dx, dz, w, d] of [[0, -4.5, 4, 5], [0, 4.5, 4, 5], [-4.5, 0, 5, 4], [4.5, 0, 5, 4]]) mbox(vg, px + dx, 0.41, pz + dz, w, 0.04, d, cloth, { cast: false });
+    for (let i = 0; i < 4; i++) mbox(vg, px + (i < 2 ? -1 : 1) * 5.4, 0.4, pz + (i % 2 ? -1 : 1) * 5.4, 1.2, 0.4, 1.2, lambert(flagCols[i]));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(vg, px + sx * 6.2, 0.4, pz + sz * 6.2, 0.3, 4.2, 0.3, D.wood);
+    mbox(vg, px, 4.6, pz, 14, 0.25, 14, lambert(0xa8282b), { cast: false });
+    boardSign(vg, px, 3.4, pz - 6.6, 5, 1.2, "PACHISI", "the game of kings");
+    MAP_SHAPES.push({ k: "r", x0: px - 6.5, x1: px + 6.5, z0: pz - 6.5, z1: pz + 6.5, c: "#c0504d" });
+
+    // the bazaar stall: a counter piled with sacks and goods, a scale and a striped awning
+    const bx = X(-352), bz = -12.5;
+    mbox(vg, bx, 0, bz, 6, 1.0, 1.6, D.wood, { solid: true });
+    const goods = [0xd9791f, 0x2f6b8f, 0xb3262b, 0x4f7a3a, 0xe8d3a6];
+    for (let i = 0; i < 5; i++) mbox(vg, bx - 2.4 + i * 1.2, 1.0, bz, 0.9, 0.5 + (i % 2) * 0.2, 0.9, lambert(goods[i]));
+    for (const sx of [-1, 1]) mbox(vg, bx + sx * 3, 0, bz - 1.3, 0.25, 3.2, 0.25, D.wood);
+    const awn = new T.Mesh(BOX, new T.MeshLambertMaterial({ map: stripeTex("#b3262b", "#f1ead8") })); awn.scale.set(6.8, 0.15, 3.4); awn.position.set(bx, 3.3, bz - 0.4); awn.rotation.x = -0.18; vg.add(awn);
+    mbox(vg, bx + 1.4, 1.6, bz + 0.3, 0.08, 0.7, 0.08, D.dark); mbox(vg, bx + 1.4, 2.2, bz + 0.3, 0.9, 0.06, 0.06, D.dark);
+    boardSign(vg, bx, 4.1, bz - 1.4, 5, 1.1, "BAZAAR", "spices · silk · jewels");
+    MAP_SHAPES.push({ k: "r", x0: bx - 3.4, x1: bx + 3.4, z0: bz - 1.7, z1: bz + 1.7, c: "#d9791f" });
+
+    // the chaat stall: a counter with big pots, a striped awning and a sign
+    const cx = X(-215), cz = 13.5;
+    mbox(vg, cx, 0, cz, 5, 1.0, 1.6, D.wood, { solid: true });
+    for (const sx of [-1, 1]) mcyl(vg, cx + sx * 1.2, 1.0, cz, 0.7, 0.7, D.dark);
+    mcyl(vg, cx, 1.0, cz, 0.45, 0.35, lambert(0xd9a928));
+    for (const sx of [-1, 1]) mbox(vg, cx + sx * 2.5, 0, cz - 1.3, 0.25, 3.1, 0.25, D.wood);
+    const awn2 = new T.Mesh(BOX, new T.MeshLambertMaterial({ map: stripeTex("#2f8f4a", "#f1ead8") })); awn2.scale.set(5.8, 0.15, 3.2); awn2.position.set(cx, 3.2, cz - 0.4); awn2.rotation.x = 0.18; vg.add(awn2);
+    boardSign(vg, cx, 3.95, cz + 1.4, 4, 1.0, "CHAAT", "hot street food");
+    MAP_SHAPES.push({ k: "r", x0: cx - 2.8, x1: cx + 2.8, z0: cz - 1.8, z1: cz + 1.8, c: "#2f8f4a" });
+  }
+
   // ---------- modern Delhi: the Metro, street lights, rickshaws ----------
 
   function buildModernBits() {
@@ -771,6 +903,7 @@ const Delhi = (() => {
     buildJamaMasjid();
     buildFatehpuri();
     buildModernBits();
+    buildVenues();
     buildPeople();
     buildRides();
     buildElephants();
@@ -837,5 +970,5 @@ const Delhi = (() => {
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, setTier, update, hits, homeInside, inPlot, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, setTier, update, hits, homeInside, inPlot, homeSpot, venueAt, VENUES, cannonShow: (v) => { if (cannonG) cannonG.visible = v; }, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();

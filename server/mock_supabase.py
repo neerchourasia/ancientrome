@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A small stand-in for Supabase, for testing the login, saving and Premium flow on your own computer.
+"""A small stand-in for Supabase, for testing the login and saving on your own computer.
 NOT for real use: it keeps everything in memory and has no real security.   python3 server/mock_supabase.py  (port 54321)
 It speaks the same web API shapes as Supabase for: sign up, log in, refresh, log out, whoami, and the profiles and
 entitlements tables. Like real Supabase, a player can read their own entitlements but only the service key can write them."""
