@@ -139,7 +139,7 @@ const DGames = (() => {
 
   function raceGame() {
     const modern = era === "modern";
-    const id = modern ? "rickshaw" : "elephant", max = modern ? 8 : 10.5, acc = modern ? 5.5 : 4.2;
+    const id = modern ? "rickshaw" : "elephant", max = modern ? 8 : 14, acc = modern ? 5.5 : 6.5; // the elephants thunder along
     const START = -585, FINISH = -30;
     const lanes = [3, -3, 9, -9], colors = [0x2f8f4a, 0xd9411f, 0x2f6bd9, 0x8a3fd0], names = ["You", "Bhola", "Jamna", "Kallu"];
     const group = new THREE.Group(); sc.add(group);
