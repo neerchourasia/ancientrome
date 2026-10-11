@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=116">
+  <link rel="stylesheet" href="walk.css?v=118">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=116"></script>
+  <script src="boot.js?v=118"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -280,7 +280,7 @@
         <tr><th>Rides (cars, rickshaws, carts, elephants)</th><td>Cars and cycle rickshaws (modern cities) and bullock carts and elephants (ancient cities) are in the Market. Buy one, take it out, walk up and press <kbd>X</kbd> to get in. <kbd>W</kbd> gas, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer, <kbd>Space</kbd> handbrake, <kbd>Esc</kbd> or <kbd>X</kbd> to get out</td></tr>
         <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear, a hound or eagle companion, house decorations, healing supplies and training</td></tr>
         <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
-        <tr><th>Games of Old Delhi</th><td><kbd>N</kbd> in Delhi opens the list: a race down Chandni Chowk (rickshaws or elephants), defending the Red Fort's gate with a cannon, kushti wrestling, kite fights, a chaat (food) run, pachisi and a bazaar trading game. <kbd>Esc</kbd> leaves a game.</td></tr>
+        <tr><th>Games of Old Delhi</th><td><kbd>N</kbd> in Delhi opens the list: a race down Chandni Chowk (rickshaws or elephants; <kbd>1</kbd>-<kbd>9</kbd> speed levels, <kbd>X</kbd> cruise, <kbd>Space</kbd> boost), defending the Red Fort's gate with a cannon, kushti wrestling, kite fights, a chaat (food) run, pachisi and a bazaar trading game. <kbd>Esc</kbd> leaves a game.</td></tr>
         <tr><th>Travel (Rome / Delhi)</th><td><kbd>B</kbd> (or the Travel button) takes you between Rome and Old Delhi, Shah Jahan's walled city. <kbd>K</kbd> there switches between Mughal Delhi (c. 1650) and Modern Delhi. The fights, races and naval battles stay in Rome.</td></tr>
         <tr><th>Ancient / Modern Rome</th><td><kbd>K</kbd> switches the whole city between 128 AD and today: the Colosseum and Forum weather into ruins, the Circus Maximus becomes a park, apartment blocks and citizens turn modern, and the Colossus (long gone) disappears. Only works while walking, not mid-game</td></tr>
         <tr><th>Touch (phone/tablet)</th><td>A joystick (bottom-left) moves, dragging anywhere else looks around. Jump/Run buttons appear while walking; fights, races and naval battles get their own on-screen buttons</td></tr>
@@ -322,32 +322,32 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=116"></script>
-  <script src="delhi-data.js?v=116"></script>
-  <script src="config.js?v=116"></script>
-  <script src="character.js?v=116"></script>
-  <script src="physics.js?v=116"></script>
-  <script src="vitals.js?v=116"></script>
-  <script src="narrator.js?v=116"></script>
-  <script src="audio.js?v=116"></script>
-  <script src="world.js?v=116"></script>
-  <script src="city.js?v=116"></script>
-  <script src="modern.js?v=116"></script>
-  <script src="delhi.js?v=116"></script>
-  <script src="delhi-games.js?v=116"></script>
-  <script src="home.js?v=116"></script>
-  <script src="spectators.js?v=116"></script>
-  <script src="fight.js?v=116"></script>
-  <script src="nav.js?v=116"></script>
-  <script src="show.js?v=116"></script>
-  <script src="naval.js?v=116"></script>
-  <script src="watch.js?v=116"></script>
-  <script src="race.js?v=116"></script>
-  <script src="account.js?v=116"></script>
-  <script src="online.js?v=116"></script>
-  <script src="pets.js?v=116"></script>
-  <script src="car.js?v=116"></script>
-  <script src="market.js?v=116"></script>
-  <script src="game.js?v=116"></script>
+  <script src="landmarks.js?v=118"></script>
+  <script src="delhi-data.js?v=118"></script>
+  <script src="config.js?v=118"></script>
+  <script src="character.js?v=118"></script>
+  <script src="physics.js?v=118"></script>
+  <script src="vitals.js?v=118"></script>
+  <script src="narrator.js?v=118"></script>
+  <script src="audio.js?v=118"></script>
+  <script src="world.js?v=118"></script>
+  <script src="city.js?v=118"></script>
+  <script src="modern.js?v=118"></script>
+  <script src="delhi.js?v=118"></script>
+  <script src="delhi-games.js?v=118"></script>
+  <script src="home.js?v=118"></script>
+  <script src="spectators.js?v=118"></script>
+  <script src="fight.js?v=118"></script>
+  <script src="nav.js?v=118"></script>
+  <script src="show.js?v=118"></script>
+  <script src="naval.js?v=118"></script>
+  <script src="watch.js?v=118"></script>
+  <script src="race.js?v=118"></script>
+  <script src="account.js?v=118"></script>
+  <script src="online.js?v=118"></script>
+  <script src="pets.js?v=118"></script>
+  <script src="car.js?v=118"></script>
+  <script src="market.js?v=118"></script>
+  <script src="game.js?v=118"></script>
 </body>
 </html>

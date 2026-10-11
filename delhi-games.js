@@ -15,7 +15,7 @@ const DGames = (() => {
   let puffTex = null;
 
   const GAMES = [
-    { id: "race", where: "the start arch at the Fatehpuri Masjid end of Chandni Chowk", name: "Race down Chandni Chowk", text: "Rickshaws (Modern Delhi) or elephants (Mughal Delhi) race from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · Space boost" },
+    { id: "race", where: "the start arch at the Fatehpuri Masjid end of Chandni Chowk", name: "Race down Chandni Chowk", text: "Rickshaws (Modern Delhi) or elephants (Mughal Delhi) race from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · 1-9 speed level · X cruise · Space boost" },
     { id: "defend", where: "the cannon on the rampart: climb the long ramp inside the west wall of the Red Fort", name: "Defend the Red Fort", text: "Raiders march down Chandni Chowk at the Lahori Gate. Aim the cannon on the gate and break up their ranks before they reach it. Three waves. Win 80 denarii.", keys: "W S farther or nearer · A D left or right · Space or click fire" },
     { id: "kushti", where: "the akhara on the open square in front of the Lahori Gate", name: "Kushti wrestling", text: "Pehlwani wrestling in a mud pit. Get to grips with your opponent, then fight for the throw by pressing Space as fast as you can. First to two throws wins 40 denarii.", keys: "WASD move · Space grip, then mash Space to throw" },
     { id: "kites", where: "the kite stall on the open square in front of the Lahori Gate", name: "Kite fights", text: "A tradition in Old Delhi: fly your kite, cross strings with the others and saw through theirs before they saw through yours. Cut all three kites for 60 denarii.", keys: "WASD fly the kite · hold Space to saw while the strings cross" },
@@ -129,6 +129,7 @@ const DGames = (() => {
     else if (runGame) { endRun(false, "You gave up the food run."); }
   }
   function fire() { if (game && game.fire) game.fire(); }
+  function key(k) { if (game && game.key) game.key(k); }
   function playHere() {
     const v = Delhi.venueAt(player.x, player.z, player.feet);
     if (v) play(v.id); else toast("Walk to one of the game spots in Old Delhi, or press N for the list.");
@@ -144,13 +145,20 @@ const DGames = (() => {
     const group = new THREE.Group(); sc.add(group);
     const racers = colors.map((c, i) => {
       const g = Car.model(id, c); g.rotation.y = -Math.PI / 2; group.add(g);
-      return { g, x: X(START), z: lanes[i], v: 0, name: names[i], me: i === 0, fin: null, lane: lanes[i], hitCd: 0, boostT: 0, boostCd: 0, ph: Math.random() * 6, skill: 0.84 + Math.random() * 0.1 };
+      return { g, x: X(START), z: lanes[i], v: 0, name: names[i], me: i === 0, fin: null, lane: lanes[i], hitCd: 0, boostT: 0, boostCd: 0, ph: Math.random() * 6, skill: 0.8 + Math.random() * 0.08 };
     });
     const me = racers[0];
+    const FRAC = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.93, 1.0], LEVELS = ["Crawl", "Slow", "Easy", "Steady", "Brisk", "Quick", "Fast", "Very fast", "Flat out"];
+    me.pace = 7; me.cruise = false; me.stam = 100; me.tired = false;
     let t = -3, over = false, msgCd = 0;
     const say = (s) => { if (msgCd <= 0) { toast(s); msgCd = 1.4; } };
     return {
-      start() { Sfx.play("horn"); toast("Get ready..."); player.x = me.x; player.z = me.z; },
+      key(k) {
+        if (k === "KeyX") { me.cruise = !me.cruise; toast(me.cruise ? "Cruise on: you hold your speed level" : "Cruise off: hold W to go"); return; }
+        const m = /^(?:Digit|Key|Numpad)([1-9])$/.exec(k);
+        if (m && Number(m[1]) !== me.pace) { me.pace = Number(m[1]); me.cruise = true; toast(`Speed ${me.pace}/9: ${LEVELS[me.pace - 1]}`); }
+      },
+      start() { Sfx.play("horn"); toast("Get ready... keys 1 to 9 pick your speed, X holds it (cruise)"); player.x = me.x; player.z = me.z; },
       update(dt, keys) {
         t += dt; msgCd -= dt;
         if (t < 0) { hud("Race down Chandni Chowk", `${Math.ceil(-t)}...`, undefined, 0); }
@@ -161,9 +169,16 @@ const DGames = (() => {
           r.hitCd -= dt; r.boostT -= dt; r.boostCd -= dt;
           let target = 0, steer = 0, brake = false;
           if (r.me) {
-            const gas = keys.has("KeyW") || keys.has("ArrowUp"); brake = keys.has("KeyS") || keys.has("ArrowDown");
+            const gas = keys.has("KeyW") || keys.has("ArrowUp") || me.cruise; brake = keys.has("KeyS") || keys.has("ArrowDown");
+            if (brake) me.cruise = false;
             steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? -1 : 0) + (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0); // + = south
-            target = gas ? max : 0;
+            let frac = FRAC[me.pace - 1];
+            if (me.tired) frac = Math.min(frac, 0.55);
+            // the higher the level, the faster you wear out; easy levels let you get your breath back
+            if (go && r.v > 1) me.stam = clamp(me.stam - Math.max(0, (frac - 0.75) * 26) * dt + (frac <= 0.75 ? (0.8 - frac) * 14 + 2 : 0) * dt, 0, 100);
+            if (me.stam <= 0 && !me.tired) { me.tired = true; toast("You are worn out! Slow down to get your breath back"); }
+            else if (me.tired && me.stam > 25) { me.tired = false; toast("You have your breath back"); }
+            target = gas ? max * frac : 0;
             if (keys.has("Space") && r.boostCd <= 0 && go) { r.boostT = 1.3; r.boostCd = 5; Sfx.play("whip"); }
           } else {
             r.ph += dt;
@@ -210,7 +225,7 @@ const DGames = (() => {
         player.x = me.x; player.z = me.z; player.feet = 0;
         const order = [...racers].sort((a, b) => (a.fin !== null && b.fin !== null ? a.fin - b.fin : a.fin !== null ? -1 : b.fin !== null ? 1 : b.x - a.x));
         const rank = order.indexOf(me) + 1;
-        if (go) hud("Race down Chandni Chowk", `${ordinal(rank)} of 4 · ${Math.max(0, Math.round(FINISH - (me.x - DELHI_X)))} m to the gate`, undefined, me.boostCd > 0 ? 1 - me.boostCd / 5 : 1);
+        if (go) hud("Race down Chandni Chowk", `${ordinal(rank)} of 4 · ${Math.max(0, Math.round(FINISH - (me.x - DELHI_X)))} m to the gate · Speed ${me.pace}/9: ${LEVELS[me.pace - 1]}${me.cruise ? " (cruise)" : ""}${me.tired ? " (worn out)" : ""} · boost ${me.boostCd > 0 ? Math.ceil(me.boostCd) + " s" : "ready"}`, undefined, me.stam / 100);
         if (me.fin !== null && !over) {
           over = true;
           const prize = rank === 1 ? 60 : rank === 2 ? 25 : 0;
@@ -688,5 +703,5 @@ const DGames = (() => {
   }
 
 
-  return { get game() { return game; }, playHere, init, open, play, update, camera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
+  return { get game() { return game; }, key, playHere, init, open, play, update, camera, stop, fire, tickRun, GAMES, get active() { return !!game || !!runGame; }, get running() { return !!runGame; }, bumped: () => { if (runGame) runGame.bump(); } };
 })();

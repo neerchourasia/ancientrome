@@ -162,6 +162,8 @@ function wireInput(canvas) {
       else if (k === "KeyX") Race.toggleCruise();
       else if (k === "KeyC") Race.cycleCamera();
       else { const m = /^(?:Digit|Key|Numpad)([1-9])$/.exec(k); if (m) Race.setPace(Number(m[1])); }
+    } else if (mode === "dgame") {
+      DGames.key(k);
     } else if (mode === "online") {
       if (k === "Space") Online.swing();
     } else if (k === "Space" && mode === "fight") {
