@@ -3,7 +3,9 @@
 
 const $ = (s) => document.querySelector(s);
 const EYE = 1.7;
-const MAP = { x0: -800, x1: 700, z0: -700, z1: 850 };
+const MAP = { x0: -800, x1: 700, z0: -700, z1: 850 }; // the map of whichever city you are in (Delhi swaps in its own)
+const ROME_MAP = { ...MAP }, ROME_BOUNDS = { ...BOUNDS };
+let city = "rome"; // "rome" or "delhi": press B (or the Travel button) to go between them
 
 const player = { x: 165, z: 6, yaw: Math.PI / 2, pitch: -0.02, feet: 0, y: EYE, vx: 0, vz: 0, bob: 0, airY: 0, vy: 0 };
 const GRAVITY = 22, JUMP_SPEED = 7.2;
@@ -15,7 +17,7 @@ let era = "ancient"; // "ancient" (c. 128 AD) or "modern" (today); K switches
 
 try { // saved progress is only trusted if it names real landmarks, so edited or corrupted storage cannot inflate the count
   const saved = JSON.parse(localStorage.getItem("rome-discovered") || "[]");
-  if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => LANDMARKS.some((l) => l.id === id && !l.home)));
+  if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home)));
 } catch (e) { /* storage unavailable */ }
 try { if (localStorage.getItem("rome-era") === "modern") era = "modern"; } catch (e) { /* storage unavailable */ }
 
@@ -103,6 +105,7 @@ function leaveMode() {
 
 // Hotkeys that start or stop things are ignored for a moment after leaving, so a held key can't restart them.
 let startLockUntil = 0;
+const homeHere = (x, z) => (city === "delhi" ? Delhi.homeInside(x, z) : Home.inside(x, z)); // your bed: the house in Rome, the haveli in Delhi
 const canStart = () => performance.now() > startLockUntil && !panelOpen;
 
 function wireInput(canvas) {
@@ -122,6 +125,7 @@ function wireInput(canvas) {
     if (k === "KeyJ") toggleVoice();
     if (k === "KeyZ") toggleRest();
     if (k === "KeyK") toggleEra();
+    if (k === "KeyB") travel(city === "rome" ? "delhi" : "rome");
     if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();
     if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
     if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
@@ -204,6 +208,7 @@ function wireInput(canvas) {
     $("#help").classList.add("show");
     setTimeout(() => $("#help").classList.remove("show"), 9000);
   });
+  $("#btn-city").addEventListener("click", () => travel(city === "rome" ? "delhi" : "rome"));
   $("#btn-map").addEventListener("click", toggleBigMap);
   $("#btn-places").addEventListener("click", togglePlaces);
   $("#btn-dirs").addEventListener("click", toggleDirections);
@@ -661,7 +666,7 @@ function cycleView(dir) {
 // The chase cameras: put the camera at an offset from you (pulled in when a wall is in the way) and look toward you.
 function chaseCamera() {
   let id = creatorOpen ? "front" : (mode === "online" && viewId() === "first" ? "close" : viewId());
-  if (id === "top" && Home.inside(player.x, player.z)) id = "close"; // the roof would hide you
+  if (id === "top" && homeHere(player.x, player.z)) id = "close"; // the roof would hide you
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx; // forward and right
   const z = creatorOpen ? (innerWidth > 700 ? 0.62 : 1.5) : camZoom; // narrow screens: pull back so the whole figure fits above the panel
   let dx = -fx, dz = -fz, dist = 4.2 * z, up = 0, pitch = player.pitch, yaw = player.yaw, tilt = 0.6;
@@ -839,7 +844,8 @@ function confirmCreator() {
 // ---------- discovery & info card ----------
 
 let currentLm = null, lastCheck = 0;
-const DISCOVERABLE = LANDMARKS.filter((l) => !l.home); // your house is on the map but is not a sight to discover
+let DISCOVERABLE = LANDMARKS.filter((l) => !l.home); // your house is on the map but is not a sight to discover
+const seenCount = () => DISCOVERABLE.filter((l) => discovered.has(l.id)).length;
 
 function checkLandmarks(t) {
   if (t - lastCheck < 0.25) return;
@@ -856,7 +862,7 @@ function checkLandmarks(t) {
       discovered.add(best.id);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
-      toast(discovered.size === DISCOVERABLE.length ? "You have discovered all of Rome. Ave!" : `Discovered: ${best.name}`);
+      toast(seenCount() === DISCOVERABLE.length ? (city === "delhi" ? "You have discovered all of Old Delhi. Wah!" : "You have discovered all of Rome. Ave!") : `Discovered: ${best.name}`);
       Sfx.play("discover");
     }
   }
@@ -881,8 +887,8 @@ function showCard(lm) {
 }
 
 function updateProgress() {
-  $("#count").textContent = `${discovered.size} / ${DISCOVERABLE.length}`;
-  $("#bar-fill").style.width = `${(discovered.size / DISCOVERABLE.length) * 100}%`;
+  $("#count").textContent = `${seenCount()} / ${DISCOVERABLE.length}`;
+  $("#bar-fill").style.width = `${(seenCount() / DISCOVERABLE.length) * 100}%`;
   buildPlacesList();
 }
 
@@ -934,17 +940,35 @@ function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); toast(S
 
 // ---------- Ancient Rome / Modern Rome ----------
 
+const ERA_NAMES = { rome: ["Ancient Rome", "Modern Rome"], delhi: ["Mughal Delhi", "Modern Delhi"] };
+
+// The places you can see in this city and era (Delhi's Metro station only exists today).
+function refreshLandmarks() {
+  const list = (city === "delhi" ? DELHI_LANDMARKS : ROME_LANDMARKS).filter((l) => !l.only || l.only === era);
+  LANDMARKS.splice(0, LANDMARKS.length, ...list);
+  DISCOVERABLE = LANDMARKS.filter((l) => !l.home);
+  currentLm = null;
+  showCard(null);
+  updateProgress();
+}
+
 function applyEra() {
   const modern = era === "modern";
   applyWorldEra(modern);
   applyInsulaeEra(modern);
   applyCitizensEra(modern);
   Modern.apply(modern);
-  if (!modern) Car.stow(); // cars only exist in Modern Rome
+  if (Delhi.built) Delhi.setEra(modern);
+  if (!modern) Car.stow(); // cars only exist today
   Crowd.setVisible(!modern);
-  $("#era-badge").textContent = modern ? "Modern Rome" : "Ancient Rome";
+  const [oldName, newName] = ERA_NAMES[city];
+  $("#era-badge").textContent = modern ? newName : oldName;
   $("#era-badge").classList.toggle("ancient", !modern);
-  $("#btn-era").innerHTML = modern ? 'Ancient Rome <kbd>K</kbd>' : 'Modern Rome <kbd>K</kbd>';
+  $("#btn-era").innerHTML = modern ? `${oldName} <kbd>K</kbd>` : `${newName} <kbd>K</kbd>`;
+  $("#btn-city").innerHTML = city === "rome" ? "✈ Travel to Delhi <kbd>B</kbd>" : "✈ Travel to Rome <kbd>B</kbd>";
+  $("#hud .top-left h1").innerHTML = city === "rome" ? "Walk Ancient Rome <small>c. 128 AD</small>" : (modern ? "Walk Modern Delhi <small>today</small>" : "Walk Mughal Delhi <small>c. 1650</small>");
+  $("#map-title").textContent = city === "rome" ? "Map of Rome" : "Map of Old Delhi";
+  refreshLandmarks();
 }
 
 function toggleEra() {
@@ -955,9 +979,46 @@ function toggleEra() {
   Nav.clear(); // a route drawn in the other era may no longer be walkable
   if (blockedAt(player.x, player.z, player.feet)) placeAt(player.x, player.z); // something appeared where you stand
   const modern = era === "modern";
-  toast(modern ? "Modern Rome: the city as it stands today" : "Ancient Rome, c. 128 AD");
-  Narrator.say(modern ? "Modern Rome. The city as it stands today." : "Ancient Rome, around 128 AD, under the emperor Hadrian.", { interrupt: true });
+  const say = city === "delhi"
+    ? (modern ? "Modern Delhi: the old city as it stands today" : "Mughal Delhi, around 1650, under the emperor Shah Jahan")
+    : (modern ? "Modern Rome: the city as it stands today" : "Ancient Rome, c. 128 AD");
+  toast(say);
+  Narrator.say(city === "delhi" ? (modern ? "Modern Delhi. The old city as it stands today." : "Mughal Delhi, around 1650, under the emperor Shah Jahan.") : (modern ? "Modern Rome. The city as it stands today." : "Ancient Rome, around 128 AD, under the emperor Hadrian."), { interrupt: true });
   if (currentLm) showCard(currentLm); // refresh the open card's "today" note
+}
+
+// Travel between Rome and Old Delhi: the screen fades, you arrive in the other city.
+let travelBusy = false;
+const mapCache = {};
+function travel(to) {
+  if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
+  if (to === city || travelBusy) return;
+  travelBusy = true;
+  Vitals.stopRest(); Nav.clear();
+  $("#sleep").classList.add("on");
+  setTimeout(() => {
+    try { arriveIn(to); } catch (err) { console.error(err); toast("Could not travel"); }
+    $("#sleep").classList.remove("on");
+    travelBusy = false;
+  }, 900);
+}
+
+function arriveIn(to) {
+  city = to;
+  if (to === "delhi") {
+    Delhi.build(scene);
+    Object.assign(BOUNDS, Delhi.BOUNDS); Object.assign(MAP, Delhi.MAP);
+  } else { Object.assign(BOUNDS, ROME_BOUNDS); Object.assign(MAP, ROME_MAP); }
+  Delhi.show(to === "delhi");
+  if (!mapCache[to]) { buildBaseMap(); mapCache[to] = baseMap; } else baseMap = mapCache[to];
+  applyEra();
+  if (to === "delhi") placeAt(Delhi.SPAWN.x, Delhi.SPAWN.z, Delhi.SPAWN.yaw);
+  else placeAt(165, 6, Math.PI / 2);
+  player.pitch = -0.02;
+  const modern = era === "modern";
+  const msg = to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort.` : "Back in Rome.";
+  toast(msg);
+  Narrator.say(to === "delhi" ? (modern ? "Welcome to Old Delhi, as it stands today. The Red Fort is at the end of Chandni Chowk." : "Welcome to Shahjahanabad, the walled capital of the Mughal emperor Shah Jahan, around 1650. The Red Fort is at the end of Chandni Chowk.") : "Back in Rome.", { interrupt: true });
 }
 
 function toggleDirections() { if ($("#places").classList.contains("show") && placesMode === "dirs") closePanels(); else openPlaces("dirs"); }
@@ -1000,7 +1061,7 @@ function updatePrompt() {
 
 function toggleRest() {
   if (mode !== "walk" || panelOpen || sleepT > 0) return;
-  if (Home.inside(player.x, player.z) && Time.bedtime) { startSleep(false); return; }
+  if (homeHere(player.x, player.z) && Time.bedtime) { startSleep(false); return; }
   if (Vitals.resting) { Vitals.stopRest(); return; }
   const stables = inCircusArea(player.x, player.z);
   if (!Vitals.needsRest(stables)) { toast("You are already in good shape"); return; }
@@ -1170,10 +1231,12 @@ function buildBaseMap() {
   g.scale(S, S);
   g.translate(-MAP.x0, -MAP.z0);
   const paint = (x0, z0, x1, z1, c) => { g.fillStyle = c; g.fillRect(x0, z0, x1 - x0, z1 - z0); };
-  paint(-120, -35, 180, 35, "#f0e8d2"); // Forum plaza
-  paint(-150, -285, -90 + 60, -195, "#eee5cf"); // Trajan's Forum
-  paint(-210, -285, -90, -195, "#eee5cf");
-  paint(-100, -4.5, 420, 4.5, "#8a8378"); // Via Sacra
+  if (city === "rome") {
+    paint(-120, -35, 180, 35, "#f0e8d2"); // Forum plaza
+    paint(-150, -285, -90 + 60, -195, "#eee5cf"); // Trajan's Forum
+    paint(-210, -285, -90, -195, "#eee5cf");
+    paint(-100, -4.5, 420, 4.5, "#8a8378"); // Via Sacra
+  }
   for (const s of MAP_SHAPES) {
     g.fillStyle = s.c;
     if (s.k === "r") g.fillRect(s.x0, s.z0, s.x1 - s.x0, s.z1 - s.z0);
@@ -1278,7 +1341,7 @@ function wakeUp() {
     const lost = Math.min(Vitals.coins, 15);
     Vitals.coins = Vitals.coins - lost;
     Vitals.hp = 60;
-    placeAt(Home.X, Home.Z - 2.5, 0); // you are carried home
+    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0); // you are carried home
     toast(`Day ${Time.day}: you woke in your bed. You collapsed in the street and a thief took ${lost} denarii`);
     Narrator.say(`Day ${Time.day}. You collapsed from tiredness, and were carried home. Next time, sleep in your bed at night.`, { interrupt: true });
   } else {
@@ -1311,7 +1374,7 @@ function updateTime(dt) {
       if (stage === 1) toast("Night is falling. Head home to sleep (press G, choose Your House)");
       else if (stage === 2) toast("It is very late! Go home and sleep, or you will collapse");
     }
-    const inHome = Home.inside(player.x, player.z);
+    const inHome = homeHere(player.x, player.z);
     if (inHome !== wasHome) {
       wasHome = inHome;
       if (inHome) toast(Time.bedtime ? "Your house. Press Z to sleep until morning" : "Your house. You can sleep here after dark (Z rests)");
@@ -1334,7 +1397,7 @@ function updateTime(dt) {
 function tick(dt) {
   updateTime(dt);
   // condition: passive recovery, resting, and the HUD
-  Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
+  Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.homeInside(player.x, player.z) ? 1.5 : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
@@ -1377,6 +1440,7 @@ function tick(dt) {
   }
   sky.follow(camera.position);
   updateCitizens(dt, clock);
+  if (city === "delhi") Delhi.update(dt, player.x, player.z);
   updateAvatar(dt);
   Pets.update(dt);
   Crowd.update(dt, clock);
@@ -1399,4 +1463,4 @@ function loop(now) {
 }
 
 init();
-window.__rome = { player, placeAt, goTo, LANDMARKS, get discovered() { return discovered; } };
+window.__rome = { player, placeAt, goTo, travel, LANDMARKS, get discovered() { return discovered; } };

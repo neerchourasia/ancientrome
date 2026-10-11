@@ -85,6 +85,7 @@ const Online = (() => {
 
   function openLobby() {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
+    if (city !== "rome") { toast("The online games are held in Rome. Press B to travel back."); return; }
     openPanel("#online");
     connect();
     refreshLobby();
