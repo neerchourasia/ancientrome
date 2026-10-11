@@ -199,7 +199,7 @@ const Car = (() => {
         bumpCd = 0.9;
         if (impact > 5) {
           const dmg = Math.min(30, (impact - 3) * 1.2);
-          Vitals.hp = Math.max(5, Vitals.hp - dmg);
+          Vitals.hp = Math.max(0, Vitals.hp - dmg);
           player.shake = Math.min(1, impact / 20); $("#flash").style.opacity = 0.45;
           Sfx.play("crash"); toast(`Crash! (-${Math.round(dmg)} health)`);
         } else Sfx.play("bump");

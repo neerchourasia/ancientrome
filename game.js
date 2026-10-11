@@ -107,7 +107,7 @@ function leaveMode() {
 // Hotkeys that start or stop things are ignored for a moment after leaving, so a held key can't restart them.
 let startLockUntil = 0;
 const homeHere = (x, z) => (city === "delhi" ? Delhi.homeInside(x, z) : Home.inside(x, z)); // your bed: the house in Rome, the haveli in Delhi
-const canStart = () => performance.now() > startLockUntil && !panelOpen;
+const canStart = () => performance.now() > startLockUntil && !panelOpen && deathT === 0;
 
 function wireInput(canvas) {
   addEventListener("keydown", (e) => {
@@ -370,7 +370,7 @@ function setWalkLevel(n) {
 function scrape(pace, dt, tx, tz) {
   const k = Math.max(0, 1 - 3 * dt);
   player.vx *= k; player.vz *= k;
-  Vitals.hp = Math.max(5, Vitals.hp - (0.6 + pace * 0.1) * dt);
+  Vitals.hp = Math.max(0, Vitals.hp - (0.6 + pace * 0.1) * dt);
   player.shake = Math.max(player.shake || 0, 0.18);
   if (scrapeCd <= 0) {
     scrapeCd = 1.1;
@@ -398,7 +398,7 @@ function describeObstacle(tx, tz) {
 function carHit(h) {
   crashCd = 1.4;
   const dmg = Math.min(30, 6 + h.v * 2.2);
-  Vitals.hp = Math.max(5, Vitals.hp - dmg);
+  Vitals.hp = Math.max(0, Vitals.hp - dmg);
   player.stun = 0.9; player.shake = 1;
   $("#flash").style.opacity = 0.6;
   const kx = h.rx * h.side * 2.6, kz = h.rz * h.side * 2.6;
@@ -414,7 +414,7 @@ function crash(impact, dx, dz, tx, tz) {
   const hard = impact > 9; // running into it
   const what = describeObstacle(tx, tz);
   const dmg = Math.min(8, 1 + impact * 0.35);
-  Vitals.hp = Math.max(5, Vitals.hp - dmg);
+  Vitals.hp = Math.max(0, Vitals.hp - dmg);
   player.stun = hard ? 0.7 : 0.4;
   player.shake = hard ? 0.9 : 0.5;
   const len = Math.hypot(dx, dz) || 1, kx = (-dx / len) * 0.8, kz = (-dz / len) * 0.8; // knocked back a step
@@ -442,7 +442,7 @@ function bumpCitizens(pace) {
     if (crashCd <= 0) {
       crashCd = 0.5;
       player.shake = Math.max(player.shake || 0, hard ? 0.6 : 0.3);
-      if (hard) Vitals.hp = Math.max(5, Vitals.hp - 1.5);
+      if (hard) Vitals.hp = Math.max(0, Vitals.hp - 1.5);
       toast(hard ? "Crash! You knocked over a citizen" : "Oops! You bumped into a citizen");
       DGames.bumped();
     }
@@ -1271,6 +1271,61 @@ function updateCompass() {
 
 let last = performance.now(), clock = 0, prevMode = "walk", errorCount = 0, placesTimer = 0;
 
+
+// ---------- dying ----------
+// If your health reaches zero (a bad crash, being run over, scraping along walls) you die: you black out, are carried
+// home and have to stay there for a whole day while you recover. Games leave you wounded instead.
+
+let deathT = 0, deathFrom = null, lowWarnT = 0;
+
+function startDeath() {
+  if (deathT > 0) return;
+  if (mode === "drive") Car.exit(true);
+  Vitals.stopRest(); Nav.clear();
+  deathT = 0.001; deathFrom = { hour: Time.hour, day: Time.day, moved: false };
+  Sfx.play("oof");
+  const d = $("#death");
+  d.querySelector("h2").textContent = "You died";
+  d.querySelector("p").textContent = "You are carried home, and you must stay there for a day to recover.";
+  d.classList.remove("lapse"); d.classList.add("on");
+  Narrator.say("You have died. You are carried home, and you must stay there for a day to recover.", { interrupt: true });
+}
+
+function updateDeath(dt) {
+  if (deathT === 0) {
+    if (!started || sleepT > 0 || !(mode === "walk" || mode === "drive")) return;
+    if (Vitals.hp <= 0.01) startDeath();
+    else if (Vitals.hp < 14) { lowWarnT -= dt; if (lowWarnT <= 0) { lowWarnT = 25; toast("You are badly hurt! Another crash could kill you. Press Z to rest"); } }
+    return;
+  }
+  deathT += dt;
+  const BLACK = 2.2, LAPSE = 7;
+  if (deathT >= 1.4 && !deathFrom.moved) {
+    deathFrom.moved = true;
+    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0);
+    player.pitch = -0.02;
+  }
+  if (deathT > BLACK) { // the day passes: the sky runs through a whole day and night
+    const f = Math.min(1, (deathT - BLACK) / LAPSE), total = deathFrom.hour + 24 * f;
+    Time.setClock(total % 24, deathFrom.day + Math.floor(total / 24));
+    sky.setHour(Time.hour, true);
+    const d = $("#death");
+    d.classList.add("lapse");
+    d.querySelector("h2").textContent = "A day at home";
+    d.querySelector("p").textContent = `Day ${Time.day} · ${Time.label()}: you rest while the day goes by...`;
+  }
+  if (deathT >= BLACK + LAPSE + 0.6) {
+    deathT = 0;
+    Vitals.hp = 55; Vitals.horses = Vitals.horses + 25;
+    const fee = Math.min(Vitals.coins, 25); Vitals.coins -= fee;
+    const rent = Market.rent(); if (rent) Vitals.coins += rent;
+    $("#death").classList.remove("on", "lapse");
+    toast(`Day ${Time.day}: you are on your feet again. The doctor charged ${fee} denarii${rent ? `, and your tenants paid ${rent}` : ""}`);
+    Narrator.say(`Day ${Time.day}. You are on your feet again, but still weak. Be careful out there.`, { interrupt: true });
+    Vitals.save();
+  }
+}
+
 // ---------- days, nights and your house ----------
 
 let sleepT = 0, slept = false, sleepCollapse = false, lastStage = 0, wasHome = false, lastClock = "";
@@ -1307,7 +1362,7 @@ function wakeUp() {
 // Runs every frame: the clock, the sky, night warnings, the house and the sleep fade.
 function updateTime(dt) {
   const sleeping = sleepT > 0;
-  if (started && !sleeping) Time.advance(dt);
+  if (started && !sleeping && deathT === 0) Time.advance(dt);
   sky.setHour(Time.hour);
   Home.update(sky.night);
   Modern.update(sky.night, dt, player.x, player.z);
@@ -1345,6 +1400,7 @@ function updateTime(dt) {
 
 function tick(dt) {
   updateTime(dt);
+  updateDeath(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
@@ -1361,7 +1417,7 @@ function tick(dt) {
   else if (mode === "drive") Car.update(dt, keys);
   else if (mode === "dgame") DGames.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
-  else if (started && !panelOpen) {
+  else if (started && !panelOpen && deathT === 0) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
     else updatePlayer(dt);
   } else if (!started) player.yaw += dt * 0.05; // slow pan behind the title screen
