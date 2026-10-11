@@ -418,7 +418,7 @@ function crash(impact, dx, dz, tx, tz) {
 // Running into a citizen knocks them over.
 function bumpCitizens(pace) {
   if (pace < 2.5) return;
-  for (const c of CITIZENS.list) {
+  for (const c of (city === "delhi" ? Delhi.people() : CITIZENS.list)) {
     if ((c.down || 0) > 0) continue;
     const d = Math.hypot(c.x - player.x, c.z - player.z);
     if (d > 0.95) continue;

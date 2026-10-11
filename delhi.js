@@ -595,12 +595,17 @@ const Delhi = (() => {
     if (!body) return;
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
-      c.t -= dt;
-      if (c.t <= 0) { c.a += (rnd() - 0.5) * 1.6; c.t = 2 + rnd() * 5; }
-      const nx = c.x + Math.sin(c.a) * c.v * dt, nz = c.z + Math.cos(c.a) * c.v * dt;
-      if (canMove(c.x, c.z, nx, nz)) { c.x = nx; c.z = nz; } else { c.a += Math.PI * (0.5 + rnd() * 0.8); c.t = 1.5; }
-      const bob = Math.abs(Math.sin(clock * 5 + c.phase)) * 0.06;
-      _o.position.set(c.x, groundAt(c.x, c.z) + bob, c.z); _o.rotation.set(0, c.a, 0); _o.scale.set(1, 1, 1); _o.updateMatrix();
+      const down = (c.down || 0) > 0; // knocked over: lies on the ground for a moment, then gets up
+      if (down) c.down -= dt;
+      else {
+        c.t -= dt;
+        if (c.t <= 0) { c.a += (rnd() - 0.5) * 1.6; c.t = 2 + rnd() * 5; }
+        const nx = c.x + Math.sin(c.a) * c.v * dt, nz = c.z + Math.cos(c.a) * c.v * dt;
+        if (canMove(c.x, c.z, nx, nz)) { c.x = nx; c.z = nz; } else { c.a += Math.PI * (0.5 + rnd() * 0.8); c.t = 1.5; }
+      }
+      const bob = down ? 0 : Math.abs(Math.sin(clock * 5 + c.phase)) * 0.06;
+      const tilt = down ? 1.35 * Math.min(1, c.down / 0.35) : 0;
+      _o.position.set(c.x, groundAt(c.x, c.z) + bob + tilt * 0.3, c.z); _o.rotation.set(-tilt, c.a, 0); _o.scale.set(1, 1, 1); _o.updateMatrix();
       body.setMatrixAt(i, _o.matrix); head.setMatrixAt(i, _o.matrix);
       if (modernNow || !c.turban) { _o.scale.set(0, 0, 0); _o.updateMatrix(); }
       hat.setMatrixAt(i, _o.matrix);
@@ -739,5 +744,5 @@ const Delhi = (() => {
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, update, homeInside, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, update, homeInside, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();
