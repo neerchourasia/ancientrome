@@ -686,16 +686,16 @@ const Delhi = (() => {
     }
     for (const m of [ramp, side]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = m.receiveShadow = true; vg.add(m); }
     addPlatformBox(X(0), X(8), 27, 270, 24.8);                         // the walkway along the top of the wall
-    addBlockerBox(X(0), X(1.2), 27, 270, 24.8, 27.2); addBlockerBox(X(6.8), X(8), 27, 270, 24.8, 27.2);
+    addBlockerBox(X(0), X(1.2), 27, 270, 24.8, 27.2); addBlockerBox(X(6.8), X(8), 31, 270, 24.8, 27.2); // (the inner edge is open where the ramp comes up)
     addBlockerBox(X(0), X(8), 26, 27, 24.8, 27.2);
     mbox(vg, X(4), 24.8, 148.5, 7, 0.05, 243, lambert(0xb9ad94), { cast: false });
-    cannonG = new T.Group(); cannonG.position.set(X(4), 24.85, 45); vg.add(cannonG);
+    cannonG = new T.Group(); cannonG.position.set(X(2.6), 24.85, 45); vg.add(cannonG);
     const iron = lambert(0x2e2e30);
     const cb = new T.Mesh(new T.CylinderGeometry(0.55, 0.8, 4.4, 12), iron); cb.rotation.z = Math.PI / 2 + 0.06; cb.position.set(-1.2, 1.5, 0); cb.castShadow = true; cannonG.add(cb);
     const carriage = new T.Mesh(BOX, D.wood); carriage.scale.set(3.2, 0.8, 1.6); carriage.position.set(-0.2, 0.9, 0); cannonG.add(carriage);
     for (const sz of [-1, 1]) { const w = new T.Mesh(new T.CylinderGeometry(0.8, 0.8, 0.25, 12), D.wood); w.rotation.x = Math.PI / 2; w.position.set(-0.2, 0.8, sz * 1.0); cannonG.add(w); }
     for (let i = 0; i < 6; i++) { const b = new T.Mesh(new T.SphereGeometry(0.35, 8, 6), iron); b.position.set(2.2 + (i % 3) * 0.7, 0.35, -2 + Math.floor(i / 3) * 0.7); cannonG.add(b); }
-    addBlockerCircle(X(4), 45, 1.4, 24.8, 27);
+    addBlockerCircle(X(2.6), 45, 1.2, 24.8, 27);
     boardSign(vg, X(6.9), 27.4, 37, 4.2, 1.1, "CANNON", "defend the gate", -Math.PI / 2);
     MAP_SHAPES.push({ k: "r", x0: X(8), x1: X(20), z0: 28, z1: 100, c: "#9a9080" });
 

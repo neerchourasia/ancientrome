@@ -81,7 +81,7 @@ const Account = (() => {
     const c = row.character, p = row.progress || {};
     if (c && typeof c === "object") { Character.set(c); applyCharacter(); }
     if (Array.isArray(p.discovered)) {
-      discovered = new Set(p.discovered.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home)));
+      discovered = new Set(p.discovered.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game)));
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
     }

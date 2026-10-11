@@ -17,7 +17,7 @@ let era = "ancient"; // "ancient" (c. 128 AD) or "modern" (today); K switches
 
 try { // saved progress is only trusted if it names real landmarks, so edited or corrupted storage cannot inflate the count
   const saved = JSON.parse(localStorage.getItem("rome-discovered") || "[]");
-  if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home)));
+  if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game)));
 } catch (e) { /* storage unavailable */ }
 try { if (localStorage.getItem("rome-era") === "modern") era = "modern"; } catch (e) { /* storage unavailable */ }
 
@@ -789,7 +789,7 @@ function confirmCreator() {
 // ---------- discovery & info card ----------
 
 let currentLm = null, lastCheck = 0;
-let DISCOVERABLE = LANDMARKS.filter((l) => !l.home); // your house is on the map but is not a sight to discover
+let DISCOVERABLE = LANDMARKS.filter((l) => !l.home && !l.game); // your house is on the map but is not a sight to discover
 const seenCount = () => DISCOVERABLE.filter((l) => discovered.has(l.id)).length;
 
 function checkLandmarks(t) {
@@ -803,7 +803,7 @@ function checkLandmarks(t) {
   if (best !== currentLm) {
     currentLm = best;
     showCard(best);
-    if (best && !best.home && !discovered.has(best.id)) {
+    if (best && !best.home && !best.game && !discovered.has(best.id)) {
       discovered.add(best.id);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
@@ -891,7 +891,7 @@ const ERA_NAMES = { rome: ["Ancient Rome", "Modern Rome"], delhi: ["Mughal Delhi
 function refreshLandmarks() {
   const list = (city === "delhi" ? DELHI_LANDMARKS : ROME_LANDMARKS).filter((l) => !l.only || l.only === era);
   LANDMARKS.splice(0, LANDMARKS.length, ...list);
-  DISCOVERABLE = LANDMARKS.filter((l) => !l.home);
+  DISCOVERABLE = LANDMARKS.filter((l) => !l.home && !l.game);
   currentLm = null;
   showCard(null);
   updateProgress();
@@ -1192,7 +1192,7 @@ function buildBaseMap() {
   g.restore();
 }
 
-const pinColor = (lm) => (discovered.has(lm.id) ? "#2f6b3a" : "#b3262b");
+const pinColor = (lm) => (lm.game ? "#d98a1f" : discovered.has(lm.id) ? "#2f6b3a" : "#b3262b");
 
 function drawMiniMap() {
   const c = $("#minimap"), g = c.getContext("2d"), n = c.width, k = n / 340; // 340 m across

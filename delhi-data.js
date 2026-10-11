@@ -97,6 +97,50 @@ const DELHI_LANDMARKS = [
     text: "An underground station of the Delhi Metro, near the Red Fort, opened on 3 July 2005. A tunnel links it to Delhi Junction railway station. It carries visitors to Old Delhi far faster than the street ever could.",
     fact: "The station is underground, with a single island platform between the tracks.",
   }),
+
+  // the places for the games (press F there to play; they are on the map and in Directions, but are not sights to discover)
+  dl({
+    id: "g-akhara", game: true, name: "The Akhara", sub: "Kushti wrestling pit",
+    x: -45, z: 35, r: 12, stand: [-45, 20],
+    text: "A mud pit on the open square before the Lahori Gate. Press F to wrestle in the Indian style, kushti: take hold of your rival and fight for the throw.",
+    fact: "Kushti is practised in an akhara, a training ground with a pit of soft earth. Wrestlers train there from early morning.",
+  }),
+  dl({
+    id: "g-race", game: true, name: "The Race Start", sub: "Chandni Chowk race",
+    x: -572, z: 0, r: 18, stand: [-558, 0],
+    text: "The start arch at the Fatehpuri Masjid end of Chandni Chowk. Press F to race down the avenue to the finish arch at the Lahori Gate, on a rickshaw or an elephant.",
+    fact: "The avenue ran about 1.5 kilometres from the Lahori Gate of the Red Fort to the Fatehpuri Masjid.",
+  }),
+  dl({
+    id: "g-cannon", game: true, name: "The Cannon", sub: "On the Red Fort rampart",
+    x: 4, z: 45, r: 10, stand: [4, 38],
+    text: "A cannon on top of the Red Fort's west wall, next to the Lahori Gate. Climb the long ramp inside the wall, then press F to man it and defend the gate from raiders.",
+    fact: "The fort's red sandstone walls rise about 18 metres on the river side and 33 metres on the city side.",
+  }),
+  dl({
+    id: "g-kites", game: true, name: "The Kite Stall", sub: "Kite fights",
+    x: -18, z: -42, r: 9, stand: [-18, -32],
+    text: "A stall selling paper kites on the open square. Press F to fly one and try to cut the strings of the other kites.",
+    fact: "Kite flying, patangbazi, is a long Old Delhi tradition, and the sky fills with kites around Independence Day.",
+  }),
+  dl({
+    id: "g-pachisi", game: true, name: "The Pachisi Pavilion", sub: "A board game of cowrie shells",
+    x: 112, z: -45, r: 10, stand: [112, -33],
+    text: "A pavilion in the Red Fort courtyard with the painted cloth of pachisi laid out. Press F to play against a rival.",
+    fact: "Pachisi is an ancient Indian game played with cowrie shells and pawns. It is said that the Mughal emperor Akbar once played it with living pieces on a courtyard board at Fatehpur Sikri.",
+  }),
+  dl({
+    id: "g-bazaar", game: true, name: "The Bazaar Stall", sub: "A trading game",
+    x: -352, z: -12, r: 9, stand: [-352, -3],
+    text: "A trader's stall beside the pool on Chandni Chowk. Press F to buy goods where they are cheap and sell them where they are dear.",
+    fact: "Chandni Chowk was divided into bazaars, among them Urdu Bazaar near the fort, Johri Bazaar (the jewellers) and Fatehpuri Bazaar.",
+  }),
+  dl({
+    id: "g-chaat", game: true, name: "The Chaat Stall", sub: "A food delivery run",
+    x: -215, z: 13, r: 8, stand: [-215, 5],
+    text: "A street food stall on Chandni Chowk. Press F to take a tray of hot chaat and deliver it to three customers before it goes cold.",
+    fact: "Chandni Chowk is famous for its street food, and the area has long been known for its old food shops.",
+  }),
 ];
 
 const ALL_LANDMARKS = [...LANDMARKS, ...DELHI_LANDMARKS];
