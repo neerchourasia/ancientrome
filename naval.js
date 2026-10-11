@@ -285,12 +285,11 @@ const Naval = (() => {
     }
     // Damage to your ship costs you: the crew (you) are hurt in proportion, and a lost battle costs money.
     const hullLost = me ? 100 - me.hp : 0, defeat = !!title && !win;
-    if (!live) Vitals.hp = defeat ? 15 : Math.max(5, Vitals.hp - hullLost * 0.35);
+    if (!live) Vitals.hp = defeat ? 0 : Math.max(5, Vitals.hp - hullLost * 0.35);
     if (live) { /* no fines or wounds against real people: only the prize (added by the caller) */ }
     else if (defeat) {
-      const fine = Math.min(40, Vitals.coins);
-      Vitals.coins -= fine;
-      text += ` You lose ${fine} denarii for the wrecked ship and are left badly wounded. Rest with Z before sailing again.`;
+      deathPending = "You went down with your ship.";
+      text += " You did not survive the sinking.";
     } else if (win) {
       Vitals.coins += NAVAL_PURSE;
       text += ` Purse earned: ${NAVAL_PURSE} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
@@ -303,10 +302,10 @@ const Naval = (() => {
     Crowd.setCheer(false);
     placeAt(CX, CZ, -Math.PI / 2);
     camera.fov = 70; camera.updateProjectionMatrix();
-    if (title) showResult(title, text, buttons || [
+    if (title) showResult(title, text, buttons || (defeat && !live ? [{ label: "Continue", fn: closePanels }] : [
       { label: win ? "Sail again" : "Try again", fn: () => { closePanels(); start(); } },
       { label: "Leave the arena", fn: closePanels },
-    ]);
+    ]));
     else msg("You leave the naval battle.", 1400);
   }
 

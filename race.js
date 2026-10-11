@@ -297,7 +297,7 @@ const Race = (() => {
     if (raw !== c.d && c.v > 2) { // scraping the spina or the stands
       c.v *= 1 - Math.min(1, 1.1 * dt);
       c.slowT = Math.max(c.slowT, 0.6);
-      if (c.player && c.bump <= 0) { c.bump = 0.8; c.shake = Math.max(c.shake, 0.4); Vitals.hp = Math.max(5, Vitals.hp - 1.5); msg("Scraping the wall!", 600); }
+      if (c.player && c.bump <= 0) { c.bump = 0.8; c.shake = Math.max(c.shake, 0.4); Vitals.hp = Math.max(0, Vitals.hp - 3); msg("Scraping the wall!", 600); }
     }
 
     // corners cap speed: tight inside lanes are slow, wide outside lanes are fast
@@ -330,7 +330,7 @@ const Race = (() => {
           x.v *= x === rear ? 0.6 : 0.8;
           if (x.player) Sfx.play("crash");
           x.slowT = CRASH_T; x.hitCd = 0.9;
-          if (x.player) { x.shake = 0.7; el("flash").style.opacity = 0.35; Vitals.hp = Math.max(5, Vitals.hp - 6); msg("Collision! You lose speed and are bruised", 900); }
+          if (x.player) { x.shake = 0.7; el("flash").style.opacity = 0.35; Vitals.hp = Math.max(0, Vitals.hp - 14); msg("Collision! You lose speed and are bruised", 900); }
         }
       }
     }

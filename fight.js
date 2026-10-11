@@ -220,14 +220,13 @@ const Fight = (() => {
     Crowd.setCheer(false);
     // The fight leaves its mark: you keep the damage you took, and a defeat costs you money and leaves you badly wounded.
     const defeat = !!title && !win;
-    Vitals.hp = defeat ? 15 : Math.max(5, P.hp);
+    Vitals.hp = defeat ? 0 : Math.max(5, P.hp);
     if (defeat) {
-      const fine = Math.min(30, Vitals.coins);
-      Vitals.coins -= fine;
-      text += ` You lose ${fine} denarii in medical fees${earned ? ` (you keep the ${earned} denarii you earned)` : ""} and are left badly wounded. Rest with Z before you fight again.`;
+      deathPending = "You were killed in the arena.";
+      text += earned ? ` You keep the ${earned} denarii you earned. You did not survive the fight.` : " You did not survive the fight.";
     } else if (win) text += ` Purse earned: ${earned} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
     const again = lastOpts;
-    if (title) showResult(title, text, [
+    if (title) showResult(title, text, defeat ? [{ label: "Continue", fn: closePanels }] : [
       { label: win ? "Fight again" : "Try again", fn: () => { closePanels(); start(again); } },
       { label: "Leave the arena", fn: closePanels },
     ]);

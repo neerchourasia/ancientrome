@@ -370,7 +370,7 @@ function setWalkLevel(n) {
 function scrape(pace, dt, tx, tz) {
   const k = Math.max(0, 1 - 3 * dt);
   player.vx *= k; player.vz *= k;
-  Vitals.hp = Math.max(0, Vitals.hp - (0.6 + pace * 0.1) * dt);
+  Vitals.hp = Math.max(0, Vitals.hp - (1.4 + pace * 0.22) * dt);
   player.shake = Math.max(player.shake || 0, 0.18);
   if (scrapeCd <= 0) {
     scrapeCd = 1.1;
@@ -397,7 +397,7 @@ function describeObstacle(tx, tz) {
 // A moving car hits you: it hurts more the faster it was going, and throws you to the side.
 function carHit(h) {
   crashCd = 1.4;
-  const dmg = Math.min(30, 6 + h.v * 2.2);
+  const dmg = Math.min(50, 10 + h.v * 3.4);
   Vitals.hp = Math.max(0, Vitals.hp - dmg);
   player.stun = 0.9; player.shake = 1;
   $("#flash").style.opacity = 0.6;
@@ -413,7 +413,7 @@ function crash(impact, dx, dz, tx, tz) {
   crashCd = 0.8;
   const hard = impact > 9; // running into it
   const what = describeObstacle(tx, tz);
-  const dmg = Math.min(8, 1 + impact * 0.35);
+  const dmg = Math.min(18, 2 + impact * 0.7);
   Vitals.hp = Math.max(0, Vitals.hp - dmg);
   player.stun = hard ? 0.7 : 0.4;
   player.shake = hard ? 0.9 : 0.5;
@@ -442,7 +442,7 @@ function bumpCitizens(pace) {
     if (crashCd <= 0) {
       crashCd = 0.5;
       player.shake = Math.max(player.shake || 0, hard ? 0.6 : 0.3);
-      if (hard) Vitals.hp = Math.max(0, Vitals.hp - 1.5);
+      if (hard) Vitals.hp = Math.max(0, Vitals.hp - 5);
       toast(hard ? "Crash! You knocked over a citizen" : "Oops! You bumped into a citizen");
       DGames.bumped();
     }
@@ -1276,7 +1276,7 @@ let last = performance.now(), clock = 0, prevMode = "walk", errorCount = 0, plac
 // If your health reaches zero (a bad crash, being run over, scraping along walls) you die: you black out, are carried
 // home and have to stay there for a whole day while you recover. Games leave you wounded instead.
 
-let deathT = 0, deathFrom = null, lowWarnT = 0;
+let deathT = 0, deathFrom = null, lowWarnT = 0, deathPending = null; // deathPending: why you are about to die (set when you are killed in the arena)
 
 function startDeath() {
   if (deathT > 0) return;
@@ -1286,15 +1286,17 @@ function startDeath() {
   Sfx.play("oof");
   const d = $("#death");
   d.querySelector("h2").textContent = "You died";
-  d.querySelector("p").textContent = "You are carried home, and you must stay there for a day to recover.";
+  d.querySelector("p").textContent = `${deathPending || ""} You are carried home, and you must stay there for a day to recover.`.trim();
+  const cause = deathPending; deathPending = null;
   d.classList.remove("lapse"); d.classList.add("on");
-  Narrator.say("You have died. You are carried home, and you must stay there for a day to recover.", { interrupt: true });
+  Narrator.say(`You have died. ${cause || ""} You are carried home, and you must stay there for a day to recover.`, { interrupt: true });
 }
 
 function updateDeath(dt) {
   if (deathT === 0) {
-    if (!started || sleepT > 0 || !(mode === "walk" || mode === "drive")) return;
-    if (Vitals.hp <= 0.01) startDeath();
+    if (started && Vitals.hp <= 0.01 && !deathPending) deathPending = "You were killed."; // remembered, so healing while a result screen is open cannot save you
+    if (!started || sleepT > 0 || !(mode === "walk" || mode === "drive") || panelOpen) return; // (wait until the result screen is closed)
+    if (deathPending) startDeath();
     else if (Vitals.hp < 14) { lowWarnT -= dt; if (lowWarnT <= 0) { lowWarnT = 25; toast("You are badly hurt! Another crash could kill you. Press Z to rest"); } }
     return;
   }
