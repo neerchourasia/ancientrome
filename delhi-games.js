@@ -150,6 +150,7 @@ const DGames = (() => {
     const me = racers[0];
     const FRAC = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.93, 1.0], LEVELS = ["Crawl", "Slow", "Easy", "Steady", "Brisk", "Quick", "Fast", "Very fast", "Flat out"];
     me.pace = 7; me.cruise = false; me.stam = 100; me.tired = false;
+    const tireRate = modern ? 1 : 0.45; // elephants have far more stamina than a rickshaw rider
     let t = -3, over = false, msgCd = 0;
     const say = (s) => { if (msgCd <= 0) { toast(s); msgCd = 1.4; } };
     return {
@@ -175,7 +176,7 @@ const DGames = (() => {
             let frac = FRAC[me.pace - 1];
             if (me.tired) frac = Math.min(frac, 0.55);
             // the higher the level, the faster you wear out; easy levels let you get your breath back
-            if (go && r.v > 1) me.stam = clamp(me.stam - Math.max(0, (frac - 0.75) * 26) * dt + (frac <= 0.75 ? (0.8 - frac) * 14 + 2 : 0) * dt, 0, 100);
+            if (go && r.v > 1) me.stam = clamp(me.stam - Math.max(0, (frac - 0.75) * 26) * tireRate * dt + (frac <= 0.75 ? (0.8 - frac) * 14 + 2 : 0) * dt, 0, 100);
             if (me.stam <= 0 && !me.tired) { me.tired = true; toast("You are worn out! Slow down to get your breath back"); }
             else if (me.tired && me.stam > 25) { me.tired = false; toast("You have your breath back"); }
             target = gas ? max * frac : 0;

@@ -43,7 +43,7 @@ const Market = (() => {
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
     rickshaw: { type: "car", name: "Cycle rickshaw", price: 200, note: "Pedal-powered, in bright colours. Top speed 25 km/h." },
     oxcart: { type: "mount", name: "Bullock cart", price: 150, note: "A wooden cart pulled by an ox. Top speed 18 km/h." },
-    elephant: { type: "mount", name: "Elephant", price: 800, note: "A tall elephant with a red and gold howdah. Top speed 32 km/h, and you can see over the crowd." },
+    elephant: { type: "mount", name: "Elephant", price: 800, note: "A tall elephant with a red and gold howdah. Top speed 50 km/h, and you can see over the crowd." },
     banners: { type: "decor", name: "Door banners", price: 60, note: "Two crimson banners either side of your front door." },
     mosaic: { type: "decor", name: "Mosaic floor", price: 90, note: "A patterned floor of coloured tiles inside your house." },
     salve: { type: "supply", name: "Healing salve", price: 40, note: "Heals 40 health at once." },
