@@ -31,6 +31,9 @@ const Market = (() => {
     scooter: { type: "car", name: "Vespa scooter", price: 250, note: "Quick and nimble. Top speed 54 km/h." },
     citycar: { type: "car", name: "City car", price: 500, note: "A blue runabout. Top speed 86 km/h." },
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
+    rickshaw: { type: "car", name: "Cycle rickshaw", price: 200, note: "Pedal-powered, in bright colours. Top speed 25 km/h." },
+    oxcart: { type: "mount", name: "Bullock cart", price: 150, note: "A wooden cart pulled by an ox. Top speed 18 km/h." },
+    elephant: { type: "mount", name: "Elephant", price: 800, note: "A tall elephant with a red and gold howdah. Top speed 32 km/h, and you can see over the crowd." },
     banners: { type: "decor", name: "Door banners", price: 60, note: "Two crimson banners either side of your front door." },
     mosaic: { type: "decor", name: "Mosaic floor", price: 90, note: "A patterned floor of coloured tiles inside your house." },
     salve: { type: "supply", name: "Healing salve", price: 40, note: "Heals 40 health at once." },
@@ -39,7 +42,7 @@ const Market = (() => {
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
   const SECTIONS = [
-    ["Things to wear", "wear"], ["Companions", "pet"], ["Cars (Modern Rome only)", "car"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -99,7 +102,7 @@ const Market = (() => {
     }
     Vitals.coins -= it.price;
     s.items.push(id); save(); Sfx.play("coin");
-    if (it.type === "car") { applyAll(); closePanels(); Car.deploy(id); return; } // it appears next to you
+    if (it.type === "car" || it.type === "mount") { applyAll(); closePanels(); Car.deploy(id); return; } // it appears next to you
     if (it.slot) wear(id); else applyAll();
     toast(it.type === "perk" ? `${it.name}: yours for good.` : it.type === "decor" ? `You decorated your house with the ${it.name.toLowerCase()}.` : `You bought the ${it.name.toLowerCase()} and took it with you.`);
   }
@@ -131,9 +134,10 @@ const Market = (() => {
     $m("mk-sections").replaceChildren(...SECTIONS.flatMap(([title, type]) => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
       h.textContent = title; ul.className = "mk-items";
-      if (type === "car" && era !== "modern") { // cars only exist today
+      const need = type === "car" ? "modern" : type === "mount" ? "ancient" : null;
+      if (need && era !== need) { // these only exist in one era
         const li = document.createElement("li"), note = document.createElement("small");
-        note.textContent = "Cars only exist in Modern Rome. Press K (or the Ancient Rome button) to go there, then come back to buy one.";
+        note.textContent = need === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there, then come back to buy one." : "Carts and elephants only live in the ancient cities (Ancient Rome and Mughal Delhi). Press K to go there, then come back to buy one.";
         li.append(note); ul.append(li);
         return [h, ul];
       }
@@ -145,7 +149,7 @@ const Market = (() => {
         b.type = "button";
         const owned = s.items.includes(id);
         if (it.type === "supply" || !owned) { b.textContent = `Buy · ${it.price}`; b.disabled = Vitals.coins < it.price; b.addEventListener("click", () => buyItem(id)); }
-        else if (it.type === "car") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
+        else if (it.type === "car" || it.type === "mount") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
         else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
         li.append(txt, b);

@@ -959,7 +959,7 @@ function applyEra() {
   applyCitizensEra(modern);
   Modern.apply(modern);
   if (Delhi.built) Delhi.setEra(modern);
-  if (!modern) Car.stow(); // cars only exist today
+  Car.onEra(modern); // cars and rickshaws only exist today, carts and elephants only in the ancient cities
   Crowd.setVisible(!modern);
   const [oldName, newName] = ERA_NAMES[city];
   $("#era-badge").textContent = modern ? newName : oldName;
@@ -1052,7 +1052,7 @@ function updatePrompt() {
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
-    if (!text && Car.nearby()) { text = "Press X to get in your car"; p.dataset.kind = "car"; }
+    if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";
   }
@@ -1402,7 +1402,7 @@ function tick(dt) {
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
   updateNavHud(dt);
-  Sfx.update(dt, { mode, engine: Car.speed01(), driving: Car.driving, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
+  Sfx.update(dt, { mode, engine: Car.speed01(), driving: Car.driving && Car.motor, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
   placesTimer += dt;
   if (placesTimer > 0.6 && $("#places").classList.contains("show")) { placesTimer = 0; refreshPlaceDistances(); }
   if (mode === "fight") Fight.update(dt, keys);

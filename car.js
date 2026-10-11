@@ -1,7 +1,7 @@
 "use strict";
-// Cars for Modern Rome: buy one in the Market, take it out, get in (X) and drive anywhere the streets and squares allow.
+// Cars, rickshaws, bullock carts and elephants: buy one in the Market, take it out, get on (X) and ride anywhere the streets and squares allow.
 // The car follows the same obstacle rules as you do (walls, parked cars, lamp posts, trees), crashes cost you health,
-// pedestrians you hit are knocked over, and the moving traffic brakes for you. Only exists in Modern Rome.
+// pedestrians you hit are knocked over, and the moving traffic brakes for you. Cars and rickshaws exist only in the modern cities; carts and elephants only in the ancient ones.
 // Depends on game.js, physics.js, modern.js and audio.js at run time.
 
 const Car = (() => {
@@ -10,9 +10,13 @@ const Car = (() => {
     scooter: { name: "Vespa scooter", max: 15, accel: 9, turn: 2.7, color: 0xd9c24a, len: 1.9, wid: 0.7 },
     citycar: { name: "City car", max: 24, accel: 10, turn: 2.1, color: 0x3a6fb5, len: 3.8, wid: 1.8 },
     sportscar: { name: "Sports car", max: 36, accel: 16, turn: 1.9, color: 0xc0262b, len: 4.4, wid: 1.9 },
+    rickshaw: { name: "Cycle rickshaw", max: 7, accel: 4.5, turn: 2.4, color: 0x2f8f4a, len: 2.6, wid: 1.2, motor: false },
+    oxcart: { name: "Bullock cart", max: 5, accel: 2.2, turn: 1.6, color: 0x6b4a2b, len: 4.6, wid: 1.6, era: "ancient", motor: false, verb: "climb on" },
+    elephant: { name: "Elephant", max: 9, accel: 3.2, turn: 1.3, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
   };
+  const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
 
-  let car = null, driving = false, camYaw = 0, bumpCd = 0, runCd = 0, stuckT = 0;
+  let car = null, driving = false, camYaw = 0, bumpCd = 0, runCd = 0, stuckT = 0, phase = 0;
   const circles = [0, 1, 2].map(() => ({ x: 0, z: 0, r: 1.0, y1: 1.6, t: 1, mine: true, era: "modern", on: false }));
   for (const c of circles) dynBlockers.push(c);
 
@@ -20,14 +24,44 @@ const Car = (() => {
   const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
   const wheel = (r, w, x, y, z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 12), lam(0x1a1a1a)); m.rotation.z = Math.PI / 2; m.position.set(x, y, z); return m; };
 
+  // A leg that swings from the hip: a pivot group with a box hanging below it.
+  const leg = (w, len, mat, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); const b = box(w, len, w, mat, 0, -len / 2, 0); p.add(b); return p; };
+
   // Faces -z (like the people), so its yaw works like yours.
   function build(id) {
-    const M = MODELS[id], g = new THREE.Group(), body = lam(M.color), glass = lam(0x1d2a33), wheels = [];
+    const M = MODELS[id], g = new THREE.Group(), body = lam(M.color), glass = lam(0x1d2a33), wheels = [], legs = [];
     const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1b0 }), tail = new THREE.MeshBasicMaterial({ color: 0xc01818 });
     if (id === "scooter") {
       g.add(box(0.34, 0.4, 1.3, body, 0, 0.55, 0.1), box(0.3, 0.1, 0.55, lam(0x2b2b2b), 0, 0.82, 0.3), box(0.9, 0.06, 0.06, lam(0x2b2b2b), 0, 1.1, -0.55), box(0.06, 0.55, 0.06, lam(0x2b2b2b), 0, 0.82, -0.55));
       g.add(box(0.1, 0.1, 0.06, lamp, 0, 0.95, -0.7));
       for (const z of [-0.65, 0.7]) { const w = wheel(0.3, 0.12, 0, 0.3, z); g.add(w); wheels.push(w); }
+    } else if (id === "rickshaw") { // a bicycle in front, a seat and a coloured canopy behind
+      const dark = lam(0x2b2b2b), cloth = lam(0xe8c13a);
+      g.add(box(0.12, 0.12, 1.4, dark, 0, 0.7, -0.7), box(0.7, 0.06, 0.06, dark, 0, 1.1, -1.3), box(0.3, 0.1, 0.4, dark, 0, 0.95, -0.5));
+      g.add(box(1.0, 0.18, 1.2, body, 0, 0.55, 0.6), box(0.95, 0.5, 0.2, body, 0, 0.9, 1.1), box(0.8, 0.12, 0.7, lam(0x7a3a2a), 0, 0.72, 0.65));
+      for (const sx of [-1, 1]) for (const z of [0.1, 1.1]) g.add(box(0.06, 1.1, 0.06, dark, sx * 0.5, 1.15, z));
+      g.add(box(1.25, 0.1, 1.5, cloth, 0, 1.75, 0.6));
+      for (const [x, z, r] of [[0, -1.3, 0.34], [-0.58, 0.7, 0.3], [0.58, 0.7, 0.3]]) { const w = wheel(r, 0.08, x, r, z); g.add(w); wheels.push(w); }
+    } else if (id === "oxcart") { // a wooden cart with big wheels, pulled by an ox
+      const wood = lam(0x6b4a2b), wd = lam(0x4a3320), ox = lam(0xe8e0d0), horn = lam(0x2b2b2b);
+      g.add(box(1.5, 0.15, 2.6, wood, 0, 1.0, 1.0), box(0.1, 0.5, 2.6, wood, -0.75, 1.3, 1.0), box(0.1, 0.5, 2.6, wood, 0.75, 1.3, 1.0), box(1.5, 0.5, 0.1, wood, 0, 1.3, 2.3));
+      g.add(box(0.5, 0.9, 0.5, lam(0xd9a13a), 0, 1.6, 1.3)); // a bale of cloth
+      g.add(box(0.1, 0.1, 2.2, wd, 0, 0.8, -1.4)); // the pole to the ox
+      for (const sx of [-1, 1]) { const w = wheel(0.8, 0.1, sx * 0.9, 0.8, 1.0); g.add(w); wheels.push(w); }
+      g.add(box(0.8, 0.85, 1.6, ox, 0, 1.2, -2.3), box(0.55, 0.55, 0.7, ox, 0, 1.45, -3.3), box(0.9, 0.08, 0.1, horn, 0, 1.8, -3.2));
+      for (const [x, z] of [[-0.28, -1.7], [0.28, -1.7], [-0.28, -2.9], [0.28, -2.9]]) { const l = leg(0.2, 0.85, ox, x, 0.85, z); g.add(l); legs.push(l); }
+    } else if (id === "elephant") { // a tall grey elephant with a red howdah
+      const gr = lam(0x9c9a95), red = lam(0xa8282b), gold = lam(0xd9a928), ivory = lam(0xf1ead8);
+      g.add(box(2.2, 2.1, 3.6, gr, 0, 3.0, 0.2), box(1.5, 1.6, 1.5, gr, 0, 3.3, -2.3));
+      g.add(box(0.6, 1.9, 0.7, gr, 0, 2.3, -3.2), box(0.5, 0.7, 0.7, gr, 0, 1.4, -3.45));
+      g.add(box(0.15, 1.3, 1.0, gr, 0.85, 3.4, -2.0), box(0.15, 1.3, 1.0, gr, -0.85, 3.4, -2.0));
+      g.add(box(0.15, 0.15, 1.5, ivory, 0.5, 2.6, -3.2), box(0.15, 0.15, 1.5, ivory, -0.5, 2.6, -3.2));
+      g.add(box(0.2, 1.2, 0.2, gr, 0, 2.3, 2.1));
+      for (const [x, z] of [[-0.75, -1.2], [0.75, -1.2], [-0.75, 1.5], [0.75, 1.5]]) { const l = leg(0.7, 2.0, gr, x, 2.0, z); g.add(l); legs.push(l); }
+      g.add(box(2.4, 0.12, 2.8, red, 0, 4.1, 0.2), box(2.5, 0.06, 2.9, gold, 0, 4.0, 0.2)); // the cloth on its back
+      g.add(box(1.5, 0.15, 1.7, lam(0x7a3a2a), 0, 4.25, 0.2));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.1, 1.5, 0.1, gold, sx * 0.7, 5.0, 0.2 + sz * 0.75));
+      g.add(box(1.7, 0.1, 1.9, red, 0, 5.8, 0.2));
     } else {
       const L = M.len, W = M.wid, low = id === "sportscar";
       g.add(box(W, low ? 0.5 : 0.65, L, body, 0, low ? 0.5 : 0.6, 0));
@@ -36,7 +70,7 @@ const Car = (() => {
       if (low) g.add(box(W * 0.9, 0.06, 0.4, body, 0, 0.95, L / 2 - 0.2), box(0.08, 0.2, 0.08, body, W * 0.3, 0.8, L / 2 - 0.2), box(0.08, 0.2, 0.08, body, -W * 0.3, 0.8, L / 2 - 0.2)); // spoiler
       for (const sx of [-1, 1]) for (const z of [-L * 0.32, L * 0.32]) { const w = wheel(0.34, 0.2, sx * (W / 2), 0.34, z); g.add(w); wheels.push(w); }
     }
-    return { g, wheels };
+    return { g, wheels, legs };
   }
 
   function placeCircles(on) {
@@ -49,8 +83,8 @@ const Car = (() => {
 
   // Take the car out of the garage and park it in front of you
   function deploy(id) {
-    if (era !== "modern") { toast("Cars only exist in Modern Rome. Press K to go there."); return; }
     if (!MODELS[id]) return;
+    if (eraOf(MODELS[id]) !== era) { toast(eraOf(MODELS[id]) === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there." : "Carts and elephants only live in the ancient cities. Press K to go there."); return; }
     stow();
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
     let spot = null;
@@ -64,7 +98,7 @@ const Car = (() => {
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
     scene.add(car.g);
     placeCircles(true);
-    toast(`${car.M.name}: walk up to it and press X to get in.`);
+    toast(`${car.M.name}: walk up to it and press X to ${car.M.verb || "get in"}.`);
     Sfx.play("coin");
   }
 
@@ -77,13 +111,13 @@ const Car = (() => {
   const nearby = () => !!car && !driving && mode === "walk" && Math.hypot(player.x - car.x, player.z - car.z) < 7;
 
   function enter() {
-    if (!nearby() || era !== "modern") return;
+    if (!nearby() || eraOf(car.M) !== era) return;
     driving = true; mode = "drive";
     placeCircles(false);
     camYaw = car.yaw;
     player.vx = player.vz = 0; Vitals.stopRest();
     $("#drive-hud").classList.add("show");
-    toast("W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
+    toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
 
   function exit(silent) {
@@ -100,10 +134,13 @@ const Car = (() => {
     player.x = spot[0]; player.z = spot[1]; player.feet = groundAt(spot[0], spot[1]); player.vx = player.vz = 0;
     player.yaw = car.yaw; player.pitch = -0.05;
     placeCircles(true);
-    if (!silent) toast("You got out. Your car stays parked here.");
+    if (!silent) toast(`You got off. Your ${car.M.name.toLowerCase()} stays parked here.`);
   }
 
-  function toggleEnter() { if (driving) exit(); else if (nearby()) enter(); else if (car && era === "modern") toast("Walk up to your car to get in."); }
+  function toggleEnter() { if (driving) exit(); else if (nearby()) enter(); else if (car && eraOf(car.M) === era) toast(`Walk up to your ${car.M.name.toLowerCase()} to ${car.M.verb || "get in"}.`); }
+
+  // Switching eras puts away anything that does not exist in the new one.
+  function onEra(modern) { if (car && eraOf(car.M) !== (modern ? "modern" : "ancient")) stow(); }
 
   // The five contact points of the car (centre and four corners) at a position and heading
   function points(x, z, yaw) {
@@ -173,12 +210,12 @@ const Car = (() => {
     // other cars on the road
     const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw);
     for (const k of [0, M.len * 0.4, -M.len * 0.4]) {
-      const h2 = Modern.hits(car.x + fx * k, car.z + fz * k);
-      if (h2 && bumpCd <= 0) { bumpCd = 0.9; car.v *= 0.2; player.shake = 0.6; Sfx.play("crash"); toast("You hit another car!"); break; }
+      const h2 = city === "delhi" ? Delhi.hits(car.x + fx * k, car.z + fz * k) : Modern.hits(car.x + fx * k, car.z + fz * k);
+      if (h2 && bumpCd <= 0) { bumpCd = 0.9; car.v *= 0.2; player.shake = 0.6; Sfx.play("crash"); toast(h2.what ? `You ran into ${h2.what}!` : "You hit another car!"); break; }
     }
     // pedestrians
     if (Math.abs(car.v) > 2.5) {
-      for (const c of CITIZENS.list) {
+      for (const c of (city === "delhi" ? Delhi.people() : CITIZENS.list)) {
         if ((c.down || 0) > 0) continue;
         if (Math.hypot(c.x - (car.x + fx * M.len * 0.3), c.z - (car.z + fz * M.len * 0.3)) < 1.7) {
           c.down = Math.abs(car.v) > 10 ? 2.6 : 1.6;
@@ -194,6 +231,8 @@ const Car = (() => {
     car.y += (groundAt(car.x, car.z) - car.y) * Math.min(1, dt * 10);
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
     for (const w of car.wheels) w.rotation.x += (car.v * dt) / 0.34;
+    phase += car.v * dt * 1.1; // legs swing as an ox or elephant walks
+    car.legs.forEach((l, i) => { l.rotation.x = Math.sin(phase + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.55 * Math.min(1, Math.abs(car.v) / 2); });
     player.x = car.x; player.z = car.z; player.yaw = car.yaw; player.feet = car.y; player.vx = player.vz = 0;
     $("#drive-kmh").textContent = Math.round(Math.abs(car.v) * 3.6);
   }
@@ -204,10 +243,11 @@ const Car = (() => {
     let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
     camYaw += dy * Math.min(1, dt * 4);
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
-    let d = 7.5 + Math.abs(car.v) * 0.09;
+    let d = 7.5 + (car.M.camH ? 3 : 0) + Math.abs(car.v) * 0.09;
     for (; d > 2.5; d -= 0.5) if (!blockedAt(car.x - fx * d, car.z - fz * d, car.y + 2.5)) break;
-    cam.position.set(car.x - fx * d, car.y + 2.6 + Math.abs(car.v) * 0.02, car.z - fz * d);
-    cam.lookAt(car.x + fx * 2, car.y + 1.1, car.z + fz * 2);
+    const up = car.M.camH || 0;
+    cam.position.set(car.x - fx * d, car.y + 2.6 + up + Math.abs(car.v) * 0.02, car.z - fz * d);
+    cam.lookAt(car.x + fx * 2, car.y + 1.1 + up * 0.7, car.z + fz * 2);
     if (player.shake > 0) {
       cam.position.x += (Math.random() - 0.5) * player.shake * 0.4; cam.position.y += (Math.random() - 0.5) * player.shake * 0.3;
       player.shake = Math.max(0, player.shake - dt * 2.4);
@@ -216,7 +256,9 @@ const Car = (() => {
   }
 
   return {
-    MODELS, deploy, stow, enter, exit, toggleEnter, update, camera, nearby,
+    MODELS, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
+    get motor() { return !car || car.M.motor !== false; },
+    get verb() { return car ? car.M.verb || "get in" : "get in"; },
     get current() { return car ? car.id : null; },
     get driving() { return driving; },
     debug: () => (car ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v, stuckT, bumpCd, driving, fitsAhead: fits(-Math.sin(car.yaw) * 0.05, -Math.cos(car.yaw) * 0.05), fitsBack: fits(Math.sin(car.yaw) * 0.05, Math.cos(car.yaw) * 0.05) } : null),
