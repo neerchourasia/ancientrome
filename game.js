@@ -425,6 +425,34 @@ function crash(impact, dx, dz, tx, tz) {
   toast(`Ouch! You ran into ${what}${hard ? " at full speed" : ""} (-${Math.round(dmg)} health)`);
 }
 
+// Knocking over too many citizens gets you arrested: the guards take you to the arena for a trial by combat
+// (four gladiators and then a lion, with the sword). Only in Ancient Rome.
+const knockTimes = [];
+function noteKnock() {
+  if (city !== "rome" || era !== "ancient" || mode === "fight") return;
+  knockTimes.push(clock);
+  while (knockTimes.length && clock - knockTimes[0] > 150) knockTimes.shift(); // forgotten after two and a half minutes
+  if (knockTimes.length === 3) toast("The guards are watching you! Stop knocking people over");
+  else if (knockTimes.length === 5) toast("One more and the guards will arrest you!");
+  else if (knockTimes.length >= 7) arrest();
+}
+
+function arrest() {
+  if (mode !== "walk" && mode !== "drive") return;
+  knockTimes.length = 0;
+  if (mode === "drive") Car.exit(true);
+  Vitals.stopRest(); Nav.clear();
+  toast("The guards seize you!");
+  Narrator.say("The guards seize you! For knocking over so many citizens you must face a trial by combat: four gladiators and a lion, with a sword.", { interrupt: true });
+  $("#sleep").classList.add("on");
+  setTimeout(() => {
+    $("#sleep").classList.remove("on");
+    if (mode !== "walk") return;
+    Fight.start({ trial: true });
+    toast("Trial by combat! Beat four gladiators and a lion with your sword to win your freedom");
+  }, 1600);
+}
+
 // Running into a citizen knocks them over.
 function bumpCitizens(pace) {
   if (pace < 2.5) return;
@@ -434,6 +462,7 @@ function bumpCitizens(pace) {
     if (d > 0.95) continue;
     const hard = pace > 8;
     c.down = hard ? 2.4 : 1.4;
+    noteKnock();
     const push = 1.3 / (d || 1);
     const nx = c.x + (c.x - player.x) * push, nz = c.z + (c.z - player.z) * push;
     if (canMove(c.x, c.z, nx, nz)) { c.x = nx; c.z = nz; }

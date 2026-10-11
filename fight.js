@@ -165,12 +165,13 @@ const Fight = (() => {
   // opts.lion: only the lion (bow). opts.hunt: an animal hunt (boar, bear, then the lion). Otherwise three gladiators.
   function start(opts = {}) {
     if (active) return;
-    if (!Vitals.canFight()) {
+    if (opts.trial) Vitals.hp = Math.max(Vitals.hp, 60); // the guards give you water and a rag for your wounds
+    if (!opts.trial && !Vitals.canFight()) {
       toast(`You are too wounded to fight (health ${Math.round(Vitals.hp)}/100). Press Z to rest and heal.`);
       return;
     }
     lastOpts = opts; earned = 0;
-    seq = opts.lion ? [3] : opts.hunt ? [4, 5, 3] : [0, 1, 2];
+    seq = opts.trial ? [0, 1, 1, 2, 3] : opts.lion ? [3] : opts.hunt ? [4, 5, 3] : [0, 1, 2]; // a trial by combat: four gladiators, then a lion, all with the sword
     active = true; mode = "fight"; round = 0; lastRound = seq.length - 1;
     P.hp = Vitals.hp; P.stam = 100; P.swing = -1; P.block = false; P.hurt = 0; // you start as hurt as you already are
     bow = !!(opts.hunt || opts.lion); // hunting animals, including the lone lion, is done with a bow
@@ -224,9 +225,9 @@ const Fight = (() => {
     if (defeat) {
       deathPending = "You were killed in the arena.";
       text += earned ? ` You keep the ${earned} denarii you earned. You did not survive the fight.` : " You did not survive the fight.";
-    } else if (win) text += ` Purse earned: ${earned} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
+    } else if (win && !lastOpts.trial) text += ` Purse earned: ${earned} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
     const again = lastOpts;
-    if (title) showResult(title, text, defeat ? [{ label: "Continue", fn: closePanels }] : [
+    if (title) showResult(title, text, defeat || lastOpts.trial ? [{ label: "Continue", fn: closePanels }] : [
       { label: win ? "Fight again" : "Try again", fn: () => { closePanels(); start(again); } },
       { label: "Leave the arena", fn: closePanels },
     ]);
@@ -326,9 +327,9 @@ const Fight = (() => {
     if (f.hp <= 0) {
       f.alive = false; f.hp = 0; phase = "roundwon"; phaseT = 2.4;
       Sfx.play("cheer");
-      const purse = Math.round((PURSE[f.def.name] || 30) * Character.mod("coin"));
+      const purse = lastOpts.trial ? 0 : Math.round((PURSE[f.def.name] || 30) * Character.mod("coin"));
       earned += purse; Vitals.coins += purse;
-      msg(`${round === lastRound ? "The crowd erupts!" : `${f.def.name} falls. The crowd roars!`} +${purse} denarii`, 2200);
+      msg(`${round === lastRound ? "The crowd erupts!" : `${f.def.name} falls. The crowd roars!`}${purse ? ` +${purse} denarii` : ""}`, 2200);
     }
   }
 
@@ -422,6 +423,7 @@ const Fight = (() => {
     if (phase === "intro" && phaseT <= 0) { phase = "fight"; msg("Fight!", 800); }
     if (phase === "roundwon" && phaseT <= 0) {
       if (round === lastRound) {
+        if (lastOpts.trial) { stop(true, "You are pardoned", "You beat four gladiators and a lion with nothing but a sword. The crowd demands your freedom and the guards let you go. Do not knock over any more citizens."); return; }
         stop(true, lastOpts.lion ? "The lion is slain!" : lastOpts.hunt ? "The hunt is won!" : "Victory in the arena!", lastOpts.hunt
           ? "The crowd roars as the last beast falls. Animal hunts (venationes) usually filled the morning of the games, with lions, bears, boars and exotic animals brought from across the empire. Sometimes the arena was decorated with trees and rocks to look like a wild landscape."
           : lastOpts.lion
@@ -512,5 +514,5 @@ const Fight = (() => {
     el("st-fill").style.width = `${P.stam}%`;
   }
 
-  return { init, start, stop: () => stop(false), update, attack, release, makeFoe, makeLion, mouseBlock: false, get active() { return active; }, debug: () => ({ phase, round, P: { ...P }, foe: foe && { x: foe.x, z: foe.z, hp: foe.hp, state: foe.state, alive: foe.alive } }) };
+  return { init, start, stop: () => { if (active && lastOpts.trial) { toast("The guards bar the gate: you cannot leave until the trial is over"); return; } stop(false); }, update, attack, release, makeFoe, makeLion, mouseBlock: false, get active() { return active; }, debug: () => ({ phase, round, P: { ...P }, foe: foe && { x: foe.x, z: foe.z, hp: foe.hp, state: foe.state, alive: foe.alive } }) };
 })();
