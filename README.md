@@ -59,6 +59,7 @@ Then visit http://localhost:8123. Because it is static, it also works on GitHub 
 | File | Purpose |
 | --- | --- |
 | `index.html`, `walk.css` | Page and HUD |
+| `delhi-data.js`, `delhi.js` | Old Delhi: the sights and facts, and the 3D city (Red Fort, Chandni Chowk, Jama Masjid), built on first travel |
 | `game.js` | Controls, minimap, map, discovery cards |
 | `physics.js` | Terrain, walkable steps and solid obstacles |
 | `world.js` | Landmark models (Forum, Colosseum, Pantheon, Circus and more) |
