@@ -396,7 +396,7 @@ function carHit(h) {
   if (canMove(player.x, player.z, player.x + kx, player.z + kz)) { player.x += kx; player.z += kz; }
   player.vx = player.vz = 0;
   Sfx.play("bump");
-  toast(`A car hit you! (-${Math.round(dmg)} health)`);
+  toast(`${h.what ? h.what[0].toUpperCase() + h.what.slice(1) : "A car"} hit you! (-${Math.round(dmg)} health)`);
 }
 
 function crash(impact, dx, dz, tx, tz) {
@@ -1362,7 +1362,7 @@ function updateTime(dt) {
   sky.setHour(Time.hour);
   Home.update(sky.night);
   Modern.update(sky.night, dt, player.x, player.z);
-  if (started && mode === "walk" && !creatorOpen && !panelOpen && crashCd <= 0) { const h = Modern.hits(player.x, player.z); if (h) carHit(h); }
+  if (started && mode === "walk" && !creatorOpen && !panelOpen && crashCd <= 0) { const h = city === "delhi" ? Delhi.hits(player.x, player.z) : Modern.hits(player.x, player.z); if (h) carHit(h); }
 
   const label = Time.label() + (Time.late && !sleeping ? " · sleepy: sleep before 4:00" : "");
   if (label !== lastClock) { lastClock = label; $("#clock").textContent = label; }

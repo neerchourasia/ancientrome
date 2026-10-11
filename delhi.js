@@ -738,11 +738,25 @@ const Delhi = (() => {
     if (!modernNow) updateElephants(dt, px, pz);
   }
 
+  // Something moving that is touching you, if any: { v, rx, rz, side, what } (side: which way it throws you), like the cars in Rome.
+  function hits(px, pz) {
+    if (!built || Math.abs(px - DX) > 800) return null;
+    for (const r of rides.list) {
+      if (r.v < 0.5 || Math.abs(px - r.x) > 2.4 || Math.abs(pz - r.z) > 1.3) continue;
+      return { v: r.v + 1.5, rx: 0, rz: r.dir, side: pz - r.z >= 0 ? 1 : -1, what: modernNow ? "a cycle rickshaw" : "a bullock cart" };
+    }
+    if (!modernNow) for (const e of jumbos) {
+      if (Math.abs(px - e.x) > 3.6 || Math.abs(pz - e.z) > 2) continue;
+      return { v: 4.5, rx: 0, rz: e.dir, side: pz - e.z >= 0 ? 1 : -1, what: "an elephant" };
+    }
+    return null;
+  }
+
   // the haveli's bedroom, for sleeping
   const homeInside = (x, z) => Math.abs(x - X(-108)) < 5.6 && Math.abs(z + 82) < 5.6;
   const homeSpot = () => ({ x: X(-100), z: -60 });
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, update, homeInside, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, update, hits, homeInside, homeSpot, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();
