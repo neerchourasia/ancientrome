@@ -8,7 +8,7 @@
 const Online = (() => {
   const cfg = window.ROME_CONFIG || {};
   const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const URL = cfg.serverUrl || (isLocal ? "ws://localhost:8765/play" : "");
+  const URL = isLocal ? "ws://localhost:8765/play" : (cfg.serverUrl || ""); // on your own computer the test server is used
   const $o = (id) => document.getElementById(id);
 
   let ws = null, welcome = null, helloKey = "", waiting = false, pingT = null, lobbyMsg = "";
@@ -38,7 +38,7 @@ const Online = (() => {
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
     sock.onclose = () => {
       if (ws !== sock) return;
-      ws = null; welcome = null; waiting = false; clearInterval(pingT);
+      ws = null; welcome = null; waiting = false; clearInterval(pingT); clearPeers();
       if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
       else if (Naval.isOnline()) Naval.stop();
@@ -58,6 +58,7 @@ const Online = (() => {
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": onFight(m); break;
+      case "world": onWorld(m); break;
       case "race": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
       case "end": if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
@@ -95,7 +96,76 @@ const Online = (() => {
 
   function leaveQueue() { send({ t: "leave" }); waiting = false; setMsg(""); }
 
+  // ------------------------------------------------------------------ the open world: other players walking about
+
+  // Whenever you are just walking (not in a game), the server tells you who is near you in the same city, and you see
+  // them as named characters. They are only for show: nobody can touch anybody.
+  const peers = new Map();
+  let walkSendT = 0;
+
+  function clearPeers() { for (const p of peers.values()) { if (p.fig.g.parent) p.fig.g.parent.remove(p.fig.g); } peers.clear(); peerCount(); }
+
+  function peerCount() {
+    const e = $o("v-peers");
+    if (e) e.textContent = peers.size ? `👥 ${peers.size} other player${peers.size === 1 ? "" : "s"} nearby` : "";
+  }
+
+  function onWorld(m) {
+    for (const [id, name, cls, look] of m.i || []) {
+      if (peers.has(id)) continue;
+      const fig = createFigure();
+      paintFigure(fig.mats, look || {});
+      applyAccessories(fig, look && look.acc);
+      fig.g.add(label(String(name || "Player"), "#ffe9a8"));
+      fig.g.visible = false;
+      scene.add(fig.g);
+      peers.set(id, { fig, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
+      toast(`${name || "A player"} is nearby`);
+    }
+    for (const [id, x, z, yaw, spd] of m.p || []) {
+      const p = peers.get(id);
+      if (!p) continue;
+      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd;
+      if (p.x === null) { p.x = x; p.z = z; p.yaw = yaw; }
+    }
+    for (const id of m.g || []) {
+      const p = peers.get(id);
+      if (p) { scene.remove(p.fig.g); peers.delete(id); }
+    }
+    peerCount();
+  }
+
+  // every frame: glide the other players to where they are, with a walking swing
+  function peersUpdate(dt) {
+    const show = mode === "walk" || mode === "drive" || mode === "watch";
+    for (const p of peers.values()) {
+      if (p.x === null) continue;
+      const k = Math.min(1, dt * 8);
+      p.x += (p.tx - p.x) * k; p.z += (p.tz - p.z) * k;
+      let dy = p.tyaw - p.yaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      p.yaw += dy * k;
+      const g = p.fig.g;
+      g.visible = show;
+      g.position.set(p.x, groundAt(p.x, p.z), p.z);
+      g.rotation.y = p.yaw;
+      p.ph += dt * (p.spd / 5.5) * 6.2;
+      const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
+      a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
+    }
+  }
+
+  // every 0.2 s while you walk: where you are (the server decides who can see you)
+  function walkTick(dt) {
+    walkSendT -= dt;
+    if (walkSendT > 0) return;
+    walkSendT = 0.2;
+    if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
+    if (mode !== "walk" && mode !== "drive") return;
+    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +Math.hypot(player.vx || 0, player.vz || 0).toFixed(1) });
+  }
+
   function bind() {
+    setInterval(() => { if (started && Character.exists && !document.hidden && (mode === "walk" || mode === "drive") && !duel && !waiting) connect(); }, 4000); // stay connected, so you see the others
     $o("on-duel").addEventListener("click", () => queue("duel"));
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
@@ -326,5 +396,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

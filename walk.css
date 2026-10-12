@@ -421,3 +421,6 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #death.lapse { background-color: rgba(0,0,0,.72); }
 #death h2 { font: 700 2.4rem Georgia, serif; color: #c0392b; margin: 0; }
 #death p { font: 600 1.15rem Georgia, serif; margin: 0; max-width: 34em; }
+
+#v-peers { margin: 4px 0 0; font-size: .78rem; color: #cfe8c9; text-align: right; }
+#v-peers:empty { display: none; }

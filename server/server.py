@@ -190,6 +190,8 @@ class Conn:
         self.want_bot = False
         self.room = None
         self.me = None             # this connection's player inside its room
+        self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
+        self.seen = set()          # the other walkers this connection has been told about
         self.tokens, self.tok_t = 60.0, now()
 
     def send(self, obj):
@@ -1073,6 +1075,62 @@ async def matchmaker():
             print("matchmaker error:", repr(e))
 
 
+
+# ---------------------------------------------------------------------------------------------------------------
+# the open world: players who are just walking around can see each other (same city, within earshot)
+
+WORLD_RANGE = 260.0     # metres: you see people this close
+WORLD_MAX = 30          # and at most this many at once (the nearest)
+WORLD_CITIES = ("rome", "delhi")
+
+
+def on_walk(conn, m):
+    """A player says where they are. Only where they stand is taken from them; who can see them is decided here."""
+    if conn.room or not conn.hello:
+        return
+    city = m.get("c")
+    if city not in WORLD_CITIES:
+        return
+    conn.city = city
+    conn.px, conn.pz = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz)
+    conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 40, 0)
+    conn.walk_at = now()
+
+
+def world_once():
+    """Tells every walker who is near them (a few times a second)."""
+    t = now()
+    groups = {}
+    for c in list(CONNS):
+        if c.hello and not c.closed and not c.room and c.city and t - c.walk_at < 4:
+            groups.setdefault(c.city, []).append(c)
+    live = set()
+    for group in groups.values():
+        for c in group:
+            live.add(c)
+            near = sorted(((math.hypot(o.px - c.px, o.pz - c.pz), o) for o in group if o is not c), key=lambda p: p[0])
+            near = [o for d, o in near if d <= WORLD_RANGE][:WORLD_MAX]
+            ids = {o.id for o in near}
+            new = [o for o in near if o.id not in c.seen]
+            gone = [i for i in c.seen if i not in ids]
+            c.seen = ids
+            if near or gone:
+                c.send({"t": "world", "p": [[o.id, round(o.px, 1), round(o.pz, 1), round(o.pyaw, 2), round(o.pspd, 1)] for o in near],
+                        "i": [[o.id, o.name, o.cls, o.look] for o in new], "g": gone})
+    for c in list(CONNS):          # anyone who stopped walking (in a game, or gone) sees nobody
+        if c not in live and c.seen:
+            c.send({"t": "world", "p": [], "i": [], "g": list(c.seen)})
+            c.seen = set()
+
+
+async def world_loop():
+    while True:
+        await asyncio.sleep(0.25)
+        try:
+            world_once()
+        except Exception as e:  # never let a bug here stop the world
+            print("world error:", repr(e))
+
 # ---------------------------------------------------------------------------------------------------------------
 # message handling
 
@@ -1091,6 +1149,8 @@ async def handle_msg(conn, m):
         return conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "bots": CFG["allow_bots"]})
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
+    if t == "walk":
+        return on_walk(conn, m)
     if t == "queue":
         mode = m.get("mode")
         if mode not in QUEUES:
@@ -1201,6 +1261,7 @@ async def ws_session(reader, writer, ip):
 async def serve(host="0.0.0.0", port=None):
     srv = await asyncio.start_server(handle_http, host, CFG["port"] if port is None else port, limit=2 ** 16)
     asyncio.ensure_future(matchmaker())
+    asyncio.ensure_future(world_loop())
     return srv
 
 

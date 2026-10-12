@@ -505,6 +505,44 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         room.step(0.05)
         self.assertTrue(room.over)            # the last captain is alone: the battle is over
 
+    # ---------------------------------------------------------------- the open world
+
+    async def test_walkers_see_each_other_only_nearby_in_the_same_city(self):
+        a, b, c, d = await self.player("Ann"), await self.player("Ben"), await self.player("Cyd"), await self.player("Dee")
+        a.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 1.0, "s": 3})
+        b.send({"t": "walk", "c": "rome", "x": 150, "z": 50, "yaw": 2.0, "s": 0})      # 50 m away: visible
+        c.send({"t": "walk", "c": "rome", "x": 900, "z": 50, "yaw": 0, "s": 0})        # far away: not visible
+        d.send({"t": "walk", "c": "delhi", "x": 110, "z": 50, "yaw": 0, "s": 0})       # same numbers, other city: not visible
+        await asyncio.sleep(0.3)
+        server.world_once()
+        wa = await a.until(lambda m: m["t"] == "world")
+        self.assertEqual([p[0] for p in wa["p"]], [b.welcome["id"]])
+        self.assertEqual(wa["i"][0][1], "Ben")                                           # name, class and look come once
+        self.assertEqual(wa["p"][0][1:3], [150.0, 50.0])
+        wb = await b.until(lambda m: m["t"] == "world")
+        self.assertEqual([p[0] for p in wb["p"]], [a.welcome["id"]])
+        server.world_once()
+        again = await a.until(lambda m: m["t"] == "world")
+        self.assertEqual(again["i"], [])                                                 # not told about Ben twice
+        # Ben walks away: Ann is told he is gone
+        b.send({"t": "walk", "c": "rome", "x": 5000, "z": 50, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.3)
+        server.world_once()
+        gone = await a.until(lambda m: m["t"] == "world" and m["g"])
+        self.assertEqual(gone["g"], [b.welcome["id"]])
+
+    async def test_walkers_in_a_game_are_not_in_the_open_world_and_bad_positions_are_clamped(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "walk", "c": "rome", "x": "x", "z": float("nan"), "yaw": 1e99, "s": -5})
+        b.send({"t": "walk", "c": "mars", "x": 1, "z": 1})                               # not a city: ignored
+        await asyncio.sleep(0.3)
+        ca = [c for c in server.CONNS if c.id == a.welcome["id"]][0]
+        self.assertEqual((ca.px, ca.pz), (0.0, 0.0))
+        self.assertLessEqual(abs(ca.pyaw), 50)
+        self.assertEqual(ca.pspd, 0)
+        cb = [c for c in server.CONNS if c.id == b.welcome["id"]][0]
+        self.assertIsNone(cb.city)
+
     # ---------------------------------------------------------------- abuse
 
     async def test_abusive_connections_are_dropped(self):

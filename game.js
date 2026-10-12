@@ -1480,6 +1480,7 @@ function tick(dt) {
   }
   sky.follow(camera.position);
   updateCitizens(dt, clock);
+  Online.walkTick(dt); Online.peersUpdate(dt);
   if (city === "delhi") Delhi.update(dt, player.x, player.z);
   DGames.tickRun(dt);
   updateAvatar(dt);

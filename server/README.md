@@ -50,6 +50,7 @@ A paid plan (a few dollars a month) keeps it awake. Fly.io and Railway work the 
 - Team battles: the server runs the five enemy bots, the friendly bots, every hit and every revive; players still cannot hurt each other or heal themselves.
 - Race progress is capped to what a chariot can really do, and the order of finishing is decided here.
 - Names, classes and looks sent by players are cleaned.
+- The open world (seeing other walkers): clients only say where they stand; positions are clamped, the server decides who can see whom (same city, within 260 m, at most 30), and people in a game are hidden from it.
 - Connections from other websites are refused, message size and rate are limited, and each address may hold only a few connections.
 
 ## What is not included yet
