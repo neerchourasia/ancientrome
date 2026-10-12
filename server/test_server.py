@@ -143,9 +143,11 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         a = await self.player(name="<script>alert(1)</script>Bob", cls="god-mode", look={"toga": 99, "skin": -3, "sash": "x"})
         self.assertNotIn("premium", a.welcome)
         self.assertEqual(server.clean_name("<b>Mara</b>"), "bMarab")
-        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": []})
+        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": [], "pet": None})
         self.assertEqual(server.clean_look({"acc": ["cloak", "cloak", "<script>", 7, "helmet"]})["acc"], ["cloak", "helmet"])
         self.assertEqual(server.clean_look({"toga": 5, "sash": 5})["toga"], 5)   # every colour is free
+        self.assertEqual(server.clean_look({"pet": "eagle"})["pet"], "eagle")
+        self.assertIsNone(server.clean_look({"pet": "<script>"})["pet"])           # only the real companions
 
     async def test_must_say_hello_first(self):
         ws = await WS.connect(self.port)

@@ -95,5 +95,8 @@ const Pets = (() => {
     pet.tail.rotation.y = Math.sin(t * 9) * (speed < 0.6 ? 0.6 : 0.25);
   }
 
-  return { set, update };
+  // A fresh pet for another player to show beside them (online.js moves it).
+  const make = (id) => (id === "eagle" ? buildEagle() : id === "hound" ? buildHound() : null);
+
+  return { set, update, make };
 })();

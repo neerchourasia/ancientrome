@@ -64,6 +64,7 @@ CLASS_MODS = {  # only what a duel needs
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
+PETS = ("hound", "eagle")
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
@@ -95,6 +96,8 @@ def clean_look(look):
         out[part] = i if ok else 0
     acc = look.get("acc") if isinstance(look, dict) else None
     out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:5] if isinstance(acc, list) else []
+    pet = look.get("pet") if isinstance(look, dict) else None
+    out["pet"] = pet if pet in PETS else None      # a companion that follows them (shown to others)
     return out
 
 

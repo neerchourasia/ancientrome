@@ -22,7 +22,7 @@ const Online = (() => {
 
   function connect() {
     if (!URL) return;
-    const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join()].join("|");
+    const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join(), Market.pet].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is
       ws.close();                                         // you logged in or changed character: connect again
@@ -32,7 +32,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn } });
+      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet } });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -103,7 +103,7 @@ const Online = (() => {
   const peers = new Map();
   let walkSendT = 0;
 
-  function clearPeers() { for (const p of peers.values()) { if (p.fig.g.parent) p.fig.g.parent.remove(p.fig.g); } peers.clear(); peerCount(); }
+  function clearPeers() { for (const p of peers.values()) { if (p.fig.g.parent) p.fig.g.parent.remove(p.fig.g); if (p.pet && p.pet.g.parent) p.pet.g.parent.remove(p.pet.g); } peers.clear(); peerCount(); }
 
   function peerCount() {
     const e = $o("v-peers");
@@ -119,7 +119,9 @@ const Online = (() => {
       fig.g.add(label(String(name || "Player"), "#ffe9a8"));
       fig.g.visible = false;
       scene.add(fig.g);
-      peers.set(id, { fig, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
+      const pet = look && Pets.make(look.pet);
+      if (pet) { pet.g.visible = false; scene.add(pet.g); pet.kind = look.pet; pet.x = null; pet.a = Math.random() * 6; }
+      peers.set(id, { fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
       toast(`${name || "A player"} is nearby`);
     }
     for (const [id, x, z, yaw, spd] of m.p || []) {
@@ -130,7 +132,7 @@ const Online = (() => {
     }
     for (const id of m.g || []) {
       const p = peers.get(id);
-      if (p) { scene.remove(p.fig.g); peers.delete(id); }
+      if (p) { scene.remove(p.fig.g); if (p.pet) scene.remove(p.pet.g); peers.delete(id); }
     }
     peerCount();
   }
@@ -151,7 +153,38 @@ const Online = (() => {
       p.ph += dt * (p.spd / 5.5) * 6.2;
       const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
       a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
+      if (p.pet) petUpdate(p, dt, show);
     }
+  }
+
+  // their companion: a hound trots behind them, an eagle circles above (it follows them, so nothing is sent for it)
+  function petUpdate(p, dt, show) {
+    const pet = p.pet, g = pet.g, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = -fz, rz = fx;
+    g.visible = show;
+    pet.t = (pet.t || 0) + dt;
+    if (pet.kind === "eagle") {
+      pet.a += dt * 0.7;
+      g.position.set(p.x + Math.cos(pet.a) * 2.4, groundAt(p.x, p.z) + 3.8 + Math.sin(pet.t * 1.6) * 0.3, p.z + Math.sin(pet.a) * 2.4);
+      g.rotation.y = -pet.a + Math.PI;
+      const flap = Math.sin(pet.t * 7) * 0.55;
+      pet.wings[0].rotation.z = flap; pet.wings[1].rotation.z = -flap;
+      return;
+    }
+    const tx = p.x - fx * 2 + rx * 1.1, tz = p.z - fz * 2 + rz * 1.1;
+    if (pet.x === null) { pet.x = tx; pet.z = tz; pet.yaw = p.yaw; }
+    const dx = tx - pet.x, dz = tz - pet.z, d = Math.hypot(dx, dz);
+    let moved = 0;
+    if (d > 0.25) { const step = Math.min(d, Math.min(9, d * 3.2) * dt); pet.x += (dx / d) * step; pet.z += (dz / d) * step; moved = step; }
+    if (d > 28) { pet.x = tx; pet.z = tz; }
+    const speed = moved / Math.max(dt, 0.001);
+    const want = speed > 0.6 ? Math.atan2(-dx, -dz) : p.yaw;
+    let dy = want - pet.yaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+    pet.yaw += dy * Math.min(1, dt * 8);
+    g.position.set(pet.x, groundAt(pet.x, pet.z), pet.z);
+    g.rotation.y = pet.yaw;
+    const sw = Math.sin(pet.t * Math.min(speed, 9) * 1.9) * 0.8 * Math.min(1, speed / 2.5);
+    pet.legs.forEach((l, i) => { l.rotation.x = i === 0 || i === 3 ? sw : -sw; });
+    pet.tail.rotation.y = Math.sin(pet.t * 9) * (speed < 0.6 ? 0.6 : 0.25);
   }
 
   // every 0.2 s while you walk: where you are (the server decides who can see you)
@@ -396,5 +429,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();
