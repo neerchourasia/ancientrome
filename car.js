@@ -267,6 +267,9 @@ const Car = (() => {
   return {
     MODELS, model, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
     get motor() { return !car || car.M.motor !== false; },
+    // what other players should see of your vehicle: the one you are in, or the one you left parked
+    share: () => (car ? { veh: driving ? car.id : null, park: driving ? null : [car.id, +car.x.toFixed(1), +car.z.toFixed(1), +car.yaw.toFixed(2)] } : { veh: null, park: null }),
+    get speed() { return car && driving ? Math.abs(car.v) : 0; },
     get verb() { return car ? car.M.verb || "get in" : "get in"; },
     get current() { return car ? car.id : null; },
     get driving() { return driving; },

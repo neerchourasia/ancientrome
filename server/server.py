@@ -65,6 +65,7 @@ CLASS_MODS = {  # only what a duel needs
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 PETS = ("hound", "eagle")
+VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant")   # what a walker can be seen riding or leaving parked
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
@@ -194,6 +195,7 @@ class Conn:
         self.room = None
         self.me = None             # this connection's player inside its room
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
+        self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.seen = set()          # the other walkers this connection has been told about
         self.tokens, self.tok_t = 60.0, now()
 
@@ -1096,7 +1098,11 @@ def on_walk(conn, m):
         return
     conn.city = city
     conn.px, conn.pz = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz)
-    conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 40, 0)
+    conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 60, 0)
+    veh = m.get("v")
+    conn.veh = veh if veh in VEHICLES else None
+    pk = m.get("k")
+    conn.park = [pk[0], round(num(pk[1], -20000, 20000), 1), round(num(pk[2], -20000, 20000), 1), round(num(pk[3], -50, 50), 2)] if isinstance(pk, list) and len(pk) == 4 and pk[0] in VEHICLES else None
     conn.walk_at = now()
 
 
@@ -1118,7 +1124,7 @@ def world_once():
             gone = [i for i in c.seen if i not in ids]
             c.seen = ids
             if near or gone:
-                c.send({"t": "world", "p": [[o.id, round(o.px, 1), round(o.pz, 1), round(o.pyaw, 2), round(o.pspd, 1)] for o in near],
+                c.send({"t": "world", "p": [[o.id, round(o.px, 1), round(o.pz, 1), round(o.pyaw, 2), round(o.pspd, 1), o.veh or 0, o.park or 0] for o in near],
                         "i": [[o.id, o.name, o.cls, o.look] for o in new], "g": gone})
     for c in list(CONNS):          # anyone who stopped walking (in a game, or gone) sees nobody
         if c not in live and c.seen:

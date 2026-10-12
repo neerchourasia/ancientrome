@@ -103,7 +103,7 @@ const Online = (() => {
   const peers = new Map();
   let walkSendT = 0;
 
-  function clearPeers() { for (const p of peers.values()) { if (p.fig.g.parent) p.fig.g.parent.remove(p.fig.g); if (p.pet && p.pet.g.parent) p.pet.g.parent.remove(p.pet.g); } peers.clear(); peerCount(); }
+  function clearPeers() { for (const p of peers.values()) { if (p.fig.g.parent) p.fig.g.parent.remove(p.fig.g); if (p.pet && p.pet.g.parent) p.pet.g.parent.remove(p.pet.g); dropVehicles(p); } peers.clear(); peerCount(); }
 
   function peerCount() {
     const e = $o("v-peers");
@@ -124,15 +124,15 @@ const Online = (() => {
       peers.set(id, { fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
       toast(`${name || "A player"} is nearby`);
     }
-    for (const [id, x, z, yaw, spd] of m.p || []) {
+    for (const [id, x, z, yaw, spd, veh, park] of m.p || []) {
       const p = peers.get(id);
       if (!p) continue;
-      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd;
+      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd; p.veh = veh || null; p.parkAt = park || null;
       if (p.x === null) { p.x = x; p.z = z; p.yaw = yaw; }
     }
     for (const id of m.g || []) {
       const p = peers.get(id);
-      if (p) { scene.remove(p.fig.g); if (p.pet) scene.remove(p.pet.g); peers.delete(id); }
+      if (p) { scene.remove(p.fig.g); if (p.pet) scene.remove(p.pet.g); dropVehicles(p); peers.delete(id); }
     }
     peerCount();
   }
@@ -153,8 +153,41 @@ const Online = (() => {
       p.ph += dt * (p.spd / 5.5) * 6.2;
       const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
       a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
-      if (p.pet) petUpdate(p, dt, show);
+      vehicleUpdate(p, dt, show);
+      if (p.pet) petUpdate(p, dt, show && !p.vm);
     }
+  }
+
+  // the vehicle they are in (they sit in it, or are hidden inside a closed car) and the one they left parked
+  function dropVehicles(p) {
+    if (p.vm) { scene.remove(p.vm); p.vm = null; }
+    if (p.pm) { scene.remove(p.pm); p.pm = null; }
+    p.vkind = p.pkind = null;
+  }
+
+  const SEAT = { scooter: 0.45, rickshaw: 0.55, oxcart: 1.0, elephant: 4.2 };       // how high the rider sits; closed cars hide them
+  function vehicleUpdate(p, dt, show) {
+    if ((p.veh || null) !== (p.vkind || null)) {
+      if (p.vm) { scene.remove(p.vm); p.vm = null; }
+      p.vkind = p.veh || null;
+      if (p.veh) { p.vm = Car.model(p.veh); scene.add(p.vm); }
+    }
+    const riding = !!p.vm;
+    if (riding) {
+      const g = p.vm, seat = SEAT[p.veh];
+      g.visible = show;
+      g.position.set(p.x, groundAt(p.x, p.z), p.z);
+      g.rotation.y = p.yaw;
+      p.fig.g.visible = show && seat !== undefined;
+      if (seat !== undefined) p.fig.g.position.y += seat;
+      for (const w of g.userData.wheels || []) w.rotation.x += (p.spd * dt) / 0.34;
+      p.vph = (p.vph || 0) + p.spd * dt * 1.1;
+      (g.userData.legs || []).forEach((l, i) => { l.rotation.x = Math.sin(p.vph + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.55 * Math.min(1, p.spd / 2); });
+    }
+    const pk = p.parkAt;
+    if (pk && (!p.pm || p.pkind !== pk[0])) { if (p.pm) scene.remove(p.pm); p.pkind = pk[0]; p.pm = Car.model(pk[0]); scene.add(p.pm); }
+    if (!pk && p.pm) { scene.remove(p.pm); p.pm = null; p.pkind = null; }
+    if (p.pm) { p.pm.visible = show; p.pm.position.set(pk[1], groundAt(pk[1], pk[2]), pk[2]); p.pm.rotation.y = pk[3]; }
   }
 
   // their companion: a hound trots behind them, an eagle circles above (it follows them, so nothing is sent for it)
@@ -194,7 +227,8 @@ const Online = (() => {
     walkSendT = 0.2;
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
-    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +Math.hypot(player.vx || 0, player.vz || 0).toFixed(1) });
+    const share = Car.share();
+    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined });
   }
 
   function bind() {
