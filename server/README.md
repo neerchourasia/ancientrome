@@ -49,7 +49,7 @@ A paid plan (a few dollars a month) keeps it awake. Fly.io and Railway work the 
 - Naval battle: free-for-all, no teams, 2-4 captains (two practice ships if you play alone and ask for bots). Browsers send where their ship is (speed and the flooded arena's edge are enforced); the server fires every cannonball and decides every hit, ram and who is the last ship afloat.
 - Team battles: the server runs the five enemy bots, the friendly bots, every hit and every revive; players still cannot hurt each other or heal themselves.
 - Race progress is capped to what a chariot can really do, and the order of finishing is decided here.
-- Names, classes and looks sent by players are cleaned.
+- Names, classes and looks sent by players are cleaned. Chat messages are cleaned, capped at 140 characters, rate-limited and swearing is masked. Admin rights come from the database (`is_admin()` in `supabase-admin.sql`), asked with the player's own login, so a forged login is never an admin.
 - The open world (seeing other walkers): clients only say where they stand; positions are clamped, the server decides who can see whom (same city, within 260 m, at most 30), and people in a game are hidden from it.
 - Connections from other websites are refused, message size and rate are limited, and each address may hold only a few connections.
 

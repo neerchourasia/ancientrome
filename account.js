@@ -13,6 +13,12 @@ const Account = (() => {
   const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(base) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(base) ? anon.length > 10 : false;
   const $a = (id) => document.getElementById(id);
 
+  let admin = false, recoveryToken = null;
+  // Arriving from a password-reset email: the link carries a short-lived token in the address
+  try {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (h.get("type") === "recovery" && h.get("access_token")) { recoveryToken = h.get("access_token"); history.replaceState(null, "", location.pathname + location.search); }
+  } catch (e) { /* ignore */ }
   let session = null, lastSaved = "", listeners = [], busy = false;
 
   try {
@@ -126,6 +132,20 @@ const Account = (() => {
         toast("Account ready: your game is now saved online");
       }
     } catch (e) { toast("Could not load your saved game: " + e.message); }
+    await checkAdmin();
+  }
+
+  // Admins (the emails in the database's `admins` table, see supabase-admin.sql) get an Admin panel.
+  async function checkAdmin() {
+    const token = await freshToken();
+    let ok = false;
+    if (token) { try { ok = (await api("/rest/v1/rpc/is_admin", { token, body: {} })) === true; } catch (e) { ok = false; } }
+    if (ok !== admin) { admin = ok; changed(); }
+  }
+  async function adminUsers() {
+    const token = await freshToken();
+    if (!token) throw new Error("Log in first");
+    return api("/rest/v1/rpc/admin_users", { token, body: {} });
   }
 
   // ------------------------------------------------------------------ sign up / log in / log out
@@ -158,10 +178,31 @@ const Account = (() => {
     } finally { busy = false; }
   }
 
+  // "Forgot your password?": Supabase emails a link that brings you back here to choose a new one.
+  async function forgot() {
+    const email = $a("ac-email").value.trim(), say = (t, bad) => { const m = $a("ac-msg"); m.textContent = t; m.classList.toggle("bad", !!bad); };
+    if (!validEmail(email)) return say("Type your email address above first, then press this again.", true);
+    try {
+      await api("/auth/v1/recover?redirect_to=" + encodeURIComponent(location.origin + location.pathname), { body: { email } });
+      say("If that email has an account, we have sent it a link to choose a new password. Check your inbox (and spam).");
+    } catch (e) { say(/rate|seconds/i.test(e.message) ? "Please wait a minute before asking for another email." : e.message, true); }
+  }
+
+  async function setNewPassword() {
+    const pw = $a("ac-newpass").value, say = (t, bad) => { const m = $a("ac-msg"); m.textContent = t; m.classList.toggle("bad", !!bad); };
+    if (pw.length < 8) return say("Your password needs at least 8 characters.", true);
+    try {
+      await api("/auth/v1/user", { method: "PUT", token: recoveryToken, body: { password: pw } });
+      recoveryToken = null; $a("ac-newpass").value = "";
+      say("Your password is changed. Log in with the new one.");
+      renderAccount();
+    } catch (e) { say(/expired|invalid|jwt/i.test(e.message) ? "That link has expired. Press \"Forgot your password?\" again for a new one." : e.message, true); }
+  }
+
   async function logOut() {
     await saveNow(true);
     const token = session && session.access_token;
-    storeSession(null); lastSaved = "";
+    storeSession(null); admin = false; lastSaved = "";
     if (token) { try { await api("/auth/v1/logout", { token, body: {} }); } catch (e) { /* the token is dropped here either way */ } }
     changed();
     toast("Logged out");
@@ -174,7 +215,8 @@ const Account = (() => {
     if (!out) return;
     const on = !!session;
     $a("ac-off").hidden = configured;
-    $a("ac-form").hidden = !configured || on;
+    $a("ac-form").hidden = !configured || on || !!recoveryToken;
+    $a("ac-reset").hidden = !configured || !recoveryToken;
     $a("ac-in").hidden = !configured || !on;
     if (on) {
       $a("ac-who").textContent = session.email;
@@ -197,9 +239,13 @@ const Account = (() => {
     $a("ac-signup").addEventListener("click", () => submit("up"));
     $a("ac-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit("in"); });
     $a("ac-save").addEventListener("click", () => saveNow(false));
+    $a("ac-forgot").addEventListener("click", forgot);
+    $a("ac-setpass").addEventListener("click", setNewPassword);
+    $a("ac-newpass").addEventListener("keydown", (e) => { if (e.key === "Enter") setNewPassword(); });
+    if (recoveryToken) { const iv = setInterval(() => { if (typeof started !== "undefined" && started && !panelOpen) { clearInterval(iv); open(); toast("Choose your new password"); } }, 800); }
     $a("ac-logout").addEventListener("click", logOut);
     renderAccount();
-    if (session) freshToken();
+    if (session) freshToken().then((t) => { if (t) checkAdmin(); });
     setInterval(() => { if (session && !document.hidden) saveNow(true); }, 30000);
     document.addEventListener("visibilitychange", () => { if (document.hidden && session) saveNow(true); });
   }
@@ -209,6 +255,8 @@ const Account = (() => {
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
     get loggedIn() { return !!session; },
     get email() { return session ? session.email : ""; },
+    get admin() { return admin; },
+    adminUsers,
     get userId() { return session ? session.id : ""; },
     onChange(f) { listeners.push(f); },
   };

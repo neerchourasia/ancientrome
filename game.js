@@ -47,6 +47,8 @@ function init() {
   buildCreator();
   Account.bind();
   Online.bind();
+  Chat.bind();
+  Admin.bind();
   Market.bind();
   applyCharacter();
   Crowd.build(scene);
@@ -127,6 +129,7 @@ function wireInput(canvas) {
     if (k === "KeyJ") toggleVoice();
     if (k === "KeyZ") toggleRest();
     if (k === "KeyK") toggleEra();
+    if (k === "Enter" && (mode === "walk" || mode === "drive" || mode === "watch") && !panelOpen && !creatorOpen) { e.preventDefault(); Chat.open(); return; }
     if (k === "KeyB") travel(city === "rome" ? "delhi" : "rome");
     if (k === "KeyN" && city === "delhi" && mode === "walk" && !panelOpen && canStart()) DGames.open();
     if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();

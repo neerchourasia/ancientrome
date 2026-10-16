@@ -91,7 +91,7 @@ class WS:
 class ServerTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.cfg = dict(server.CFG)
-        self.saved = (server.verify_token, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE)
+        self.saved = (server.verify_token, server.is_admin, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE)
         server.CFG.update(bot_wait=0.6, race_wait=0.6, origins=[], supabase_url="")
         self.srv = await server.serve("127.0.0.1", 0)
         self.port = self.srv.sockets[0].getsockname()[1]
@@ -102,11 +102,12 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             c.close()
         self.srv.close()
         server.CONNS.clear()
+        server.BLOCKED.clear(); server.CHAT_LOG.clear()
         for q in server.QUEUES.values():
             q.clear()
         server.CFG.clear()
         server.CFG.update(self.cfg)
-        server.verify_token, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE = self.saved
+        server.verify_token, server.is_admin, server.RACE_TOTAL, server.RACE_COUNTDOWN, server.RACE_GRACE = self.saved
         for t in asyncio.all_tasks():
             if t is not asyncio.current_task() and "matchmaker" in repr(t):
                 t.cancel()
@@ -556,6 +557,86 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ca.pspd, 0)
         cb = [c for c in server.CONNS if c.id == b.welcome["id"]][0]
         self.assertIsNone(cb.city)
+
+    # ---------------------------------------------------------------- chat and admin
+
+    async def test_chat_reaches_everyone_is_cleaned_and_rate_limited(self):
+        a = await self.player("Ann")
+        b = await self.player("Ben")
+        a.send({"t": "chat", "text": "  hello\x00 \n  friends  "})
+        for w in (a, b):
+            m = await w.until(lambda m: m["t"] == "chat" and not m.get("sys"))
+            self.assertEqual((m["name"], m["text"], m["adm"]), ("Ann", "hello friends", 0))
+        a.send({"t": "chat", "text": "x" * 500})
+        long = await b.until(lambda m: m["t"] == "chat" and m["text"].startswith("xxx"))
+        self.assertEqual(len(long["text"]), 140)
+        a.send({"t": "chat", "text": "what the fuck"})
+        masked = await b.until(lambda m: m["t"] == "chat" and m["text"].startswith("what"))
+        self.assertNotIn("fuck", masked["text"])
+        for i in range(8):                       # a flood is cut short
+            a.send({"t": "chat", "text": "spam %d" % i})
+        await asyncio.sleep(0.5)
+        got = []
+        while True:
+            try:
+                got.append(await b.until(lambda m: m["t"] == "chat", timeout=0.4))
+            except asyncio.TimeoutError:
+                break
+        self.assertLess(len([g for g in got if g["text"].startswith("spam")]), 8)
+        c = await self.player("Cyd")             # newcomers see what was said
+        log = await c.until(lambda m: m["t"] == "chat_log")
+        self.assertTrue(any(e["text"] == "hello friends" for e in log["m"]))
+
+    async def test_whisper_goes_only_to_the_two_people(self):
+        a, b, c = await self.player("Ann"), await self.player("Ben"), await self.player("Cyd")
+        a.send({"t": "chat", "text": "/w ben psst"})
+        got = await b.until(lambda m: m["t"] == "chat" and m.get("w"))
+        self.assertEqual((got["name"], got["to"], got["text"]), ("Ann", "Ben", "psst"))
+        await a.until(lambda m: m["t"] == "chat" and m.get("w"))
+        with self.assertRaises(asyncio.TimeoutError):
+            await c.until(lambda m: m["t"] == "chat" and m.get("w"), timeout=0.6)
+
+    async def test_names_with_spaces_work_in_commands(self):
+        a, b = await self.player("Ann"), await self.player("The OG")
+        a.send({"t": "chat", "text": "/w The OG you have a space in your name"})
+        got = await b.until(lambda m: m["t"] == "chat" and m.get("w"))
+        self.assertEqual((got["to"], got["text"]), ("The OG", "you have a space in your name"))
+
+    async def test_only_admins_can_mute_kick_and_announce(self):
+        server.CFG["supabase_url"] = "https://example.supabase.co"
+
+        async def fake_verify(token):
+            return {"boss": "u-boss", "pal": "u-pal"}.get(token)
+
+        async def fake_admin(token):
+            return token == "boss"
+        server.verify_token, server.is_admin = fake_verify, fake_admin
+        boss, pal = await self.player("Boss", token="boss"), await self.player("Pal", token="pal")
+        self.assertTrue(boss.welcome["admin"])
+        self.assertFalse(pal.welcome["admin"])
+        pal.send({"t": "chat", "text": "/kick boss"})                                  # not allowed
+        refuse = await pal.until(lambda m: m["t"] == "chat" and m.get("sys"))
+        self.assertIn("Unknown", refuse["text"])
+        boss.send({"t": "chat", "text": "/say the games start soon"})
+        ann = await pal.until(lambda m: m["t"] == "chat" and "Announcement" in m.get("text", ""))
+        self.assertIn("games start soon", ann["text"])
+        boss.send({"t": "chat", "text": "/mute pal 5"})
+        await pal.until(lambda m: m["t"] == "chat" and "muted you" in m.get("text", ""))
+        pal.send({"t": "chat", "text": "can anyone hear me"})
+        again = await pal.until(lambda m: m["t"] == "chat" and m.get("sys") and "muted" in m["text"])
+        self.assertTrue(again)
+        boss.send({"t": "admin", "a": "who"})
+        who = await boss.until(lambda m: m["t"] == "adminwho")
+        self.assertEqual({w["name"] for w in who["who"]}, {"Boss", "Pal"})
+        pal.send({"t": "admin", "a": "who"})                                           # the panel answers only to admins
+        with self.assertRaises(asyncio.TimeoutError):
+            await pal.until(lambda m: m["t"] == "adminwho", timeout=0.6)
+        boss.send({"t": "chat", "text": "/kick pal"})
+        self.assertTrue(await pal.closed())
+        again = await WS.connect(self.port)                                              # kicked people are kept out for a while
+        again.send({"t": "hello", "name": "Pal", "cls": "gladiator", "token": "pal", "look": {}})
+        err = await again.until(lambda m: m["t"] == "error")
+        self.assertEqual(err["code"], "kicked")
 
     # ---------------------------------------------------------------- abuse
 

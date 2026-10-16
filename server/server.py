@@ -18,6 +18,7 @@ Settings are environment variables (see server/README.md).
 """
 import asyncio
 import base64
+import collections
 import hashlib
 import json
 import math
@@ -135,6 +136,19 @@ async def verify_token(token):
         return None
 
 
+async def is_admin(token):
+    """Is this login an admin? Asked of Supabase (the `is_admin` function in supabase-admin.sql), so the list of admins lives in
+    your database and nothing secret is needed here. A forged token is never an admin."""
+    if not CFG["supabase_url"] or not token:
+        return False
+    hdr = {"apikey": CFG["anon_key"], "Authorization": "Bearer " + str(token)[:4000], "Content-Type": "application/json"}
+    try:
+        r = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/rpc/is_admin", hdr, {}, "POST")
+        return r is True
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # WebSocket framing (RFC 6455)
 
@@ -197,6 +211,9 @@ class Conn:
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.seen = set()          # the other walkers this connection has been told about
+        self.admin = False         # set from the database when they log in with an admin account
+        self.muted_until = 0.0
+        self.ctok, self.ctok_t = 3.0, now()   # chat: how many messages they may send right now
         self.tokens, self.tok_t = 60.0, now()
 
     def send(self, obj):
@@ -1140,6 +1157,162 @@ async def world_loop():
         except Exception as e:  # never let a bug here stop the world
             print("world error:", repr(e))
 
+
+# ---------------------------------------------------------------------------------------------------------------
+# chat, and the admin's tools
+
+CHAT_LOG = collections.deque(maxlen=40)     # the last messages, shown to people who join
+BLOCKED = {}                                # kicked: login id or address -> until when
+CHAT_MAX = 140
+BAD_WORDS = re.compile(r"(fuck|shit|bitch|cunt|asshole|nigg|fagg)", re.I)   # masked, not blocked
+
+
+def clean_chat(v):
+    v = re.sub(r"[\x00-\x1f\x7f]", " ", str(v if v is not None else ""))
+    v = re.sub(r"\s+", " ", v).strip()[:CHAT_MAX]
+    return BAD_WORDS.sub(lambda m: m.group(0)[0] + "*" * (len(m.group(0)) - 1), v)
+
+
+def say_to(conn, text):
+    conn.send({"t": "chat", "sys": 1, "text": text})
+
+
+def match_name(rest):
+    """Splits 'The OG hello there' into (the player called 'The OG', 'hello there'): names may contain spaces, so the longest
+    name that the text starts with wins."""
+    rest = str(rest or "").strip()
+    best = None
+    for c in CONNS:
+        if c.hello and not c.closed:
+            n = c.name.lower()
+            low = rest.lower()
+            if (low == n or low.startswith(n + " ")) and (best is None or len(c.name) > len(best.name)):
+                best = c
+    if best is None:
+        return None, rest
+    return best, rest[len(best.name):].strip()
+
+
+def find_player(name):
+    name = str(name or "").strip().lower()
+    for c in CONNS:
+        if c.hello and not c.closed and c.name.lower() == name:
+            return c
+    return None
+
+
+def broadcast_chat(entry):
+    for c in list(CONNS):
+        if c.hello and not c.closed:
+            c.send(entry)
+
+
+def kick(target, minutes=10):
+    BLOCKED[target.uid or target.ip] = now() + minutes * 60
+    BLOCKED[target.ip] = now() + minutes * 60
+    target.send({"t": "kicked", "minutes": minutes})
+    target.close()
+
+
+def blocked(conn):
+    t = now()
+    return BLOCKED.get(conn.ip, 0) > t or (conn.uid and BLOCKED.get(conn.uid, 0) > t)
+
+
+def on_chat(conn, m):
+    t = now()
+    if t < conn.muted_until:
+        return say_to(conn, "You are muted for another %d minute(s)." % (int((conn.muted_until - t) / 60) + 1))
+    conn.ctok = min(3.0, conn.ctok + (t - conn.ctok_t) / 1.5)
+    conn.ctok_t = t
+    if conn.ctok < 1:
+        return say_to(conn, "Slow down a little.")
+    text = clean_chat(m.get("text"))
+    if not text:
+        return
+    conn.ctok -= 1
+    if text.startswith("/"):
+        return chat_command(conn, text)
+    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0}
+    CHAT_LOG.append(entry)
+    broadcast_chat(entry)
+
+
+def chat_command(conn, text):
+    head, _, rest = text[1:].partition(" ")
+    cmd = head.lower()
+    if cmd in ("w", "whisper", "msg"):
+        target, msg = match_name(rest)
+        if not target:
+            return say_to(conn, "Nobody online has that name. Whisper with: /w name your message")
+        if not msg:
+            return say_to(conn, "Whisper with: /w name your message")
+        entry = {"t": "chat", "id": conn.id, "name": conn.name, "to": target.name, "text": msg, "w": 1, "adm": 1 if conn.admin else 0}
+        target.send(entry)
+        if target is not conn:
+            conn.send(entry)
+        return
+    if cmd == "help":
+        say_to(conn, "Chat: just type. /w name message whispers to one person.")
+        if conn.admin:
+            say_to(conn, "Admin: /who, /kick name, /mute name [minutes], /unmute name, /say message")
+        return
+    if not conn.admin:
+        return say_to(conn, "Unknown command. Type /help.")
+    if cmd == "who":
+        names = ["%s (%s)" % (c.name, c.city or "menu") for c in CONNS if c.hello and not c.closed]
+        return say_to(conn, "Online (%d): %s" % (len(names), ", ".join(names) or "nobody"))
+    if cmd == "say" and rest.strip():
+        entry = {"t": "chat", "sys": 1, "text": "Announcement: " + rest.strip()[:CHAT_MAX]}
+        CHAT_LOG.append(entry)
+        return broadcast_chat(entry)
+    if cmd in ("kick", "mute", "unmute") and rest.strip():
+        target, extra = match_name(rest)
+        if not target:
+            return say_to(conn, "Nobody online has that name.")
+        if target.admin:
+            return say_to(conn, "You cannot do that to an admin.")
+        if cmd == "kick":
+            kick(target)
+            return say_to(conn, "%s was kicked for 10 minutes." % target.name)
+        if cmd == "mute":
+            try:
+                minutes = max(1, min(1440, int(extra))) if extra else 10
+            except ValueError:
+                minutes = 10
+            target.muted_until = now() + minutes * 60
+            say_to(target, "An admin muted you for %d minute(s)." % minutes)
+            return say_to(conn, "%s is muted for %d minute(s)." % (target.name, minutes))
+        target.muted_until = 0.0
+        return say_to(conn, "%s can chat again." % target.name)
+    say_to(conn, "Unknown command. Type /help.")
+
+
+def on_admin(conn, m):
+    """The admin panel: who is online, and kick / mute buttons."""
+    if not conn.admin:
+        return
+    a = m.get("a")
+    if a == "who":
+        conn.send({"t": "adminwho", "who": [{"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
+                                              "muted": c.muted_until > now(), "admin": c.admin} for c in CONNS if c.hello and not c.closed]})
+        return
+    target = next((c for c in CONNS if c.id == m.get("id") and c.hello), None)
+    if not target or target.admin:
+        return
+    if a == "kick":
+        kick(target)
+    elif a == "mute":
+        try:
+            minutes = max(1, min(1440, int(m.get("min", 10))))
+        except (TypeError, ValueError):
+            minutes = 10
+        target.muted_until = now() + minutes * 60
+        say_to(target, "An admin muted you for %d minute(s)." % minutes)
+    elif a == "unmute":
+        target.muted_until = 0.0
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # message handling
 
@@ -1155,11 +1328,20 @@ async def handle_msg(conn, m):
         conn.name = clean_name(m.get("name"))
         conn.cls = m.get("cls") if m.get("cls") in CLASS_MODS else "gladiator"
         conn.look = clean_look(m.get("look"))
-        return conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "bots": CFG["allow_bots"]})
+        if blocked(conn):
+            conn.send({"t": "error", "code": "kicked", "msg": "You were kicked for a while. Try again later."})
+            return conn.close()
+        conn.admin = bool(conn.uid) and await is_admin(m.get("token"))
+        conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "admin": conn.admin, "bots": CFG["allow_bots"]})
+        return conn.send({"t": "chat_log", "m": list(CHAT_LOG)})
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "walk":
         return on_walk(conn, m)
+    if t == "chat":
+        return on_chat(conn, m)
+    if t == "admin":
+        return on_admin(conn, m)
     if t == "queue":
         mode = m.get("mode")
         if mode not in QUEUES:

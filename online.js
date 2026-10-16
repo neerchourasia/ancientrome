@@ -52,7 +52,11 @@ const Online = (() => {
 
   function onMessage(m) {
     switch (m.t) {
-      case "welcome": welcome = m; setMsg(""); break;
+      case "welcome": welcome = m; Admin.server = !!m.admin; setMsg(""); break;
+      case "chat": Chat.add(m); break;
+      case "chat_log": Chat.history(m.m); break;
+      case "adminwho": Admin.showOnline(m.who || []); break;
+      case "kicked": Chat.add({ sys: 1, text: `An admin kicked you for ${m.minutes || 10} minutes.` }); break;
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
@@ -463,5 +467,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();
