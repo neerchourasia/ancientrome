@@ -7,6 +7,7 @@
 const Sfx = (() => {
   const KEY = "rome-sound";
   let ctx = null, master = null, noise = null, brown = null, on = true, excite = 0, burst = 0, burstT = 4;
+  let rainSnd = null, rainLevel = 0;
   let engine = null, stepPhase = 0, hoofT = 0, birdT = 3, cricketT = 1, clock = 0, rumble = null, wind = null;
   const tmp = { x: 0, y: 0, z: 0 };
   try { on = localStorage.getItem(KEY) !== "off"; } catch (e) { /* storage unavailable */ }
@@ -74,6 +75,11 @@ const Sfx = (() => {
     rl.type = "lowpass"; rl.frequency.value = 260; rg.gain.value = 0;
     rs.connect(rl); rl.connect(rg); rg.connect(master);
     rumble = { g: rg };
+    // rain: a hiss of filtered noise
+    const ns = loop(noise), nh = ctx.createBiquadFilter(), nl = ctx.createBiquadFilter(), ng = ctx.createGain();
+    nh.type = "highpass"; nh.frequency.value = 1400; nl.type = "lowpass"; nl.frequency.value = 7500; ng.gain.value = 0;
+    ns.connect(nh); nh.connect(nl); nl.connect(ng); ng.connect(master);
+    rainSnd = { g: ng };
   }
 
   // ---------- listener maths ----------
@@ -156,6 +162,7 @@ const Sfx = (() => {
     horn: () => { tone(196, 0.9, "sawtooth", 0.16); tone(294, 0.9, "sawtooth", 0.11); tone(392, 0.9, "sawtooth", 0.07); },
     discover: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.55, "sine", 0.16, null, null, i * 0.11)); },
     coin: () => { tone(1320, 0.09, "sine", 0.16); tone(1760, 0.16, "sine", 0.14, null, null, 0.07); },
+    thunder: () => { puff(2.6, 120, 0.4, 0.8, null, "lowpass", 0.08); puff(1.4, 260, 0.5, 0.5, null, "lowpass", 0.02, 0.15); tone(48, 2.2, "sine", 0.55, 28); },
     gong: () => { tone(82, 2.2, "sine", 0.5); tone(164, 1.6, "sine", 0.2); puff(0.3, 900, 0.5, 0.2); },
   };
 
@@ -204,6 +211,7 @@ const Sfx = (() => {
       s.pan.pan.setTargetAtTime(sp.pan, t, 0.12);
       s.lp.frequency.setTargetAtTime(cut, t, 0.12);
     }
+    if (rainSnd) rainSnd.g.gain.setTargetAtTime(rainLevel * 0.11, t, 0.8);
     // the engine of your car, only while you drive
     if (engine) {
       engine.g.gain.setTargetAtTime(info.driving ? 0.035 + 0.05 * (info.engine || 0) : 0, t, 0.12);
@@ -266,6 +274,7 @@ const Sfx = (() => {
       if (!ctx || !on || !SOUNDS[name]) return;
       try { SOUNDS[name](pos ? { x: pos.x, z: pos.z, range: pos.range || 240 } : null); } catch (e) { console.warn("sound error:", name, e); }
     },
+    setWeather(rain) { rainLevel = rain; },
     update(dt, info) { try { update(dt, info); } catch (e) { if (!Sfx._warned) { Sfx._warned = 1; console.warn("sound update error:", e); } } },
   };
 })();

@@ -411,9 +411,10 @@ const Delhi = (() => {
     // trees along the avenue's edges
     const trunk = new T.CylinderGeometry(0.25, 0.35, 1, 6); trunk.translate(0, 0.5, 0);
     const crown = new T.SphereGeometry(1, 9, 7); crown.translate(0, 0.9, 0);
+    D.lawn.userData.leaf = 0x6e9446; // lawns and leaves change colour with the seasons (weather.js)
     const spots = [];
     for (let x = -590; x < -100; x += 28) for (const s of [-1, 1]) spots.push([x + (rnd() - 0.5) * 6, s * 15.2]);
-    const tr = new T.InstancedMesh(trunk, lambert(0x5a4630), spots.length), cr = new T.InstancedMesh(crown, lambert(0x4a7a36), spots.length), o = new T.Object3D();
+    const tr = new T.InstancedMesh(trunk, lambert(0x5a4630), spots.length), cr = new T.InstancedMesh(crown, Object.assign(lambert(0x4a7a36), { userData: { leaf: 0x4a7a36 } }), spots.length), o = new T.Object3D();
     spots.forEach(([x, z], i) => {
       o.rotation.set(0, 0, 0); o.position.set(X(x), 0, z); o.scale.set(1, 4, 1); o.updateMatrix(); tr.setMatrixAt(i, o.matrix);
       o.position.set(X(x), 4, z); o.scale.set(3, 3, 3); o.updateMatrix(); cr.setMatrixAt(i, o.matrix);
@@ -473,7 +474,8 @@ const Delhi = (() => {
     return mesh;
   }
   function hdome(t, cx, y0, cz, r, h, m, drum = 0) { dome(houses[t].g, X(cx), y0, cz, r, h, m, drum); }
-  function htree(t, cx, cz, s = 1) { hc(t, cx, 0, cz, 0.3 * s, 3.2 * s, lambert(0x5a4630), true); const c = new T.Mesh(new T.SphereGeometry(1.8 * s, 9, 7), lambert(0x4a7a36)); c.position.set(X(cx), 4.2 * s, cz); c.castShadow = true; houses[t].g.add(c); }
+  const leafMat = Object.assign(lambert(0x4a7a36), { userData: { leaf: 0x4a7a36 } });
+  function htree(t, cx, cz, s = 1) { hc(t, cx, 0, cz, 0.3 * s, 3.2 * s, lambert(0x5a4630), true); const c = new T.Mesh(new T.SphereGeometry(1.8 * s, 9, 7), leafMat); c.position.set(X(cx), 4.2 * s, cz); c.castShadow = true; houses[t].g.add(c); }
   function hlawn(t, cx, cz, w, d) { mbox(houses[t].g, X(cx), 0.04, cz, w, 0.06, d, D.lawn, { cast: false }); }
   function hfountain(t, cx, cz, r = 2.6) { hc(t, cx, 0, cz, r, 0.7, D.marble, true); hc(t, cx, 0.6, cz, r * 0.82, 0.1, D.water, false); hc(t, cx, 0.7, cz, 0.35, 1.6, D.marble, false); }
 
@@ -909,6 +911,7 @@ const Delhi = (() => {
     buildElephants();
     elephant(scene, X(141), 262, Math.PI); elephant(scene, X(159), 262, Math.PI); // the stone elephants at the Delhi Gate
     setEra(false);
+    if (typeof Weather !== "undefined") Weather.refreshFoliage(); // Delhi's trees and lawns take the colour of the season
   }
 
   function setEra(modern) {

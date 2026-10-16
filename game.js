@@ -58,6 +58,7 @@ function init() {
   Nav.init(scene);
   DGames.init(scene);
   scene.traverse((o) => { if (o.isInstancedMesh) o.frustumCulled = false; });
+  Weather.init(sky, scene);
   applyEra();
 
   buildBaseMap();
@@ -1434,6 +1435,7 @@ function updateTime(dt) {
 function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
+  Weather.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

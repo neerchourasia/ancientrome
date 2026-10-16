@@ -14,6 +14,8 @@ const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
 // ---------- ground ----------
 
+let GROUND = null; // the terrain mesh (weather.js tints it with the seasons)
+
 function buildGround(scene) {
   const size = 2800, seg = 240, ox = -50, oz = 80;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg);
@@ -35,6 +37,7 @@ function buildGround(scene) {
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   geo.computeVertexNormals();
   const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  GROUND = ground;
   ground.position.set(ox, 0, oz);
   ground.receiveShadow = true;
   scene.add(ground);
@@ -105,7 +108,8 @@ function buildSky(scene) {
   const ca = new THREE.Color(), cb = new THREE.Color(), tmp = new THREE.Color();
   const mix = (k, i0, i1, f) => tmp.copy(ca.setHex(i0[k])).lerp(cb.setHex(i1[k]), f);
   const g = cvs.getContext("2d");
-  const state = { hour: -1, night: 0, dir: new THREE.Vector3(0, 1, 0), sunDir: new THREE.Vector3(0, 1, 0), moonDir: new THREE.Vector3(0, 1, 0) };
+  const state = { hour: -1, night: 0, dir: new THREE.Vector3(0, 1, 0), sunDir: new THREE.Vector3(0, 1, 0), moonDir: new THREE.Vector3(0, 1, 0), wx: { grey: 0, dark: 0, fogMul: 1 } };
+  const greyDay = new THREE.Color(0x9aa1a8), greyOut = new THREE.Color();
   state.setHour = (h, force) => {
     h = ((h % 24) + 24) % 24;
     if (!force && Math.abs(h - state.hour) < 0.004) return;
@@ -116,27 +120,31 @@ function buildSky(scene) {
     let f = (h - k0.h) / (k1.h - k0.h); f = f * f * (3 - 2 * f);
     const num = (k) => k0[k] + (k1[k] - k0[k]) * f;
 
+    // the weather greys the sky and the fog and dims the light (more so by day than by night)
+    const wx = state.wx, nightK = num("night");
+    greyOut.copy(greyDay).multiplyScalar(0.22 + 0.78 * (1 - nightK));
+    const wmix = (c) => c.clone().lerp(greyOut, wx.grey);
     const grad = g.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, "#" + mix("top", k0, k1, f).getHexString());
-    grad.addColorStop(0.5, "#" + mix("mid", k0, k1, f).getHexString());
-    grad.addColorStop(1, "#" + mix("bottom", k0, k1, f).getHexString());
+    grad.addColorStop(0, "#" + wmix(mix("top", k0, k1, f)).getHexString());
+    grad.addColorStop(0.5, "#" + wmix(mix("mid", k0, k1, f)).getHexString());
+    grad.addColorStop(1, "#" + wmix(mix("bottom", k0, k1, f)).getHexString());
     g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
     tex.needsUpdate = true;
-    scene.fog.color.copy(mix("fog", k0, k1, f)); scene.fog.far = num("fogFar");
-    hemi.color.copy(mix("hemiSky", k0, k1, f)); hemi.groundColor.copy(mix("hemiGround", k0, k1, f)); hemi.intensity = num("hemiI");
-    sun.color.copy(mix("sun", k0, k1, f)); sun.intensity = num("sunI");
+    scene.fog.color.copy(wmix(mix("fog", k0, k1, f))); scene.fog.far = num("fogFar") * wx.fogMul; scene.fog.near = wx.fogMul < 1 ? Math.max(4, 220 * wx.fogMul * wx.fogMul) : 220;
+    hemi.color.copy(mix("hemiSky", k0, k1, f)); hemi.groundColor.copy(mix("hemiGround", k0, k1, f)); hemi.intensity = num("hemiI") * (1 - 0.35 * wx.dark);
+    sun.color.copy(mix("sun", k0, k1, f)); sun.intensity = num("sunI") * (1 - 0.85 * wx.dark);
     state.night = num("night");
     moon.intensity = Math.max(0, state.night - 0.35) * 0.5;
     lamp.intensity = Math.max(0, state.night - 0.3) * 1.1;
-    starMat.opacity = Math.max(0, Math.min(1, (state.night - 0.55) * 2.5));
+    starMat.opacity = Math.max(0, Math.min(1, (state.night - 0.55) * 2.5)) * (1 - wx.grey);
 
     const a = ((h - 6) / 12) * Math.PI; // the sun rises in the east (-x), peaks at noon and sets in the west
     state.sunDir.set(-Math.cos(a) * 0.9, Math.sin(a), 0.3).normalize();
     const hm = h < 12 ? h + 24 : h, b = ((hm - 18) / 12) * Math.PI;
     state.moonDir.set(-Math.cos(b) * 0.9, Math.sin(b), -0.3).normalize();
     state.dir.copy(state.sunDir); state.dir.y = Math.max(state.dir.y, 0.25); state.dir.normalize(); // keep shadows from stretching to infinity
-    sunDisc.visible = state.sunDir.y > -0.05;
-    moonDisc.visible = state.moonDir.y > -0.05 && state.night > 0.2;
+    sunDisc.visible = state.sunDir.y > -0.05 && wx.dark < 0.6;
+    moonDisc.visible = state.moonDir.y > -0.05 && state.night > 0.2 && wx.dark < 0.6;
   };
   state.follow = (p) => {
     dome.position.copy(p); stars.position.copy(p);
@@ -241,6 +249,7 @@ function buildTrees(scene) {
   const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x5c4630 }), pos.length);
   const pines = new THREE.InstancedMesh(pineGeo, new THREE.MeshLambertMaterial({ color: 0x4f7a3a }), pos.length);
   const cyps = new THREE.InstancedMesh(cypGeo, new THREE.MeshLambertMaterial({ color: 0x2f5a35 }), pos.length);
+  pines.material.userData.leaf = 0x4f7a3a; cyps.material.userData.leaf = 0x2f5a35; // leaves change colour with the seasons (weather.js)
   const o = new THREE.Object3D(), hide = new THREE.Matrix4().makeScale(0, 0, 0);
   pos.forEach((p, i) => {
     o.rotation.set(0, rnd() * 6, 0);
