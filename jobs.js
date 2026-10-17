@@ -107,7 +107,7 @@ const Jobs = (() => {
     for (let i = 0; i < 4; i++) { const b = new T.Mesh(BOXG, lam(0x6a4c2a)); b.scale.set(5.6, 0.2, 0.25); b.rotation.y = i * Math.PI / 4; spin.add(b); }
     box(hall, cx + 6.5, 0, cz - 1, 4, 0.3, 4, lam(0x6a4c2a));
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(hall, cx + 6.5 + sx * 1.9, 0, cz - 1 + sz * 1.9, 0.14, 5, lam(0x4a3a2a));
-    sign(hall, cx, 3.6, cz + 3.4, 4.4, 1.1, "WINCH", "raise the lifts", Math.PI);
+    sign(hall, cx, 3.6, cz + 3.4, 4.4, 1.1, "WINCH", "raise the lifts");
 
     // four cages of beasts along the north wall
     BEASTS.forEach(([, name], i) => {
@@ -117,7 +117,7 @@ const Jobs = (() => {
       box(hall, bx, 3.4, bz + 2.3, 7.2, 0.25, 0.25, lam(0x1d1a16));
       const colors = [0xc9a24a, 0x5a3a22, 0xd9b640, 0x4a3a30];
       box(hall, bx, 0.1, bz + 0.3, 2.2, 1.1, 1.0, lam(colors[i]));
-      sign(hall, bx, 4.4, bz + 2.5, 3.2, 0.9, String(i + 1), name, Math.PI);
+      sign(hall, bx, 4.4, bz + 2.5, 3.2, 0.9, String(i + 1), name);
     });
     // the scenery: crates, a painted flat and a rope hoist
     const px = H.x + 24, pz = H.z + 5;
@@ -125,7 +125,7 @@ const Jobs = (() => {
     box(hall, px, 0.6, pz - 2.2, 7, 4.4, 0.3, lam(0xb86a4a));
     box(hall, px - 1.2, 1.4, pz - 2.4, 2.2, 2.2, 0.15, lam(0x2f6b8f)); box(hall, px + 1.8, 2.4, pz - 2.4, 1.6, 1.6, 0.15, lam(0xd9b640));
     cyl(hall, px, 0, pz - 4.5, 0.15, 6, lam(0x4a3a2a));
-    sign(hall, px, 6.1, pz + 5.5, 4.4, 1.1, "SCENERY", "for the games", Math.PI);
+    sign(hall, px, 6.1, pz + 5.5, 4.4, 1.1, "SCENERY", "for the games");
     // the foreman, and a couple of workers standing about
     foreman = person(hall, H.x - 22, H.z - 6, 0x9a2a2a);
     person(hall, H.x + 11, H.z - 4, 0x6a5a3a); person(hall, H.x + 4, H.z + 12, 0x5a6a4a);

@@ -19,10 +19,11 @@ const FOES = [
   { name: "Lion", beast: true, hp: 90, dmg: 21, speed: 6.2, windup: 0.5, recover: 1.0, blockP: 0, poise: 0.3, engage: 4.2, reach: 4.8, color: 0xc8963e, plume: 0x6b4a1e },
   { name: "Wild Boar", beast: true, kind: "boar", hp: 60, dmg: 14, speed: 6.6, windup: 0.4, recover: 0.9, blockP: 0, poise: 0.2, engage: 3.2, reach: 3.8 },
   { name: "Bear", beast: true, kind: "bear", hp: 120, dmg: 20, speed: 3.8, windup: 0.75, recover: 1.2, blockP: 0, poise: 0.5, engage: 3.3, reach: 3.7 },
+  { name: "Leopard", beast: true, leopard: true, hp: 70, dmg: 17, speed: 7.6, windup: 0.4, recover: 0.8, blockP: 0, poise: 0.2, engage: 3.8, reach: 4.2, color: 0xd9b650, plume: 0xd9b650 },
 ];
 
 // Prize money for beating each opponent (denarii).
-const PURSE = { "Murmillo": 25, "Thraex": 35, "Champion of Rome": 45, "Lion": 60, "Wild Boar": 30, "Bear": 50 };
+const PURSE = { "Murmillo": 25, "Thraex": 35, "Champion of Rome": 45, "Lion": 60, "Wild Boar": 30, "Bear": 50, "Leopard": 45 };
 
 const Fight = (() => {
   let scene, cam, fp, sword, shield, foe = null, lastRound = 2, lastOpts = {}, seq = [0, 1, 2], earned = 0;
@@ -146,9 +147,15 @@ const Fight = (() => {
     part(new THREE.BoxGeometry(0.1, 0.08, 0.06), dark, 0, 1.24, 1.7);
     part(new THREE.BoxGeometry(0.1, 0.08, 0.04), dark, -0.16, 1.38, 1.5);
     part(new THREE.BoxGeometry(0.1, 0.08, 0.04), dark, 0.16, 1.38, 1.5);
+    if (def.leopard) { // slimmer than the lion, no mane, and spotted
+      const spot = lambert(0x2a1c10);
+      for (const [sx, sy, sz] of [[-0.3, 1.3, 0.5], [0.3, 1.2, -0.1], [-0.3, 1.15, -0.5], [0.3, 1.35, 0.2], [0, 1.45, -0.3], [-0.3, 1.3, 0], [0.3, 1.1, 0.6], [0, 1.43, 0.45]]) part(new THREE.BoxGeometry(0.14, 0.14, 0.14), spot, sx, sy, sz);
+    } else {
     const ruff = part(new THREE.SphereGeometry(0.55, 10, 8), mane, 0, 1.25, 0.85); ruff.scale.set(1, 1.05, 0.85);
+    }
     const tail = part(new THREE.BoxGeometry(0.1, 0.1, 0.95), fur, 0, 1.15, -1.35); tail.rotation.x = 0.5;
     part(new THREE.SphereGeometry(0.14, 8, 6), mane, 0, 1.4, -1.75);
+    if (def.leopard) g.scale.set(0.9, 0.9, 0.9);
     return { g, arm: new THREE.Group(), shieldG: new THREE.Group(), mats: [fur] };
   }
 
@@ -162,7 +169,7 @@ const Fight = (() => {
     msgTimer = setTimeout(() => m.classList.remove("show"), ms);
   }
 
-  // opts.lion: only the lion (bow). opts.hunt: an animal hunt (boar, bear, then the lion). Otherwise three gladiators.
+  // opts.lion: only the lion (bow). opts.hunt: an animal hunt (boar, leopard, bear, then the lion). Otherwise three gladiators.
   function start(opts = {}) {
     if (active) return;
     if (opts.trial) Vitals.hp = Math.max(Vitals.hp, 60); // the guards give you water and a rag for your wounds
@@ -171,7 +178,7 @@ const Fight = (() => {
       return;
     }
     lastOpts = opts; earned = 0;
-    seq = opts.trial ? [0, 1, 1, 2, 3] : opts.lion ? [3] : opts.hunt ? [4, 5, 3] : [0, 1, 2]; // a trial by combat: four gladiators, then a lion, all with the sword
+    seq = opts.trial ? [0, 1, 1, 2, 3] : opts.lion ? [3] : opts.hunt ? [4, 6, 5, 3] : [0, 1, 2]; // a trial by combat: four gladiators, then a lion, all with the sword
     active = true; mode = "fight"; round = 0; lastRound = seq.length - 1;
     P.hp = Vitals.hp; P.stam = 100; P.swing = -1; P.block = false; P.hurt = 0; // you start as hurt as you already are
     bow = !!(opts.hunt || opts.lion); // hunting animals, including the lone lion, is done with a bow
@@ -237,7 +244,7 @@ const Fight = (() => {
   // ---------- combat ----------
 
   // A big quiver for the animal hunt (three animals to bring down), a smaller one for the lion on its own.
-  const quiverSize = () => (lastOpts.hunt ? 30 : 14);
+  const quiverSize = () => (lastOpts.hunt ? 38 : 14);
 
   // Sword: swing. Bow: start drawing (release() shoots).
   function attack() {
