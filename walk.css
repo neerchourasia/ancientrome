@@ -452,3 +452,15 @@ body.playing #chat:not(.open) { display: none; }
 .ad-scroll { max-height: 34vh; overflow: auto; }
 #admin h3 { margin: 12px 0 4px; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 #admin code { background: rgba(255,255,255,.1); padding: 0 4px; border-radius: 4px; }
+
+/* every close button looks the same: a square with an X in it */
+button[aria-label="Close"], button.dclose, #places-close, #bigmap-close, #market-close, #account-close, #on-close, #controls-close, #nav-close {
+  display: inline-flex !important; align-items: center; justify-content: center; flex: none !important;
+  width: 36px !important; height: 36px !important; padding: 0 !important;
+  font: 700 1.5rem/1 system-ui, sans-serif !important; color: #fff !important; cursor: pointer;
+  background: rgba(255,255,255,.08) !important; border: 2px solid rgba(255,255,255,.85) !important; border-radius: 8px !important;
+}
+button[aria-label="Close"]:hover, button.dclose:hover, #places-close:hover, #bigmap-close:hover, #market-close:hover, #account-close:hover, #on-close:hover, #controls-close:hover, #nav-close:hover {
+  border-color: var(--gold) !important; color: var(--gold) !important; background: rgba(226,185,85,.15) !important;
+}
+button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
