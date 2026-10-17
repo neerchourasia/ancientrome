@@ -63,6 +63,11 @@ const Online = (() => {
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": onFight(m); break;
       case "world": onWorld(m); break;
+      case "houses": Robbery.setHouses(m.h, m.mine); break;
+      case "heist_no": toast(m.msg || "You cannot rob that house."); break;
+      case "heist": Robbery.begin(m); break;
+      case "heistpos": Robbery.pos(m); break;
+      case "heist_end": Robbery.end(m); break;
       case "race": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
       case "end": if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
@@ -232,7 +237,7 @@ const Online = (() => {
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();
-    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined });
+    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house });
   }
 
   function bind() {

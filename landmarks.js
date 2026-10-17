@@ -4,6 +4,12 @@
 
 const LANDMARKS = [
   {
+    id: "domus", game: true, name: "The Via Domus", sub: "A street of houses: every player online has one",
+    x: 250, z: -40, r: 30, stand: [160, -40],
+    text: "A street of houses east of the Forum. Everyone who is online has a house here, with their name over the door. Walk up to someone else's door and press F to break in: you take 100 denarii, pick a getaway vehicle and run before the owner catches you. If they do, you lose 100 denarii to them. You need to be online (Play online) and the owner must be in Rome.",
+    fact: "Wealthy Romans lived in a domus, a single-family town house built round an atrium. Most people lived in crowded apartment blocks (insulae).",
+  },
+  {
     id: "hypogeum", game: true, only: "ancient", name: "The Hypogeum Jobs", sub: "Work in the cellars under the Colosseum",
     x: 318, z: 66, r: 16, stand: [318, 50],
     text: "A stone stair-house by the Colosseum's west gate leads down to the hypogeum, the cellars under the arena. Go down and press F at a workplace: turn the capstan that raises the lifts, feed the beasts in their cages or hoist the scenery. You are paid in denarii, and rise in rank with every shift.",

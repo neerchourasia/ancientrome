@@ -40,6 +40,7 @@ function init() {
   buildLandmarks(scene);
   Stalls.build(scene, Stalls.SITES.rome.x, Stalls.SITES.rome.z, "rome");
   Jobs.build(scene);
+  Robbery.init(scene);
   Home.build();
   buildInsulae(scene);
   buildTrees(scene);
@@ -158,6 +159,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Jobs.at(player.x, player.z, player.feet)) Jobs.act();
       else if (k === "KeyF" && Garage.at(player.x, player.z, player.feet)) Garage.open();
       else if (k === "KeyF" && Dresser.at(player.x, player.z, player.feet)) Dresser.open();
+      else if (k === "KeyF" && Robbery.at(player.x, player.z, player.feet)) Robbery.act();
       else if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
@@ -211,6 +213,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "job") { Jobs.act(); return; }
     if ($("#prompt").dataset.kind === "garage") { Garage.open(); return; }
     if ($("#prompt").dataset.kind === "dresser") { Dresser.open(); return; }
+    if ($("#prompt").dataset.kind === "rob") { Robbery.act(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -1058,6 +1061,7 @@ function updatePrompt() {
     if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
     if (!text) { const st = Stalls.at(player.x, player.z, player.feet); if (st) { text = `F: shop at the ${st.name}`; p.dataset.kind = "stall"; } }
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
+    if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
@@ -1477,7 +1481,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jobs.update(dt); Garage.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

@@ -96,6 +96,23 @@ const Shipyard = (() => {
     g.fillText("BOW", geo.cx, 14); g.fillText("port (Q)", 40, geo.h - 14); g.fillText("starboard (E)", 252, geo.h - 14);
   }
 
+  // a small picture of a saved ship from above (bow at the top) with its cannons marked, for the list
+  function mini(d) {
+    const t = TYPES[d.type], c = document.createElement("canvas"), W2 = 44, H2 = 84;
+    c.width = W2; c.height = H2; c.className = "sy-mini"; c.title = "Cannons: " + count(d);
+    const g = c.getContext("2d"), half = Math.max(5, t.view.half / 4.2), len = t.view.len / 4.2, top = (H2 - len) / 2 + 3, cx = W2 / 2;
+    g.fillStyle = css(HULLS[d.hull]); g.strokeStyle = "#1a120a"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(cx, top); g.quadraticCurveTo(cx + half, top + 12, cx + half, top + 24); g.lineTo(cx + half, top + len - 2); g.lineTo(cx - half, top + len - 2); g.lineTo(cx - half, top + 24); g.quadraticCurveTo(cx - half, top + 12, cx, top); g.closePath(); g.fill(); g.stroke();
+    for (const [mz] of t.masts) { const y = top + 10 + ((SLOT_Z[0] - mz) / (SLOT_Z[0] - SLOT_Z[SLOTS - 1])) * (len - 22); g.fillStyle = css(SAILS[d.sail]); g.fillRect(cx - half * 0.7, y - 1.5, half * 1.4, 3); }
+    for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) {
+      const y = top + 10 + (i / (SLOTS - 1)) * (len - 22), x = cx + (side === "port" ? -1 : 1) * (half + 1);
+      g.beginPath(); g.arc(x, y, d[side][i] ? 2.6 : 1.4, 0, 6.3);
+      g.fillStyle = d[side][i] ? "#ffcf4a" : "rgba(255,255,255,.28)"; g.fill();
+      if (d[side][i]) { g.strokeStyle = "#1a120a"; g.lineWidth = 1; g.stroke(); }
+    }
+    return c;
+  }
+
   function stats() {
     const d = draft, t = TYPES[d.type], n = count(d), p = d.port.filter(Boolean).length, s = d.star.filter(Boolean).length;
     $s("sy-stats").textContent = `${t.name}: hull ${t.hp}, top speed ${Math.round(t.max * 3.6)} km/h, turning ${t.turn >= 1.2 ? "very sharp" : t.turn >= 0.95 ? "good" : t.turn >= 0.8 ? "slow" : "heavy"}. Cannons ${n} of ${t.cannons} (port ${p}, starboard ${s}). Each side fires together; more cannons on a side hit harder but reload slower (${(1.6 + 0.2 * p).toFixed(1)} s port, ${(1.6 + 0.2 * s).toFixed(1)} s starboard).`;
@@ -130,7 +147,10 @@ const Shipyard = (() => {
     // the saved ships
     $s("sy-list").replaceChildren(...ships.map((s, i) => {
       const li = document.createElement("li"), b = document.createElement("button");
-      b.type = "button"; b.className = i === sel ? "on" : ""; b.textContent = `${i === sel ? "▶ " : ""}${s.name} (${TYPES[s.type].name}, ${count(s)} cannons)`;
+      b.type = "button"; b.className = i === sel ? "on" : "";
+      const label = document.createElement("span"), nm = document.createElement("strong"), sub = document.createElement("small");
+      nm.textContent = `${i === sel ? "▶ " : ""}${s.name}`; sub.textContent = `${TYPES[s.type].name} · ${count(s)} cannons: ${s.port.filter(Boolean).length} port, ${s.star.filter(Boolean).length} starboard`;
+      label.append(nm, sub); b.append(mini(i === sel && draft ? draft : s), label);
       b.addEventListener("click", () => { sel = i; draft = clone(ships[i]); save(); refresh(); });
       li.append(b);
       if (ships.length > 1) { const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = "Delete this ship"; x.className = "sy-del"; x.addEventListener("click", () => { ships.splice(i, 1); sel = Math.min(sel, ships.length - 1); draft = clone(ships[sel]); save(); refresh(); }); li.append(x); }
