@@ -52,6 +52,15 @@ const Naval = (() => {
   // A galley with a ram at the bow, masts and sails, and cannons where the design puts them (the default has three a side).
   // def.ports / def.stars say which of the seven positions along each side hold a cannon (bow first); def.masts is [z, height] pairs.
   const SLOT_Z = [3.6, 2.4, 1.2, 0, -1.2, -2.4, -3.6];
+  // A pointed bow: a flat triangle of the hull's width, `len` long and `h` high, base at z = 0 and tip at z = len
+  function wedge(halfW, len, h) {
+    const sh = new THREE.Shape(); sh.moveTo(-halfW, 0); sh.lineTo(halfW, 0); sh.lineTo(0, len); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false });
+    g.rotateX(Math.PI / 2);                                   // lay it flat: the shape's y points along +z, and the thickness goes down...
+    g.translate(0, h, 0);                                     // ...so lift it to sit on y = 0 and rise to y = h
+    return g;
+  }
+
   function makeGalley(def) {
     const g = new THREE.Group();
     const sh = def.shape || "galley", K = def.lenK || 1, hw = def.hw || 1.5;
@@ -63,15 +72,14 @@ const Naval = (() => {
     if (sh === "galley") {
       hull = part(new THREE.BoxGeometry(3, 1.1, 9), wood, 0, 0.4, 0);
       part(new THREE.BoxGeometry(3.3, 0.25, 8.6), dark, 0, 1.0, 0);
-      part(new THREE.BoxGeometry(2.0, 1.1, 2.2), wood, 0, 0.45, 5.4);
-      const ram = part(new THREE.ConeGeometry(0.4, 1.7, 8), bronze, 0, 0.1, 7.0); ram.rotation.x = Math.PI / 2;
+      part(wedge(1.5, 2.8, 1.1), wood, 0, -0.15, 4.5);                                          // the pointed bow
+      const ram = part(new THREE.ConeGeometry(0.4, 1.7, 8), bronze, 0, 0.1, 7.5); ram.rotation.x = Math.PI / 2;
       part(new THREE.BoxGeometry(2.4, def.castle ? 3.4 : 2.4, 0.5), wood, 0, def.castle ? 2.2 : 1.7, -4.6);
       if (def.castle) part(new THREE.BoxGeometry(2.8, 0.3, 2.2), dark, 0, 3.9, -4.0);
     } else if (sh === "kayak" || sh === "canoe") {
       const w = hw * 2;
       hull = part(new THREE.BoxGeometry(w, sh === "kayak" ? 0.45 : 0.6, L), wood, 0, 0.3, 0);
-      const bow = part(new THREE.ConeGeometry(w / 2, 1.6, 8), wood, 0, 0.3, L / 2 + 0.7); bow.rotation.x = Math.PI / 2;
-      const stern = part(new THREE.ConeGeometry(w / 2, 1.4, 8), wood, 0, 0.3, -L / 2 - 0.6); stern.rotation.x = -Math.PI / 2;
+      part(wedge(w / 2, 1.8, sh === "kayak" ? 0.45 : 0.6), wood, 0, 0.075, L / 2);                // the pointed bow and a flat stern
       part(new THREE.CylinderGeometry(0.2, 0.26, 0.9, 8), lambert(0x3a5a8a), 0, 0.95, -0.4);       // the paddler
       part(new THREE.SphereGeometry(0.2, 8, 6), skin, 0, 1.55, -0.4);
       const pad = part(new THREE.CylinderGeometry(0.04, 0.04, sh === "kayak" ? 2.6 : 1.8, 6), dark, 0, 1.0, -0.4); pad.rotation.z = sh === "kayak" ? Math.PI / 2 : 0.7;
@@ -79,14 +87,14 @@ const Naval = (() => {
     } else if (sh === "fishing") {
       hull = part(new THREE.BoxGeometry(hw * 2, 1.0, L), wood, 0, 0.35, 0);
       part(new THREE.BoxGeometry(hw * 2 + 0.2, 0.2, L - 0.4), dark, 0, 0.92, 0);
-      const bow = part(new THREE.ConeGeometry(hw, 1.8, 6), wood, 0, 0.35, L / 2 + 0.8); bow.rotation.x = Math.PI / 2;
+      part(wedge(hw, 2.0, 1.0), wood, 0, -0.15, L / 2);
       part(new THREE.BoxGeometry(hw * 1.4, 1.4, 1.8), lambert(0xd9cfb8), 0, 1.6, -L / 4);             // the wheelhouse
       part(new THREE.BoxGeometry(hw * 1.5, 0.15, 2.0), band, 0, 2.35, -L / 4);
       part(new THREE.BoxGeometry(0.9, 0.4, 0.9), lambert(0x6a8a9a), -hw * 0.5, 1.2, L / 4);          // a crate of fish
       part(new THREE.BoxGeometry(1.4, 0.05, 1.0), lambert(0x8a7a5a), hw * 0.5, 1.05, L / 5);          // nets
     } else { // battleship
       hull = part(new THREE.BoxGeometry(hw * 2, 1.5, L), wood, 0, 0.5, 0);
-      const bow = part(new THREE.ConeGeometry(hw * 1.0, 3.6, 4), wood, 0, 0.5, L / 2 + 1.6); bow.rotation.x = Math.PI / 2; bow.rotation.z = Math.PI / 4; bow.scale.set(1, 1, 0.5);
+      part(wedge(hw, 3.6, 1.5), wood, 0, -0.25, L / 2);
       part(new THREE.BoxGeometry(hw * 2 - 0.4, 0.3, L - 0.6), lambert(0x4a4f56), 0, 1.35, 0);
       part(new THREE.BoxGeometry(hw * 1.2, 1.6, 4.2), lambert(0x8a9098), 0, 2.2, -L / 6);             // the bridge
       part(new THREE.BoxGeometry(hw * 0.8, 0.9, 2.0), lambert(0xa0a6ae), 0, 3.5, -L / 6);
@@ -101,8 +109,9 @@ const Naval = (() => {
     for (const [mz, mh] of def.masts || [[0.4, 6.5]]) {
       const k = mh / 6.5;
       part(new THREE.CylinderGeometry(0.13, 0.17, mh, 8), dark, 0, 1 + mh / 2, mz);
-      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k) * Math.min(1, hw / 1.5 + 0.3), 2.8 * k, 0.08), sailM, 0, 1 + mh * 0.55, mz);
-      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k) * Math.min(1, hw / 1.5 + 0.3), 0.7 * k, 0.1), band, 0, 1 + mh * 0.83, mz + 0.03);
+      const sw = Math.max(1.2, hw * 2 * 0.82 * Math.max(0.8, k));                                  // as wide as the picture shows: a little under the hull
+      part(new THREE.BoxGeometry(sw, 2.8 * k, 0.08), band, 0, 1 + mh * 0.55, mz);                  // the sail, in the colour you chose
+      part(new THREE.BoxGeometry(sw, 0.25 * k, 0.1), sailM, 0, 1 + mh * 0.83, mz + 0.03);          // a cream trim along the top
     }
     const cannons = [];
     const layout = def.ports ? [[1, def.ports, def.paims || []], [-1, def.stars, def.saims || []]] : [[1, [1, 0, 1, 0, 1, 0, 0], []], [-1, [1, 0, 1, 0, 1, 0, 0], []]];
