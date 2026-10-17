@@ -178,6 +178,11 @@ const Home = (() => {
       piece(1, CONE, leaf, cx, 3.2, cz, 1.2, 5.4, 1.2, true, true);
     }
 
+    // a garage beside the house for every upgrade (not the small house you start with), open to the north
+    const gmat = { wall: stone, roof: M.roof, dark: lambert(0x55504a), door: lambert(0x7a5a34) };
+    for (const p of Garage.parts(284, 52, "n")) piece(1, BOX, gmat[p.mat], p.x, p.y0 + p.h / 2, p.z, p.w, p.h, p.d, p.solid);
+    Garage.register("rome", worldScene, 284, 52, "n", () => tier);
+
     // tier 2: two wings either side of the house, and a colonnade over the garden path
     for (const wx of [243, 267]) {
       piece(2, BOX, stone, wx, 2, 50, 12, 4, 10, true);

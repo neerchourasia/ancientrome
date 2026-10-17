@@ -83,6 +83,7 @@ const Market = (() => {
     pets: { title: "Animals and rides", types: ["pet", "car", "mount"] },
     builder: { title: "Builder and decorator", types: ["decor"], house: true },
     healer: { title: "Healer and trainer", types: ["supply", "perk"] },
+    garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true },
   };
   let stall = "food";
   const SECTIONS = [
@@ -196,13 +197,14 @@ const Market = (() => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
       h.textContent = title; ul.className = "mk-items";
       const need = type === "car" ? "modern" : type === "mount" ? "ancient" : null;
+      if (need && era !== need && def.ownedOnly) return []; // your garage only lists what exists in this era
       if (need && era !== need) { // these only exist in one era
         const li = document.createElement("li"), note = document.createElement("small");
         note.textContent = need === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there, then come back to buy one." : "Carts and elephants only live in the ancient cities (Ancient Rome and Mughal Delhi). Press K to go there, then come back to buy one.";
         li.append(note); ul.append(li);
         return [h, ul];
       }
-      for (const [id, it] of Object.entries(ITEMS).filter(([, x]) => x.type === type && (type !== "food" || foodHere(x)))) {
+      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => x.type === type && (type !== "food" || foodHere(x)) && (!def.ownedOnly || s.items.includes(fid)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
         name.textContent = it.name; note.textContent = it.note;
@@ -216,6 +218,7 @@ const Market = (() => {
         li.append(txt, b);
         ul.append(li);
       }
+      if (def.ownedOnly && !ul.children.length) { const li = document.createElement("li"), note = document.createElement("small"); note.textContent = "You do not own any of these yet. Buy one at the animals and rides stall in the market square."; li.append(note); ul.append(li); }
       return [h, ul];
     }));
   }

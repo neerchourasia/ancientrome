@@ -537,6 +537,10 @@ const Delhi = (() => {
     // 2: the grand haveli; 3: the same, with a tower, a pavilion in a pool and a gate
     grandHouse(2);
     grandHouse(3);
+    // a garage for every upgrade (not the small house), by the east wall of the plot, open to the west
+    const gm = { wall: D.cream, roof: D.redDark, dark: lambert(0x6a625a), door: D.wood };
+    for (let t = 1; t <= 3; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);
+    Garage.register("delhi", scene, X(-72), -28, "w", () => houseTier);
     hc(3, -72, 0, -85, 5.5, 24, D.cream, true, 8);
     hc(3, -72, 24, -85, 6.4, 0.6, D.marble, false, 8);
     hdome(3, -72, 24.6, -85, 4, 5, D.gold, 0.8);
@@ -1067,5 +1071,5 @@ const Delhi = (() => {
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, setTier, update, hits, homeInside, inPlot, homeSpot, venueAt, VENUES, cannonShow: (v) => { if (cannonG) cannonG.visible = v; }, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, setTier, get tier() { return houseTier; }, update, hits, homeInside, inPlot, homeSpot, venueAt, VENUES, cannonShow: (v) => { if (cannonG) cannonG.visible = v; }, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();
