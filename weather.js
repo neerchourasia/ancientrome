@@ -28,20 +28,20 @@ const Weather = (() => {
     ],
   };
   const LOOK = { // what each kind of weather does to the world
-    clear: { cover: 0.04, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0.05, icon: "☀", name: "Sunny" },
-    partly: { cover: 0.3, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.12, grey: 0.2, wind: 0.15, icon: "🌤", name: "Partly cloudy" },
-    cloudy: { cover: 0.72, rain: 0, snow: 0, hail: 0, fog: 0.05, dark: 0.35, grey: 0.45, wind: 0.2, icon: "⛅", name: "Cloudy" },
-    windy: { cover: 0.18, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.1, grey: 0.15, wind: 1, icon: "💨", name: "Windy" },
-    drizzle: { cover: 0.85, rain: 0.28, snow: 0, hail: 0, fog: 0.12, dark: 0.35, grey: 0.55, wind: 0.2, icon: "🌦", name: "Drizzle" },
-    rain: { cover: 0.95, rain: 0.7, snow: 0, hail: 0, fog: 0.25, dark: 0.55, grey: 0.75, wind: 0.35, icon: "🌧", name: "Rain" },
+    clear: { cover: 0.07, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0.05, icon: "☀", name: "Sunny" },
+    partly: { cover: 0.38, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.12, grey: 0.2, wind: 0.15, icon: "🌤", name: "Partly cloudy" },
+    cloudy: { cover: 0.9, rain: 0, snow: 0, hail: 0, fog: 0.05, dark: 0.35, grey: 0.45, wind: 0.2, icon: "⛅", name: "Cloudy" },
+    windy: { cover: 0.25, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.1, grey: 0.15, wind: 1, icon: "💨", name: "Windy" },
+    drizzle: { cover: 0.95, rain: 0.28, snow: 0, hail: 0, fog: 0.12, dark: 0.35, grey: 0.55, wind: 0.2, icon: "🌦", name: "Drizzle" },
+    rain: { cover: 1, rain: 0.7, snow: 0, hail: 0, fog: 0.25, dark: 0.55, grey: 0.75, wind: 0.35, icon: "🌧", name: "Rain" },
     storm: { cover: 1, rain: 1, snow: 0, hail: 0, fog: 0.3, dark: 0.8, grey: 0.9, wind: 0.8, icon: "⛈", name: "Thunderstorm" },
-    fog: { cover: 0.35, rain: 0, snow: 0, hail: 0, fog: 1, dark: 0.25, grey: 0.7, wind: 0, icon: "🌫", name: "Fog" },
-    mist: { cover: 0.25, rain: 0, snow: 0, hail: 0, fog: 0.45, dark: 0.12, grey: 0.35, wind: 0.05, icon: "🌁", name: "Misty" },
-    hail: { cover: 0.95, rain: 0.45, snow: 0, hail: 1, fog: 0.2, dark: 0.65, grey: 0.85, wind: 0.5, icon: "🧊", name: "Hailstorm" },
+    fog: { cover: 0.4, rain: 0, snow: 0, hail: 0, fog: 1, dark: 0.25, grey: 0.7, wind: 0, icon: "🌫", name: "Fog" },
+    mist: { cover: 0.3, rain: 0, snow: 0, hail: 0, fog: 0.45, dark: 0.12, grey: 0.35, wind: 0.05, icon: "🌁", name: "Misty" },
+    hail: { cover: 1, rain: 0.45, snow: 0, hail: 1, fog: 0.2, dark: 0.65, grey: 0.85, wind: 0.5, icon: "🧊", name: "Hailstorm" },
     blizzard: { cover: 1, rain: 0, snow: 1, hail: 0, fog: 0.8, dark: 0.45, grey: 0.85, wind: 1, icon: "🌨", name: "Blizzard" },
     tornado: { cover: 1, rain: 0.3, snow: 0, hail: 0, fog: 0.3, dark: 0.75, grey: 0.9, wind: 1, icon: "🌪", name: "Tornado" },
     cyclone: { cover: 1, rain: 1, snow: 0, hail: 0, fog: 0.45, dark: 0.85, grey: 0.95, wind: 1, icon: "🌀", name: "Cyclone" },
-    snow: { cover: 0.85, rain: 0, snow: 1, hail: 0, fog: 0.35, dark: 0.3, grey: 0.6, wind: 0.2, icon: "❄", name: "Snow" },
+    snow: { cover: 0.9, rain: 0, snow: 1, hail: 0, fog: 0.35, dark: 0.3, grey: 0.6, wind: 0.2, icon: "❄", name: "Snow" },
   };
   // how the land looks: the ground tint, and the colour that leaves are blended towards (with how strongly)
   const LAND = [
@@ -54,7 +54,7 @@ const Weather = (() => {
   const cur = { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0, cover: 0 };
   let sky = null, scene = null, forced = null, kind = "clear", season = 0, appliedSeason = -1, appliedSnow = -1, lastSky = 0;
   let clouds = [], cloudTex = null, hail = null, hailPos = null, funnel = null, funnelBits = null, tx = 0, tz = 0, tdir = 0, hailT = 0, hurtT = 0, warned = "", drops = null, dropPos = null, dropVel = null, flakes = null, flakePos = null, bits = null, bitPos = null, bitSeed = null, boltT = 12, flash = 0, thunderT = -1, hudT = 0, lastBadge = "", clock = 0;
-  const NH = 420, N = 1100, NF = 1500, NB = 170, NC = 36;   // NC: clouds in the sky; how many show depends on the weather
+  const NH = 420, N = 1100, NF = 1500, NB = 170, NC = 90;   // NC: clouds in the sky; how many show depends on the weather
 
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const el = (id) => document.getElementById(id);
@@ -160,7 +160,7 @@ const Weather = (() => {
         grp.add(sp);
       }
       // clouds are spread over a wide square around you and drift with the wind; thr: the cloud cover at which this one appears
-      grp.userData = { x: (Math.random() - 0.5) * 2400, z: (Math.random() - 0.5) * 2400, y: 260 + Math.random() * 120, thr: i / NC, fade: 0 };
+      grp.userData = { x: (Math.random() - 0.5) * 2400, z: (Math.random() - 0.5) * 2400, y: 230 + Math.random() * 150, thr: i / NC, fade: 0 };
       grp.visible = false; grp.renderOrder = -1; scene.add(grp); clouds.push(grp);
     }
     scene.add(drops, flakes, bits, hail, funnel);
@@ -321,6 +321,12 @@ const Weather = (() => {
         }
       }
     } else funnel.userData.placed = 0;
+    // the winds of a hurricane or a blizzard shove you along (east), so walking against them is hard
+    if ((kind === "cyclone" || kind === "blizzard") && cur.wind > 0.9 && started && mode === "walk" && player.airY <= 0.02) {
+      const push = (kind === "cyclone" ? 2.4 : 1.6) * Math.min(1, (cur.wind - 0.9) * 10) * dt;
+      if (!blockedAt(player.x + push, player.z, player.feet)) player.x += push;
+      if (warned !== "wind") { warned = "wind"; toast(kind === "cyclone" ? "The hurricane's winds are shoving you east. Find shelter!" : "The blizzard's winds shove you along."); }
+    }
     // clouds drift on the wind, wrapping round you, and fade in and out as the cover changes; they darken with the storm and at night
     const night = sky.night || 0, shade = (1 - 0.8 * night) * (1 - 0.55 * cur.dark), ground = 0.62 + 0.38 * shade;
     for (const c of clouds) {
@@ -333,7 +339,8 @@ const Weather = (() => {
       if (dx > 1200) u.x -= 2400; else if (dx < -1200) u.x += 2400;
       if (dz > 1200) u.z -= 2400; else if (dz < -1200) u.z += 2400;
       c.position.set(u.x, u.y, u.z);
-      for (const sp of c.children) { sp.material.opacity = 0.9 * u.fade; sp.material.color.setScalar(ground); }
+      const grow = 0.8 + 0.7 * cur.cover;                          // clouds swell as the sky clouds over: a heavy ceiling in a storm
+      for (const sp of c.children) { sp.material.opacity = (0.55 + 0.4 * cur.cover) * u.fade; sp.material.color.setScalar(ground); sp.userData.k = sp.userData.k || sp.scale.x; sp.scale.set(sp.userData.k * grow, sp.userData.k * grow * 0.45, 1); }
     }
     Sfx.setWeather(rain, cur.wind);
     lightning(dt);
