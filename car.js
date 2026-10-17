@@ -258,7 +258,7 @@ const Car = (() => {
 
   // A fresh model of a vehicle for the Delhi games, in another colour (the body and the cloth or canopy take the colour).
   function model(id, color) {
-    const M = MODELS[id], m = build(id), accents = id === "elephant" ? [0xa8282b] : [M.color, 0xe8c13a];
+    const M = MODELS[id], m = build(id), accents = id === "elephant" ? [0xa8282b] : id === "oxcart" ? [0xd9a13a] : [M.color, 0xe8c13a];
     if (color !== undefined) m.g.traverse((o) => { if (o.isMesh && o.material && o.material.color && accents.includes(o.material.color.getHex())) o.material = lam(color); });
     m.g.userData.wheels = m.wheels; m.g.userData.legs = m.legs;
     return m.g;

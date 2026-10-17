@@ -15,7 +15,7 @@ const DGames = (() => {
   let puffTex = null;
 
   const GAMES = [
-    { id: "race", where: "the start arch at the Fatehpuri Masjid end of Chandni Chowk", name: "Race down Chandni Chowk", text: "Rickshaws (Modern Delhi) or elephants (Mughal Delhi) race from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · 1-9 speed level · X cruise · Space boost" },
+    { id: "race", where: "the start arch at the Fatehpuri Masjid end of Chandni Chowk", name: "Race down Chandni Chowk", text: "Choose your vehicle (a rickshaw, scooter, car or sports car today; an elephant or a bullock cart in Mughal Delhi) and race three rivals from the Fatehpuri Masjid to the Lahori Gate. Dodge the street traffic and use your boost. Win 60 denarii.", keys: "W go · S brake · A D change lane · 1-9 speed level · X cruise · Space boost" },
     { id: "defend", where: "the cannon on the rampart: climb the long ramp inside the west wall of the Red Fort", name: "Defend the Red Fort", text: "Raiders march down Chandni Chowk at the Lahori Gate. Aim the cannon on the gate and break up their ranks before they reach it. Three waves. Win 80 denarii.", keys: "W S farther or nearer · A D left or right · Space or click fire" },
     { id: "kushti", where: "the akhara on the open square in front of the Lahori Gate", name: "Kushti wrestling", text: "Pehlwani wrestling in a mud pit. Get to grips with your opponent, then fight for the throw by pressing Space as fast as you can. First to two throws wins 40 denarii.", keys: "WASD move · Space grip, then mash Space to throw" },
     { id: "kites", where: "the kite stall on the open square in front of the Lahori Gate", name: "Kite fights", text: "A tradition in Old Delhi: fly your kite, cross strings with the others and saw through theirs before they saw through yours. Cut all three kites for 60 denarii.", keys: "WASD fly the kite · hold Space to saw while the strings cross" },
@@ -100,8 +100,35 @@ const DGames = (() => {
     openPanel("#dgames");
   }
 
-  function play(id) {
+  // What you can race on: today's vehicles in Modern Delhi, the old ones in Mughal Delhi. max is the top speed in the race (m/s),
+  // acc how quickly it gets there, tire how fast a long flat-out run wears out its rider (1 = a person pedalling).
+  const RIDES = {
+    rickshaw: { name: "Cycle rickshaw", max: 8, acc: 5.5, tire: 1, note: "Pedal-powered and light. Nimble, but the rider tires quickly." },
+    scooter: { name: "Vespa scooter", max: 12, acc: 8, tire: 0.5, note: "Quick off the line and easy to weave through traffic." },
+    citycar: { name: "City car", max: 15, acc: 7, tire: 0.3, note: "A steady, fast runabout. Wide, so keep clear of the traffic." },
+    sportscar: { name: "Sports car", max: 19, acc: 10, tire: 0.3, note: "The fastest thing in Old Delhi. Hard to steer through a crowd." },
+    elephant: { name: "Elephant", max: 14, acc: 6.5, tire: 0.45, note: "Thunders along, and has plenty of stamina." },
+    oxcart: { name: "Bullock cart", max: 7, acc: 3.5, tire: 0.8, note: "Slow and sturdy. Your rivals ride bullock carts too." },
+  };
+  const RACE_RIDES = { modern: ["rickshaw", "scooter", "citycar", "sportscar"], ancient: ["elephant", "oxcart"] };
+
+  function pickRide() {
+    const ul = $d("pick-list");
+    ul.replaceChildren(...RACE_RIDES[era === "modern" ? "modern" : "ancient"].map((id) => {
+      const r = RIDES[id], li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
+      const name = document.createElement("strong"), note = document.createElement("small");
+      name.textContent = `${r.name}${Market.owns(id) ? " (yours)" : ""} · ${Math.round(r.max * 3.6)} km/h`; note.textContent = r.note;
+      txt.append(name, note);
+      b.type = "button"; b.textContent = "Race on this"; b.addEventListener("click", () => play("race", { ride: id }));
+      li.append(txt, b);
+      return li;
+    }));
+    openPanel("#dg-pick");
+  }
+
+  function play(id, opts = {}) {
     if (city !== "delhi" || mode !== "walk" || sleepT > 0) return;
+    if (id === "race" && !opts.ride) { if (!Vitals.canFight()) { toast(`You are too wounded for that (health ${Math.round(Vitals.hp)}/100). Press Z to rest and heal.`); return; } pickRide(); return; }
     if (id === "pachisi") { openPachisi(); return; }
     if (id === "bazaar") { openBazaar(); return; }
     if (!Vitals.canFight() && id !== "kites") { toast(`You are too wounded for that (health ${Math.round(Vitals.hp)}/100). Press Z to rest and heal.`); return; }
@@ -110,7 +137,7 @@ const DGames = (() => {
     if (id === "run") { runGame = startRun(); return; }
     const makers = { race: raceGame, defend: defendGame, kushti: kushtiGame, kites: kiteGame };
     const back = { x: player.x, z: player.z, yaw: player.yaw };
-    const g = makers[id](back);
+    const g = makers[id](back, opts);
     g.id = id; g.back = back; g.keysText = info.keys;
     begin(g);
     hud(info.name, "", info.keys, null);
@@ -137,9 +164,9 @@ const DGames = (() => {
 
   // ------------------------------------------------------------------ 1. the race down Chandni Chowk
 
-  function raceGame() {
-    const modern = era === "modern";
-    const id = modern ? "rickshaw" : "elephant", max = modern ? 8 : 14, acc = modern ? 5.5 : 6.5; // the elephants thunder along
+  function raceGame(back, opts = {}) {
+    const ride = RIDES[opts.ride] || RIDES[era === "modern" ? "rickshaw" : "elephant"];
+    const id = RIDES[opts.ride] ? opts.ride : era === "modern" ? "rickshaw" : "elephant", max = ride.max, acc = ride.acc; // everyone in the race rides the same kind of vehicle
     const START = -585, FINISH = -30;
     const lanes = [3, -3, 9, -9], colors = [0x2f8f4a, 0xd9411f, 0x2f6bd9, 0x8a3fd0], names = ["You", "Bhola", "Jamna", "Kallu"];
     const group = new THREE.Group(); sc.add(group);
@@ -150,7 +177,7 @@ const DGames = (() => {
     const me = racers[0];
     const FRAC = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.93, 1.0], LEVELS = ["Crawl", "Slow", "Easy", "Steady", "Brisk", "Quick", "Fast", "Very fast", "Flat out"];
     me.pace = 7; me.cruise = false; me.stam = 100; me.tired = false;
-    const tireRate = modern ? 1 : 0.45; // elephants have far more stamina than a rickshaw rider
+    const tireRate = ride.tire; // a rickshaw rider tires quickly, an elephant or an engine hardly at all
     let t = -3, over = false, msgCd = 0;
     const say = (s) => { if (msgCd <= 0) { toast(s); msgCd = 1.4; } };
     return {
