@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=183">
+  <link rel="stylesheet" href="walk.css?v=184">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=183"></script>
+  <script src="boot.js?v=184"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -356,7 +356,7 @@
       <header><h2>Play real people</h2><button id="on-close" type="button" aria-label="Close">×</button></header>
       <p id="on-status"></p>
       <div class="on-games"><button id="on-duel" type="button">⚔ Duel a real person</button><button id="on-race" type="button">🏁 Race real people</button><button id="on-coop" type="button">🛡 Team up: beat 5 bots together</button><button id="on-naval" type="button">⚓ Naval battle: every ship for itself</button></div>
-      <label id="on-shiprow" class="ac-check">⚓ Your ship for the naval battle: <select id="on-ship"></select> <small>(build and save ships in the shipyard: press N in the arena)</small></label>
+      <div id="on-shiprow"><label for="on-ship"><strong>⚓ Your ship for the naval battle</strong></label><select id="on-ship"></select><small>Pick one of your saved ships. Build and save ships in the shipyard (press N in the arena).</small></div>
       <label id="on-botrow" class="ac-check"><input id="on-bot" type="checkbox" checked> <span>If nobody is around, let bots fill in (a practice opponent or practice ships, or friendly teammates in the team battle)</span></label>
       <button id="on-cancel" type="button" hidden>Stop looking</button>
           </div>
@@ -417,41 +417,41 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=183"></script>
-  <script src="delhi-data.js?v=183"></script>
-  <script src="config.js?v=183"></script>
-  <script src="character.js?v=183"></script>
-  <script src="physics.js?v=183"></script>
-  <script src="vitals.js?v=183"></script>
-  <script src="narrator.js?v=183"></script>
-  <script src="audio.js?v=183"></script>
-  <script src="world.js?v=183"></script>
-  <script src="city.js?v=183"></script>
-  <script src="weather.js?v=183"></script>
-  <script src="modern.js?v=183"></script>
-  <script src="delhi.js?v=183"></script>
-  <script src="delhi-games.js?v=183"></script>
-  <script src="home.js?v=183"></script>
-  <script src="spectators.js?v=183"></script>
-  <script src="fight.js?v=183"></script>
-  <script src="nav.js?v=183"></script>
-  <script src="show.js?v=183"></script>
-  <script src="shipyard.js?v=183"></script>
-  <script src="naval.js?v=183"></script>
-  <script src="watch.js?v=183"></script>
-  <script src="race.js?v=183"></script>
-  <script src="account.js?v=183"></script>
-  <script src="online.js?v=183"></script>
-  <script src="chat.js?v=183"></script>
-  <script src="tax.js?v=183"></script>
-  <script src="pets.js?v=183"></script>
-  <script src="car.js?v=183"></script>
-  <script src="market.js?v=183"></script>
-  <script src="garage.js?v=183"></script>
-  <script src="dresser.js?v=183"></script>
-  <script src="stalls.js?v=183"></script>
-  <script src="robbery.js?v=183"></script>
-  <script src="jobs.js?v=183"></script>
-  <script src="game.js?v=183"></script>
+  <script src="landmarks.js?v=184"></script>
+  <script src="delhi-data.js?v=184"></script>
+  <script src="config.js?v=184"></script>
+  <script src="character.js?v=184"></script>
+  <script src="physics.js?v=184"></script>
+  <script src="vitals.js?v=184"></script>
+  <script src="narrator.js?v=184"></script>
+  <script src="audio.js?v=184"></script>
+  <script src="world.js?v=184"></script>
+  <script src="city.js?v=184"></script>
+  <script src="weather.js?v=184"></script>
+  <script src="modern.js?v=184"></script>
+  <script src="delhi.js?v=184"></script>
+  <script src="delhi-games.js?v=184"></script>
+  <script src="home.js?v=184"></script>
+  <script src="spectators.js?v=184"></script>
+  <script src="fight.js?v=184"></script>
+  <script src="nav.js?v=184"></script>
+  <script src="show.js?v=184"></script>
+  <script src="shipyard.js?v=184"></script>
+  <script src="naval.js?v=184"></script>
+  <script src="watch.js?v=184"></script>
+  <script src="race.js?v=184"></script>
+  <script src="account.js?v=184"></script>
+  <script src="online.js?v=184"></script>
+  <script src="chat.js?v=184"></script>
+  <script src="tax.js?v=184"></script>
+  <script src="pets.js?v=184"></script>
+  <script src="car.js?v=184"></script>
+  <script src="market.js?v=184"></script>
+  <script src="garage.js?v=184"></script>
+  <script src="dresser.js?v=184"></script>
+  <script src="stalls.js?v=184"></script>
+  <script src="robbery.js?v=184"></script>
+  <script src="jobs.js?v=184"></script>
+  <script src="game.js?v=184"></script>
 </body>
 </html>

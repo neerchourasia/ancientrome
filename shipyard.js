@@ -223,7 +223,7 @@ const Shipyard = (() => {
     refresh();
   }
 
-  function commit() { draft.name = $s("sy-name").value.trim() || draft.name; draft = sanitize(draft); ships[sel] = clone(draft); save(); return draft; }
+  function commit() { draft.name = $s("sy-name").value.trim() || draft.name; draft = sanitize(draft); ships[sel] = clone(draft); save(); if (typeof Account !== "undefined") Account.saveNow(true); return draft; }
 
   function open() {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
@@ -268,7 +268,11 @@ const Shipyard = (() => {
       if (!raw || !Array.isArray(raw.ships)) return;
       if (Number.isInteger(raw.owned)) owned = Math.max(START_CANNONS, raw.owned);
       const list = raw.ships.map(sanitize).filter(Boolean).slice(0, MAX_SAVED);
-      if (list.length) { ships = list; sel = Math.min(list.length - 1, Math.max(0, raw.sel | 0)); owned = Math.max(owned, ...ships.map(count)); save(); }
+      if (list.length) {                                  // keep the ships you made on this device that the cloud save does not have yet
+        const merged = list.slice();
+        for (const s of ships) if (merged.length < MAX_SAVED && !merged.some((m) => m.name === s.name && JSON.stringify(m) === JSON.stringify(s))) if (!merged.some((m) => m.name === s.name)) merged.push(s);
+        ships = merged; sel = Math.min(merged.length - 1, Math.max(0, raw.sel | 0)); owned = Math.max(owned, ...ships.map(count)); save();
+      }
     },
     TYPES, SLOTS, SLOT_Z,
   };
