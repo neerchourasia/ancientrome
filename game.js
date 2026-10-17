@@ -1018,7 +1018,7 @@ function arriveIn(to) {
   else placeAt(165, 6, Math.PI / 2);
   player.pitch = -0.02;
   const modern = era === "modern";
-  const msg = to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort.` : "Back in Rome.";
+  const msg = to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort. The market stalls are in the square south of the Lahori Gate (press G, then The Market, for directions).` : "Back in Rome. The market square is south of the Forum (press G, then The Market).";
   toast(msg);
   Narrator.say(to === "delhi" ? (modern ? "Welcome to Old Delhi, as it stands today. The Red Fort is at the end of Chandni Chowk." : "Welcome to Shahjahanabad, the walled capital of the Mughal emperor Shah Jahan, around 1650. The Red Fort is at the end of Chandni Chowk.") : "Back in Rome.", { interrupt: true });
 }
