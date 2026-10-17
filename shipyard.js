@@ -22,6 +22,7 @@ const Shipyard = (() => {
   const SAILS = [0x2f8f4a, 0xb3262b, 0x6b3fa0, 0x2f6b8f, 0xc7a21a, 0xe8e0cc, 0x1f1f1f, 0xd9791f];
   const HULLS = [0x7a5230, 0x5a3a20, 0x8a8470, 0x3a4a5a, 0xa0522d, 0x2a2a2a];
   const MAX_SAVED = 4;
+  const CANNON_PRICE = 200, START_CANNONS = 6;       // each cannon costs 200 denarii; you start with the six of the starter galley
 
   const css = (n) => "#" + n.toString(16).padStart(6, "0");
   const count = (d) => d.port.filter(Boolean).length + d.star.filter(Boolean).length;
@@ -41,12 +42,13 @@ const Shipyard = (() => {
     return out;
   }
 
-  let ships = [standard()], sel = 0, draft = null;
+  let ships = [standard()], sel = 0, draft = null, owned = START_CANNONS;   // owned: how many cannons you have bought (a ship can carry up to that many)
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw && Array.isArray(raw.ships)) { const list = raw.ships.map(sanitize).filter(Boolean).slice(0, MAX_SAVED); if (list.length) { ships = list; sel = Math.min(list.length - 1, Math.max(0, raw.sel | 0)); } }
+    owned = Math.max(START_CANNONS, Number.isInteger(raw && raw.owned) ? raw.owned : 0, ...ships.map(count)); // ships saved before cannons had a price keep theirs
   } catch (e) { /* storage unavailable */ }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ ships, sel })); } catch (e) { /* ignore */ } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ ships, sel, owned })); } catch (e) { /* ignore */ } };
   const $s = (id) => document.getElementById(id);
   const clone = (d) => JSON.parse(JSON.stringify(d));
 
@@ -119,6 +121,7 @@ const Shipyard = (() => {
     const d = draft, t = TYPES[d.type], n = count(d), p = d.port.filter(Boolean).length, s = d.star.filter(Boolean).length;
     $s("sy-stats").textContent = `${t.name}: hull ${t.hp}, top speed ${Math.round(t.max * 3.6)} km/h, turning ${t.turn >= 1.2 ? "very sharp" : t.turn >= 0.95 ? "good" : t.turn >= 0.8 ? "slow" : "heavy"}. Cannons ${n} of ${t.cannons} (port ${p}, starboard ${s}). Each side fires together; more cannons on a side hit harder but reload slower (${(1.6 + 0.2 * p).toFixed(1)} s port, ${(1.6 + 0.2 * s).toFixed(1)} s starboard).`;
     $s("sy-note").textContent = t.note;
+    $s("sy-owned").textContent = `You own ${owned} cannons (you can use them on any ship, and move them for free). Another costs ${CANNON_PRICE} denarii: you have ${Vitals.coins}.`;
   }
 
   function clickCanvas(e) {
@@ -128,7 +131,14 @@ const Shipyard = (() => {
       const p = slotPos(side, i);
       if (Math.hypot(x - p.x, y - p.y) < 20) {
         if (draft[side][i]) { if (count(draft) > 1) { draft[side][i] = false; hint("Cannon taken off."); } else hint("A ship needs at least one cannon."); }
-        else if (count(draft) < TYPES[draft.type].cannons) { draft[side][i] = true; hint("Cannon added."); }
+        else if (count(draft) < TYPES[draft.type].cannons) {
+          if (count(draft) >= owned) {                              // you must buy another cannon first
+            if (Vitals.coins < CANNON_PRICE) { hint(`A new cannon costs ${CANNON_PRICE} denarii and you have ${Vitals.coins}. (You own ${owned} cannons.)`); toast(`A cannon costs ${CANNON_PRICE} denarii.`); refresh(); return; }
+            Vitals.coins -= CANNON_PRICE; owned++; save(); Sfx.play("coin");
+            hint(`Bought a cannon for ${CANNON_PRICE} denarii. You now own ${owned}.`);
+          } else hint("Cannon added.");
+          draft[side][i] = true;
+        }
         else {                                                        // at the limit: move the nearest cannon to this spot (same side first)
           let best = null, bd = Infinity;
           for (const s2 of [side, side === "port" ? "star" : "port"]) for (let j = 0; j < SLOTS; j++) if (draft[s2][j]) { const d = Math.abs(j - i) + (s2 === side ? 0 : 3); if (d < bd) { bd = d; best = [s2, j]; } }
@@ -215,11 +225,12 @@ const Shipyard = (() => {
     get sel() { return sel; },
     choose(i) { if (Number.isInteger(i) && i >= 0 && i < ships.length) { sel = i; save(); } },
     onlineDesign: () => { const d = ships[sel]; return { type: d.type, sail: d.sail, hull: d.hull, port: d.port.slice(), star: d.star.slice() }; },
-    snapshot: () => ({ ships: clone(ships), sel }),
+    snapshot: () => ({ ships: clone(ships), sel, owned }),
     restore(raw) {
       if (!raw || !Array.isArray(raw.ships)) return;
+      if (Number.isInteger(raw.owned)) owned = Math.max(START_CANNONS, raw.owned);
       const list = raw.ships.map(sanitize).filter(Boolean).slice(0, MAX_SAVED);
-      if (list.length) { ships = list; sel = Math.min(list.length - 1, Math.max(0, raw.sel | 0)); save(); }
+      if (list.length) { ships = list; sel = Math.min(list.length - 1, Math.max(0, raw.sel | 0)); owned = Math.max(owned, ...ships.map(count)); save(); }
     },
     TYPES, SLOTS, SLOT_Z,
   };
