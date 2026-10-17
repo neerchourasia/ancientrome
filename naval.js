@@ -10,6 +10,7 @@ const Naval = (() => {
   const GRAVITY = 14;
   const NAVAL_PURSE = 120; // denarii for winning the naval battle
 
+  let lastDesign = null;
   let scene, active = false, phase = "idle", phaseT = 0, wave = 0, flood = 0, floodTarget = 0, clock = 0, msgTimer, camYaw = 0;
   let water, rippleTex, me = null, foes = [], balls = [], fx = [], queue = [];
   let online = null; // a live battle against real people (free-for-all): { ships, balls, sendT, n, humans, over }
@@ -48,25 +49,34 @@ const Naval = (() => {
     scene.add(water);
   }
 
-  // A small galley with a ram at the bow (+z), a sail and three cannons per side.
+  // A galley with a ram at the bow, masts and sails, and cannons where the design puts them (the default has three a side).
+  // def.ports / def.stars say which of the seven positions along each side hold a cannon (bow first); def.masts is [z, height] pairs.
+  const SLOT_Z = [3.6, 2.4, 1.2, 0, -1.2, -2.4, -3.6];
   function makeGalley(def) {
     const g = new THREE.Group();
-    const wood = lambert(0x7a5230), dark = lambert(0x2a1f16), bronze = lambert(0x9a6a2c), iron = lambert(0x2e2e30), sailM = lambert(0xd9cfb8), band = lambert(def.sail);
+    const wood = lambert(def.hull || 0x7a5230), dark = lambert(0x2a1f16), bronze = lambert(0x9a6a2c), iron = lambert(0x2e2e30), sailM = lambert(0xd9cfb8), band = lambert(def.sail);
     const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
     const hull = part(new THREE.BoxGeometry(3, 1.1, 9), wood, 0, 0.4, 0);
     part(new THREE.BoxGeometry(3.3, 0.25, 8.6), dark, 0, 1.0, 0);
     part(new THREE.BoxGeometry(2.0, 1.1, 2.2), wood, 0, 0.45, 5.4);
     const ram = part(new THREE.ConeGeometry(0.4, 1.7, 8), bronze, 0, 0.1, 7.0); ram.rotation.x = Math.PI / 2;
-    part(new THREE.BoxGeometry(2.4, 2.4, 0.5), wood, 0, 1.7, -4.6);
-    part(new THREE.CylinderGeometry(0.13, 0.17, 6.5, 8), dark, 0, 4.3, 0.4);
-    part(new THREE.BoxGeometry(4.2, 2.8, 0.08), sailM, 0, 4.6, 0.4);
-    part(new THREE.BoxGeometry(4.2, 0.7, 0.1), band, 0, 5.4, 0.43);
+    part(new THREE.BoxGeometry(2.4, def.castle ? 3.4 : 2.4, 0.5), wood, 0, def.castle ? 2.2 : 1.7, -4.6);
+    if (def.castle) part(new THREE.BoxGeometry(2.8, 0.3, 2.2), dark, 0, 3.9, -4.0);
+    for (const [mz, mh] of def.masts || [[0.4, 6.5]]) {
+      const k = mh / 6.5;
+      part(new THREE.CylinderGeometry(0.13, 0.17, mh, 8), dark, 0, 1 + mh / 2, mz);
+      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k), 2.8 * k, 0.08), sailM, 0, 1 + mh * 0.55, mz);
+      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k), 0.7 * k, 0.1), band, 0, 1 + mh * 0.83, mz + 0.03);
+    }
     const cannons = [];
-    for (const side of [1, -1]) for (const cz of [-2.4, 0, 2.4]) {
+    const layout = def.ports ? [[1, def.ports], [-1, def.stars]] : [[1, [0, 1, 0, 1, 0, 1, 0]], [-1, [0, 1, 0, 1, 0, 1, 0]]];
+    for (const [side, slots] of layout) slots.forEach((on, i) => {
+      if (!on) return;
+      const cz = SLOT_Z[i];
       const c = part(new THREE.CylinderGeometry(0.22, 0.3, 1.2, 10), iron, side * 1.6, 1.3, cz);
       c.rotation.z = -side * Math.PI / 2;
       cannons.push({ side, z: cz });
-    }
+    });
     g.traverse((c) => { c.frustumCulled = false; });
     g.scale.setScalar(def.scale);
     return { g, cannons, hull };
@@ -76,7 +86,7 @@ const Naval = (() => {
     const model = makeGalley(def);
     scene.add(model.g);
     const c0 = isPlayer ? 0.3 : 2.5;
-    return { model, def, sc: def.scale, x, z, yaw, v: 0, hp: def.hp, max: def.hp, maxSpeed: def.max, player: isPlayer, cd: { 1: c0, "-1": c0 }, ram: 0, flash: 0, dead: false, sink: 0 };
+    return { model, def, sc: def.scale, turnK: def.turn || 1, x, z, yaw, v: 0, hp: def.hp, max: def.hp, maxSpeed: def.max, player: isPlayer, cd: { 1: c0, "-1": c0 }, ram: 0, flash: 0, dead: false, sink: 0 };
   }
 
   // ---------- effects ----------
@@ -117,7 +127,7 @@ const Naval = (() => {
 
   function fireSide(s, side) {
     if (s.dead || s.cd[side] > 0 || phase !== "battle") return false;
-    s.cd[side] = s.player ? 2.2 : 4.5 + Math.random() * 2;
+    s.cd[side] = s.player ? 1.6 + 0.2 * s.model.cannons.filter((c) => c.side === side).length : 4.5 + Math.random() * 2; // a bigger broadside reloads slower (three a side: 2.2 s)
     s.model.cannons.filter((c) => c.side === side).forEach((c, i) => queue.push({ t: i * 0.13 + Math.random() * 0.05, s, side, c }));
     return true;
   }
@@ -183,7 +193,7 @@ const Naval = (() => {
   function stepShip(s, dt, throttle, turn) {
     const target = throttle > 0 ? s.maxSpeed * throttle : throttle < 0 ? -2.2 : 0;
     s.v += Math.max(-5 * dt, Math.min(3.2 * dt, target - s.v));
-    s.yaw += turn * 1.0 * (0.35 + Math.min(1, Math.abs(s.v) / s.maxSpeed) * 0.65) * dt * (s.v < -0.1 ? -1 : 1);
+    s.yaw += turn * (s.turnK || 1) * (0.35 + Math.min(1, Math.abs(s.v) / s.maxSpeed) * 0.65) * dt * (s.v < -0.1 ? -1 : 1);
     s.x += Math.sin(s.yaw) * s.v * dt; s.z += Math.cos(s.yaw) * s.v * dt;
     const e = ((s.x - CX) / RX) ** 2 + ((s.z - CZ) / RZ) ** 2;
     if (e > 1) { const k = 1 / Math.sqrt(e); s.x = CX + (s.x - CX) * k; s.z = CZ + (s.z - CZ) * k; s.v *= 0.7; }
@@ -243,7 +253,7 @@ const Naval = (() => {
     msgTimer = setTimeout(() => m.classList.remove("show"), ms);
   }
 
-  function start() {
+  function start(design) {
     if (active) return;
     if (!Vitals.canFight()) {
       toast(`You are too wounded to command a ship (health ${Math.round(Vitals.hp)}/100). Press Z to rest and heal.`);
@@ -251,7 +261,8 @@ const Naval = (() => {
     }
     active = true; mode = "naval"; phase = "flooding"; phaseT = 4.5; wave = 0; flood = 0; floodTarget = 1;
     fx = []; balls = []; queue = [];
-    me = makeShip({ hp: 100, scale: 0.8, max: 6.6, sail: 0x2f8f4a }, CX - 18, CZ, Math.PI / 2, true);
+    me = makeShip(design || (typeof Shipyard !== "undefined" ? Shipyard.selectedDef() : { hp: 100, scale: 0.8, max: 6.6, sail: 0x2f8f4a }), CX - 18, CZ, Math.PI / 2, true);
+    if (design) lastDesign = design;
     me.model.g.visible = false;
     camYaw = me.yaw;
     el("naval-hud").classList.add("show");
@@ -284,7 +295,7 @@ const Naval = (() => {
       for (const b of live.balls.values()) { scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh.geometry.dispose(); }
     }
     // Damage to your ship costs you: the crew (you) are hurt in proportion, and a lost battle costs money.
-    const hullLost = me ? 100 - me.hp : 0, defeat = !!title && !win;
+    const hullLost = me ? 100 * (1 - me.hp / me.max) : 0, defeat = !!title && !win;
     if (!live) Vitals.hp = defeat ? 0 : Math.max(5, Vitals.hp - hullLost * 0.35);
     if (live) { /* no fines or wounds against real people: only the prize (added by the caller) */ }
     else if (defeat) {
@@ -572,7 +583,7 @@ const Naval = (() => {
     if (me) { player.x = me.x; player.z = me.z; player.feet = 0; }
     el("nv-wave").textContent = `Wave ${Math.min(wave + 1, WAVES.length)} / ${WAVES.length}`;
     el("nv-enemies").textContent = `Enemy ships: ${foes.filter((f) => !f.dead).length}`;
-    el("nv-hull").style.width = `${me ? me.hp : 0}%`;
+    el("nv-hull").style.width = `${me ? (me.hp / me.max) * 100 : 0}%`;
     el("nv-port").classList.toggle("ready", !!me && me.cd[1] <= 0);
     el("nv-star").classList.toggle("ready", !!me && me.cd[-1] <= 0);
     const f = el("flash");

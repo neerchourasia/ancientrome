@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=166">
+  <link rel="stylesheet" href="walk.css?v=171">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=166"></script>
+  <script src="boot.js?v=171"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -270,6 +270,26 @@
     </div>
   </div>
 
+  <div id="shipyard" class="dpanel" role="dialog" aria-label="Shipyard">
+    <div class="box wide">
+      <header><h2>⚓ The shipyard</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
+      <p class="dnote small">Build your ship for the naumachia. Pick a type, click the circles along each side to put a cannon there (or take it off), choose the colours, then save it and sail.</p>
+      <ul id="sy-list" class="dlist"></ul>
+      <div class="sy-grid">
+        <canvas id="sy-canvas" width="300" height="440" aria-label="Your ship from above"></canvas>
+        <div class="sy-side">
+          <label class="dnote">Name <input id="sy-name" type="text" maxlength="20"></label>
+          <p class="dnote small">Type</p><div id="sy-types" class="dbtns"></div>
+          <p id="sy-note" class="dnote small"></p>
+          <p class="dnote small">Sail colour</p><div id="sy-sails" class="sy-sws"></div>
+          <p class="dnote small">Hull colour</p><div id="sy-hulls" class="sy-sws"></div>
+          <p id="sy-stats" class="dnote small"></p>
+        </div>
+      </div>
+      <div class="dbtns"><button id="sy-save" type="button">Save this ship</button><button id="sy-new" type="button">Save as a new ship</button><button id="sy-sail" type="button">⚓ Sail into battle</button></div>
+    </div>
+  </div>
+
   <div id="job" class="dpanel" role="dialog" aria-label="Work in the hypogeum">
     <div class="box">
       <header><h2 id="job-title">Work</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
@@ -385,39 +405,40 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=166"></script>
-  <script src="delhi-data.js?v=166"></script>
-  <script src="config.js?v=166"></script>
-  <script src="character.js?v=166"></script>
-  <script src="physics.js?v=166"></script>
-  <script src="vitals.js?v=166"></script>
-  <script src="narrator.js?v=166"></script>
-  <script src="audio.js?v=166"></script>
-  <script src="world.js?v=166"></script>
-  <script src="city.js?v=166"></script>
-  <script src="weather.js?v=166"></script>
-  <script src="modern.js?v=166"></script>
-  <script src="delhi.js?v=166"></script>
-  <script src="delhi-games.js?v=166"></script>
-  <script src="home.js?v=166"></script>
-  <script src="spectators.js?v=166"></script>
-  <script src="fight.js?v=166"></script>
-  <script src="nav.js?v=166"></script>
-  <script src="show.js?v=166"></script>
-  <script src="naval.js?v=166"></script>
-  <script src="watch.js?v=166"></script>
-  <script src="race.js?v=166"></script>
-  <script src="account.js?v=166"></script>
-  <script src="online.js?v=166"></script>
-  <script src="chat.js?v=166"></script>
-  <script src="tax.js?v=166"></script>
-  <script src="pets.js?v=166"></script>
-  <script src="car.js?v=166"></script>
-  <script src="market.js?v=166"></script>
-  <script src="garage.js?v=166"></script>
-  <script src="dresser.js?v=166"></script>
-  <script src="stalls.js?v=166"></script>
-  <script src="jobs.js?v=166"></script>
-  <script src="game.js?v=166"></script>
+  <script src="landmarks.js?v=171"></script>
+  <script src="delhi-data.js?v=171"></script>
+  <script src="config.js?v=171"></script>
+  <script src="character.js?v=171"></script>
+  <script src="physics.js?v=171"></script>
+  <script src="vitals.js?v=171"></script>
+  <script src="narrator.js?v=171"></script>
+  <script src="audio.js?v=171"></script>
+  <script src="world.js?v=171"></script>
+  <script src="city.js?v=171"></script>
+  <script src="weather.js?v=171"></script>
+  <script src="modern.js?v=171"></script>
+  <script src="delhi.js?v=171"></script>
+  <script src="delhi-games.js?v=171"></script>
+  <script src="home.js?v=171"></script>
+  <script src="spectators.js?v=171"></script>
+  <script src="fight.js?v=171"></script>
+  <script src="nav.js?v=171"></script>
+  <script src="show.js?v=171"></script>
+  <script src="shipyard.js?v=171"></script>
+  <script src="naval.js?v=171"></script>
+  <script src="watch.js?v=171"></script>
+  <script src="race.js?v=171"></script>
+  <script src="account.js?v=171"></script>
+  <script src="online.js?v=171"></script>
+  <script src="chat.js?v=171"></script>
+  <script src="tax.js?v=171"></script>
+  <script src="pets.js?v=171"></script>
+  <script src="car.js?v=171"></script>
+  <script src="market.js?v=171"></script>
+  <script src="garage.js?v=171"></script>
+  <script src="dresser.js?v=171"></script>
+  <script src="stalls.js?v=171"></script>
+  <script src="jobs.js?v=171"></script>
+  <script src="game.js?v=171"></script>
 </body>
 </html>

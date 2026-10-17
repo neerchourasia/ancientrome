@@ -53,6 +53,7 @@ function init() {
   Tax.bind();
   Admin.bind();
   Market.bind();
+  Shipyard.bind();
   applyCharacter();
   Crowd.build(scene);
   Fight.init(scene, camera);
@@ -162,7 +163,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
       else if (k === "KeyL" && inArena(player.x, player.z)) Fight.start({ lion: true });
       else if (k === "KeyU" && inArena(player.x, player.z)) Fight.start({ hunt: true });
-      else if (k === "KeyN" && inArena(player.x, player.z)) Naval.start();
+      else if (k === "KeyN" && inArena(player.x, player.z)) Shipyard.open();
       else if (k === "KeyR" && inCircusTrack(player.x, player.z)) Race.start();
       else if (k === "KeyV" && (inColosseum(player.x, player.z) || inCircusArea(player.x, player.z))) Watch.start(inColosseum(player.x, player.z) ? "duel" : "race");
     } else if (mode === "naval") {
@@ -1050,7 +1051,7 @@ function updatePrompt() {
     p.dataset.kind = "";
     if (Vitals.resting) text = "Resting... move to stand up";
     else if (era === "modern" && (inArena(player.x, player.z) || inCircusTrack(player.x, player.z) || inColosseum(player.x, player.z) || inCircusStands(player.x, player.z))) text = "The games only ran in Ancient Rome. Press K to go back";
-    else if (inArena(player.x, player.z)) text = Vitals.canFight() ? "F: gladiators · U: animal hunt · L: lion · N: naval battle · V: watch the games" : "Too wounded to fight. Press Z to rest and heal · V: watch the games";
+    else if (inArena(player.x, player.z)) text = Vitals.canFight() ? "F: gladiators · U: animal hunt · L: lion · N: build your ship and fight a naval battle · V: watch the games" : "Too wounded to fight. Press Z to rest and heal · V: watch the games";
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
