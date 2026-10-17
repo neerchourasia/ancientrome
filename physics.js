@@ -56,8 +56,11 @@ function inCorridor(p, dx, dz) {
   return Math.abs(dx) < p.gap && (p.side === 0 || Math.sign(dz) === p.side);
 }
 
-function addPlatformBox(x0, x1, z0, z1, top) {
-  platformGrid.add({ t: 0, x0, x1, z0, z1, top }, x0, x1, z0, z1);
+// Walkable surfaces can belong to one era (`extra.era`), like obstacles, so places that only exist today do not leave steps behind.
+function addPlatformBox(x0, x1, z0, z1, top, extra) {
+  const item = { t: 0, x0, x1, z0, z1, top, ...extra };
+  platformGrid.add(item, x0, x1, z0, z1);
+  return item;
 }
 function addPlatformCircle(cx, cz, r, top) {
   platformGrid.add({ t: 1, cx, cz, r2: r * r, top }, cx - r, cx + r, cz - r, cz + r);
@@ -94,6 +97,7 @@ function groundAt(x, z) {
   for (let i = 0; i < list.length; i++) {
     const p = list[i];
     if (p.top <= h) continue;
+    if (p.era && (p.era === "modern") !== modernEra) continue;
     if (p.t === 0) {
       if (x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1) h = p.top;
     } else if (p.t === 1) {

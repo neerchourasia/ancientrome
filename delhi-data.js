@@ -92,6 +92,18 @@ const DELHI_LANDMARKS = [
     modern: "It is still a working mosque. Visitors climb the same steps and look out over the markets.",
   }),
   dl({
+    id: "d-indiagate", only: "modern", name: "India Gate", sub: "War memorial · completed 1931",
+    x: -100, z: 900, r: 70, stand: [-165, 900],
+    text: "A 42-metre arch of sandstone on a granite base, at the eastern end of New Delhi's great ceremonial avenue. It was designed by Edwin Lutyens and finished in 1931, as a memorial to the Indian soldiers who died in the First World War and the Third Anglo-Afghan War. The names of more than 13,000 of them are carved into its walls.",
+    fact: "It is often compared with the Arc de Triomphe in Paris. An eternal flame burned under the arch from 1972, until it was merged with the flame at the nearby National War Memorial in 2022.",
+  }),
+  dl({
+    id: "d-kartavya", only: "modern", name: "Kartavya Path", sub: "The ceremonial avenue, once Rajpath",
+    x: -280, z: 900, r: 60, stand: [-300, 900],
+    text: "The great ceremonial avenue of New Delhi, between long canals and wide lawns. It was called Kingsway and then Rajpath, and in 2022 it was renamed Kartavya Path, the Path of Duty. The Republic Day parade marches along it every 26 January.",
+    fact: "When Shah Jahan built his capital this ground was open country. New Delhi was laid out here only after 1911.",
+  }),
+  dl({
     id: "d-metro", only: "modern", name: "Chandni Chowk Metro Station", sub: "Yellow Line · opened 2005",
     x: -212, z: 30, r: 22, stand: [-212, 12],
     text: "An underground station of the Delhi Metro, near the Red Fort, opened on 3 July 2005. A tunnel links it to Delhi Junction railway station. It carries visitors to Old Delhi far faster than the street ever could.",

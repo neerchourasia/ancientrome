@@ -6,8 +6,8 @@
 
 const Delhi = (() => {
   const DX = DELHI_X;
-  const BOUNDS_D = { minX: DX - 705, maxX: DX + 315, minZ: -335, maxZ: 385 };
-  const MAP_D = { x0: DX - 720, x1: DX + 440, z0: -345, z1: 395 };
+  const BOUNDS_D = { minX: DX - 705, maxX: DX + 315, minZ: -335, maxZ: 1250 };   // Old Delhi, and New Delhi's India Gate far to the south
+  const MAP_D = { x0: DX - 720, x1: DX + 440, z0: -345, z1: 1260 };
   const SPAWN = { x: DX - 40, z: 0, yaw: -Math.PI / 2 };
 
   let built = false, scene = null, root = null, modernNow = false, clock = 0;
@@ -47,7 +47,7 @@ const Delhi = (() => {
     parent.add(mesh);
     const ex = o.era ? { era: o.era } : undefined;
     if (o.solid) addBlockerBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h, ex);
-    if (o.walk) addPlatformBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0 + h);
+    if (o.walk) addPlatformBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0 + h, ex);
     if (o.map) MAP_SHAPES.push({ k: "r", x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, c: o.map });
     return mesh;
   }
@@ -95,37 +95,43 @@ const Delhi = (() => {
     p.lineTo(w / 2, 0); p.lineTo(-w / 2, 0);
     return p;
   }
-  function archWallGeo(w, h, thick, ow, oh) {
+  function roundArchShape(w, h) { // a round (Roman) arch, as on India Gate
+    const p = new T.Path();
+    p.moveTo(-w / 2, 0); p.lineTo(-w / 2, h - w / 2); p.absarc(0, h - w / 2, w / 2, Math.PI, 0, true); p.lineTo(w / 2, 0); p.lineTo(-w / 2, 0);
+    return p;
+  }
+  function archWallGeo(w, h, thick, ow, oh, round) {
     const s = new T.Shape();
     s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2, h); s.lineTo(-w / 2, h); s.lineTo(-w / 2, 0);
-    s.holes.push(archShape(ow, oh));
+    s.holes.push(round ? roundArchShape(ow, oh) : archShape(ow, oh));
     const g = new T.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: 10 });
     g.translate(0, 0, -thick / 2);
     return g;
   }
 
   // A gate with a pointed archway. `alongZ`: the wall runs north-south and you walk through it east-west.
-  function gate(parent, cx, cz, alongZ, w, h, thick, ow, oh, m, y0 = 0) {
-    const mesh = new T.Mesh(archWallGeo(w, h, thick, ow, oh), m);
+  function gate(parent, cx, cz, alongZ, w, h, thick, ow, oh, m, y0 = 0, o = {}) {
+    const ex = o.era ? { era: o.era } : undefined;
+    const mesh = new T.Mesh(archWallGeo(w, h, thick, ow, oh, o.round), m);
     mesh.position.set(cx, y0, cz);
     if (alongZ) mesh.rotation.y = Math.PI / 2;
     mesh.castShadow = mesh.receiveShadow = true;
     parent.add(mesh);
     const hw = (w - ow) / 2;
     if (alongZ) {
-      addBlockerBox(cx - thick / 2, cx + thick / 2, cz - w / 2, cz - ow / 2, y0, y0 + h);
-      addBlockerBox(cx - thick / 2, cx + thick / 2, cz + ow / 2, cz + w / 2, y0, y0 + h);
-      addBlockerBox(cx - thick / 2, cx + thick / 2, cz - ow / 2, cz + ow / 2, y0 + oh, y0 + h);
+      addBlockerBox(cx - thick / 2, cx + thick / 2, cz - w / 2, cz - ow / 2, y0, y0 + h, ex);
+      addBlockerBox(cx - thick / 2, cx + thick / 2, cz + ow / 2, cz + w / 2, y0, y0 + h, ex);
+      addBlockerBox(cx - thick / 2, cx + thick / 2, cz - ow / 2, cz + ow / 2, y0 + oh, y0 + h, ex);
     } else {
-      addBlockerBox(cx - w / 2, cx - ow / 2, cz - thick / 2, cz + thick / 2, y0, y0 + h);
-      addBlockerBox(cx + ow / 2, cx + w / 2, cz - thick / 2, cz + thick / 2, y0, y0 + h);
-      addBlockerBox(cx - ow / 2, cx + ow / 2, cz - thick / 2, cz + thick / 2, y0 + oh, y0 + h);
+      addBlockerBox(cx - w / 2, cx - ow / 2, cz - thick / 2, cz + thick / 2, y0, y0 + h, ex);
+      addBlockerBox(cx + ow / 2, cx + w / 2, cz - thick / 2, cz + thick / 2, y0, y0 + h, ex);
+      addBlockerBox(cx - ow / 2, cx + ow / 2, cz - thick / 2, cz + thick / 2, y0 + oh, y0 + h, ex);
     }
     return mesh;
   }
 
   // Steps rising to `top` along one side of a platform. dir: +x, -x, +z or -z is the way you climb up (towards the platform).
-  function steps(x0, z0, dir, width, n, rise, tread) {
+  function steps(x0, z0, dir, width, n, rise, tread, era) {
     for (let k = 1; k <= n; k++) {
       const run = (n - k + 1) * tread, top = k * rise;
       let a, b, c, d;
@@ -133,7 +139,7 @@ const Delhi = (() => {
       else if (dir === "+x") { a = x0; b = x0 + run; c = z0 - width / 2; d = z0 + width / 2; }
       else if (dir === "-z") { a = x0 - width / 2; b = x0 + width / 2; c = z0 - run; d = z0; }
       else { a = x0 - width / 2; b = x0 + width / 2; c = z0; d = z0 + run; }
-      addPlatformBox(a, b, c, d, top);
+      addPlatformBox(a, b, c, d, top, era ? { era } : undefined);
       const m = new T.Mesh(BOX, D.stone);
       m.scale.set(b - a, top, d - c); m.position.set((a + b) / 2, top / 2, (c + d) / 2);
       m.receiveShadow = true; m.castShadow = true;
@@ -346,7 +352,7 @@ const Delhi = (() => {
 
   const EXCL = [ // [x0, x1, z0, z1] in local coordinates: where the town is not built
     [-640, 12, -19, 19], [-92, 12, -72, 72], [-4, 314, -282, 282],
-    [-340, -132, 195, 352], [-159, -141, 18, 352], [-292, -188, -112, -18], [-136, -64, -96, -18],
+    [-340, -132, 195, 352], [-159, -141, 18, 400], [-292, -188, -112, -18], [-136, -64, -96, -18],
     [-708, -610, -76, 76], [-424, -416, -340, -18], [-232, -192, 18, 46],
   ];
   const excluded = (x, z, m = 0) => EXCL.some(([x0, x1, z0, z1]) => x > x0 - m && x < x1 + m && z > z0 - m && z < z1 + m);
@@ -745,6 +751,90 @@ const Delhi = (() => {
     MAP_SHAPES.push({ k: "r", x0: cx - 2.8, x1: cx + 2.8, z0: cz - 1.8, z1: cz + 1.8, c: "#2f8f4a" });
   }
 
+
+  // ---------- New Delhi: the road south, India Gate and Kartavya Path (they only exist today) ----------
+
+  const GATE = { x: -100, z: 900 };
+  const leafTrees = (parent, spots, color, scale = 1) => { // a batch of round trees (instanced)
+    const trunk = new T.CylinderGeometry(0.25, 0.35, 1, 6); trunk.translate(0, 0.5, 0);
+    const crown = new T.SphereGeometry(1, 9, 7); crown.translate(0, 0.9, 0);
+    const tr = new T.InstancedMesh(trunk, lambert(0x5a4630), spots.length);
+    const cr = new T.InstancedMesh(crown, Object.assign(lambert(color), { userData: { leaf: color } }), spots.length), o = new T.Object3D();
+    spots.forEach(([x, z, k = 1], i) => {
+      o.rotation.set(0, 0, 0); o.position.set(X(x), 0, z); o.scale.set(1, 4 * scale * k, 1); o.updateMatrix(); tr.setMatrixAt(i, o.matrix);
+      o.position.set(X(x), 4 * scale * k, z); o.scale.set(3 * scale * k, 3 * scale * k, 3 * scale * k); o.updateMatrix(); cr.setMatrixAt(i, o.matrix);
+    });
+    for (const m of [tr, cr]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = true; parent.add(m); }
+  };
+
+  function buildNewDelhi() {
+    const gx = X(GATE.x), gz = GATE.z, sand = lambert(0xb98a5e, { map: stoneTex("#ffffff") }), granite = lambert(0x7d7d7a);
+    // more ground to the south
+    const g2 = new T.Mesh(new T.PlaneGeometry(1500, 900), lambert(0xa9a06f)); g2.rotation.x = -Math.PI / 2; g2.position.set(X(-190), -0.03, 820); g2.receiveShadow = true; scene.add(g2);
+    // the road from the Jama Masjid lane south to the avenue: a dirt track in Shah Jahan's day, tarmac today
+    const road = new T.Mesh(new T.PlaneGeometry(14, 540), new T.MeshLambertMaterial({ map: pavingTex("#c4b08a", "rgba(110,80,50,.28)", 32, 2, 38) }));
+    road.rotation.x = -Math.PI / 2; road.position.set(X(-150), 0.03, 620); road.receiveShadow = true; scene.add(road);
+    MAP_SHAPES.push({ k: "r", x0: X(-157), x1: X(-143), z0: 350, z1: 892, c: "#c8b99a" });
+    const roadTrees = []; for (let z = 375; z < 880; z += 26) roadTrees.push([-162, z], [-138, z + 13]);
+    leafTrees(scene, roadTrees, 0x4a7a36);
+
+    // Shah Jahan's day: open scrubland with a few trees where New Delhi will one day stand
+    const field = []; for (let i = 0; i < 26; i++) field.push([-420 + Math.random() * 520, 790 + Math.random() * 220, 0.8 + Math.random() * 0.7]);
+    leafTrees(mughal, field, 0x5a7a3a);
+    mbox(mughal, X(-190), 0.02, 900, 520, 0.04, 260, lambert(0xb5a56a), { cast: false });
+
+    // Kartavya Path (once Rajpath): a paved avenue between two long canals and wide lawns
+    const AV0 = -450, AV1 = -112, len = AV1 - AV0, cx = X((AV0 + AV1) / 2);
+    const paveTex = pavingTex("#c9b58f", "rgba(110,80,50,.25)", 32, 40, 3);
+    const av = new T.Mesh(new T.PlaneGeometry(len, 30), new T.MeshLambertMaterial({ map: paveTex })); av.rotation.x = -Math.PI / 2; av.position.set(cx, 0.03, gz); modernG.add(av);
+    for (const sz of [-1, 1]) {
+      mbox(modernG, cx, 0.02, gz + sz * 24, len, 0.05, 8, D.water, { cast: false });
+      mbox(modernG, cx, 0, gz + sz * 28.5, len, 0.35, 0.7, D.marble, { cast: false }); mbox(modernG, cx, 0, gz + sz * 19.5, len, 0.35, 0.7, D.marble, { cast: false });
+      mbox(modernG, cx, 0.03, gz + sz * 45, len, 0.06, 32, D.lawn, { cast: false });
+    }
+    // the lane crosses the canal on a bridge
+    mbox(modernG, X(-150), 0.05, gz - 24, 14, 0.12, 9, lambert(0xc4b08a), { cast: false });
+    const lawnTrees = []; for (let x = AV0 + 10; x < AV1 - 20; x += 24) lawnTrees.push([x, gz - 58], [x + 12, gz + 58]);
+    leafTrees(modernG, lawnTrees, 0x4a7a36, 1.2);
+    // street lamps down both edges
+    const pole = new T.CylinderGeometry(0.1, 0.14, 1, 6); pole.translate(0, 0.5, 0);
+    const lamps = []; for (let x = AV0 + 6; x < AV1; x += 30) lamps.push([x, gz - 16], [x, gz + 16]);
+    const poles = new T.InstancedMesh(pole, D.grey, lamps.length), heads = new T.InstancedMesh(BOX, D.yellow, lamps.length), o = new T.Object3D();
+    lamps.forEach(([x, z], i) => { o.rotation.set(0, 0, 0); o.position.set(X(x), 0, z); o.scale.set(1, 7, 1); o.updateMatrix(); poles.setMatrixAt(i, o.matrix); o.position.set(X(x), 7, z); o.scale.set(1.2, 0.3, 0.6); o.updateMatrix(); heads.setMatrixAt(i, o.matrix); });
+    for (const m of [poles, heads]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; modernG.add(m); }
+    // the plaza round the gate
+    const plaza = new T.Mesh(new T.PlaneGeometry(160, 120), new T.MeshLambertMaterial({ map: pavingTex("#cdbb96", "rgba(110,80,50,.28)", 32, 14, 10) })); plaza.rotation.x = -Math.PI / 2; plaza.position.set(X(-50), 0.04, gz); modernG.add(plaza);
+
+    // India Gate: a 42 m round arch of sandstone on a granite base, three low steps all round
+    const E = "modern";
+    mbox(modernG, gx, 0, gz, 46, 0.4, 42, granite, { walk: true, era: E });
+    mbox(modernG, gx, 0.4, gz, 38, 0.4, 34, granite, { walk: true, era: E });
+    mbox(modernG, gx, 0.8, gz, 32, 0.4, 28, granite, { walk: true, era: E });
+    const base = 1.2;
+    gate(modernG, gx, gz, true, 24, 38, 12, 11, 25, sand, base, { era: E, round: true });
+    mbox(modernG, gx, base + 38, gz, 14, 1.2, 26, sand, { cast: true });                 // the cornice
+    mbox(modernG, gx, base + 39.2, gz, 11, 1.0, 22, sand);
+    mcyl(modernG, gx, base + 40.2, gz, 4.2, 0.9, D.dark);                                   // the shallow bowl on top
+    mcyl(modernG, gx, base + 41.0, gz, 5.0, 0.3, sand);
+    mbox(modernG, gx, base + 35.5, gz, 12.5, 2.6, 24, lambert(0xa57a52), { cast: false });   // the frieze
+    for (const side of [-1, 1]) {
+      boardSign(modernG, gx + side * 6.1, base + 36.8, gz, 14, 2.6, "INDIA", null, side * Math.PI / 2, "#a57a52", "#3a2a1a");
+      const names = canvasTex(64, 128, (g, w, h) => { g.fillStyle = "#b98a5e"; g.fillRect(0, 0, w, h); g.fillStyle = "rgba(60,40,25,.55)"; for (let r = 4; r < h; r += 5) { let x = 3; while (x < w - 4) { const l = 3 + Math.random() * 9; g.fillRect(x, r, l, 1.6); x += l + 3; } } }, 1, 1);
+      for (const sz of [-1, 1]) { const pl = new T.Mesh(new T.PlaneGeometry(4.6, 22), new T.MeshLambertMaterial({ map: names })); pl.position.set(gx + side * 6.05, base + 14, gz + sz * 8.3); pl.rotation.y = side * Math.PI / 2; modernG.add(pl); }
+    }
+    MAP_SHAPES.push({ k: "r", x0: gx - 23, x1: gx + 23, z0: gz - 21, z1: gz + 21, c: "#b98a5e" }, { k: "r", x0: X(AV0), x1: X(AV1), z0: gz - 15, z1: gz + 15, c: "#c8b99a" }, { k: "r", x0: X(AV0), x1: X(AV1), z0: gz - 28, z1: gz - 20, c: "#8fc0d9" }, { k: "r", x0: X(AV0), x1: X(AV1), z0: gz + 20, z1: gz + 28, c: "#8fc0d9" });
+
+    // the canopy behind the gate, with a granite statue of Subhas Chandra Bose under it (put there in 2022)
+    const kx = gx + 78;
+    mbox(modernG, kx, 0, gz, 26, 0.5, 26, granite, { walk: true, era: E }); mbox(modernG, kx, 0.5, gz, 22, 0.5, 22, granite, { walk: true, era: E });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(modernG, kx + sx * 8, 1, gz + sz * 8, 2.2, 10, 2.2, sand, { solid: true, era: E });
+    mbox(modernG, kx, 11, gz, 21, 1.6, 21, sand);
+    const roof = new T.Mesh(new T.ConeGeometry(15.5, 5, 4), sand); roof.position.set(kx, 13.4, gz); roof.rotation.y = Math.PI / 4; modernG.add(roof);
+    mbox(modernG, kx, 1, gz, 4, 1.4, 4, granite, { solid: true, era: E }); mcyl(modernG, kx, 2.4, gz, 0.9, 5.6, D.dark); mcyl(modernG, kx, 2.4, gz, 1.1, 1.2, D.dark);
+    const head = new T.Mesh(new T.SphereGeometry(0.62, 10, 8), D.dark); head.position.set(kx, 8.5, gz); modernG.add(head);
+    MAP_SHAPES.push({ k: "r", x0: kx - 13, x1: kx + 13, z0: gz - 13, z1: gz + 13, c: "#b98a5e" });
+  }
+
   // ---------- modern Delhi: the Metro, street lights, rickshaws ----------
 
   function buildModernBits() {
@@ -784,7 +874,7 @@ const Delhi = (() => {
     const head = new T.InstancedMesh(headGeo, new T.MeshLambertMaterial({ color: 0xffffff }), count);
     const hat = new T.InstancedMesh(hatGeo, new T.MeshLambertMaterial({ color: 0xffffff }), count);
     const skins = [0xc9956b, 0xa8724c, 0x8d5a38, 0xd9a77a].map((c) => new T.Color(c));
-    const hubs = [[-300, 0, 160, 14], [-100, 0, 40, 40], [100, 0, 60, 90], [-230, 270, 40, 40], [-640, 0, 40, 30], [200, -200, 50, 40]];
+    const hubs = [[-300, 0, 160, 14], [-100, 0, 40, 40], [100, 0, 60, 90], [-230, 270, 40, 40], [-640, 0, 40, 30], [200, -200, 50, 40], [-100, 900, 70, 40]];
     for (let i = 0; i < count; i++) {
       let x = 0, z = 0;
       for (let t = 0; t < 40; t++) {
@@ -906,6 +996,7 @@ const Delhi = (() => {
     buildFatehpuri();
     buildModernBits();
     buildVenues();
+    buildNewDelhi();
     buildPeople();
     buildRides();
     buildElephants();
