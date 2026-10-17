@@ -4,8 +4,9 @@
 
 const Vitals = (() => {
   const KEY = "rome-vitals";
+  const START_COINS = 300; // what a new game starts with
   const MIN_FIGHT_HP = 35, MIN_RACE_HORSES = 40, RACE_ENTRY = 20;
-  const s = { hp: 100, horses: 100, coins: 100 };
+  const s = { hp: 100, horses: 100, coins: START_COINS };
   let resting = false, saveT = 0, fed = 0;
 
   const clamp = (v) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 100));
@@ -47,6 +48,6 @@ const Vitals = (() => {
       return null;
     },
     save,
-    reset() { s.hp = 100; s.horses = 100; s.coins = 100; save(); },
+    reset() { s.hp = 100; s.horses = 100; s.coins = START_COINS; save(); },
   };
 })();
