@@ -28,20 +28,20 @@ const Weather = (() => {
     ],
   };
   const LOOK = { // what each kind of weather does to the world
-    clear: { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0.05, icon: "☀", name: "Sunny" },
-    partly: { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.12, grey: 0.2, wind: 0.15, icon: "🌤", name: "Partly cloudy" },
-    cloudy: { rain: 0, snow: 0, hail: 0, fog: 0.05, dark: 0.35, grey: 0.45, wind: 0.2, icon: "⛅", name: "Cloudy" },
-    windy: { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.1, grey: 0.15, wind: 1, icon: "💨", name: "Windy" },
-    drizzle: { rain: 0.28, snow: 0, hail: 0, fog: 0.12, dark: 0.35, grey: 0.55, wind: 0.2, icon: "🌦", name: "Drizzle" },
-    rain: { rain: 0.7, snow: 0, hail: 0, fog: 0.25, dark: 0.55, grey: 0.75, wind: 0.35, icon: "🌧", name: "Rain" },
-    storm: { rain: 1, snow: 0, hail: 0, fog: 0.3, dark: 0.8, grey: 0.9, wind: 0.8, icon: "⛈", name: "Thunderstorm" },
-    fog: { rain: 0, snow: 0, hail: 0, fog: 1, dark: 0.25, grey: 0.7, wind: 0, icon: "🌫", name: "Fog" },
-    mist: { rain: 0, snow: 0, hail: 0, fog: 0.45, dark: 0.12, grey: 0.35, wind: 0.05, icon: "🌁", name: "Misty" },
-    hail: { rain: 0.45, snow: 0, hail: 1, fog: 0.2, dark: 0.65, grey: 0.85, wind: 0.5, icon: "🧊", name: "Hailstorm" },
-    blizzard: { rain: 0, snow: 1, hail: 0, fog: 0.8, dark: 0.45, grey: 0.85, wind: 1, icon: "🌨", name: "Blizzard" },
-    tornado: { rain: 0.3, snow: 0, hail: 0, fog: 0.3, dark: 0.75, grey: 0.9, wind: 1, icon: "🌪", name: "Tornado" },
-    cyclone: { rain: 1, snow: 0, hail: 0, fog: 0.45, dark: 0.85, grey: 0.95, wind: 1, icon: "🌀", name: "Cyclone" },
-    snow: { rain: 0, snow: 1, hail: 0, fog: 0.35, dark: 0.3, grey: 0.6, wind: 0.2, icon: "❄", name: "Snow" },
+    clear: { cover: 0.04, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0.05, icon: "☀", name: "Sunny" },
+    partly: { cover: 0.3, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.12, grey: 0.2, wind: 0.15, icon: "🌤", name: "Partly cloudy" },
+    cloudy: { cover: 0.72, rain: 0, snow: 0, hail: 0, fog: 0.05, dark: 0.35, grey: 0.45, wind: 0.2, icon: "⛅", name: "Cloudy" },
+    windy: { cover: 0.18, rain: 0, snow: 0, hail: 0, fog: 0, dark: 0.1, grey: 0.15, wind: 1, icon: "💨", name: "Windy" },
+    drizzle: { cover: 0.85, rain: 0.28, snow: 0, hail: 0, fog: 0.12, dark: 0.35, grey: 0.55, wind: 0.2, icon: "🌦", name: "Drizzle" },
+    rain: { cover: 0.95, rain: 0.7, snow: 0, hail: 0, fog: 0.25, dark: 0.55, grey: 0.75, wind: 0.35, icon: "🌧", name: "Rain" },
+    storm: { cover: 1, rain: 1, snow: 0, hail: 0, fog: 0.3, dark: 0.8, grey: 0.9, wind: 0.8, icon: "⛈", name: "Thunderstorm" },
+    fog: { cover: 0.35, rain: 0, snow: 0, hail: 0, fog: 1, dark: 0.25, grey: 0.7, wind: 0, icon: "🌫", name: "Fog" },
+    mist: { cover: 0.25, rain: 0, snow: 0, hail: 0, fog: 0.45, dark: 0.12, grey: 0.35, wind: 0.05, icon: "🌁", name: "Misty" },
+    hail: { cover: 0.95, rain: 0.45, snow: 0, hail: 1, fog: 0.2, dark: 0.65, grey: 0.85, wind: 0.5, icon: "🧊", name: "Hailstorm" },
+    blizzard: { cover: 1, rain: 0, snow: 1, hail: 0, fog: 0.8, dark: 0.45, grey: 0.85, wind: 1, icon: "🌨", name: "Blizzard" },
+    tornado: { cover: 1, rain: 0.3, snow: 0, hail: 0, fog: 0.3, dark: 0.75, grey: 0.9, wind: 1, icon: "🌪", name: "Tornado" },
+    cyclone: { cover: 1, rain: 1, snow: 0, hail: 0, fog: 0.45, dark: 0.85, grey: 0.95, wind: 1, icon: "🌀", name: "Cyclone" },
+    snow: { cover: 0.85, rain: 0, snow: 1, hail: 0, fog: 0.35, dark: 0.3, grey: 0.6, wind: 0.2, icon: "❄", name: "Snow" },
   };
   // how the land looks: the ground tint, and the colour that leaves are blended towards (with how strongly)
   const LAND = [
@@ -51,10 +51,10 @@ const Weather = (() => {
     { ground: [0.95, 0.98, 1.05], leaf: 0x7d8576, k: 0.6, bits: 0xd9dde0 },     // winter: pale and bare
   ];
 
-  const cur = { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0 };
+  const cur = { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0, cover: 0 };
   let sky = null, scene = null, forced = null, kind = "clear", season = 0, appliedSeason = -1, appliedSnow = -1, lastSky = 0;
-  let hail = null, hailPos = null, funnel = null, funnelBits = null, tx = 0, tz = 0, tdir = 0, hailT = 0, hurtT = 0, warned = "", drops = null, dropPos = null, dropVel = null, flakes = null, flakePos = null, bits = null, bitPos = null, bitSeed = null, boltT = 12, flash = 0, thunderT = -1, hudT = 0, lastBadge = "", clock = 0;
-  const NH = 420, N = 1100, NF = 1500, NB = 170;
+  let clouds = [], cloudTex = null, hail = null, hailPos = null, funnel = null, funnelBits = null, tx = 0, tz = 0, tdir = 0, hailT = 0, hurtT = 0, warned = "", drops = null, dropPos = null, dropVel = null, flakes = null, flakePos = null, bits = null, bitPos = null, bitSeed = null, boltT = 12, flash = 0, thunderT = -1, hudT = 0, lastBadge = "", clock = 0;
+  const NH = 420, N = 1100, NF = 1500, NB = 170, NC = 36;   // NC: clouds in the sky; how many show depends on the weather
 
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const el = (id) => document.getElementById(id);
@@ -150,6 +150,19 @@ const Weather = (() => {
     const dust = new THREE.Mesh(new THREE.CylinderGeometry(18, 28, 14, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a7a62, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false, fog: false }));
     dust.position.y = 6; dust.name = "dust";
     funnel.add(cone, inner, dust); funnel.visible = false; funnel.renderOrder = 4;
+    // clouds: soft white puffs high up, in clumps of a few; each has its own limit, so more of them show as the sky clouds over
+    cloudTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 6, 64, 64, 62); gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(0.55, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+    for (let i = 0; i < NC; i++) {
+      const grp = new THREE.Group(), puffs = 4 + Math.floor(Math.random() * 3), big = 90 + Math.random() * 90;
+      for (let k = 0; k < puffs; k++) {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, fog: false, opacity: 0.9 }));
+        const w = big * (0.7 + Math.random() * 0.6); sp.scale.set(w, w * 0.45, 1); sp.position.set((k - puffs / 2) * big * 0.5 + (Math.random() - 0.5) * 20, (Math.random() - 0.3) * 10, (Math.random() - 0.5) * 40);
+        grp.add(sp);
+      }
+      // clouds are spread over a wide square around you and drift with the wind; thr: the cloud cover at which this one appears
+      grp.userData = { x: (Math.random() - 0.5) * 2400, z: (Math.random() - 0.5) * 2400, y: 260 + Math.random() * 120, thr: i / NC, fade: 0 };
+      grp.visible = false; grp.renderOrder = -1; scene.add(grp); clouds.push(grp);
+    }
     scene.add(drops, flakes, bits, hail, funnel);
     refreshLand();
   }
@@ -200,7 +213,7 @@ const Weather = (() => {
     kind = forced || fc.kind;
     const L = LOOK[kind], k = Math.min(1, dt * 0.18); // about 5 seconds to change
     let moved = false;
-    for (const key of ["rain", "snow", "hail", "fog", "dark", "grey", "wind"]) {
+    for (const key of ["rain", "snow", "hail", "fog", "dark", "grey", "wind", "cover"]) {
       const before = cur[key]; cur[key] += (L[key] - cur[key]) * k;
       if (Math.abs(cur[key] - before) > 1e-4) moved = true;
     }
@@ -308,6 +321,20 @@ const Weather = (() => {
         }
       }
     } else funnel.userData.placed = 0;
+    // clouds drift on the wind, wrapping round you, and fade in and out as the cover changes; they darken with the storm and at night
+    const night = sky.night || 0, shade = (1 - 0.8 * night) * (1 - 0.55 * cur.dark), ground = 0.62 + 0.38 * shade;
+    for (const c of clouds) {
+      const u = c.userData, want = cur.cover > u.thr ? 1 : 0;
+      u.fade += (want - u.fade) * Math.min(1, dt * 0.5);
+      c.visible = u.fade > 0.02;
+      if (!c.visible) continue;
+      u.x += (3 + cur.wind * 14) * dt;
+      let dx = u.x - camera.position.x, dz = u.z - camera.position.z;
+      if (dx > 1200) u.x -= 2400; else if (dx < -1200) u.x += 2400;
+      if (dz > 1200) u.z -= 2400; else if (dz < -1200) u.z += 2400;
+      c.position.set(u.x, u.y, u.z);
+      for (const sp of c.children) { sp.material.opacity = 0.9 * u.fade; sp.material.color.setScalar(ground); }
+    }
     Sfx.setWeather(rain, cur.wind);
     lightning(dt);
     hudT += dt; if (hudT > 1) { hudT = 0; badge(); }
