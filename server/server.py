@@ -211,6 +211,7 @@ class Conn:
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.seen = set()          # the other walkers this connection has been told about
+        self.ship = None           # the ship design they chose for the naval battle
         self.htier = 0             # the tier of their house (0 to 3), shown to others on their plot
         self.plot = None           # which house plot in Rome is theirs
         self.heist = None          # a robbery they are in (as the thief or the owner)
@@ -741,6 +742,45 @@ NAVAL_GRAVITY = 14.0
 BOT_SHIP_NAMES = ("Corvus", "Neptunus", "Fortuna")
 
 
+# The ships a player can bring (mirrors shipyard.js): hull points, size, top speed (m/s), how many cannons, half-width and length
+NAVAL_SLOTS = 7
+NAVAL_SLOT_Z = (3.6, 2.4, 1.2, 0.0, -1.2, -2.4, -3.6)
+NAVAL_TYPES = {
+    "kayak": {"hp": 30, "scale": 0.55, "max": 9.6, "cannons": 2, "hw": 0.45, "lenK": 0.7},
+    "canoe": {"hp": 45, "scale": 0.6, "max": 8.8, "cannons": 3, "hw": 0.7, "lenK": 0.78},
+    "fishing": {"hp": 65, "scale": 0.72, "max": 6.2, "cannons": 4, "hw": 1.2, "lenK": 0.8},
+    "liburna": {"hp": 70, "scale": 0.66, "max": 8.2, "cannons": 4, "hw": 1.5, "lenK": 1.0},
+    "galley": {"hp": 100, "scale": 0.8, "max": 6.6, "cannons": 6, "hw": 1.5, "lenK": 1.0},
+    "trireme": {"hp": 130, "scale": 0.92, "max": 5.8, "cannons": 9, "hw": 1.5, "lenK": 1.0},
+    "quinquereme": {"hp": 175, "scale": 1.08, "max": 4.8, "cannons": 12, "hw": 1.5, "lenK": 1.0},
+    "battleship": {"hp": 260, "scale": 1.3, "max": 4.2, "cannons": 14, "hw": 2.1, "lenK": 1.3},
+}
+
+
+def clean_ship(d):
+    """A ship design from a browser, cut down to what is allowed: a known type, at most that type's cannons, no junk."""
+    out = {"type": "galley", "sail": 0, "hull": 0, "port": [False] * NAVAL_SLOTS, "star": [False] * NAVAL_SLOTS}
+    if not isinstance(d, dict):
+        out["port"] = [i in (1, 3, 5) for i in range(NAVAL_SLOTS)]
+        out["star"] = list(out["port"])
+        return out
+    if d.get("type") in NAVAL_TYPES:
+        out["type"] = d["type"]
+    for k, n in (("sail", 8), ("hull", 6)):
+        v = d.get(k)
+        out[k] = v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < n else 0
+    left = NAVAL_TYPES[out["type"]]["cannons"]
+    for side in ("port", "star"):
+        arr = d.get(side) if isinstance(d.get(side), list) else []
+        for i in range(NAVAL_SLOTS):
+            if i < len(arr) and arr[i] is True and left > 0:
+                out[side][i] = True
+                left -= 1
+    if not any(out["port"]) and not any(out["star"]):
+        out["port"][3] = out["star"][3] = True
+    return out
+
+
 class Ship:
     def __init__(self, conn, index, count, bot=False):
         self.conn, self.i, self.bot = conn, index, bot
@@ -751,8 +791,13 @@ class Ship:
         self.x, self.z = 19.0 * math.cos(a), 15.5 * math.sin(a)
         self.yaw = math.atan2(-self.x, -self.z)          # facing the middle
         self.v = 0.0
-        self.hp = 60.0 if bot else 100.0
-        self.max_speed = 5.4 if bot else NAVAL_SPEED
+        self.design = None if (bot or conn is None) else clean_ship(getattr(conn, "ship", None))
+        T = NAVAL_TYPES[self.design["type"]] if self.design else NAVAL_TYPES["galley"]
+        self.sc, self.hw, self.lenK = T["scale"], T["hw"], T["lenK"]
+        self.hp = 60.0 if bot else float(T["hp"])
+        self.max_speed = 5.4 if bot else T["max"]
+        d = self.design or clean_ship(None)
+        self.cannons = {1: [NAVAL_SLOT_Z[i] * self.lenK for i in range(NAVAL_SLOTS) if d["port"][i]], -1: [NAVAL_SLOT_Z[i] * self.lenK for i in range(NAVAL_SLOTS) if d["star"][i]]}
         self.cd = {1: 0.3, -1: 0.3}
         self.ram = 0.0
         self.dead_at = None                               # when it sank (for the final order)
@@ -803,7 +848,7 @@ class NavalRoom:
             if s.conn:
                 s.conn.send({"t": "match", "mode": "naval", "room": self.id, "you": s.i, "countdown": NAVAL_COUNTDOWN,
                              "rx": NAVAL_RX, "rz": NAVAL_RZ,
-                             "players": [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look, "bot": q.bot,
+                             "players": [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look, "bot": q.bot, "ship": q.design,
                                           "x": round(q.x, 2), "z": round(q.z, 2), "yaw": round(q.yaw, 3)} for q in self.ships]})
         self.task = asyncio.ensure_future(self.run())
 
@@ -822,7 +867,7 @@ class NavalRoom:
         if "x" in m and "z" in m:
             nx, nz = num(m.get("x"), -60, 60, s.x), num(m.get("z"), -60, 60, s.z)
             step = math.hypot(nx - s.x, nz - s.z)
-            lim = NAVAL_SPEED * 1.25 * dt + 0.4           # cannot sail faster than a galley can
+            lim = s.max_speed * 1.25 * dt + 0.4           # cannot sail faster than their ship can
             if step > lim:
                 nx, nz = s.x + (nx - s.x) * lim / step, s.z + (nz - s.z) * lim / step
                 step = lim
@@ -833,7 +878,7 @@ class NavalRoom:
             yaw = num(m.get("yaw"), -50, 50, s.yaw)
             fx, fz = math.sin(yaw), math.cos(yaw)
             along = ((nx - s.x) * fx + (nz - s.z) * fz) / dt   # speed along the bow, for rams
-            s.v = max(-3.0, min(NAVAL_SPEED, 0.5 * s.v + 0.5 * along))
+            s.v = max(-3.0, min(s.max_speed, 0.5 * s.v + 0.5 * along))
             s.x, s.z, s.yaw = nx, nz, yaw
         side = m.get("fire")
         if side in (1, -1):
@@ -842,16 +887,20 @@ class NavalRoom:
     def fire(self, s, side):
         if s.dead or s.cd[side] > 0 or now() < self.start_at:
             return False
-        s.cd[side] = NAVAL_CD if not s.bot else 4.5 + random.random() * 2
-        for k in range(3):
-            s.queue.append([k * 0.13 + random.random() * 0.05, side, (-2.4, 0.0, 2.4)[k]])
+        guns = s.cannons[side]
+        if not guns:
+            return False
+        s.cd[side] = 1.6 + 0.2 * len(guns) if not s.bot else 4.5 + random.random() * 2   # a bigger broadside reloads slower (three: 2.2 s)
+        for k, cz in enumerate(guns):
+            s.queue.append([k * 0.13 + random.random() * 0.05, side, cz])
         return True
 
     def shoot(self, s, side, cz):
         fx, fz = ship_fwd(s)
         nx, nz = ship_side(s, side)
-        sc = 0.8
-        x, z, y = s.x + fx * cz * sc + nx * 1.9 * sc, s.z + fz * cz * sc + nz * 1.9 * sc, NAVAL_LEVEL + 1.3 * sc
+        sc = s.sc
+        off = (s.hw + 0.4) * sc
+        x, z, y = s.x + fx * cz * sc + nx * off, s.z + fz * cz * sc + nz * off, NAVAL_LEVEL + 1.3 * sc
         spread = 4.2 if s.bot else 1.5
         along = (random.random() - 0.5) * spread
         sp = 24.0 * (0.95 + random.random() * 0.1)
@@ -957,7 +1006,7 @@ class NavalRoom:
                 dx, dz = b["x"] - s.x, b["z"] - s.z
                 sn, cs = math.sin(s.yaw), math.cos(s.yaw)
                 along, lateral = dx * sn + dz * cs, dx * cs - dz * sn
-                if abs(lateral) < 1.52 and abs(along) < 4.0 and NAVAL_LEVEL - 0.3 < b["y"] < NAVAL_LEVEL + 2.4:
+                if abs(lateral) < (s.hw + 0.4) * s.sc and abs(along) < 5.0 * s.sc * s.lenK and NAVAL_LEVEL - 0.3 < b["y"] < NAVAL_LEVEL + 2.4:
                     self.hurt(s, NAVAL_BALL_DMG, b["x"], b["y"], b["z"], b["by"])
                     done = True
                     break
@@ -984,11 +1033,11 @@ class NavalRoom:
 
     def collide_all(self):
         live = [s for s in self.ships if not s.dead]
-        r = 1.9 * 0.8 * 0.9
-        pts = lambda s: [(s.x + math.sin(s.yaw) * z * 0.8, s.z + math.cos(s.yaw) * z * 0.8) for z in (-2.6, 0.0, 2.6)]
+        pts = lambda s: [(s.x + math.sin(s.yaw) * z * s.sc * s.lenK, s.z + math.cos(s.yaw) * z * s.sc * s.lenK) for z in (-2.6, 0.0, 2.6)]
         for ai in range(len(live)):
             for bi in range(ai + 1, len(live)):
                 a, b = live[ai], live[bi]
+                r = ((a.hw + 0.4) * a.sc + (b.hw + 0.4) * b.sc) * 0.45
                 hit = None
                 for p in pts(a):
                     for q in pts(b):
@@ -1499,6 +1548,8 @@ async def handle_msg(conn, m):
             return conn.send({"t": "error", "code": "mode", "msg": "Unknown game"})
         if conn.room:
             return conn.send({"t": "error", "code": "busy", "msg": "You are already in a game"})
+        if mode == "naval":
+            conn.ship = clean_ship(m.get("ship"))
         return enqueue(conn, mode, m.get("bot"))
     if t == "leave":
         leave_queue(conn)

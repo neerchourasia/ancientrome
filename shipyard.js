@@ -113,6 +113,8 @@ const Shipyard = (() => {
     return c;
   }
 
+  const hint = (t) => { const h = $s("sy-hint"); if (h) h.textContent = t; };
+
   function stats() {
     const d = draft, t = TYPES[d.type], n = count(d), p = d.port.filter(Boolean).length, s = d.star.filter(Boolean).length;
     $s("sy-stats").textContent = `${t.name}: hull ${t.hp}, top speed ${Math.round(t.max * 3.6)} km/h, turning ${t.turn >= 1.2 ? "very sharp" : t.turn >= 0.95 ? "good" : t.turn >= 0.8 ? "slow" : "heavy"}. Cannons ${n} of ${t.cannons} (port ${p}, starboard ${s}). Each side fires together; more cannons on a side hit harder but reload slower (${(1.6 + 0.2 * p).toFixed(1)} s port, ${(1.6 + 0.2 * s).toFixed(1)} s starboard).`;
@@ -124,10 +126,14 @@ const Shipyard = (() => {
     const c = $s("sy-canvas"), r = c.getBoundingClientRect(), x = (e.clientX - r.left) * (c.width / r.width), y = (e.clientY - r.top) * (c.height / r.height);
     for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) {
       const p = slotPos(side, i);
-      if (Math.hypot(x - p.x, y - p.y) < 17) {
-        if (draft[side][i]) { if (count(draft) > 1) draft[side][i] = false; else toast("A ship needs at least one cannon."); }
-        else if (count(draft) < TYPES[draft.type].cannons) draft[side][i] = true;
-        else toast(`A ${TYPES[draft.type].name.toLowerCase()} carries at most ${TYPES[draft.type].cannons} cannons. Take one off first.`);
+      if (Math.hypot(x - p.x, y - p.y) < 20) {
+        if (draft[side][i]) { if (count(draft) > 1) { draft[side][i] = false; hint("Cannon taken off."); } else hint("A ship needs at least one cannon."); }
+        else if (count(draft) < TYPES[draft.type].cannons) { draft[side][i] = true; hint("Cannon added."); }
+        else {                                                        // at the limit: move the nearest cannon to this spot (same side first)
+          let best = null, bd = Infinity;
+          for (const s2 of [side, side === "port" ? "star" : "port"]) for (let j = 0; j < SLOTS; j++) if (draft[s2][j]) { const d = Math.abs(j - i) + (s2 === side ? 0 : 3); if (d < bd) { bd = d; best = [s2, j]; } }
+          if (best) { draft[best[0]][best[1]] = false; draft[side][i] = true; hint(`Moved a cannon to the ${side === "port" ? "port" : "starboard"} side. (This ship carries at most ${TYPES[draft.type].cannons}.)`); }
+        }
         refresh(); return;
       }
     }
@@ -204,6 +210,11 @@ const Shipyard = (() => {
   return {
     bind, open, def, sail,
     selectedDef: () => def(ships[sel]),
+    // for the online lobby: choose one of your saved ships (you cannot build one there)
+    list: () => ships.map((s, i) => ({ i, label: `${s.name} (${TYPES[s.type].name}, ${count(s)} cannons)` })),
+    get sel() { return sel; },
+    choose(i) { if (Number.isInteger(i) && i >= 0 && i < ships.length) { sel = i; save(); } },
+    onlineDesign: () => { const d = ships[sel]; return { type: d.type, sail: d.sail, hull: d.hull, port: d.port.slice(), star: d.star.slice() }; },
     snapshot: () => ({ ships: clone(ships), sel }),
     restore(raw) {
       if (!raw || !Array.isArray(raw.ships)) return;

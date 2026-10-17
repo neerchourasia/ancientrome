@@ -455,6 +455,35 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(end["mode"], "naval")
         self.assertEqual([o["i"] for o in end["order"]], [0, 2, 1])   # winner, then the later sinking, then the first
 
+    def test_ship_designs_are_cut_down_to_what_is_allowed(self):
+        d = server.clean_ship({"type": "bogus", "sail": 99, "hull": "x", "port": [True] * 20, "star": [True] * 20})
+        self.assertEqual((d["type"], d["sail"], d["hull"]), ("galley", 0, 0))
+        self.assertEqual(sum(d["port"]) + sum(d["star"]), 6)                       # a galley carries at most 6 cannons
+        k = server.clean_ship({"type": "kayak", "port": [True] * 7, "star": [True] * 7})
+        self.assertEqual(sum(k["port"]) + sum(k["star"]), 2)
+        e = server.clean_ship({"type": "battleship", "port": [False] * 7, "star": [False] * 7})
+        self.assertEqual(sum(e["port"]) + sum(e["star"]), 2)                       # never a ship with no cannons
+        self.assertEqual(sum(server.clean_ship(None)["port"]), 3)                  # the default: three a side
+
+    async def test_naval_players_bring_their_own_ships(self):
+        server.CFG["naval_wait"] = 0.6
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "queue", "mode": "naval", "ship": {"type": "battleship", "sail": 2, "hull": 3, "port": [True] * 7, "star": [True] * 7}})
+        b.send({"t": "queue", "mode": "naval", "ship": {"type": "kayak", "port": [True, False, False, False, False, False, False], "star": [True, False, False, False, False, False, False]}})
+        ma = await a.until(lambda m: m["t"] == "match", timeout=4)
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.start_at = 0
+        ann, ben = room.ships
+        self.assertEqual((ann.hp, ben.hp), (260.0, 30.0))
+        self.assertEqual((len(ann.cannons[1]), len(ann.cannons[-1])), (7, 7))
+        self.assertEqual((ann.max_speed, ben.max_speed), (4.2, 9.6))
+        self.assertEqual([p["ship"]["type"] for p in ma["players"]], ["battleship", "kayak"])
+        ann.cd = {1: 0.0, -1: 0.0}
+        self.assertTrue(room.fire(ann, 1))
+        self.assertEqual(len(ann.queue), 7)                                        # the whole broadside goes off
+        self.assertEqual(round(ann.cd[1], 1), 3.0)                                 # and a big broadside reloads slower
+
     async def test_naval_a_lone_player_gets_practice_ships_when_they_ask(self):
         server.CFG["bot_wait"] = 0.5
         a = await self.player("Solo")

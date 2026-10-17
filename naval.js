@@ -392,7 +392,8 @@ const Naval = (() => {
     fx = []; balls = []; queue = [];
     const ships = {};
     for (const p of m.players) {
-      const s = makeShip({ hp: 100, scale: 0.8, max: 6.6, sail: SAILS[p.i % SAILS.length] }, CX + p.x, CZ + p.z, p.yaw, p.i === m.you);
+      const sdef = p.ship && typeof Shipyard !== "undefined" ? Shipyard.def(p.ship) : { hp: 100, scale: 0.8, max: 6.6, sail: SAILS[p.i % SAILS.length] };
+      const s = makeShip(sdef, CX + p.x, CZ + p.z, p.yaw, p.i === m.you);
       s.idx = p.i; s.name = p.name; s.bot = !!p.bot; s.tx = s.x; s.tz = s.z; s.tyaw = s.yaw;
       s.cd = { 1: 0, "-1": 0 };
       s.model.g.visible = false;

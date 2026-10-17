@@ -94,13 +94,21 @@ const Online = (() => {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
     if (city !== "rome") { toast("The online games are held in Rome. Press B to travel back."); return; }
     openPanel("#online");
+    fillShips();
     connect();
     refreshLobby();
   }
 
   function queue(game) {
     if (!welcome) { connect(); return; }
-    send({ t: "queue", mode: game, bot: $o("on-bot").checked });
+    send({ t: "queue", mode: game, bot: $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
+  }
+
+  // the ship picker for the naval battle: your saved ships (you build them in the shipyard in the arena, not here)
+  function fillShips() {
+    const sel = $o("on-ship");
+    sel.replaceChildren(...Shipyard.list().map((s) => { const o = document.createElement("option"); o.value = s.i; o.textContent = s.label; return o; }));
+    sel.value = Shipyard.sel;
   }
 
   function leaveQueue() { send({ t: "leave" }); waiting = false; setMsg(""); }
@@ -246,6 +254,7 @@ const Online = (() => {
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-naval").addEventListener("click", () => queue("naval"));
+    $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("btn-online").addEventListener("click", openLobby);
