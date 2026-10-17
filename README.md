@@ -86,6 +86,7 @@ Then visit http://localhost:8123. Because it is static, it also works on GitHub 
 | `server/` | The game server for live duels and races against real people (Python, nothing to install), its 15 tests, a fake Supabase for testing, and a deployment guide (`server/README.md`) |
 | `config.js` | The settings you change to go online: Supabase and the game server address |
 | `car.js` | Cars for Modern Rome: buy one in the Market, get in with X and drive |
+| `jobs.js` | Jobs in the hypogeum under the Colosseum (winch crew, beast keeper, scenery crew) and the ranks you earn |
 | `market.js`, `stalls.js`, `pets.js` | The shop (house upgrades, food, things to wear, decorations, supplies, training), the market square with its five stalls in Rome and Old Delhi, and the companions that follow you |
 | `account.js`, `online.js` | Sign-up, login and cloud saving; the lobby and live duels and races |
 | `terms.html`, `privacy.html` | Drafts of the Terms of Use and Privacy Policy (add your contact email; have them reviewed) |

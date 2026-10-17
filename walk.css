@@ -415,6 +415,15 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #dg-hud .bar[hidden] { display: none; }
 #dg-hud p { margin: 0; font-size: .75rem; color: var(--muted); }
 
+/* jobs in the hypogeum */
+.jb-bar { position: relative; height: 26px; margin: 10px 0; background: rgba(255,255,255,.12); border-radius: 6px; overflow: hidden; }
+.jb-zone { position: absolute; top: 0; bottom: 0; background: rgba(70,170,90,.55); }
+.jb-mark { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; background: var(--gold); }
+.jb-cages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+.jb-cage { white-space: pre; font-size: 1.1rem; padding: 12px 4px; line-height: 1.5; }
+.jb-cage.hungry { background: #b3262b; border-color: #ffd36b; animation: jbpulse .5s infinite alternate; }
+@keyframes jbpulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
 /* dying: black out, carried home, a day passes */
 #death { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #000; color: #d9cfc0; text-align: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 1.2s ease, background-color 1.5s ease; }
 #death.on { opacity: 1; pointer-events: auto; }

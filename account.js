@@ -79,6 +79,7 @@ const Account = (() => {
         time: { hour: +Time.hour.toFixed(2), day: Time.day },
         owned: Market.snapshot(),
         tax: Tax.snapshot(),
+        jobs: Jobs.snapshot(),
         era,
       },
     };
@@ -100,6 +101,7 @@ const Account = (() => {
     }
     if (p.owned && typeof p.owned === "object") Market.restore(p.owned);
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
+    if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 

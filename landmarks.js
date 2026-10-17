@@ -4,6 +4,12 @@
 
 const LANDMARKS = [
   {
+    id: "hypogeum", game: true, only: "ancient", name: "The Hypogeum Jobs", sub: "Work in the cellars under the Colosseum",
+    x: 318, z: 66, r: 16, stand: [318, 50],
+    text: "A stone stair-house by the Colosseum's west gate leads down to the hypogeum, the cellars under the arena. Go down and press F at a workplace: turn the capstan that raises the lifts, feed the beasts in their cages or hoist the scenery. You are paid in denarii, and rise in rank with every shift.",
+    fact: "The hypogeum was added under Domitian, after the Colosseum opened. Around 80 winches and lifts raised animals and scenery straight up into the arena.",
+  },
+  {
     id: "market", game: true, name: "The Market", sub: "Food, clothes, rides, houses and a healer",
     x: 170, z: 62, r: 26, stand: [170, 40],
     text: "A paved square south of the Forum with a well in the middle and five stalls along its south side: a food stall, a clothier, animals and rides, a builder and a healer. Walk up to a stall and press F to shop.",
