@@ -75,7 +75,7 @@ const Naval = (() => {
       part(new THREE.CylinderGeometry(0.2, 0.26, 0.9, 8), lambert(0x3a5a8a), 0, 0.95, -0.4);       // the paddler
       part(new THREE.SphereGeometry(0.2, 8, 6), skin, 0, 1.55, -0.4);
       const pad = part(new THREE.CylinderGeometry(0.04, 0.04, sh === "kayak" ? 2.6 : 1.8, 6), dark, 0, 1.0, -0.4); pad.rotation.z = sh === "kayak" ? Math.PI / 2 : 0.7;
-      if (sh === "canoe") part(new THREE.BoxGeometry(w * 0.9, 0.08, 0.5), band, 0, 0.62, L / 4);
+      part(new THREE.BoxGeometry(w * 0.9, 0.08, 0.5), band, 0, sh === "kayak" ? 0.55 : 0.62, L / 4);   // a stripe in the boat's colour
     } else if (sh === "fishing") {
       hull = part(new THREE.BoxGeometry(hw * 2, 1.0, L), wood, 0, 0.35, 0);
       part(new THREE.BoxGeometry(hw * 2 + 0.2, 0.2, L - 0.4), dark, 0, 0.92, 0);
@@ -92,6 +92,9 @@ const Naval = (() => {
       part(new THREE.BoxGeometry(hw * 0.8, 0.9, 2.0), lambert(0xa0a6ae), 0, 3.5, -L / 6);
       for (const z of [-L / 3.2, -L / 8]) part(new THREE.CylinderGeometry(0.5, 0.65, 2.4, 10), lambert(0x2a2d32), 0, 3.4, z - 1);   // the funnels
       for (const z of [L / 3, L / 6 + 1]) { part(new THREE.CylinderGeometry(0.9, 1.0, 0.7, 12), lambert(0x4a4f56), 0, 1.7, z); const b = part(new THREE.CylinderGeometry(0.16, 0.2, 2.2, 8), iron, 0, 1.95, z + 1.1); b.rotation.x = Math.PI / 2; } // the big turrets
+      for (const sx of [-1, 1]) part(new THREE.BoxGeometry(0.14, 0.45, L * 0.92), band, sx * (hw + 0.03), 0.95, 0);   // a stripe along each side in the ship's colour
+      for (const z of [-L / 3.2, -L / 8]) part(new THREE.CylinderGeometry(0.55, 0.7, 0.5, 10), band, 0, 4.1, z - 1);        // a band round each funnel
+      part(new THREE.BoxGeometry(hw * 1.25, 0.18, 4.4), band, 0, 3.0, -L / 6);                          // and a stripe round the bridge
       part(new THREE.BoxGeometry(0.12, 0.4, 0.12), lambert(def.sail), 0, 5.2, -L / 6);                // a flag in the ship's colour
       part(new THREE.BoxGeometry(0.8, 0.5, 0.05), band, 0.4, 5.4, -L / 6);
     }
