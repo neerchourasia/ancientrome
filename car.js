@@ -220,6 +220,7 @@ const Car = (() => {
         if (Math.hypot(c.x - (car.x + fx * M.len * 0.3), c.z - (car.z + fz * M.len * 0.3)) < 1.7) {
           c.down = Math.abs(car.v) > 10 ? 2.6 : 1.6;
           noteKnock();
+          Speech.rammed(c, Math.abs(car.v) > 10);
           const d = Math.hypot(c.x - car.x, c.z - car.z) || 1;
           if (canMove(c.x, c.z, c.x + ((c.x - car.x) / d) * 1.6, c.z + ((c.z - car.z) / d) * 1.6)) { c.x += ((c.x - car.x) / d) * 1.6; c.z += ((c.z - car.z) / d) * 1.6; }
           Sfx.play("oof");

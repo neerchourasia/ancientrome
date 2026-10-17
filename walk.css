@@ -464,3 +464,9 @@ button[aria-label="Close"]:hover, button.dclose:hover, #places-close:hover, #big
   border-color: var(--gold) !important; color: var(--gold) !important; background: rgba(226,185,85,.15) !important;
 }
 button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+#v-tax { margin: 4px 0 0; font-size: .75rem; color: var(--muted); text-align: right; }
+#v-tax.warn { color: #e2b955; }
+#v-tax.bad { color: #ff7a6d; font-weight: 700; }
+#v-tax:empty { display: none; }
+#btn-tax.alert { border-color: #e2b955 !important; color: #ffe29a; }

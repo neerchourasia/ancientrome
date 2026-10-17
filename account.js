@@ -78,6 +78,7 @@ const Account = (() => {
         vitals: { hp: Math.round(Vitals.hp), horses: Math.round(Vitals.horses), coins: Vitals.coins },
         time: { hour: +Time.hour.toFixed(2), day: Time.day },
         owned: Market.snapshot(),
+        tax: Tax.snapshot(),
         era,
       },
     };
@@ -98,6 +99,7 @@ const Account = (() => {
       if (Number.isFinite(v.coins)) Vitals.coins = v.coins;
     }
     if (p.owned && typeof p.owned === "object") Market.restore(p.owned);
+    if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 

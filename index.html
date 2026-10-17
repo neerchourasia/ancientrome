@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=142">
+  <link rel="stylesheet" href="walk.css?v=144">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=142"></script>
+  <script src="boot.js?v=144"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -51,6 +51,7 @@
         <button id="btn-view" type="button">View <kbd>C</kbd></button>
         <button id="btn-era" type="button">Modern Rome <kbd>K</kbd></button>
         <button id="btn-dgames" type="button" hidden>🎮 Delhi games <kbd>N</kbd></button>
+        <button id="btn-tax" type="button">💰 Tax</button>
         <button id="btn-chat" type="button">💬 Chat <kbd>Enter</kbd></button>
         <button id="btn-admin" type="button" hidden>🛠 Admin</button>
         <button id="btn-city" type="button">✈ Travel to Delhi <kbd>B</kbd></button>
@@ -74,6 +75,7 @@
       <div class="row"><span>Health</span><div class="bar"><div id="v-hp"></div></div></div>
       <div class="row"><span>Horses</span><div class="bar"><div id="v-horse"></div></div></div>
       <div class="row coins"><span>Denarii</span><b id="v-coins">100</b></div>
+      <p id="v-tax"></p>
       <p id="v-char"></p>
       <p id="v-peers"></p>
       <p id="v-rest"></p>
@@ -266,6 +268,17 @@
     </div>
   </div>
 
+  <div id="tax" class="dpanel" role="dialog" aria-label="Tax">
+    <div class="box">
+      <header><h2>💰 The tax collector</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
+      <p id="tax-text" class="dnote"></p>
+      <p class="dnote">You owe: <b id="tax-amount"></b></p>
+      <p id="tax-have" class="dnote small"></p>
+      <div class="dbtns"><button id="tax-pay" type="button">Pay</button></div>
+      <p class="dnote small">The tax is higher if you own a better house or are rich. Every 30 days. Miss it and people hate you: they shout at you, the Market charges 25% more, and after 15 days the collectors take your savings.</p>
+    </div>
+  </div>
+
   <div id="dg-pick" class="dpanel" role="dialog" aria-label="Choose your vehicle">
     <div class="box">
       <header><h2>Choose your vehicle</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
@@ -360,34 +373,35 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=142"></script>
-  <script src="delhi-data.js?v=142"></script>
-  <script src="config.js?v=142"></script>
-  <script src="character.js?v=142"></script>
-  <script src="physics.js?v=142"></script>
-  <script src="vitals.js?v=142"></script>
-  <script src="narrator.js?v=142"></script>
-  <script src="audio.js?v=142"></script>
-  <script src="world.js?v=142"></script>
-  <script src="city.js?v=142"></script>
-  <script src="weather.js?v=142"></script>
-  <script src="modern.js?v=142"></script>
-  <script src="delhi.js?v=142"></script>
-  <script src="delhi-games.js?v=142"></script>
-  <script src="home.js?v=142"></script>
-  <script src="spectators.js?v=142"></script>
-  <script src="fight.js?v=142"></script>
-  <script src="nav.js?v=142"></script>
-  <script src="show.js?v=142"></script>
-  <script src="naval.js?v=142"></script>
-  <script src="watch.js?v=142"></script>
-  <script src="race.js?v=142"></script>
-  <script src="account.js?v=142"></script>
-  <script src="online.js?v=142"></script>
-  <script src="chat.js?v=142"></script>
-  <script src="pets.js?v=142"></script>
-  <script src="car.js?v=142"></script>
-  <script src="market.js?v=142"></script>
-  <script src="game.js?v=142"></script>
+  <script src="landmarks.js?v=144"></script>
+  <script src="delhi-data.js?v=144"></script>
+  <script src="config.js?v=144"></script>
+  <script src="character.js?v=144"></script>
+  <script src="physics.js?v=144"></script>
+  <script src="vitals.js?v=144"></script>
+  <script src="narrator.js?v=144"></script>
+  <script src="audio.js?v=144"></script>
+  <script src="world.js?v=144"></script>
+  <script src="city.js?v=144"></script>
+  <script src="weather.js?v=144"></script>
+  <script src="modern.js?v=144"></script>
+  <script src="delhi.js?v=144"></script>
+  <script src="delhi-games.js?v=144"></script>
+  <script src="home.js?v=144"></script>
+  <script src="spectators.js?v=144"></script>
+  <script src="fight.js?v=144"></script>
+  <script src="nav.js?v=144"></script>
+  <script src="show.js?v=144"></script>
+  <script src="naval.js?v=144"></script>
+  <script src="watch.js?v=144"></script>
+  <script src="race.js?v=144"></script>
+  <script src="account.js?v=144"></script>
+  <script src="online.js?v=144"></script>
+  <script src="chat.js?v=144"></script>
+  <script src="tax.js?v=144"></script>
+  <script src="pets.js?v=144"></script>
+  <script src="car.js?v=144"></script>
+  <script src="market.js?v=144"></script>
+  <script src="game.js?v=144"></script>
 </body>
 </html>

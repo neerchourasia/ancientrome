@@ -48,6 +48,7 @@ function init() {
   Account.bind();
   Online.bind();
   Chat.bind();
+  Tax.bind();
   Admin.bind();
   Market.bind();
   applyCharacter();
@@ -61,6 +62,7 @@ function init() {
   DGames.init(scene);
   scene.traverse((o) => { if (o.isInstancedMesh) o.frustumCulled = false; });
   Weather.init(sky, scene);
+  Speech.init(scene);
   applyEra();
 
   buildBaseMap();
@@ -467,6 +469,7 @@ function bumpCitizens(pace) {
     const hard = pace > 8;
     c.down = hard ? 2.4 : 1.4;
     noteKnock();
+    Speech.rammed(c, hard);
     const push = 1.3 / (d || 1);
     const nx = c.x + (c.x - player.x) * push, nz = c.z + (c.z - player.z) * push;
     if (canMove(c.x, c.z, nx, nz)) { c.x = nx; c.z = nz; }
@@ -1439,6 +1442,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
+  Tax.update(dt); Speech.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

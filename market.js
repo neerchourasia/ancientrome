@@ -77,6 +77,8 @@ const Market = (() => {
     return out;
   }
 
+  // People who hate you (you missed the tax) charge 25% more
+  const mark = (p) => Math.round(p * (typeof Tax !== "undefined" ? Tax.priceMul : 1));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } };
   const $m = (id) => document.getElementById(id);
 
@@ -93,8 +95,8 @@ const Market = (() => {
   function buyHouse() {
     const next = homes()[tier() + 1];
     if (!next) return;
-    if (Vitals.coins < next.price) { toast(`You need ${next.price} denarii for the ${next.name.toLowerCase()} (you have ${Vitals.coins}).`); return; }
-    Vitals.coins -= next.price;
+    if (Vitals.coins < mark(next.price)) { toast(`You need ${mark(next.price)} denarii for the ${next.name.toLowerCase()} (you have ${Vitals.coins}).`); return; }
+    Vitals.coins -= mark(next.price);
     if (homes() === HOUSES_D) s.dhouse += 1; else s.house += 1;
     save(); applyAll(); Sfx.play("coin");
     toast(homes() === HOUSES_D ? `You bought the ${next.name.toLowerCase()}! It stands on your plot off Chandni Chowk.` : `You bought the ${next.name.toLowerCase()}! Go and see it near the Colosseum road.`);
@@ -104,16 +106,16 @@ const Market = (() => {
   function buyItem(id) {
     const it = ITEMS[id];
     if (!it || (it.type !== "supply" && s.items.includes(id))) return;
-    if (Vitals.coins < it.price) { toast(`The ${it.name.toLowerCase()} costs ${it.price} denarii (you have ${Vitals.coins}).`); return; }
+    if (Vitals.coins < mark(it.price)) { toast(`The ${it.name.toLowerCase()} costs ${mark(it.price)} denarii (you have ${Vitals.coins}).`); return; }
     if (it.type === "supply") {
       if (id === "salve" ? Vitals.hp >= 99 : Vitals.horses >= 99) { toast(id === "salve" ? "You are already in good health." : "Your horses are already fit."); return; }
-      Vitals.coins -= it.price;
+      Vitals.coins -= mark(it.price);
       if (id === "salve") Vitals.hp = Vitals.hp + 40; else Vitals.horses = Vitals.horses + 40;
       Sfx.play("coin"); render();
       toast(id === "salve" ? `The salve heals you. Health ${Math.round(Vitals.hp)}/100.` : `Your horses feel stronger. Fitness ${Math.round(Vitals.horses)}/100.`);
       return;
     }
-    Vitals.coins -= it.price;
+    Vitals.coins -= mark(it.price);
     s.items.push(id); save(); Sfx.play("coin");
     if (it.type === "car" || it.type === "mount") { applyAll(); closePanels(); Car.deploy(id); return; } // it appears next to you
     if (it.slot) wear(id); else applyAll();
@@ -140,8 +142,8 @@ const Market = (() => {
     $m("mk-house-next").hidden = !next;
     if (next) {
       $m("mk-house-next").textContent = `Next: ${next.name}. ${next.perk}`;
-      $m("mk-house-buy").textContent = `Buy for ${next.price} denarii`;
-      $m("mk-house-buy").disabled = Vitals.coins < next.price;
+      $m("mk-house-buy").textContent = `Buy for ${mark(next.price)} denarii`;
+      $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
     } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : " It is the finest house in Rome.";
 
     $m("mk-sections").replaceChildren(...SECTIONS.flatMap(([title, type]) => {
@@ -161,7 +163,7 @@ const Market = (() => {
         txt.append(name, note);
         b.type = "button";
         const owned = s.items.includes(id);
-        if (it.type === "supply" || !owned) { b.textContent = `Buy · ${it.price}`; b.disabled = Vitals.coins < it.price; b.addEventListener("click", () => buyItem(id)); }
+        if (it.type === "supply" || !owned) { b.textContent = `Buy · ${mark(it.price)}`; b.disabled = Vitals.coins < mark(it.price); b.addEventListener("click", () => buyItem(id)); }
         else if (it.type === "car" || it.type === "mount") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
         else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
