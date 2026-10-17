@@ -546,6 +546,54 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         gone = await a.until(lambda m: m["t"] == "world" and m["g"])
         self.assertEqual(gone["g"], [b.welcome["id"]])
 
+    async def test_houses_stand_on_the_street_and_a_thief_can_get_away_or_be_caught(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 0, "s": 0, "h": 2})
+        b.send({"t": "walk", "c": "rome", "x": 150, "z": 50, "yaw": 0, "s": 0, "h": 1})
+        await asyncio.sleep(0.3)
+        server.houses_once()
+        ha = await a.until(lambda m: m["t"] == "houses" and m["h"])
+        self.assertEqual([h[2:] for h in ha["h"]], [["Ben", 1]])                          # Ann sees Ben's house, with its tier
+        self.assertNotEqual(ha["mine"], ha["h"][0][0])                                    # and everyone has their own plot
+        bx, bz, _, _ = server.plot_pos(ha["h"][0][0])
+        # too far from the door: refused
+        a.send({"t": "rob", "target": b.welcome["id"]})
+        no = await a.until(lambda m: m["t"] == "heist_no")
+        self.assertIn("door", no["msg"])
+        # at the door: the robbery starts for both
+        a.send({"t": "walk", "c": "rome", "x": bx, "z": bz, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.2)
+        a.send({"t": "rob", "target": b.welcome["id"]})
+        ta = await a.until(lambda m: m["t"] == "heist")
+        tb = await b.until(lambda m: m["t"] == "heist")
+        self.assertEqual((ta["role"], ta["other"], tb["role"], tb["other"]), ("thief", "Ben", "owner", "Ann"))
+        # Ann runs far away: she gets clear
+        a.send({"t": "walk", "c": "rome", "x": bx + 400, "z": bz, "yaw": 0, "s": 20})
+        await asyncio.sleep(0.2)
+        for _ in range(9):
+            server.heist_once()
+        endA = await a.until(lambda m: m["t"] == "heist_end")
+        self.assertEqual((endA["result"], endA["loot"]), ("escaped", 100))
+        await b.until(lambda m: m["t"] == "heist_end")
+        # robbing again at once is refused (she lies low)
+        a.send({"t": "walk", "c": "rome", "x": bx, "z": bz, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.2)
+        a.send({"t": "rob", "target": b.welcome["id"]})
+        again = await a.until(lambda m: m["t"] == "heist_no")
+        self.assertIn("Lie low", again["msg"])
+        # a second robbery where the owner catches up
+        server.HEISTS.clear()
+        for c in server.CONNS:
+            c.rob_cd, c.heist = 0.0, None
+        server.VICTIM_CD.clear()
+        a.send({"t": "rob", "target": b.welcome["id"]})
+        await a.until(lambda m: m["t"] == "heist")
+        b.send({"t": "walk", "c": "rome", "x": bx + 2, "z": bz, "yaw": 0, "s": 8})   # Ben is right on top of her
+        await asyncio.sleep(0.2)
+        server.heist_once()
+        caught = await a.until(lambda m: m["t"] == "heist_end")
+        self.assertEqual(caught["result"], "caught")
+
     async def test_walkers_in_a_game_are_not_in_the_open_world_and_bad_positions_are_clamped(self):
         a, b = await self.player("Ann"), await self.player("Ben")
         a.send({"t": "walk", "c": "rome", "x": "x", "z": float("nan"), "yaw": 1e99, "s": -5})

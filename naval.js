@@ -54,26 +54,60 @@ const Naval = (() => {
   const SLOT_Z = [3.6, 2.4, 1.2, 0, -1.2, -2.4, -3.6];
   function makeGalley(def) {
     const g = new THREE.Group();
-    const wood = lambert(def.hull || 0x7a5230), dark = lambert(0x2a1f16), bronze = lambert(0x9a6a2c), iron = lambert(0x2e2e30), sailM = lambert(0xd9cfb8), band = lambert(def.sail);
+    const sh = def.shape || "galley", K = def.lenK || 1, hw = def.hw || 1.5;
+    const hullC = def.hull || 0x7a5230;
+    const wood = lambert(hullC), dark = lambert(0x2a1f16), bronze = lambert(0x9a6a2c), iron = lambert(0x2e2e30), sailM = lambert(0xd9cfb8), band = lambert(def.sail), skin = lambert(0xd8a77a);
     const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
-    const hull = part(new THREE.BoxGeometry(3, 1.1, 9), wood, 0, 0.4, 0);
-    part(new THREE.BoxGeometry(3.3, 0.25, 8.6), dark, 0, 1.0, 0);
-    part(new THREE.BoxGeometry(2.0, 1.1, 2.2), wood, 0, 0.45, 5.4);
-    const ram = part(new THREE.ConeGeometry(0.4, 1.7, 8), bronze, 0, 0.1, 7.0); ram.rotation.x = Math.PI / 2;
-    part(new THREE.BoxGeometry(2.4, def.castle ? 3.4 : 2.4, 0.5), wood, 0, def.castle ? 2.2 : 1.7, -4.6);
-    if (def.castle) part(new THREE.BoxGeometry(2.8, 0.3, 2.2), dark, 0, 3.9, -4.0);
+    const L = 9 * K;                                                // the hull's length
+    let hull;
+    if (sh === "galley") {
+      hull = part(new THREE.BoxGeometry(3, 1.1, 9), wood, 0, 0.4, 0);
+      part(new THREE.BoxGeometry(3.3, 0.25, 8.6), dark, 0, 1.0, 0);
+      part(new THREE.BoxGeometry(2.0, 1.1, 2.2), wood, 0, 0.45, 5.4);
+      const ram = part(new THREE.ConeGeometry(0.4, 1.7, 8), bronze, 0, 0.1, 7.0); ram.rotation.x = Math.PI / 2;
+      part(new THREE.BoxGeometry(2.4, def.castle ? 3.4 : 2.4, 0.5), wood, 0, def.castle ? 2.2 : 1.7, -4.6);
+      if (def.castle) part(new THREE.BoxGeometry(2.8, 0.3, 2.2), dark, 0, 3.9, -4.0);
+    } else if (sh === "kayak" || sh === "canoe") {
+      const w = hw * 2;
+      hull = part(new THREE.BoxGeometry(w, sh === "kayak" ? 0.45 : 0.6, L), wood, 0, 0.3, 0);
+      const bow = part(new THREE.ConeGeometry(w / 2, 1.6, 8), wood, 0, 0.3, L / 2 + 0.7); bow.rotation.x = Math.PI / 2;
+      const stern = part(new THREE.ConeGeometry(w / 2, 1.4, 8), wood, 0, 0.3, -L / 2 - 0.6); stern.rotation.x = -Math.PI / 2;
+      part(new THREE.CylinderGeometry(0.2, 0.26, 0.9, 8), lambert(0x3a5a8a), 0, 0.95, -0.4);       // the paddler
+      part(new THREE.SphereGeometry(0.2, 8, 6), skin, 0, 1.55, -0.4);
+      const pad = part(new THREE.CylinderGeometry(0.04, 0.04, sh === "kayak" ? 2.6 : 1.8, 6), dark, 0, 1.0, -0.4); pad.rotation.z = sh === "kayak" ? Math.PI / 2 : 0.7;
+      if (sh === "canoe") part(new THREE.BoxGeometry(w * 0.9, 0.08, 0.5), band, 0, 0.62, L / 4);
+    } else if (sh === "fishing") {
+      hull = part(new THREE.BoxGeometry(hw * 2, 1.0, L), wood, 0, 0.35, 0);
+      part(new THREE.BoxGeometry(hw * 2 + 0.2, 0.2, L - 0.4), dark, 0, 0.92, 0);
+      const bow = part(new THREE.ConeGeometry(hw, 1.8, 6), wood, 0, 0.35, L / 2 + 0.8); bow.rotation.x = Math.PI / 2;
+      part(new THREE.BoxGeometry(hw * 1.4, 1.4, 1.8), lambert(0xd9cfb8), 0, 1.6, -L / 4);             // the wheelhouse
+      part(new THREE.BoxGeometry(hw * 1.5, 0.15, 2.0), band, 0, 2.35, -L / 4);
+      part(new THREE.BoxGeometry(0.9, 0.4, 0.9), lambert(0x6a8a9a), -hw * 0.5, 1.2, L / 4);          // a crate of fish
+      part(new THREE.BoxGeometry(1.4, 0.05, 1.0), lambert(0x8a7a5a), hw * 0.5, 1.05, L / 5);          // nets
+    } else { // battleship
+      hull = part(new THREE.BoxGeometry(hw * 2, 1.5, L), wood, 0, 0.5, 0);
+      const bow = part(new THREE.ConeGeometry(hw * 1.0, 3.6, 4), wood, 0, 0.5, L / 2 + 1.6); bow.rotation.x = Math.PI / 2; bow.rotation.z = Math.PI / 4; bow.scale.set(1, 1, 0.5);
+      part(new THREE.BoxGeometry(hw * 2 - 0.4, 0.3, L - 0.6), lambert(0x4a4f56), 0, 1.35, 0);
+      part(new THREE.BoxGeometry(hw * 1.2, 1.6, 4.2), lambert(0x8a9098), 0, 2.2, -L / 6);             // the bridge
+      part(new THREE.BoxGeometry(hw * 0.8, 0.9, 2.0), lambert(0xa0a6ae), 0, 3.5, -L / 6);
+      for (const z of [-L / 3.2, -L / 8]) part(new THREE.CylinderGeometry(0.5, 0.65, 2.4, 10), lambert(0x2a2d32), 0, 3.4, z - 1);   // the funnels
+      for (const z of [L / 3, L / 6 + 1]) { part(new THREE.CylinderGeometry(0.9, 1.0, 0.7, 12), lambert(0x4a4f56), 0, 1.7, z); const b = part(new THREE.CylinderGeometry(0.16, 0.2, 2.2, 8), iron, 0, 1.95, z + 1.1); b.rotation.x = Math.PI / 2; } // the big turrets
+      part(new THREE.BoxGeometry(0.12, 0.4, 0.12), lambert(def.sail), 0, 5.2, -L / 6);                // a flag in the ship's colour
+      part(new THREE.BoxGeometry(0.8, 0.5, 0.05), band, 0.4, 5.4, -L / 6);
+    }
     for (const [mz, mh] of def.masts || [[0.4, 6.5]]) {
       const k = mh / 6.5;
       part(new THREE.CylinderGeometry(0.13, 0.17, mh, 8), dark, 0, 1 + mh / 2, mz);
-      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k), 2.8 * k, 0.08), sailM, 0, 1 + mh * 0.55, mz);
-      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k), 0.7 * k, 0.1), band, 0, 1 + mh * 0.83, mz + 0.03);
+      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k) * Math.min(1, hw / 1.5 + 0.3), 2.8 * k, 0.08), sailM, 0, 1 + mh * 0.55, mz);
+      part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k) * Math.min(1, hw / 1.5 + 0.3), 0.7 * k, 0.1), band, 0, 1 + mh * 0.83, mz + 0.03);
     }
     const cannons = [];
     const layout = def.ports ? [[1, def.ports], [-1, def.stars]] : [[1, [0, 1, 0, 1, 0, 1, 0]], [-1, [0, 1, 0, 1, 0, 1, 0]]];
+    const sideX = hw + 0.1, cy = sh === "kayak" ? 0.7 : sh === "canoe" ? 0.85 : sh === "battleship" ? 1.7 : 1.3;
     for (const [side, slots] of layout) slots.forEach((on, i) => {
       if (!on) return;
-      const cz = SLOT_Z[i];
-      const c = part(new THREE.CylinderGeometry(0.22, 0.3, 1.2, 10), iron, side * 1.6, 1.3, cz);
+      const cz = SLOT_Z[i] * K;
+      const c = part(new THREE.CylinderGeometry(sh === "battleship" ? 0.26 : 0.22, sh === "battleship" ? 0.34 : 0.3, sh === "kayak" ? 0.7 : 1.2, 10), iron, side * sideX, cy, cz);
       c.rotation.z = -side * Math.PI / 2;
       cannons.push({ side, z: cz });
     });
@@ -595,8 +629,9 @@ const Naval = (() => {
     const f = focus();
     camYaw += angDiff(camYaw, f.yaw) * Math.min(1, dt * 3);
     const fx_ = Math.sin(camYaw), fz_ = Math.cos(camYaw), L = level();
-    cam.position.set(f.x - fx_ * 12, L + 7.5, f.z - fz_ * 12);
-    cam.lookAt(f.x + fx_ * 6, L + 1.2, f.z + fz_ * 6);
+    const k = Math.max(0.85, (f.sc || 0.8) / 0.8 * 0.85); // a bigger ship needs the camera further back
+    cam.position.set(f.x - fx_ * 12 * k, L + 7.5 * k, f.z - fz_ * 12 * k);
+    cam.lookAt(f.x + fx_ * 6 * k, L + 1.2, f.z + fz_ * 6 * k);
   }
 
   return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length }) };

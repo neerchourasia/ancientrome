@@ -211,6 +211,11 @@ class Conn:
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.seen = set()          # the other walkers this connection has been told about
+        self.htier = 0             # the tier of their house (0 to 3), shown to others on their plot
+        self.plot = None           # which house plot in Rome is theirs
+        self.heist = None          # a robbery they are in (as the thief or the owner)
+        self.rob_cd = 0.0          # when they may rob again
+        self.houses_sig = None
         self.admin = False         # set from the database when they log in with an admin account
         self.muted_until = 0.0
         self.ctok, self.ctok_t = 3.0, now()   # chat: how many messages they may send right now
@@ -1121,6 +1126,8 @@ def on_walk(conn, m):
     pk = m.get("k")
     conn.park = [pk[0], round(num(pk[1], -20000, 20000), 1), round(num(pk[2], -20000, 20000), 1), round(num(pk[3], -50, 50), 2)] if isinstance(pk, list) and len(pk) == 4 and pk[0] in VEHICLES else None
     conn.walk_at = now()
+    h = m.get("h")
+    conn.htier = int(h) if isinstance(h, (int, float)) and 0 <= h <= 3 else conn.htier
 
 
 def world_once():
@@ -1150,12 +1157,154 @@ def world_once():
 
 
 async def world_loop():
+    n = 0
     while True:
         await asyncio.sleep(0.25)
+        n += 1
         try:
             world_once()
+            if n % 2 == 0:
+                heist_once()
+            if n % 4 == 0:
+                houses_once()
         except Exception as e:  # never let a bug here stop the world
             print("world error:", repr(e))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# houses and robberies: everyone online has a house plot on the Via Domus in Rome. You can break into someone else's house
+# (they must be online and in Rome), run with the loot, and the owner chases you. Caught, you lose 100 denarii (to the owner);
+# get away and you keep 100 denarii of theirs. Coins are kept by the browsers; the server only decides who got caught.
+
+HOUSE_PLOTS = 12
+PLOT_X0, PLOT_DX = 185.0, 26.0
+PLOT_NORTH_Z, PLOT_SOUTH_Z = -55.0, -25.0
+HEIST_LOOT = 100
+HEIST_TIME = 80.0           # seconds the thief has to get away
+HEIST_CATCH = 4.0           # the owner catches the thief within this many metres
+HEIST_ESCAPE = 230.0        # ... and the thief is clear when this far away
+HEIST_DOOR = 9.0            # you must be this close to a house door to break in
+HEIST_COOLDOWN = 90.0       # a thief rests this long after a robbery
+HEIST_SAME_VICTIM = 300.0
+HEISTS = []                 # [{thief, victim, t0, last_send, far}]
+VICTIM_CD = {}              # (thief id, victim id) -> when they may rob that house again
+
+
+def plot_pos(i):
+    """The door of plot i (x, z) where you stand to break in, and the plot's centre."""
+    col, row = i % 6, i // 6
+    x = PLOT_X0 + col * PLOT_DX
+    if row == 0:
+        return x, PLOT_NORTH_Z + 7.5, x, PLOT_NORTH_Z
+    return x, PLOT_SOUTH_Z - 7.5, x, PLOT_SOUTH_Z
+
+
+def assign_plots():
+    used = {c.plot for c in CONNS if c.hello and not c.closed and c.plot is not None}
+    for c in sorted((c for c in CONNS if c.hello and not c.closed and c.plot is None), key=lambda c: c.id):
+        for i in range(HOUSE_PLOTS):
+            if i not in used:
+                c.plot = i
+                used.add(i)
+                break
+
+
+def houses_once():
+    """Tells everyone which houses stand on the street (their owners are online), when that changes."""
+    assign_plots()
+    rows = sorted([c.plot, c.id, c.name, c.htier] for c in CONNS if c.hello and not c.closed and c.plot is not None)
+    sig = json.dumps(rows)
+    for c in list(CONNS):
+        if not c.hello or c.closed:
+            continue
+        mine = [r for r in rows if r[1] != c.id]
+        s2 = sig + (c.id if c.plot is None else str(c.plot))
+        if c.houses_sig != s2:
+            c.houses_sig = s2
+            c.send({"t": "houses", "h": mine, "mine": c.plot})
+
+
+def find_conn(cid):
+    for c in CONNS:
+        if c.id == cid and c.hello and not c.closed:
+            return c
+    return None
+
+
+def walking(c):
+    return c.city == "rome" and not c.room and now() - c.walk_at < 4
+
+
+def on_rob(conn, m):
+    """The thief says: I am breaking into this house."""
+    t = now()
+    victim = find_conn(m.get("target"))
+    err = None
+    if conn.room or not walking(conn):
+        err = "You can only rob a house while you are walking in Rome."
+    elif conn.heist:
+        err = "You are already running from a robbery."
+    elif victim is None or victim is conn or victim.plot is None:
+        err = "That house is empty."
+    elif not walking(victim):
+        err = "The owner is not at home in Rome right now, so there is nothing worth taking."
+    elif victim.heist:
+        err = "Someone is already robbing that house."
+    elif t < conn.rob_cd:
+        err = "Lie low for a bit: you robbed someone a moment ago."
+    elif t < VICTIM_CD.get((conn.id, victim.id), 0):
+        err = "You robbed that house recently. Try another."
+    else:
+        dx, dz, _, _ = plot_pos(victim.plot)
+        if math.hypot(conn.px - dx, conn.pz - dz) > HEIST_DOOR:
+            err = "Go up to the door first."
+    if err:
+        return conn.send({"t": "heist_no", "msg": err})
+    h = {"thief": conn, "victim": victim, "t0": t, "last": 0.0, "far": 0.0}
+    HEISTS.append(h)
+    conn.heist = victim.heist = h
+    conn.send({"t": "heist", "role": "thief", "other": victim.name, "loot": HEIST_LOOT, "time": HEIST_TIME})
+    victim.send({"t": "heist", "role": "owner", "other": conn.name, "loot": HEIST_LOOT, "time": HEIST_TIME, "x": round(conn.px, 1), "z": round(conn.pz, 1)})
+
+
+def heist_end(h, result):
+    if h in HEISTS:
+        HEISTS.remove(h)
+    th, vi = h["thief"], h["victim"]
+    th.heist = vi.heist = None
+    th.rob_cd = now() + HEIST_COOLDOWN
+    VICTIM_CD[(th.id, vi.id)] = now() + HEIST_SAME_VICTIM
+    msg = {"t": "heist_end", "result": result, "loot": HEIST_LOOT, "thief": th.name, "victim": vi.name}
+    th.send({**msg, "role": "thief"})
+    vi.send({**msg, "role": "owner"})
+
+
+def heist_once():
+    """Called a few times a second: who got caught, who got away."""
+    t = now()
+    for h in list(HEISTS):
+        th, vi = h["thief"], h["victim"]
+        if th.closed or not th.hello:
+            heist_end(h, "caught")
+            continue
+        if vi.closed or not vi.hello or vi.room:
+            heist_end(h, "escaped")
+            continue
+        if th.room:
+            heist_end(h, "escaped")
+            continue
+        d = math.hypot(th.px - vi.px, th.pz - vi.pz) if th.city == vi.city else 1e9
+        if d < HEIST_CATCH:
+            heist_end(h, "caught")
+            continue
+        h["far"] = h["far"] + 1 if d > HEIST_ESCAPE else 0
+        if h["far"] >= 8 or t - h["t0"] > HEIST_TIME:
+            heist_end(h, "escaped")
+            continue
+        if t - h["last"] > 1.0:
+            h["last"] = t
+            vi.send({"t": "heistpos", "x": round(th.px, 1), "z": round(th.pz, 1), "d": round(d), "left": max(0, round(HEIST_TIME - (t - h["t0"])))})
+            th.send({"t": "heistpos", "d": round(d), "left": max(0, round(HEIST_TIME - (t - h["t0"])))})
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1338,6 +1487,8 @@ async def handle_msg(conn, m):
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "walk":
         return on_walk(conn, m)
+    if t == "rob":
+        return on_rob(conn, m)
     if t == "chat":
         return on_chat(conn, m)
     if t == "admin":
@@ -1360,6 +1511,8 @@ async def handle_msg(conn, m):
 
 
 def drop(conn):
+    if conn.heist:
+        heist_end(conn.heist, "caught" if conn.heist["thief"] is conn else "escaped")
     leave_queue(conn)
     if conn.room:
         conn.room.leave(conn)
