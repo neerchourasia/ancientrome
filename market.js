@@ -67,6 +67,8 @@ const Market = (() => {
     f_kebab: F("Seekh kebab", 18, 26, "Spiced meat grilled over charcoal.", ["delhi", "ancient"]),
     f_lassi: F("Lassi", 8, 10, "Cool, thick yoghurt drink in a clay cup.", ["delhi", "ancient"]),
     f_pulao: F("Pulao", 25, 34, "Fragrant rice cooked with spices and nuts.", ["delhi", "ancient"]),
+    f_dosa: F("Masala dosa", 12, 16, "A thin, crisp rice pancake rolled round spiced potato, with sambar and chutney.", ["delhi", "ancient"]),
+    f_dosa_m: F("Masala dosa", 12, 16, "A thin, crisp rice pancake rolled round spiced potato, with sambar and chutney.", ["delhi", "modern"]),
     f_samosa: F("Samosa", 6, 9, "A crisp pastry with spiced potato and peas.", ["delhi", "modern"]),
     f_chaat: F("Chaat plate", 10, 14, "Tangy, crunchy and sweet all at once.", ["delhi", "modern"]),
     f_chai: F("Cup of chai", 4, 5, "Sweet milky tea.", ["delhi", "modern"]),
@@ -148,6 +150,7 @@ const Market = (() => {
       if (Vitals.hunger >= 90 && Vitals.hp >= 99) { toast("You are not hungry."); return; }
       Vitals.coins -= mark(it.price);
       Vitals.eat(it.heal, it.heal * 2.5);
+      { const hb = document.getElementById("v-hunger"); if (hb) { hb.classList.add("ate"); setTimeout(() => hb.classList.remove("ate"), 700); } }
       Sfx.play("coin"); render();
       toast(`${it.name}: delicious. Hunger ${Math.round(Vitals.hunger)}/100, health ${Math.round(Vitals.hp)}/100.`);
       return;

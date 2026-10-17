@@ -192,8 +192,10 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #vitals { position: absolute; right: 14px; bottom: 14px; width: 190px; padding: 8px 10px; background: var(--panel); border-radius: 10px; font-size: .78rem; }
 #vitals .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 #vitals .row > span { width: 52px; color: var(--muted); }
+#vitals #v-hunger { transition: width .9s ease, background-color .9s ease, filter .4s; }
+#vitals #v-hunger.ate { filter: brightness(1.6); }
 #vitals .bar { flex: 1; height: 9px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; overflow: hidden; }
-#v-hp, #v-horse { height: 100%; width: 100%; background: #3aa557; transition: width .3s, background .3s; }
+#v-hp, #v-horse, #v-hunger { height: 100%; width: 100%; background: #3aa557; transition: width .3s, background .3s; }
 #vitals .coins b { color: var(--gold); font-size: .95rem; }
 #v-rest { margin: 2px 0 0; color: var(--gold); text-align: center; min-height: 1em; }
 
