@@ -267,6 +267,20 @@ const Car = (() => {
 
   return {
     MODELS, model, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
+    // Click on your parked car and it goes back to your garage (if you have one)
+    clickAt(cx, cy, cam, canvasEl) {
+      if (!car || driving || mode !== "walk") return false;
+      const r = canvasEl.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), cam);
+      if (!ray.intersectObject(car.g, true).length) return false;
+      if (Math.hypot(player.x - car.x, player.z - car.z) > 30) return false;
+      if (!Garage.any()) { toast("You need a garage: upgrade your house (the garden house or better has one). Or park it away from the garage list."); return true; }
+      const name = car.M.name.toLowerCase();
+      stow(); Garage.refresh(); Sfx.play("coin");
+      toast(`Your ${name} goes back to your garage.`);
+      return true;
+    },
     get motor() { return !car || car.M.motor !== false; },
     // what other players should see of your vehicle: the one you are in, or the one you left parked
     share: () => (car ? { veh: driving ? car.id : null, park: driving ? null : [car.id, +car.x.toFixed(1), +car.z.toFixed(1), +car.yaw.toFixed(2)] } : { veh: null, park: null }),

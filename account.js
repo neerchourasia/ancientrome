@@ -75,7 +75,7 @@ const Account = (() => {
       character: { name: Character.name, cls: Character.cls, look: Character.look },
       progress: {
         discovered: [...discovered],
-        vitals: { hp: Math.round(Vitals.hp), horses: Math.round(Vitals.horses), coins: Vitals.coins },
+        vitals: { hp: Math.round(Vitals.hp), horses: Math.round(Vitals.horses), coins: Vitals.coins, hunger: Math.round(Vitals.hunger) },
         time: { hour: +Time.hour.toFixed(2), day: Time.day },
         owned: Market.snapshot(),
         tax: Tax.snapshot(),
@@ -98,6 +98,7 @@ const Account = (() => {
       if (Number.isFinite(v.hp)) Vitals.hp = v.hp;
       if (Number.isFinite(v.horses)) Vitals.horses = v.horses;
       if (Number.isFinite(v.coins)) Vitals.coins = v.coins;
+      if (Number.isFinite(v.hunger)) Vitals.hunger = v.hunger;
     }
     if (p.owned && typeof p.owned === "object") Market.restore(p.owned);
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);

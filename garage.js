@@ -88,6 +88,7 @@ const Garage = (() => {
     // parent: where the vehicles are shown; (x, z) world centre; tier(): your house tier in that city
     register(city, parent, x, z, facing, tier) { sites.push({ city, parent, x, z, facing, tier, group: null, shown: null }); },
     at, refresh, stored,
+    any: () => sites.some((s) => mine(s) && s.tier() >= 1), // you have a garage in this city
     update(dt) { t -= dt; if (t <= 0) { t = 0.7; refresh(); } },
     open() { if (!at(player.x, player.z, player.feet)) return false; Market.open("garage"); return true; },
   };

@@ -1,7 +1,7 @@
 "use strict";
 // Chat with the other players, and the admin panel. Messages go through the game server (server/server.py), which cleans
-// them, limits how fast they come, masks swearing and lets admins mute or kick. Press Enter to type, Enter again to send,
-// Esc to close. `/w name message` whispers to one person; `/help` lists the commands. Depends on online.js and account.js.
+// them, limits how fast they come, masks swearing and lets admins mute or kick. Press Enter to type, Enter again to send (the chat stays open
+// so you can keep on typing), Esc or Enter on an empty line to close. `/w name message` whispers to one person; `/help` lists the commands. Depends on online.js and account.js.
 
 const Chat = (() => {
   const $c = (id) => document.getElementById(id);
@@ -65,11 +65,10 @@ const Chat = (() => {
     e.preventDefault();
     const input = $c("chat-input"), text = input.value.trim();
     input.value = "";
-    if (text) {
-      if (!Online.connected) add({ sys: 1, text: "Not connected to the game server yet. Try again in a moment." });
-      else send({ t: "chat", text });
-    }
-    closeChat();
+    if (!text) { closeChat(); return; }   // Enter on an empty line closes the chat
+    if (!Online.connected) add({ sys: 1, text: "Not connected to the game server yet. Try again in a moment." });
+    else send({ t: "chat", text });
+    input.focus();                          // stay open, so you can keep on messaging (Esc or an empty Enter closes it)
   }
 
   function bind() {

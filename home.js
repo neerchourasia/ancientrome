@@ -103,6 +103,15 @@ const Home = (() => {
     F.cyl(-4.9, 0.15, 3.7, 0.3, 0.8, lambert(0xa5552f));                      // amphora
     F.box(0, 0.16, -0.5, 3.2, 0.03, 2.4, red, { cast: false });              // rug
 
+    // the dresser, against the east wall (see dresser.js): look at what you own to wear
+    const dm = { wood: wood, top: lambert(0x8a6a3a), drawer: lambert(0x5a3e22), mirror: new T.MeshBasicMaterial({ color: 0xb8d0dc }), frame: M.bronze };
+    for (const p of Dresser.parts(259.9, 49.0, "w")) {
+      const m = shadowed(new T.Mesh(BOX, dm[p.mat]));
+      m.scale.set(p.w, p.h, p.d); m.position.set(p.x, 0.15 + p.y0 + p.h / 2, p.z); worldScene.add(m);
+      if (p.solid) addBlockerBox(p.x - p.w / 2, p.x + p.w / 2, p.z - p.d / 2, p.z + p.d / 2, 0.15, 0.15 + p.y0 + p.h);
+    }
+    Dresser.register("rome", 259.9, 49.0, "w", () => true);
+
     const [lx, lz] = F.toW(2.2, 1.2);
     lamp = new T.PointLight(0xffc477, 0.3, 17);
     lamp.position.set(lx, F.y + 3, lz);

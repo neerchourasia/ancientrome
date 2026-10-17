@@ -537,6 +537,12 @@ const Delhi = (() => {
     // 2: the grand haveli; 3: the same, with a tower, a pavilion in a pool and a gate
     grandHouse(2);
     grandHouse(3);
+    // a dresser in every house: against the east wall of the small house and the bigger one, and the north wall of the bedroom in the haveli and mahal
+    const dm2 = { wood: D.wood, top: lambert(0x8a6a3a), drawer: lambert(0x5a3e22), mirror: new T.MeshBasicMaterial({ color: 0xb8d0dc }), frame: D.gold };
+    [[0, -96.6, -36.4, "w"], [1, -93.4, -48.4, "w"], [2, -85, -76.6, "s"], [3, -85, -76.6, "s"]].forEach(([t, dx, dz, f]) => {
+      for (const p of Dresser.parts(dx, dz, f)) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, dm2[p.mat], p.solid);
+      Dresser.register("delhi", X(dx), dz, f, () => houseTier === t);
+    });
     // a garage for every upgrade (not the small house), by the east wall of the plot, open to the west
     const gm = { wall: D.cream, roof: D.redDark, dark: lambert(0x6a625a), door: D.wood };
     for (let t = 1; t <= 3; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);

@@ -83,7 +83,8 @@ const Market = (() => {
     pets: { title: "Animals and rides", types: ["pet", "car", "mount"] },
     builder: { title: "Builder and decorator", types: ["decor"], house: true },
     healer: { title: "Healer and trainer", types: ["supply", "perk"] },
-    garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true },
+    garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
+    dresser: { title: "Your dresser", types: ["wear"], ownedOnly: true, empty: "You do not own anything to wear yet. The clothier in the market square sells hats, cloaks, armour and boots. You cannot buy things here." },
   };
   let stall = "food";
   const SECTIONS = [
@@ -144,11 +145,11 @@ const Market = (() => {
     if (Vitals.coins < mark(it.price)) { toast(`The ${it.name.toLowerCase()} costs ${mark(it.price)} denarii (you have ${Vitals.coins}).`); return; }
     if (it.type === "food") {
       if (!foodHere(it)) return;
-      if (Vitals.hp >= 99 && Vitals.fed > 120) { toast("You are not hungry."); return; }
+      if (Vitals.hunger >= 90 && Vitals.hp >= 99) { toast("You are not hungry."); return; }
       Vitals.coins -= mark(it.price);
-      Vitals.eat(it.heal);
+      Vitals.eat(it.heal, it.heal * 2.5);
       Sfx.play("coin"); render();
-      toast(`${it.name}: delicious. Health ${Math.round(Vitals.hp)}/100, and you heal faster for a while.`);
+      toast(`${it.name}: delicious. Hunger ${Math.round(Vitals.hunger)}/100, health ${Math.round(Vitals.hp)}/100.`);
       return;
     }
     if (it.type === "supply") {
@@ -181,6 +182,7 @@ const Market = (() => {
     const def = STALLS[stall] || STALLS.food;
     $m("mk-title").textContent = def.title;
     $m("mk-house-box").hidden = !def.house;
+    $m("mk-purse").hidden = !!def.ownedOnly;
     $m("mk-coins").textContent = Vitals.coins;
     const cur = homes()[tier()], next = homes()[tier() + 1];
     $m("mk-house-name").textContent = cur.name;
@@ -218,7 +220,7 @@ const Market = (() => {
         li.append(txt, b);
         ul.append(li);
       }
-      if (def.ownedOnly && !ul.children.length) { const li = document.createElement("li"), note = document.createElement("small"); note.textContent = "You do not own any of these yet. Buy one at the animals and rides stall in the market square."; li.append(note); ul.append(li); }
+      if (def.ownedOnly && !ul.children.length) { const li = document.createElement("li"), note = document.createElement("small"); note.textContent = def.empty; li.append(note); ul.append(li); }
       return [h, ul];
     }));
   }

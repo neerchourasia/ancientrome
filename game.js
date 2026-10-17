@@ -156,6 +156,7 @@ function wireInput(canvas) {
       if (k === "KeyF" && Stalls.at(player.x, player.z, player.feet)) Stalls.open();
       else if (k === "KeyF" && Jobs.at(player.x, player.z, player.feet)) Jobs.act();
       else if (k === "KeyF" && Garage.at(player.x, player.z, player.feet)) Garage.open();
+      else if (k === "KeyF" && Dresser.at(player.x, player.z, player.feet)) Dresser.open();
       else if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
@@ -195,6 +196,11 @@ function wireInput(canvas) {
     if (mode === "dgame") { DGames.fire(); return; }
     if (started && mode === "walk" && !panelOpen) dragging = true;
   });
+  let downAt = null;
+  canvas.addEventListener("mousedown", (e) => { downAt = { x: e.clientX, y: e.clientY }; }, true);
+  canvas.addEventListener("mouseup", (e) => { // a plain click (not a drag) on your parked car sends it to your garage
+    if (e.button === 0 && mode === "walk" && !panelOpen && downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6) Car.clickAt(e.clientX, e.clientY, camera, renderer.domElement);
+  });
   addEventListener("mouseup", (e) => { dragging = false; if (e.button === 2) Fight.mouseBlock = false; if (e.button === 0 && mode === "fight") Fight.release(); });
   $("#prompt").addEventListener("click", () => {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
@@ -203,6 +209,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "stall") { Stalls.open(); return; }
     if ($("#prompt").dataset.kind === "job") { Jobs.act(); return; }
     if ($("#prompt").dataset.kind === "garage") { Garage.open(); return; }
+    if ($("#prompt").dataset.kind === "dresser") { Dresser.open(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -1050,6 +1057,7 @@ function updatePrompt() {
     if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
     if (!text) { const st = Stalls.at(player.x, player.z, player.feet); if (st) { text = `F: shop at the ${st.name}`; p.dataset.kind = "stall"; } }
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
+    if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
@@ -1068,10 +1076,23 @@ function toggleRest() {
   toast(stables ? "Resting at the stables: you and the horses recover" : "Resting: you recover. The horses only recover quickly at the Circus stables");
 }
 
+// Hunger warnings: you must eat. Food is sold at the market square (the food stall).
+let hungerBand = 0;
+function hungerWarn() {
+  const h = Vitals.hunger, band = h <= 0.01 ? 3 : h <= 15 ? 2 : h <= 40 ? 1 : 0;
+  if (band > hungerBand) {
+    toast(band === 1 ? "You are getting hungry. Buy food at the food stall in the market square (see Places)." : band === 2 ? "You are very hungry! Eat soon." : "You are starving! You lose health until you eat. Buy food now.");
+    if (band >= 2) Narrator.say(band === 3 ? "You are starving." : "You are very hungry.", { interrupt: false });
+  }
+  hungerBand = band;
+}
 let lastCoins = Vitals.coins;
 function updateVitalsHud() {
   $("#v-hp").style.width = `${Vitals.hp}%`;
   $("#v-hp").style.background = Vitals.hp < Vitals.MIN_FIGHT_HP ? "#c0392b" : Vitals.hp < 65 ? "#e2b955" : "#3aa557";
+  $("#v-hunger").style.width = `${Vitals.hunger}%`;
+  $("#v-hunger").style.background = Vitals.hunger <= 15 ? "#c0392b" : Vitals.hunger < 40 ? "#e2b955" : "#3aa557";
+  hungerWarn();
   $("#v-horse").style.width = `${Vitals.horses}%`;
   $("#v-horse").style.background = Vitals.horses < Vitals.MIN_RACE_HORSES ? "#c0392b" : Vitals.horses < 65 ? "#e2b955" : "#3aa557";
   if (Vitals.coins > lastCoins) Sfx.play("coin");
@@ -1344,7 +1365,7 @@ function startDeath() {
 
 function updateDeath(dt) {
   if (deathT === 0) {
-    if (started && Vitals.hp <= 0.01 && !deathPending) deathPending = "You were killed."; // remembered, so healing while a result screen is open cannot save you
+    if (started && Vitals.hp <= 0.01 && !deathPending) deathPending = Vitals.hunger <= 0.01 ? "You starved to death." : "You were killed."; // remembered, so healing while a result screen is open cannot save you
     if (!started || sleepT > 0 || !(mode === "walk" || mode === "drive") || panelOpen) return; // (wait until the result screen is closed)
     if (deathPending) startDeath();
     else if (Vitals.hp < 14) { lowWarnT -= dt; if (lowWarnT <= 0) { lowWarnT = 25; toast("You are badly hurt! Another crash could kill you. Press Z to rest"); } }
@@ -1368,7 +1389,7 @@ function updateDeath(dt) {
   }
   if (deathT >= BLACK + LAPSE + 0.6) {
     deathT = 0;
-    Vitals.hp = 55; Vitals.horses = Vitals.horses + 25;
+    Vitals.hp = 55; Vitals.horses = Vitals.horses + 25; Vitals.hunger = Math.max(Vitals.hunger, 50); // the doctor feeds you a little
     const fee = Math.min(Vitals.coins, 25); Vitals.coins -= fee;
     const rent = Market.rent(); if (rent) Vitals.coins += rent;
     $("#death").classList.remove("on", "lapse");
