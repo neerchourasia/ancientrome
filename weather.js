@@ -59,24 +59,56 @@ const Weather = (() => {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const el = (id) => document.getElementById(id);
 
+  // The weather changes every day. Each day has a theme (rolled for that day, never the same as yesterday's), and the day's
+  // weather follows it most of the time. Severe days (hail, blizzard, tornado, cyclone) come every week or so, by season and city:
+  // the severe weather lasts for two stretches of that day (about ten hours), and the rest of the day is the build-up and the aftermath.
+  const SEVERE = ["hail", "blizzard", "tornado", "cyclone"];
+  const SEVERE_DAY = { // the chance that a day in this season is a severe day, and what kind
+    rome: [{ hail: 0.07, tornado: 0.04 }, { hail: 0.09, tornado: 0.05 }, { cyclone: 0.12, hail: 0.05, tornado: 0.02 }, { blizzard: 0.13, hail: 0.03 }],
+    delhi: [{ hail: 0.07, tornado: 0.04 }, { tornado: 0.05, hail: 0.05 }, { cyclone: 0.16, hail: 0.04 }, { hail: 0.03, tornado: 0.01 }],
+  };
+
+  const seasonOf = (c, day) => (Math.floor(((day - 1) % 28 + 28) % 28 / 7) + (c === "delhi" ? 2 : 0)) % 4; // Delhi's seasons run two ahead of Rome's
+
+  // the theme of a day (k re-rolls it)
+  function dayRaw(c, day, k) {
+    const s = seasonOf(c, day), r = mulberry(day * 104729 + (c === "delhi" ? 7919 : 15485863) + s * 977 + k * 6700417);
+    let x = r();
+    for (const [kind, p] of Object.entries(SEVERE_DAY[c][s])) { if (x < p) return { kind, severe: true, w: Math.floor(r() * 4) }; x -= p; }
+    const odds = ODDS[c][s], list = TYPES.filter((t) => !SEVERE.includes(t) && odds[t]), total = list.reduce((a, t) => a + odds[t], 0);
+    let y = r() * total;
+    for (const t of list) { y -= odds[t]; if (y <= 0) return { kind: t, severe: false }; }
+    return { kind: "clear", severe: false };
+  }
+  function dayTheme(c, day) {
+    const yest = dayRaw(c, day - 1, 0).kind;
+    let k = 0, d = dayRaw(c, day, 0);
+    while (d.kind === yest && k < 6) d = dayRaw(c, day, ++k);       // never the same weather two days running
+    return { ...d, k };
+  }
+
   // One roll of the weather for a city (`bump` re-rolls it with another seed)
   function roll(c, day, hour, bump) {
-    const s = (Math.floor(((day - 1) % 28 + 28) % 28 / 7) + (c === "delhi" ? 2 : 0)) % 4, block = Math.floor((day * 24 + hour) / 5); // Delhi's seasons run two seasons ahead of Rome's
-    const r = mulberry(block * 7919 + (c === "delhi" ? 104729 : 1299709) + s * 31 + bump * 15485863)();
-    const odds = ODDS[c][s], total = TYPES.reduce((a, t) => a + (odds[t] || 0), 0);
-    let acc = 0;
-    for (const t of TYPES) { acc += (odds[t] || 0) / total; if (r < acc) return { season: s, kind: t }; }
+    const s = seasonOf(c, day), th = dayTheme(c, day), slot = Math.min(4, Math.floor(hour / 5));
+    const r = mulberry(day * 7919 + slot * 31337 + (c === "delhi" ? 104729 : 1299709) + s * 31 + bump * 15485863);
+    if (th.severe && slot >= th.w && slot <= th.w + 1) return { season: s, kind: th.kind };      // the storm itself
+    if (th.severe && (slot === th.w - 1 || slot === th.w + 2)) return { season: s, kind: s === 3 && c === "rome" && th.kind === "blizzard" ? "snow" : th.kind === "cyclone" ? "storm" : "cloudy" }; // the build-up and the aftermath
+    if (r() < 0.65) return { season: s, kind: th.kind };                                           // most of the day follows its theme
+    const odds = ODDS[c][s], list = TYPES.filter((t) => !SEVERE.includes(t) && odds[t]), total = list.reduce((a, t) => a + odds[t], 0);
+    let y = r() * total;
+    for (const t of list) { y -= odds[t]; if (y <= 0) return { season: s, kind: t }; }
     return { season: s, kind: "clear" };
   }
 
   // The weather for a day and hour in a city: the same for everyone who is at that time. Rome and Delhi have their own weather:
-  // when both would get the same sort of weather (dry, grey, wet...) at the same moment, Delhi's is rolled again, and Delhi's seasons run two seasons ahead of Rome's (spring in Rome is the monsoon in Delhi), so the two cities are clearly different.
+  // when both would get the same sort of weather (dry, grey, wet...) at the same moment, Delhi's is rolled again, so the two cities
+  // are clearly different. (A severe event in either city is never rolled away.)
   const GROUP = { clear: "dry", partly: "dry", windy: "dry", cloudy: "grey", mist: "grey", fog: "grey", drizzle: "wet", rain: "wet", storm: "wet", hail: "wet", cyclone: "wet", snow: "snow", blizzard: "snow", tornado: "tornado" };
   function forecast(c, day, hour) {
     if (c !== "delhi") return roll("rome", day, hour, 0);
     const other = GROUP[roll("rome", day, hour, 0).kind];
     let w = roll("delhi", day, hour, 0);
-    for (let bump = 1; bump <= 10 && GROUP[w.kind] === other; bump++) w = roll("delhi", day, hour, bump); // a different sort of weather, not just a different name
+    for (let bump = 1; bump <= 10 && GROUP[w.kind] === other && !SEVERE.includes(w.kind); bump++) w = roll("delhi", day, hour, bump); // a different sort of weather, not just a different name
     return w;
   }
 
