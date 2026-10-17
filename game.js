@@ -1359,6 +1359,7 @@ function startDeath() {
   if (deathT > 0) return;
   if (mode === "drive") Car.exit(true);
   Vitals.stopRest(); Nav.clear();
+  sleepT = 0; slept = false; $("#sleep").classList.remove("on");   // no "Sleeping..." screen on top of the death screen
   deathT = 0.001; deathFrom = { hour: Time.hour, day: Time.day, moved: false };
   Sfx.play("oof");
   const d = $("#death");
@@ -1391,7 +1392,7 @@ function updateDeath(dt) {
     const d = $("#death");
     d.classList.add("lapse");
     d.querySelector("h2").textContent = "A day at home";
-    d.querySelector("p").textContent = `Day ${Time.day} · ${Time.label()}: you rest while the day goes by...`;
+    d.querySelector("p").textContent = `${Time.label()}: you rest while the day goes by...`;
   }
   if (deathT >= BLACK + LAPSE + 0.6) {
     deathT = 0;
@@ -1410,7 +1411,7 @@ function updateDeath(dt) {
 let sleepT = 0, slept = false, sleepCollapse = false, lastStage = 0, wasHome = false, lastClock = "";
 
 function startSleep(collapse) {
-  if (sleepT > 0) return;
+  if (sleepT > 0 || deathT > 0) return;           // not while you are dying: the two black screens would pile up
   sleepT = 0.001; slept = false; sleepCollapse = collapse;
   Vitals.stopRest(); Nav.clear && Nav.clear();
   toast(collapse ? "You are so tired that you collapse..." : "You lie down in your bed...");
@@ -1471,7 +1472,7 @@ function updateTime(dt) {
   // the sleep fade: dark, wake up, light again
   if (sleeping) {
     sleepT += dt;
-    $("#sleep").classList.toggle("on", sleepT < 2.4);
+    $("#sleep").classList.toggle("on", sleepT < 2.4 && deathT === 0);
     if (sleepT >= 1.2 && !slept) { slept = true; wakeUp(); }
     if (sleepT >= 3.6) { sleepT = 0; slept = false; }
   }
