@@ -51,8 +51,42 @@ const Market = (() => {
     horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
+  // Food from the food stall. Each dish belongs to one city and era. `heal` is health at once; eating also leaves you "fed",
+  // which speeds up how fast you heal on your own for a few minutes.
+  const F = (name, price, heal, note, where) => ({ type: "food", name, price, heal, note, where });
+  const FOODS = {
+    f_bread: F("Fresh bread", 6, 10, "A warm round loaf from the baker's oven.", ["rome", "ancient"]),
+    f_olives: F("Olives and cheese", 9, 14, "Salty olives with a wedge of sheep's cheese.", ["rome", "ancient"]),
+    f_honey: F("Honey cakes", 14, 20, "Sweet cakes soaked in honey, a Roman treat.", ["rome", "ancient"]),
+    f_pork: F("Roast pork", 28, 36, "Slow-roasted, with herbs and a little garum.", ["rome", "ancient"]),
+    f_pizza: F("Pizza slice", 8, 14, "Hot from the oven, with melted cheese.", ["rome", "modern"]),
+    f_gelato: F("Gelato", 10, 11, "Two scoops, cold and creamy.", ["rome", "modern"]),
+    f_pasta: F("Bowl of pasta", 18, 28, "Carbonara, thick with egg and pepper.", ["rome", "modern"]),
+    f_espresso: F("Espresso", 6, 6, "Small, black and strong.", ["rome", "modern"]),
+    f_jalebi: F("Jalebi", 8, 12, "Crisp orange spirals soaked in syrup.", ["delhi", "ancient"]),
+    f_kebab: F("Seekh kebab", 18, 26, "Spiced meat grilled over charcoal.", ["delhi", "ancient"]),
+    f_lassi: F("Lassi", 8, 10, "Cool, thick yoghurt drink in a clay cup.", ["delhi", "ancient"]),
+    f_pulao: F("Pulao", 25, 34, "Fragrant rice cooked with spices and nuts.", ["delhi", "ancient"]),
+    f_samosa: F("Samosa", 6, 9, "A crisp pastry with spiced potato and peas.", ["delhi", "modern"]),
+    f_chaat: F("Chaat plate", 10, 14, "Tangy, crunchy and sweet all at once.", ["delhi", "modern"]),
+    f_chai: F("Cup of chai", 4, 5, "Sweet milky tea.", ["delhi", "modern"]),
+    f_momos: F("Plate of momos", 14, 20, "Steamed dumplings with a red chilli sauce.", ["delhi", "modern"]),
+    f_butter: F("Butter chicken and naan", 28, 38, "Rich, creamy and filling.", ["delhi", "modern"]),
+  };
+  Object.assign(ITEMS, FOODS);
+  const foodHere = (it) => it.where[0] === (typeof city !== "undefined" ? city : "rome") && it.where[1] === (typeof era !== "undefined" ? era : "ancient");
+
+  // Each stall in the market sells some kinds of thing (the builder also sells houses)
+  const STALLS = {
+    food: { title: "Food stall", types: ["food"] },
+    clothes: { title: "Clothier", types: ["wear"] },
+    pets: { title: "Animals and rides", types: ["pet", "car", "mount"] },
+    builder: { title: "Builder and decorator", types: ["decor"], house: true },
+    healer: { title: "Healer and trainer", types: ["supply", "perk"] },
+  };
+  let stall = "food";
   const SECTIONS = [
-    ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -68,7 +102,7 @@ const Market = (() => {
     if (raw && Number.isInteger(raw.house) && raw.house >= 0 && raw.house < HOUSES.length) out.house = raw.house;
     if (raw && Number.isInteger(raw.dhouse) && raw.dhouse >= 0 && raw.dhouse < HOUSES_D.length) out.dhouse = raw.dhouse;
     const items = Array.isArray(raw && raw.items) ? raw.items : [], worn = Array.isArray(raw && raw.worn) ? raw.worn : [];
-    out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply"))];
+    out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply" && ITEMS[id].type !== "food"))];
     const slots = new Set();
     for (const id of worn) {
       if (typeof id !== "string" || !out.items.includes(id) || !ITEMS[id].slot || slots.has(ITEMS[id].slot)) continue;
@@ -105,8 +139,17 @@ const Market = (() => {
 
   function buyItem(id) {
     const it = ITEMS[id];
-    if (!it || (it.type !== "supply" && s.items.includes(id))) return;
+    if (!it || (it.type !== "supply" && it.type !== "food" && s.items.includes(id))) return;
     if (Vitals.coins < mark(it.price)) { toast(`The ${it.name.toLowerCase()} costs ${mark(it.price)} denarii (you have ${Vitals.coins}).`); return; }
+    if (it.type === "food") {
+      if (!foodHere(it)) return;
+      if (Vitals.hp >= 99 && Vitals.fed > 120) { toast("You are not hungry."); return; }
+      Vitals.coins -= mark(it.price);
+      Vitals.eat(it.heal);
+      Sfx.play("coin"); render();
+      toast(`${it.name}: delicious. Health ${Math.round(Vitals.hp)}/100, and you heal faster for a while.`);
+      return;
+    }
     if (it.type === "supply") {
       if (id === "salve" ? Vitals.hp >= 99 : Vitals.horses >= 99) { toast(id === "salve" ? "You are already in good health." : "Your horses are already fit."); return; }
       Vitals.coins -= mark(it.price);
@@ -134,6 +177,9 @@ const Market = (() => {
   function render() {
     const box = $m("market");
     if (!box) return;
+    const def = STALLS[stall] || STALLS.food;
+    $m("mk-title").textContent = def.title;
+    $m("mk-house-box").hidden = !def.house;
     $m("mk-coins").textContent = Vitals.coins;
     const cur = homes()[tier()], next = homes()[tier() + 1];
     $m("mk-house-name").textContent = cur.name;
@@ -146,7 +192,7 @@ const Market = (() => {
       $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
     } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : " It is the finest house in Rome.";
 
-    $m("mk-sections").replaceChildren(...SECTIONS.flatMap(([title, type]) => {
+    $m("mk-sections").replaceChildren(...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
       h.textContent = title; ul.className = "mk-items";
       const need = type === "car" ? "modern" : type === "mount" ? "ancient" : null;
@@ -156,14 +202,14 @@ const Market = (() => {
         li.append(note); ul.append(li);
         return [h, ul];
       }
-      for (const [id, it] of Object.entries(ITEMS).filter(([, x]) => x.type === type)) {
+      for (const [id, it] of Object.entries(ITEMS).filter(([, x]) => x.type === type && (type !== "food" || foodHere(x)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
         name.textContent = it.name; note.textContent = it.note;
         txt.append(name, note);
         b.type = "button";
         const owned = s.items.includes(id);
-        if (it.type === "supply" || !owned) { b.textContent = `Buy · ${mark(it.price)}`; b.disabled = Vitals.coins < mark(it.price); b.addEventListener("click", () => buyItem(id)); }
+        if (it.type === "supply" || it.type === "food" || !owned) { b.textContent = `Buy · ${mark(it.price)}`; b.disabled = Vitals.coins < mark(it.price); b.addEventListener("click", () => buyItem(id)); }
         else if (it.type === "car" || it.type === "mount") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
         else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
@@ -174,14 +220,14 @@ const Market = (() => {
     }));
   }
 
-  function open() {
+  function open(which) {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
+    stall = STALLS[which] ? which : "food";
     openPanel("#market");
     render();
   }
 
   function bind() {
-    $m("btn-market").addEventListener("click", open);
     $m("market-close").addEventListener("click", closePanels);
     $m("market").addEventListener("click", (e) => { if (e.target.id === "market") closePanels(); });
     $m("mk-house-buy").addEventListener("click", buyHouse);
@@ -189,7 +235,7 @@ const Market = (() => {
   }
 
   return {
-    bind, open, render, ITEMS,
+    bind, open, render, ITEMS, STALLS,
     get house() { return s.house; },
     get worn() { return s.worn.filter((id) => ITEMS[id].type === "wear"); }, // what other players can see
     get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },

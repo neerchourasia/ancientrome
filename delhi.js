@@ -749,6 +749,9 @@ const Delhi = (() => {
     const awn2 = new T.Mesh(BOX, new T.MeshLambertMaterial({ map: stripeTex("#2f8f4a", "#f1ead8") })); awn2.scale.set(5.8, 0.15, 3.2); awn2.position.set(cx, 3.2, cz - 0.4); awn2.rotation.x = 0.18; vg.add(awn2);
     boardSign(vg, cx, 3.95, cz + 1.4, 4, 1.0, "CHAAT", "hot street food");
     MAP_SHAPES.push({ k: "r", x0: cx - 2.8, x1: cx + 2.8, z0: cz - 1.8, z1: cz + 1.8, c: "#2f8f4a" });
+
+    // the market square on the open ground before the Lahori Gate
+    Stalls.build(vg, X(-50), 60, "delhi");
   }
 
 

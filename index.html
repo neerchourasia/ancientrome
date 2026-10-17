@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=144">
+  <link rel="stylesheet" href="walk.css?v=146">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=144"></script>
+  <script src="boot.js?v=146"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -45,7 +45,6 @@
         <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
         <button id="btn-time" type="button">Time <kbd>T</kbd></button>
         <button id="btn-char" type="button">Character <kbd>Y</kbd></button>
-        <button id="btn-market" type="button">🛒 Market</button>
         <button id="btn-online" type="button">🌐 Play online</button>
         <button id="btn-account" type="button">Log in</button>
         <button id="btn-view" type="button">View <kbd>C</kbd></button>
@@ -209,14 +208,16 @@
 
   <div id="market" role="dialog" aria-label="Market">
     <div class="box">
-      <header><h2>The Market</h2><button id="market-close" type="button" aria-label="Close">×</button></header>
+      <header><h2 id="mk-title">The Market</h2><button id="market-close" type="button" aria-label="Close">×</button></header>
       <p class="mk-purse">Your purse: <b id="mk-coins">0</b> denarii. Win fights and races to earn more.</p>
-      <h3>Your house</h3>
-      <div class="mk-card">
-        <strong id="mk-house-name"></strong>
-        <p id="mk-house-perk"></p>
-        <p id="mk-house-next" class="mk-next"></p>
-        <button id="mk-house-buy" type="button">Buy</button>
+      <div id="mk-house-box">
+        <h3>Your house</h3>
+        <div class="mk-card">
+          <strong id="mk-house-name"></strong>
+          <p id="mk-house-perk"></p>
+          <p id="mk-house-next" class="mk-next"></p>
+          <button id="mk-house-buy" type="button">Buy</button>
+        </div>
       </div>
       <div id="mk-sections"></div>
     </div>
@@ -329,7 +330,7 @@
         <tr><th>Look around</th><td>Drag the mouse</td></tr>
         <tr><th>Camera</th><td><kbd>C</kbd> changes the camera view: close behind, far behind, side, front, bird's-eye, first person (<kbd>Shift</kbd>+<kbd>C</kbd> goes back). Scroll the mouse wheel to zoom in and out. You can see yourself in every view except first person</td></tr>
         <tr><th>Rides (cars, rickshaws, carts, elephants)</th><td>Cars and cycle rickshaws (modern cities) and bullock carts and elephants (ancient cities) are in the Market. Buy one, take it out, walk up and press <kbd>X</kbd> to get in. <kbd>W</kbd> gas, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer, <kbd>Space</kbd> handbrake, <kbd>Esc</kbd> or <kbd>X</kbd> to get out</td></tr>
-        <tr><th>Market</th><td>The <b>🛒 Market</b> button: spend your denarii on a better house (garden, grand domus, villa) and on things to wear, a hound or eagle companion, house decorations, healing supplies and training</td></tr>
+        <tr><th>Market</th><td>Walk to the market square (Rome: south of the Forum; Old Delhi: the open square before the Lahori Gate) and press <kbd>F</kbd> at a stall. The <b>food stall</b> sells hot dishes that heal you, the <b>clothier</b> things to wear, the <b>animals and rides</b> stall companions, cars, carts and elephants, the <b>builder</b> a better house and decorations, and the <b>healer</b> salves, fodder and training</td></tr>
         <tr><th>Character and class</th><td><kbd>Y</kbd> opens the character screen: pick a name, a class (Gladiator, Charioteer, Venator or Merchant, each with its own bonuses) and your look. You are asked once when you first enter Rome</td></tr>
         <tr><th>Games of Old Delhi</th><td><kbd>N</kbd> in Delhi opens the list: a race down Chandni Chowk (rickshaws or elephants; <kbd>1</kbd>-<kbd>9</kbd> speed levels, <kbd>X</kbd> cruise, <kbd>Space</kbd> boost), defending the Red Fort's gate with a cannon, kushti wrestling, kite fights, a chaat (food) run, pachisi and a bazaar trading game. <kbd>Esc</kbd> leaves a game.</td></tr>
         <tr><th>Travel (Rome / Delhi)</th><td><kbd>B</kbd> (or the Travel button) takes you between Rome and Old Delhi, Shah Jahan's walled city. <kbd>K</kbd> there switches between Mughal Delhi (c. 1650) and Modern Delhi. The fights, races and naval battles stay in Rome.</td></tr>
@@ -373,35 +374,36 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=144"></script>
-  <script src="delhi-data.js?v=144"></script>
-  <script src="config.js?v=144"></script>
-  <script src="character.js?v=144"></script>
-  <script src="physics.js?v=144"></script>
-  <script src="vitals.js?v=144"></script>
-  <script src="narrator.js?v=144"></script>
-  <script src="audio.js?v=144"></script>
-  <script src="world.js?v=144"></script>
-  <script src="city.js?v=144"></script>
-  <script src="weather.js?v=144"></script>
-  <script src="modern.js?v=144"></script>
-  <script src="delhi.js?v=144"></script>
-  <script src="delhi-games.js?v=144"></script>
-  <script src="home.js?v=144"></script>
-  <script src="spectators.js?v=144"></script>
-  <script src="fight.js?v=144"></script>
-  <script src="nav.js?v=144"></script>
-  <script src="show.js?v=144"></script>
-  <script src="naval.js?v=144"></script>
-  <script src="watch.js?v=144"></script>
-  <script src="race.js?v=144"></script>
-  <script src="account.js?v=144"></script>
-  <script src="online.js?v=144"></script>
-  <script src="chat.js?v=144"></script>
-  <script src="tax.js?v=144"></script>
-  <script src="pets.js?v=144"></script>
-  <script src="car.js?v=144"></script>
-  <script src="market.js?v=144"></script>
-  <script src="game.js?v=144"></script>
+  <script src="landmarks.js?v=146"></script>
+  <script src="delhi-data.js?v=146"></script>
+  <script src="config.js?v=146"></script>
+  <script src="character.js?v=146"></script>
+  <script src="physics.js?v=146"></script>
+  <script src="vitals.js?v=146"></script>
+  <script src="narrator.js?v=146"></script>
+  <script src="audio.js?v=146"></script>
+  <script src="world.js?v=146"></script>
+  <script src="city.js?v=146"></script>
+  <script src="weather.js?v=146"></script>
+  <script src="modern.js?v=146"></script>
+  <script src="delhi.js?v=146"></script>
+  <script src="delhi-games.js?v=146"></script>
+  <script src="home.js?v=146"></script>
+  <script src="spectators.js?v=146"></script>
+  <script src="fight.js?v=146"></script>
+  <script src="nav.js?v=146"></script>
+  <script src="show.js?v=146"></script>
+  <script src="naval.js?v=146"></script>
+  <script src="watch.js?v=146"></script>
+  <script src="race.js?v=146"></script>
+  <script src="account.js?v=146"></script>
+  <script src="online.js?v=146"></script>
+  <script src="chat.js?v=146"></script>
+  <script src="tax.js?v=146"></script>
+  <script src="pets.js?v=146"></script>
+  <script src="car.js?v=146"></script>
+  <script src="market.js?v=146"></script>
+  <script src="stalls.js?v=146"></script>
+  <script src="game.js?v=146"></script>
 </body>
 </html>

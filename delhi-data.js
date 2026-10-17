@@ -148,6 +148,12 @@ const DELHI_LANDMARKS = [
     fact: "Chandni Chowk was divided into bazaars, among them Urdu Bazaar near the fort, Johri Bazaar (the jewellers) and Fatehpuri Bazaar.",
   }),
   dl({
+    id: "g-market", game: true, name: "The Market", sub: "Food, clothes, rides, houses and a healer",
+    x: -50, z: 60, r: 26, stand: [-50, 40],
+    text: "A market square before the Lahori Gate with a well in the middle and five stalls along its south side: a food stall, a clothier, animals and rides, a builder and a healer. Walk up to a stall and press F to shop.",
+    fact: "Old Delhi's bazaars each had their own trade, and the sweetmeat and cloth sellers of Chandni Chowk were famous across India.",
+  }),
+  dl({
     id: "g-chaat", game: true, name: "The Chaat Stall", sub: "A food delivery run",
     x: -215, z: 13, r: 8, stand: [-215, 5],
     text: "A street food stall on Chandni Chowk. Press F to take a tray of hot chaat and deliver it to three customers before it goes cold.",

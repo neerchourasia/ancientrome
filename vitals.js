@@ -6,7 +6,7 @@ const Vitals = (() => {
   const KEY = "rome-vitals";
   const MIN_FIGHT_HP = 35, MIN_RACE_HORSES = 40, RACE_ENTRY = 20;
   const s = { hp: 100, horses: 100, coins: 100 };
-  let resting = false, saveT = 0;
+  let resting = false, saveT = 0, fed = 0;
 
   const clamp = (v) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 100));
   try {
@@ -21,6 +21,8 @@ const Vitals = (() => {
     get horses() { return s.horses; }, set horses(v) { s.horses = clamp(v); },
     get coins() { return s.coins; }, set coins(v) { s.coins = Math.max(0, Math.round(v)); },
     get resting() { return resting; },
+    get fed() { return fed; },
+    eat(heal) { s.hp = clamp(s.hp + heal); fed = Math.min(420, fed + heal * 6 + 40); }, // a meal heals at once and speeds up healing for a few minutes
     MIN_FIGHT_HP, MIN_RACE_HORSES, RACE_ENTRY,
     canFight: () => s.hp >= MIN_FIGHT_HP,
     canRace: () => s.horses >= MIN_RACE_HORSES,
@@ -35,10 +37,11 @@ const Vitals = (() => {
         const rest = resting && ctx.mode === "walk";
         // You always recover a little while you are not in a game; resting is about four times faster.
         // From 20 health: about 55 s resting, or about 3.5 minutes just walking around. Horses are slower: about 90 s from 30 to full resting at the stables, and many minutes on their own.
-        s.hp = clamp(s.hp + (rest ? 1.45 * (ctx.restBoost || 1) : 0.38) * dt); // a better house heals you faster
+        s.hp = clamp(s.hp + (rest ? 1.45 * (ctx.restBoost || 1) : 0.38) * (fed > 0 ? 1.8 : 1) * dt); // a better house heals you faster, and so does a good meal
         s.horses = clamp(s.horses + (rest && ctx.atStables ? 0.8 : 0.06) * dt);
         if (rest && s.hp >= 99.5 && (!ctx.atStables || s.horses >= 99.5)) { resting = false; return "refreshed"; }
       }
+      if (fed > 0) fed = Math.max(0, fed - dt);
       saveT += dt;
       if (saveT > 2) { saveT = 0; save(); }
       return null;

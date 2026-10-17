@@ -4,6 +4,12 @@
 
 const LANDMARKS = [
   {
+    id: "market", game: true, name: "The Market", sub: "Food, clothes, rides, houses and a healer",
+    x: 170, z: 62, r: 26, stand: [170, 40],
+    text: "A paved square south of the Forum with a well in the middle and five stalls along its south side: a food stall, a clothier, animals and rides, a builder and a healer. Walk up to a stall and press F to shop.",
+    fact: "Roman markets, the macella, sold meat, fish and vegetables under covered stalls around a central fountain or well.",
+  },
+  {
     id: "home", home: true, name: "Your House", sub: "Domus Mea · your home in Rome",
     x: 255, z: 50, r: 9, stand: [255, 36],
     text: "A small house just south of the road to the Colosseum. Inside are your bed, a chest and a lamp. When night falls, come home and press Z to sleep until morning.",
