@@ -254,7 +254,15 @@ const Weather = (() => {
       if (tw && started && (mode === "walk" || mode === "drive") && player) {
         const pd = Math.hypot(tx - player.x, tz - player.z);
         if (pd < 130 && warned !== "near") { warned = "near"; toast("A tornado! Run away from it."); Narrator.say("A tornado is on the land. Run from it.", { interrupt: true }); }
-        if (pd < 24) { Vitals.hp = Math.max(8, Vitals.hp - 14 * dt); hurtT -= dt; if (hurtT <= 0) { hurtT = 1.5; toast("The tornado tears at you!"); Sfx.play("bump"); } }
+        if (pd < 45 && pd > 3) { // the wind drags you in
+          const pull = (45 - pd) / 45 * 6 * dt, nx = player.x + (tx - player.x) / pd * pull, nz = player.z + (tz - player.z) / pd * pull;
+          if (!blockedAt(nx, nz, player.feet)) { player.x = nx; player.z = nz; }
+        }
+        if (pd < 28) { // inside the funnel it kills: faster the closer you are
+          Vitals.hp -= (pd < 12 ? 45 : 18) * dt; hurtT -= dt;
+          if (hurtT <= 0) { hurtT = 1.2; toast("The tornado tears at you! Run!"); Sfx.play("bump"); }
+          if (Vitals.hp <= 0.01) { Vitals.hp = 0; funnel.userData.placed = 0; } // it moves off and comes back about 190 m away after you die
+        }
       }
     } else funnel.userData.placed = 0;
     Sfx.setWeather(rain, cur.wind);
