@@ -671,13 +671,26 @@ const DGames = (() => {
   }
   function bzNew() {
     const stake = Math.min(150, Math.floor(Vitals.coins));
-    bz = { day: 1, at: "urdu", cash: stake, stake, hold: Object.fromEntries(GOODS.map((g) => [g.id, 0])), prices: {}, event: null, done: false };
+    bz = { day: 1, at: "urdu", cash: stake, stake, hold: Object.fromEntries(GOODS.map((g) => [g.id, 0])), prices: {}, event: null, done: false, hour: 6, closed: false };
     bzPrices(); bzRender();
+  }
+  // The day: the bazaars open at 6 am and close at 7 pm. Trading takes 15 minutes, a walk to another bazaar 2 hours.
+  const fmtHour = (h) => { const m = Math.round((h % 1) * 60), hh = Math.floor(h), ap = hh >= 12 ? "pm" : "am", h12 = hh % 12 === 0 ? 12 : hh % 12; return `${h12}:${String(m).padStart(2, "0")} ${ap}`; };
+  const dayPart = (h) => (h < 11 ? "morning" : h < 15 ? "midday" : h < 18 ? "afternoon" : "evening");
+  function bzTick(hours) { bz.hour = Math.min(19, bz.hour + hours); if (bz.hour >= 19) bz.closed = true; }
+  function bzDrift() { // prices wander a little as the day goes on
+    for (const b of BAZAARS) for (const g of GOODS) bz.prices[b.id][g.id] = Math.max(1, Math.round(bz.prices[b.id][g.id] * (0.93 + Math.random() * 0.14)));
+  }
+  function bzNextDay() {
+    bz.day++;
+    if (bz.day > DAYS) { bzFinish(); return; }
+    bz.hour = 6; bz.closed = false; bzPrices(); bzRender();
+    toast(`Day ${bz.day}: the bazaar opens at 6 am`);
   }
   const bzCount = () => Object.values(bz.hold).reduce((a, b) => a + b, 0);
   function bzRender() {
     const here = BAZAARS.find((b) => b.id === bz.at), P = bz.prices[bz.at];
-    $d("bz-head").textContent = `Day ${bz.day} of ${DAYS} · ${here.name} · cash ${bz.cash} · carrying ${bzCount()} of ${CAP}${bz.event ? ` · News: ${GOODS.find((g) => g.id === bz.event.good).name.split(" ")[0]} ${bz.event.mul < 1 ? "is cheap today" : "is dear today"}` : ""}`;
+    $d("bz-head").textContent = `Day ${bz.day} of ${DAYS} · ${fmtHour(bz.hour)} (${dayPart(bz.hour)}${bz.closed ? ", closing" : ""}) · ${here.name} · cash ${bz.cash} · carrying ${bzCount()} of ${CAP}${bz.event ? ` · News: ${GOODS.find((g) => g.id === bz.event.good).name.split(" ")[0]} ${bz.event.mul < 1 ? "is cheap today" : "is dear today"}` : ""}`;
     const t = $d("bz-table"); t.replaceChildren();
     const head = t.insertRow(); for (const h of ["Goods", "Price", "Have", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const g of GOODS) {
@@ -687,15 +700,16 @@ const DGames = (() => {
       row.insertCell().textContent = bz.hold[g.id];
       const act = row.insertCell();
       const btn = (label, fn, dis) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.disabled = !!dis || bz.done; b.addEventListener("click", fn); act.append(b); };
-      btn("Buy 1", () => bzBuy(g.id, 1), bz.cash < price || bzCount() >= CAP); btn("Buy 5", () => bzBuy(g.id, 5), bz.cash < price * 5 || bzCount() > CAP - 5);
-      btn("Sell 1", () => bzSell(g.id, 1), bz.hold[g.id] < 1); btn("Sell all", () => bzSell(g.id, bz.hold[g.id]), bz.hold[g.id] < 1);
+      btn("Buy 1", () => bzBuy(g.id, 1), bz.closed || bz.cash < price || bzCount() >= CAP); btn("Buy 5", () => bzBuy(g.id, 5), bz.closed || bz.cash < price * 5 || bzCount() > CAP - 5);
+      btn("Sell 1", () => bzSell(g.id, 1), bz.closed || bz.hold[g.id] < 1); btn("Sell all", () => bzSell(g.id, bz.hold[g.id]), bz.closed || bz.hold[g.id] < 1);
     }
     const tr = $d("bz-travel"); tr.replaceChildren();
-    for (const b of BAZAARS.filter((x) => x.id !== bz.at)) { const bt = document.createElement("button"); bt.type = "button"; bt.textContent = `Go to ${b.name} (1 day)`; bt.disabled = bz.done || bz.cash < 2; bt.addEventListener("click", () => bzGo(b.id)); tr.append(bt); }
+    if (bz.closed || bz.hour + 2 > 19.01) { const sl = document.createElement("button"); sl.type = "button"; sl.textContent = bz.day >= DAYS ? "The last bazaar closes: finish" : "The bazaar closes: sleep until morning"; sl.addEventListener("click", bzNextDay); tr.append(sl); }
+    for (const b of BAZAARS.filter((x) => x.id !== bz.at)) { const bt = document.createElement("button"); bt.type = "button"; bt.textContent = `Go to ${b.name} (2 hours)`; bt.disabled = bz.done || bz.closed || bz.cash < 2 || bz.hour + 2 > 19.01; bt.addEventListener("click", () => bzGo(b.id)); tr.append(bt); }
   }
-  function bzBuy(id, n) { const p = bz.prices[bz.at][id]; if (bz.cash < p * n || bzCount() + n > CAP) return; bz.cash -= p * n; bz.hold[id] += n; Sfx.play("coin"); bzRender(); }
-  function bzSell(id, n) { const p = bz.prices[bz.at][id]; n = Math.min(n, bz.hold[id]); if (n < 1) return; bz.cash += p * n; bz.hold[id] -= n; Sfx.play("coin"); bzRender(); }
-  function bzGo(id) { bz.cash -= 2; bz.at = id; bz.day++; if (bz.day > DAYS) { bzFinish(); return; } bzPrices(); bzRender(); }
+  function bzBuy(id, n) { const p = bz.prices[bz.at][id]; if (bz.cash < p * n || bzCount() + n > CAP) return; bz.cash -= p * n; bz.hold[id] += n; Sfx.play("coin"); bzTick(0.25); bzRender(); }
+  function bzSell(id, n) { const p = bz.prices[bz.at][id]; n = Math.min(n, bz.hold[id]); if (n < 1) return; bz.cash += p * n; bz.hold[id] -= n; Sfx.play("coin"); bzTick(0.25); bzRender(); }
+  function bzGo(id) { bz.cash -= 2; bz.at = id; bzTick(2); bzDrift(); bzRender(); }
   function bzFinish() {
     if (bz.done) return;
     for (const g of GOODS) bz.cash += bz.hold[g.id] * bz.prices[bz.at][g.id]; // whatever you still carry is sold at today's price
