@@ -61,7 +61,7 @@ const Weather = (() => {
 
   // One roll of the weather for a city (`bump` re-rolls it with another seed)
   function roll(c, day, hour, bump) {
-    const s = Math.floor(((day - 1) % 28 + 28) % 28 / 7), block = Math.floor((day * 24 + hour) / 5);
+    const s = (Math.floor(((day - 1) % 28 + 28) % 28 / 7) + (c === "delhi" ? 2 : 0)) % 4, block = Math.floor((day * 24 + hour) / 5); // Delhi's seasons run two seasons ahead of Rome's
     const r = mulberry(block * 7919 + (c === "delhi" ? 104729 : 1299709) + s * 31 + bump * 15485863)();
     const odds = ODDS[c][s], total = TYPES.reduce((a, t) => a + (odds[t] || 0), 0);
     let acc = 0;
@@ -70,12 +70,13 @@ const Weather = (() => {
   }
 
   // The weather for a day and hour in a city: the same for everyone who is at that time. Rome and Delhi have their own weather:
-  // when both would get the same kind at the same moment, Delhi's is rolled again, so the two cities are different.
+  // when both would get the same sort of weather (dry, grey, wet...) at the same moment, Delhi's is rolled again, and Delhi's seasons run two seasons ahead of Rome's (spring in Rome is the monsoon in Delhi), so the two cities are clearly different.
+  const GROUP = { clear: "dry", partly: "dry", windy: "dry", cloudy: "grey", mist: "grey", fog: "grey", drizzle: "wet", rain: "wet", storm: "wet", hail: "wet", cyclone: "wet", snow: "snow", blizzard: "snow", tornado: "tornado" };
   function forecast(c, day, hour) {
     if (c !== "delhi") return roll("rome", day, hour, 0);
-    const other = roll("rome", day, hour, 0).kind;
+    const other = GROUP[roll("rome", day, hour, 0).kind];
     let w = roll("delhi", day, hour, 0);
-    for (let bump = 1; bump <= 6 && w.kind === other; bump++) w = roll("delhi", day, hour, bump);
+    for (let bump = 1; bump <= 10 && GROUP[w.kind] === other; bump++) w = roll("delhi", day, hour, bump); // a different sort of weather, not just a different name
     return w;
   }
 
