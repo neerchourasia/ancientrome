@@ -458,12 +458,15 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
     def test_ship_designs_are_cut_down_to_what_is_allowed(self):
         d = server.clean_ship({"type": "bogus", "sail": 99, "hull": "x", "port": [True] * 20, "star": [True] * 20})
         self.assertEqual((d["type"], d["sail"], d["hull"]), ("galley", 0, 0))
-        self.assertEqual(sum(d["port"]) + sum(d["star"]), 6)                       # a galley carries at most 6 cannons
+        self.assertEqual(sum(d["port"]) + sum(d["star"]), 8)                       # a galley has 4 spots a side
         k = server.clean_ship({"type": "kayak", "port": [True] * 7, "star": [True] * 7})
-        self.assertEqual(sum(k["port"]) + sum(k["star"]), 2)
+        self.assertEqual(sum(k["port"]) + sum(k["star"]), 1)                       # a kayak holds one cannon
         e = server.clean_ship({"type": "battleship", "port": [False] * 7, "star": [False] * 7})
         self.assertEqual(sum(e["port"]) + sum(e["star"]), 2)                       # never a ship with no cannons
         self.assertEqual(sum(server.clean_ship(None)["port"]), 3)                  # the default: three a side
+        c = server.clean_ship({"type": "canoe", "port": [True] * 7, "star": [True] * 7})
+        self.assertEqual((sum(c["port"]), sum(c["star"])), (1, 1))                 # a canoe only has the middle spot on each side
+        self.assertEqual([len(v["ports"]) + len(v["stars"]) for v in server.NAVAL_TYPES.values()], [1, 2, 4, 6, 8, 10, 12, 14])   # every boat holds a different number
 
     async def test_naval_players_bring_their_own_ships(self):
         server.CFG["naval_wait"] = 0.6

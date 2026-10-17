@@ -102,14 +102,14 @@ const Naval = (() => {
       part(new THREE.BoxGeometry(4.2 * Math.max(0.7, k) * Math.min(1, hw / 1.5 + 0.3), 0.7 * k, 0.1), band, 0, 1 + mh * 0.83, mz + 0.03);
     }
     const cannons = [];
-    const layout = def.ports ? [[1, def.ports], [-1, def.stars]] : [[1, [0, 1, 0, 1, 0, 1, 0]], [-1, [0, 1, 0, 1, 0, 1, 0]]];
+    const layout = def.ports ? [[1, def.ports, def.paims || []], [-1, def.stars, def.saims || []]] : [[1, [1, 0, 1, 0, 1, 0, 0], []], [-1, [1, 0, 1, 0, 1, 0, 0], []]];
     const sideX = hw + 0.1, cy = sh === "kayak" ? 0.7 : sh === "canoe" ? 0.85 : sh === "battleship" ? 1.7 : 1.3;
-    for (const [side, slots] of layout) slots.forEach((on, i) => {
+    for (const [side, slots, aims] of layout) slots.forEach((on, i) => {
       if (!on) return;
-      const cz = SLOT_Z[i] * K;
+      const cz = SLOT_Z[i] * K, aim = Number.isInteger(aims[i]) ? aims[i] : 2, th = aim * Math.PI / 4;
       const c = part(new THREE.CylinderGeometry(sh === "battleship" ? 0.26 : 0.22, sh === "battleship" ? 0.34 : 0.3, sh === "kayak" ? 0.7 : 1.2, 10), iron, side * sideX, cy, cz);
-      c.rotation.z = -side * Math.PI / 2;
-      cannons.push({ side, z: cz });
+      c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(side * Math.sin(th), 0, Math.cos(th))); // the barrel points the way it is aimed
+      cannons.push({ side, z: cz, aim });
     });
     g.traverse((c) => { c.frustumCulled = false; });
     g.scale.setScalar(def.scale);
@@ -170,16 +170,17 @@ const Naval = (() => {
     const { s, side, c } = q;
     if (s.dead) return;
     const [fx_, fz_] = forward(s), [nx, nz] = sideNormal(s, side);
-    const x = s.x + fx_ * c.z * s.sc + nx * 1.9 * s.sc, z = s.z + fz_ * c.z * s.sc + nz * 1.9 * s.sc, y = level() + 1.3 * s.sc;
+    const th = (c.aim === undefined ? 2 : c.aim) * Math.PI / 4, dx = fx_ * Math.cos(th) + nx * Math.sin(th), dz = fz_ * Math.cos(th) + nz * Math.sin(th); // the way this cannon is aimed
+    const x = s.x + fx_ * c.z * s.sc + nx * 1.9 * s.sc + dx * 0.6, z = s.z + fz_ * c.z * s.sc + nz * 1.9 * s.sc + dz * 0.6, y = level() + 1.3 * s.sc;
     const spread = s.player ? 1.5 : 4.2;
-    const along = (Math.random() - 0.5) * spread, sp = 24 * (0.95 + Math.random() * 0.1);
+    const wander = (Math.random() - 0.5) * spread, sp = 24 * (0.95 + Math.random() * 0.1);
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lambert(0x1a1a1c));
     m.position.set(x, y, z);
     scene.add(m);
-    balls.push({ mesh: m, x, y, z, vx: nx * sp + fx_ * (s.v + along), vz: nz * sp + fz_ * (s.v + along), vy: 5.5 + Math.random(), owner: s });
-    puff("fire", x + nx * 0.8, y, z + nz * 0.8, { size: 1.6, life: 0.25, grow: 6 });
+    balls.push({ mesh: m, x, y, z, vx: dx * sp - dz * wander + fx_ * s.v, vz: dz * sp + dx * wander + fz_ * s.v, vy: 5.5 + Math.random(), owner: s });
+    puff("fire", x + dx * 0.8, y, z + dz * 0.8, { size: 1.6, life: 0.25, grow: 6 });
     Sfx.play("cannon", { x, z });
-    for (let k = 0; k < 2; k++) puff("smoke", x + nx * 1.2, y + 0.2, z + nz * 1.2, { size: 1.2, life: 1.6, vx: nx * 1.5 + (Math.random() - 0.5), vy: 0.8, vz: nz * 1.5 + (Math.random() - 0.5), grow: 1.8, opacity: 0.7 });
+    for (let k = 0; k < 2; k++) puff("smoke", x + dx * 1.2, y + 0.2, z + dz * 1.2, { size: 1.2, life: 1.6, vx: dx * 1.5 + (Math.random() - 0.5), vy: 0.8, vz: dz * 1.5 + (Math.random() - 0.5), grow: 1.8, opacity: 0.7 });
   }
 
   function hitShip(t, dmg, x, y, z) {
@@ -364,9 +365,25 @@ const Naval = (() => {
       let best = null, bd = Infinity;
       for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
       if (!best) return;
-      const [lx, lz] = sideNormal(me, 1);
-      fireSide(me, (best.x - me.x) * lx + (best.z - me.z) * lz > 0 ? 1 : -1);
+      fireSide(me, bestSide(me, best));
     }
+  }
+
+  // the side whose cannons bear best on a target (counts the cannons aimed within 50 degrees of it; the facing side if none)
+  function bestSide(s, target) {
+    const dx = target.x - s.x, dz = target.z - s.z, d = Math.hypot(dx, dz) || 1, [lx, lz] = sideNormal(s, 1), facing = dx * lx + dz * lz > 0 ? 1 : -1, [fx_, fz_] = forward(s);
+    let best = facing, bn = 0;
+    for (const side of [1, -1]) {
+      const [nx, nz] = sideNormal(s, side);
+      let n = 0;
+      for (const c of s.model.cannons) {
+        if (c.side !== side) continue;
+        const th = (c.aim === undefined ? 2 : c.aim) * Math.PI / 4, ax = fx_ * Math.cos(th) + nx * Math.sin(th), az = fz_ * Math.cos(th) + nz * Math.sin(th);
+        if ((ax * dx + az * dz) / d > 0.64) n++;      // within about 50 degrees of the target
+      }
+      if (n > bn) { bn = n; best = side; }
+    }
+    return best;
   }
 
 
@@ -425,8 +442,7 @@ const Naval = (() => {
       let best = null, bd = Infinity;
       for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
       if (!best) return;
-      const [lx, lz] = sideNormal(me, 1);
-      side = (best.x - me.x) * lx + (best.z - me.z) * lz > 0 ? 1 : -1;
+      side = bestSide(me, best);
     }
     Online.navalSend({ t: "naval", fire: side });
   }
@@ -635,5 +651,5 @@ const Naval = (() => {
     cam.lookAt(f.x + fx_ * 6 * k, L + 1.2, f.z + fz_ * 6 * k);
   }
 
-  return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length }) };
+  return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length, shots: balls.map((b) => ({ vx: b.vx, vz: b.vz })) }) };
 })();

@@ -9,16 +9,20 @@ const Shipyard = (() => {
   const SLOT_Z = [3.6, 2.4, 1.2, 0, -1.2, -2.4, -3.6];          // along the ship (+z is the bow), in ship units
   // shape: how the hull is built (naval.js); hw: half the hull's width and lenK: its length against the galley's, in ship units;
   // view: how the ship is drawn in the editor (half width and length in pixels)
+  // ports / stars: which of the seven positions along each side a cannon can go (so each boat holds a different number);
+  // scale: the boat's size in the arena; shape / hw / lenK: how the hull is built (naval.js); view: how it is drawn in the editor
   const TYPES = {
-    kayak: { name: "Kayak", note: "A narrow one-person boat. Very fast and almost impossible to hit, but a single hit sinks it. Up to 2 cannons.", hp: 30, scale: 0.55, max: 9.6, turn: 1.7, cannons: 2, masts: [], shape: "kayak", hw: 0.45, lenK: 0.7, view: { half: 16, len: 250 } },
-    canoe: { name: "Canoe", note: "A dugout canoe with a paddler. Quick and handy. Up to 3 cannons.", hp: 45, scale: 0.6, max: 8.8, turn: 1.5, cannons: 3, masts: [], shape: "canoe", hw: 0.7, lenK: 0.78, view: { half: 24, len: 280 } },
-    fishing: { name: "Fishing boat", note: "A little boat with a cabin, a mast and nets. Sturdier than a canoe. Up to 4 cannons.", hp: 65, scale: 0.72, max: 6.2, turn: 1.15, cannons: 4, masts: [[0.8, 4.5]], shape: "fishing", hw: 1.2, lenK: 0.8, view: { half: 36, len: 300 } },
-    liburna: { name: "Liburna", note: "A small, quick scout. Turns sharply but is easy to sink. Up to 4 cannons.", hp: 70, scale: 0.66, max: 8.2, turn: 1.35, cannons: 4, masts: [[0.4, 5]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 40, len: 330 } },
-    galley: { name: "Galley", note: "The balanced warship. Up to 6 cannons.", hp: 100, scale: 0.8, max: 6.6, turn: 1.0, cannons: 6, masts: [[0.4, 6.5]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 46, len: 340 } },
-    trireme: { name: "Trireme", note: "Two masts and a stout hull. Slower, up to 9 cannons.", hp: 130, scale: 0.92, max: 5.8, turn: 0.85, cannons: 9, masts: [[-1.6, 6], [2.2, 5.2]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 48, len: 340 } },
-    quinquereme: { name: "Quinquereme", note: "A heavy flagship with a deck castle. Slow and hard to turn, up to 12 cannons.", hp: 175, scale: 1.08, max: 4.8, turn: 0.7, cannons: 12, masts: [[-2.4, 6], [0.2, 7], [2.6, 5.2]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 52, len: 345 } },
-    battleship: { name: "Battleship", note: "A huge armoured warship with funnels and turrets. The toughest and the slowest, with every position along both sides (14 cannons).", hp: 260, scale: 1.3, max: 4.2, turn: 0.55, cannons: 14, masts: [], shape: "battleship", hw: 2.1, lenK: 1.3, view: { half: 58, len: 350 } },
+    kayak: { name: "Kayak", note: "A narrow one-person boat: 1 cannon, on the port side. Very fast and almost impossible to hit, but one hit sinks it.", hp: 30, scale: 0.5, max: 9.6, turn: 1.7, ports: [3], stars: [], masts: [], shape: "kayak", hw: 0.45, lenK: 0.7, view: { half: 15, len: 210 } },
+    canoe: { name: "Canoe", note: "A dugout canoe with a paddler: 2 cannons. Quick and handy.", hp: 45, scale: 0.6, max: 8.8, turn: 1.5, ports: [3], stars: [3], masts: [], shape: "canoe", hw: 0.7, lenK: 0.78, view: { half: 22, len: 250 } },
+    fishing: { name: "Fishing boat", note: "A little boat with a cabin, a mast and nets: 4 cannons. Sturdier than a canoe.", hp: 65, scale: 0.55, max: 6.2, turn: 1.15, ports: [2, 4], stars: [2, 4], masts: [[0.8, 4.5]], shape: "fishing", hw: 1.1, lenK: 0.75, view: { half: 27, len: 255 } },
+    liburna: { name: "Liburna", note: "A small, quick warship: 6 cannons. Turns sharply but is easy to sink.", hp: 70, scale: 0.8, max: 8.2, turn: 1.35, ports: [1, 3, 5], stars: [1, 3, 5], masts: [[0.4, 5]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 38, len: 310 } },
+    galley: { name: "Galley", note: "The balanced warship: 8 cannons.", hp: 100, scale: 0.9, max: 6.6, turn: 1.0, ports: [0, 2, 4, 6], stars: [0, 2, 4, 6], masts: [[0.4, 6.5]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 43, len: 325 } },
+    trireme: { name: "Trireme", note: "Two masts and a stout hull: 10 cannons. Slower.", hp: 130, scale: 1.0, max: 5.8, turn: 0.85, ports: [0, 1, 3, 5, 6], stars: [0, 1, 3, 5, 6], masts: [[-1.6, 6], [2.2, 5.2]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 48, len: 338 } },
+    quinquereme: { name: "Quinquereme", note: "A heavy flagship with a deck castle: 12 cannons. Slow and hard to turn.", hp: 175, scale: 1.15, max: 4.8, turn: 0.7, ports: [0, 1, 2, 4, 5, 6], stars: [0, 1, 2, 4, 5, 6], masts: [[-2.4, 6], [0.2, 7], [2.6, 5.2]], shape: "galley", hw: 1.5, lenK: 1, view: { half: 53, len: 346 } },
+    battleship: { name: "Battleship", note: "A huge armoured warship with funnels and turrets: 14 cannons, every position on both sides. The toughest and the slowest.", hp: 260, scale: 1.4, max: 4.2, turn: 0.55, ports: [0, 1, 2, 3, 4, 5, 6], stars: [0, 1, 2, 3, 4, 5, 6], masts: [], shape: "battleship", hw: 2.1, lenK: 1.3, view: { half: 58, len: 352 } },
   };
+  for (const t of Object.values(TYPES)) t.cannons = t.ports.length + t.stars.length;   // the most a boat can hold
+  const allowed = (type, side, i) => TYPES[type][side === "port" ? "ports" : "stars"].includes(i);
   const SAILS = [0x2f8f4a, 0xb3262b, 0x6b3fa0, 0x2f6b8f, 0xc7a21a, 0xe8e0cc, 0x1f1f1f, 0xd9791f];
   const HULLS = [0x7a5230, 0x5a3a20, 0x8a8470, 0x3a4a5a, 0xa0522d, 0x2a2a2a];
   const MAX_SAVED = 4;
@@ -27,18 +31,22 @@ const Shipyard = (() => {
   const css = (n) => "#" + n.toString(16).padStart(6, "0");
   const count = (d) => d.port.filter(Boolean).length + d.star.filter(Boolean).length;
   const blank = () => Array(SLOTS).fill(false);
-  const standard = () => ({ name: "My galley", type: "galley", sail: 0, hull: 0, port: blank().map((_, i) => [1, 3, 5].includes(i)), star: blank().map((_, i) => [1, 3, 5].includes(i)) }); // three a side, like the galley you started with
+  const sides = () => Array(SLOTS).fill(2);               // aim: 0 ahead, 1 ahead and out, 2 straight out of the side, 3 astern and out, 4 astern
+  const AIMS = [["Ahead", "fires forward"], ["Ahead & out", "forward and to the side"], ["Side", "straight out of the side"], ["Astern & out", "backward and to the side"], ["Astern", "fires backward"]];
+  let pick = null;                                        // the cannon you have selected in the editor: { side, i }
+  const standard = () => ({ name: "My galley", type: "galley", sail: 0, hull: 0, port: blank().map((_, i) => [0, 2, 4].includes(i)), star: blank().map((_, i) => [0, 2, 4].includes(i)), pa: sides(), sa: sides() }); // three a side, like the galley you started with
 
   function sanitize(d) {
-    const out = { name: "My ship", type: "galley", sail: 0, hull: 0, port: blank(), star: blank() };
+    const out = { name: "My ship", type: "galley", sail: 0, hull: 0, port: blank(), star: blank(), pa: sides(), sa: sides() };
     if (!d || typeof d !== "object") return null;
     if (typeof d.name === "string") out.name = d.name.replace(/[^\p{L}\p{N} '\-]/gu, "").slice(0, 20).trim() || "My ship";
     if (TYPES[d.type]) out.type = d.type;
     if (Number.isInteger(d.sail) && d.sail >= 0 && d.sail < SAILS.length) out.sail = d.sail;
     if (Number.isInteger(d.hull) && d.hull >= 0 && d.hull < HULLS.length) out.hull = d.hull;
     let left = TYPES[out.type].cannons;
-    for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) if (Array.isArray(d[side]) && d[side][i] === true && left > 0) { out[side][i] = true; left--; }
-    if (count(out) === 0) { out.port[3] = true; out.star[3] = true; }
+    for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) if (Array.isArray(d[side]) && d[side][i] === true && left > 0 && allowed(out.type, side, i)) { out[side][i] = true; left--; }
+    for (const k of ["pa", "sa"]) if (Array.isArray(d[k])) for (let i = 0; i < SLOTS; i++) if (Number.isInteger(d[k][i]) && d[k][i] >= 0 && d[k][i] <= 4) out[k][i] = d[k][i];
+    if (count(out) === 0) { const t = TYPES[out.type]; out.port[t.ports[0] === undefined ? 0 : t.ports[Math.floor(t.ports.length / 2)]] = t.ports.length > 0; if (t.stars.length) out.star[t.stars[Math.floor(t.stars.length / 2)]] = true; }
     return out;
   }
 
@@ -56,7 +64,7 @@ const Shipyard = (() => {
   function def(d) {
     d = sanitize(d) || standard();
     const t = TYPES[d.type];
-    return { design: d, hp: t.hp, scale: t.scale, max: t.max, turn: t.turn, sail: SAILS[d.sail], hull: HULLS[d.hull], masts: t.masts, shape: t.shape, hw: t.hw, lenK: t.lenK, castle: d.type === "quinquereme", name: d.name, ports: d.port.slice(), stars: d.star.slice() };
+    return { design: d, hp: t.hp, scale: t.scale, max: t.max, turn: t.turn, sail: SAILS[d.sail], hull: HULLS[d.hull], masts: t.masts, shape: t.shape, hw: t.hw, lenK: t.lenK, castle: d.type === "quinquereme", name: d.name, ports: d.port.slice(), stars: d.star.slice(), paims: d.pa.slice(), saims: d.sa.slice() };
   }
 
   // ---------------------------------------------------------------- the picture of the ship (seen from above, bow at the top)
@@ -88,11 +96,16 @@ const Shipyard = (() => {
     }
     // the cannon slots: filled when a cannon stands there
     for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) {
+      if (!allowed(d.type, side, i)) continue;
       const p = slotPos(side, i), on = d[side][i];
       g.beginPath(); g.arc(p.x, p.y, 13, 0, 6.3);
       g.fillStyle = on ? "#2e2e30" : "rgba(255,255,255,.12)"; g.fill();
       g.lineWidth = 2; g.strokeStyle = on ? "#e2b955" : "rgba(255,255,255,.45)"; g.setLineDash(on ? [] : [4, 3]); g.stroke(); g.setLineDash([]);
-      if (on) { g.fillStyle = "#e2b955"; g.beginPath(); g.arc(p.x + (side === "port" ? -3 : 3), p.y, 4, 0, 6.3); g.fill(); }
+      if (on) {                                                    // the barrel, pointing the way the cannon is aimed
+        const th = d[side === "port" ? "pa" : "sa"][i] * Math.PI / 4, out = side === "port" ? -1 : 1, ex = p.x + out * Math.sin(th) * 22, ey = p.y - Math.cos(th) * 22;
+        g.strokeStyle = "#e2b955"; g.lineWidth = 5; g.lineCap = "round"; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(ex, ey); g.stroke(); g.lineCap = "butt";
+      }
+      if (pick && pick.side === side && pick.i === i && on) { g.beginPath(); g.arc(p.x, p.y, 18, 0, 6.3); g.lineWidth = 3; g.strokeStyle = "#ffffff"; g.stroke(); }
     }
     g.fillStyle = "rgba(255,255,255,.7)"; g.font = "bold 13px sans-serif"; g.textAlign = "center";
     g.fillText("BOW", geo.cx, 14); g.fillText("port (Q)", 40, geo.h - 14); g.fillText("starboard (E)", 252, geo.h - 14);
@@ -107,10 +120,15 @@ const Shipyard = (() => {
     g.beginPath(); g.moveTo(cx, top); g.quadraticCurveTo(cx + half, top + 12, cx + half, top + 24); g.lineTo(cx + half, top + len - 2); g.lineTo(cx - half, top + len - 2); g.lineTo(cx - half, top + 24); g.quadraticCurveTo(cx - half, top + 12, cx, top); g.closePath(); g.fill(); g.stroke();
     for (const [mz] of t.masts) { const y = top + 10 + ((SLOT_Z[0] - mz) / (SLOT_Z[0] - SLOT_Z[SLOTS - 1])) * (len - 22); g.fillStyle = css(SAILS[d.sail]); g.fillRect(cx - half * 0.7, y - 1.5, half * 1.4, 3); }
     for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) {
+      if (!allowed(d.type, side, i)) continue;
       const y = top + 10 + (i / (SLOTS - 1)) * (len - 22), x = cx + (side === "port" ? -1 : 1) * (half + 1);
       g.beginPath(); g.arc(x, y, d[side][i] ? 2.6 : 1.4, 0, 6.3);
       g.fillStyle = d[side][i] ? "#ffcf4a" : "rgba(255,255,255,.28)"; g.fill();
-      if (d[side][i]) { g.strokeStyle = "#1a120a"; g.lineWidth = 1; g.stroke(); }
+      if (d[side][i]) {
+        g.strokeStyle = "#1a120a"; g.lineWidth = 1; g.stroke();
+        const th = d[side === "port" ? "pa" : "sa"][i] * Math.PI / 4, out = side === "port" ? -1 : 1;
+        g.strokeStyle = "#ffcf4a"; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + out * Math.sin(th) * 6, y - Math.cos(th) * 6); g.stroke();
+      }
     }
     return c;
   }
@@ -129,24 +147,36 @@ const Shipyard = (() => {
     const c = $s("sy-canvas"), r = c.getBoundingClientRect(), x = (e.clientX - r.left) * (c.width / r.width), y = (e.clientY - r.top) * (c.height / r.height);
     for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) {
       const p = slotPos(side, i);
-      if (Math.hypot(x - p.x, y - p.y) < 20) {
-        if (draft[side][i]) { if (count(draft) > 1) { draft[side][i] = false; hint("Cannon taken off."); } else hint("A ship needs at least one cannon."); }
+      if (allowed(draft.type, side, i) && Math.hypot(x - p.x, y - p.y) < 20) {
+        const aimKey = side === "port" ? "pa" : "sa";
+        if (draft[side][i]) { pick = { side, i }; hint("Cannon selected: choose which way it points below, or take it off."); }
         else if (count(draft) < TYPES[draft.type].cannons) {
           if (count(draft) >= owned) {                              // you must buy another cannon first
             if (Vitals.coins < CANNON_PRICE) { hint(`A new cannon costs ${CANNON_PRICE} denarii and you have ${Vitals.coins}. (You own ${owned} cannons.)`); toast(`A cannon costs ${CANNON_PRICE} denarii.`); refresh(); return; }
             Vitals.coins -= CANNON_PRICE; owned++; save(); Sfx.play("coin");
-            hint(`Bought a cannon for ${CANNON_PRICE} denarii. You now own ${owned}.`);
-          } else hint("Cannon added.");
-          draft[side][i] = true;
+            hint(`Bought a cannon for ${CANNON_PRICE} denarii. You now own ${owned}. Choose which way it points below.`);
+          } else hint("Cannon added. Choose which way it points below.");
+          draft[side][i] = true; draft[aimKey][i] = 2; pick = { side, i };
         }
         else {                                                        // at the limit: move the nearest cannon to this spot (same side first)
           let best = null, bd = Infinity;
           for (const s2 of [side, side === "port" ? "star" : "port"]) for (let j = 0; j < SLOTS; j++) if (draft[s2][j]) { const d = Math.abs(j - i) + (s2 === side ? 0 : 3); if (d < bd) { bd = d; best = [s2, j]; } }
-          if (best) { draft[best[0]][best[1]] = false; draft[side][i] = true; hint(`Moved a cannon to the ${side === "port" ? "port" : "starboard"} side. (This ship carries at most ${TYPES[draft.type].cannons}.)`); }
+          if (best) { const oldAim = draft[best[0] === "port" ? "pa" : "sa"][best[1]]; draft[best[0]][best[1]] = false; draft[side][i] = true; draft[aimKey][i] = oldAim; pick = { side, i }; hint(`Moved a cannon to the ${side === "port" ? "port" : "starboard"} side. (This ship carries at most ${TYPES[draft.type].cannons}.)`); }
         }
         refresh(); return;
       }
     }
+    pick = null; refresh();
+  }
+
+  // the aim buttons for the selected cannon
+  function aimBar() {
+    const bar = $s("sy-aim");
+    if (!pick || !draft[pick.side][pick.i]) { pick = null; bar.hidden = true; return; }
+    bar.hidden = false;
+    const key = pick.side === "port" ? "pa" : "sa", cur = draft[key][pick.i];
+    $s("sy-aim-title").textContent = `${pick.side === "port" ? "Port" : "Starboard"} cannon ${pick.i + 1} of ${SLOTS} (counting from the bow): which way does it point?`;
+    for (const b of bar.querySelectorAll("button[data-aim]")) b.classList.toggle("on", Number(b.dataset.aim) === cur);
   }
 
   // ---------------------------------------------------------------- the panel
@@ -176,15 +206,20 @@ const Shipyard = (() => {
     sw($s("sy-sails"), SAILS, "sail"); sw($s("sy-hulls"), HULLS, "hull");
     $s("sy-name").value = draft.name;
     $s("sy-new").disabled = ships.length >= MAX_SAVED;
-    draw(); stats();
+    aimBar(); draw(); stats();
   }
 
   function setType(t) {
     if (!TYPES[t] || draft.type === t) return;
-    draft.type = t;
-    let left = TYPES[t].cannons;                     // keep what fits, from the bow backwards
+    draft.type = t; pick = null;
+    for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) if (draft[side][i] && !allowed(t, side, i)) {   // a cannon whose spot this boat lacks moves to the nearest spot it has
+      draft[side][i] = false;
+      const list = TYPES[t][side === "port" ? "ports" : "stars"].filter((j) => !draft[side][j]).sort((a, b) => Math.abs(a - i) - Math.abs(b - i));
+      if (list.length) { draft[side][list[0]] = true; draft[side === "port" ? "pa" : "sa"][list[0]] = 2; }
+    }
+    let left = TYPES[t].cannons;
     for (const side of ["port", "star"]) for (let i = 0; i < SLOTS; i++) if (draft[side][i]) { if (left > 0) left--; else draft[side][i] = false; }
-    if (count(draft) === 0) { draft.port[3] = true; draft.star[3] = true; }
+    if (count(draft) === 0) draft = sanitize(draft);
     refresh();
   }
 
@@ -193,7 +228,7 @@ const Shipyard = (() => {
   function open() {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
     if (!Vitals.canFight()) { toast(`You are too wounded to command a ship (health ${Math.round(Vitals.hp)}/100). Press Z to rest and heal.`); return; }
-    draft = clone(ships[sel]);
+    draft = clone(ships[sel]); pick = null;
     openPanel("#shipyard");
     refresh();
   }
@@ -210,6 +245,9 @@ const Shipyard = (() => {
       const b = document.createElement("button"); b.type = "button"; b.dataset.type = id; b.textContent = t.name;
       b.addEventListener("click", () => setType(id)); row.append(b);
     }
+    const bar = $s("sy-aim"), row2 = bar.querySelector(".sy-aims");
+    AIMS.forEach(([name, note], k) => { const b = document.createElement("button"); b.type = "button"; b.dataset.aim = k; b.textContent = name; b.title = `${name}: ${note}`; b.addEventListener("click", () => { if (!pick) return; draft[pick.side === "port" ? "pa" : "sa"][pick.i] = k; hint(`Aimed ${note}.`); refresh(); }); row2.append(b); });
+    $s("sy-aim-off").addEventListener("click", () => { if (!pick) return; if (count(draft) <= 1) { hint("A ship needs at least one cannon."); return; } draft[pick.side][pick.i] = false; pick = null; hint("Cannon taken off (you keep it, and can put it on again for free)."); refresh(); });
     $s("sy-canvas").addEventListener("click", clickCanvas);
     $s("sy-name").addEventListener("input", () => { draft.name = $s("sy-name").value.slice(0, 20); });
     $s("sy-save").addEventListener("click", () => { commit(); refresh(); toast(`Saved "${ships[sel].name}".`); });
@@ -224,7 +262,7 @@ const Shipyard = (() => {
     list: () => ships.map((s, i) => ({ i, label: `${s.name} (${TYPES[s.type].name}, ${count(s)} cannons)` })),
     get sel() { return sel; },
     choose(i) { if (Number.isInteger(i) && i >= 0 && i < ships.length) { sel = i; save(); } },
-    onlineDesign: () => { const d = ships[sel]; return { type: d.type, sail: d.sail, hull: d.hull, port: d.port.slice(), star: d.star.slice() }; },
+    onlineDesign: () => { const d = ships[sel]; return { type: d.type, sail: d.sail, hull: d.hull, port: d.port.slice(), star: d.star.slice(), pa: d.pa.slice(), sa: d.sa.slice() }; },
     snapshot: () => ({ ships: clone(ships), sel, owned }),
     restore(raw) {
       if (!raw || !Array.isArray(raw.ships)) return;

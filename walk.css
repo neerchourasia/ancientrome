@@ -426,6 +426,9 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 /* the shipyard */
 .dpanel .box.wide { width: min(640px, 100%); }
 .sy-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+#sy-aim { margin: 8px 0; padding: 8px; background: rgba(255,255,255,.07); border-radius: 8px; }
+.sy-aims { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.sy-aims button.on { border-color: var(--gold); color: var(--gold); }
 .sy-pic { width: 240px; max-width: 100%; }
 #sy-canvas { width: 240px; max-width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); cursor: pointer; }
 .sy-side { flex: 1; min-width: 220px; }

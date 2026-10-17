@@ -746,22 +746,24 @@ BOT_SHIP_NAMES = ("Corvus", "Neptunus", "Fortuna")
 NAVAL_SLOTS = 7
 NAVAL_SLOT_Z = (3.6, 2.4, 1.2, 0.0, -1.2, -2.4, -3.6)
 NAVAL_TYPES = {
-    "kayak": {"hp": 30, "scale": 0.55, "max": 9.6, "cannons": 2, "hw": 0.45, "lenK": 0.7},
-    "canoe": {"hp": 45, "scale": 0.6, "max": 8.8, "cannons": 3, "hw": 0.7, "lenK": 0.78},
-    "fishing": {"hp": 65, "scale": 0.72, "max": 6.2, "cannons": 4, "hw": 1.2, "lenK": 0.8},
-    "liburna": {"hp": 70, "scale": 0.66, "max": 8.2, "cannons": 4, "hw": 1.5, "lenK": 1.0},
-    "galley": {"hp": 100, "scale": 0.8, "max": 6.6, "cannons": 6, "hw": 1.5, "lenK": 1.0},
-    "trireme": {"hp": 130, "scale": 0.92, "max": 5.8, "cannons": 9, "hw": 1.5, "lenK": 1.0},
-    "quinquereme": {"hp": 175, "scale": 1.08, "max": 4.8, "cannons": 12, "hw": 1.5, "lenK": 1.0},
-    "battleship": {"hp": 260, "scale": 1.3, "max": 4.2, "cannons": 14, "hw": 2.1, "lenK": 1.3},
+    "kayak": {"hp": 30, "scale": 0.5, "max": 9.6, "hw": 0.45, "lenK": 0.7, "ports": (3,), "stars": ()},
+    "canoe": {"hp": 45, "scale": 0.6, "max": 8.8, "hw": 0.7, "lenK": 0.78, "ports": (3,), "stars": (3,)},
+    "fishing": {"hp": 65, "scale": 0.55, "max": 6.2, "hw": 1.1, "lenK": 0.75, "ports": (2, 4), "stars": (2, 4)},
+    "liburna": {"hp": 70, "scale": 0.8, "max": 8.2, "hw": 1.5, "lenK": 1.0, "ports": (1, 3, 5), "stars": (1, 3, 5)},
+    "galley": {"hp": 100, "scale": 0.9, "max": 6.6, "hw": 1.5, "lenK": 1.0, "ports": (0, 2, 4, 6), "stars": (0, 2, 4, 6)},
+    "trireme": {"hp": 130, "scale": 1.0, "max": 5.8, "hw": 1.5, "lenK": 1.0, "ports": (0, 1, 3, 5, 6), "stars": (0, 1, 3, 5, 6)},
+    "quinquereme": {"hp": 175, "scale": 1.15, "max": 4.8, "hw": 1.5, "lenK": 1.0, "ports": (0, 1, 2, 4, 5, 6), "stars": (0, 1, 2, 4, 5, 6)},
+    "battleship": {"hp": 260, "scale": 1.4, "max": 4.2, "hw": 2.1, "lenK": 1.3, "ports": tuple(range(7)), "stars": tuple(range(7))},
 }
+for _t in NAVAL_TYPES.values():
+    _t["cannons"] = len(_t["ports"]) + len(_t["stars"])         # the most a boat can hold
 
 
 def clean_ship(d):
     """A ship design from a browser, cut down to what is allowed: a known type, at most that type's cannons, no junk."""
-    out = {"type": "galley", "sail": 0, "hull": 0, "port": [False] * NAVAL_SLOTS, "star": [False] * NAVAL_SLOTS}
+    out = {"type": "galley", "sail": 0, "hull": 0, "port": [False] * NAVAL_SLOTS, "star": [False] * NAVAL_SLOTS, "pa": [2] * NAVAL_SLOTS, "sa": [2] * NAVAL_SLOTS}   # pa / sa: how each cannon is aimed (0 ahead, 1 ahead-diagonal, 2 side, 3 astern-diagonal, 4 astern)
     if not isinstance(d, dict):
-        out["port"] = [i in (1, 3, 5) for i in range(NAVAL_SLOTS)]
+        out["port"] = [i in (0, 2, 4) for i in range(NAVAL_SLOTS)]
         out["star"] = list(out["port"])
         return out
     if d.get("type") in NAVAL_TYPES:
@@ -770,14 +772,22 @@ def clean_ship(d):
         v = d.get(k)
         out[k] = v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < n else 0
     left = NAVAL_TYPES[out["type"]]["cannons"]
-    for side in ("port", "star"):
+    ok = {"port": NAVAL_TYPES[out["type"]]["ports"], "star": NAVAL_TYPES[out["type"]]["stars"]}
+    for side, aim in (("port", "pa"), ("star", "sa")):
         arr = d.get(side) if isinstance(d.get(side), list) else []
+        aims = d.get(aim) if isinstance(d.get(aim), list) else []
         for i in range(NAVAL_SLOTS):
-            if i < len(arr) and arr[i] is True and left > 0:
+            if i < len(arr) and arr[i] is True and left > 0 and i in ok[side]:
                 out[side][i] = True
                 left -= 1
+            if i < len(aims) and isinstance(aims[i], int) and not isinstance(aims[i], bool) and 0 <= aims[i] <= 4:
+                out[aim][i] = aims[i]
     if not any(out["port"]) and not any(out["star"]):
-        out["port"][3] = out["star"][3] = True
+        t = NAVAL_TYPES[out["type"]]
+        if t["ports"]:
+            out["port"][t["ports"][len(t["ports"]) // 2]] = True
+        if t["stars"]:
+            out["star"][t["stars"][len(t["stars"]) // 2]] = True
     return out
 
 
@@ -797,7 +807,7 @@ class Ship:
         self.hp = 60.0 if bot else float(T["hp"])
         self.max_speed = 5.4 if bot else T["max"]
         d = self.design or clean_ship(None)
-        self.cannons = {1: [NAVAL_SLOT_Z[i] * self.lenK for i in range(NAVAL_SLOTS) if d["port"][i]], -1: [NAVAL_SLOT_Z[i] * self.lenK for i in range(NAVAL_SLOTS) if d["star"][i]]}
+        self.cannons = {1: [(NAVAL_SLOT_Z[i] * self.lenK, d["pa"][i]) for i in range(NAVAL_SLOTS) if d["port"][i]], -1: [(NAVAL_SLOT_Z[i] * self.lenK, d["sa"][i]) for i in range(NAVAL_SLOTS) if d["star"][i]]}   # (position along the ship, aim)
         self.cd = {1: 0.3, -1: 0.3}
         self.ram = 0.0
         self.dead_at = None                               # when it sank (for the final order)
@@ -891,23 +901,26 @@ class NavalRoom:
         if not guns:
             return False
         s.cd[side] = 1.6 + 0.2 * len(guns) if not s.bot else 4.5 + random.random() * 2   # a bigger broadside reloads slower (three: 2.2 s)
-        for k, cz in enumerate(guns):
-            s.queue.append([k * 0.13 + random.random() * 0.05, side, cz])
+        for k, (cz, aim) in enumerate(guns):
+            s.queue.append([k * 0.13 + random.random() * 0.05, side, cz, aim])
         return True
 
-    def shoot(self, s, side, cz):
+    def shoot(self, s, side, cz, aim=2):
         fx, fz = ship_fwd(s)
         nx, nz = ship_side(s, side)
         sc = s.sc
         off = (s.hw + 0.4) * sc
         x, z, y = s.x + fx * cz * sc + nx * off, s.z + fz * cz * sc + nz * off, NAVAL_LEVEL + 1.3 * sc
         spread = 4.2 if s.bot else 1.5
-        along = (random.random() - 0.5) * spread
+        th = aim * math.pi / 4                             # 0 ahead ... 2 straight out of the side ... 4 astern
+        dx_, dz_ = fx * math.cos(th) + nx * math.sin(th), fz * math.cos(th) + nz * math.sin(th)
+        x, z = x + dx_ * 0.6, z + dz_ * 0.6
+        off = (random.random() - 0.5) * spread             # the shot wanders a little across its line
         sp = 24.0 * (0.95 + random.random() * 0.1)
-        self.balls.append({"id": self.next_ball, "x": x, "y": y, "z": z, "vx": nx * sp + fx * (s.v + along),
-                           "vz": nz * sp + fz * (s.v + along), "vy": 5.5 + random.random(), "by": s})
+        self.balls.append({"id": self.next_ball, "x": x, "y": y, "z": z, "vx": dx_ * sp - dz_ * off + fx * s.v,
+                           "vz": dz_ * sp + dx_ * off + fz * s.v, "vy": 5.5 + random.random(), "by": s})
         self.next_ball += 1
-        self.events.append(["f", round(x, 1), round(y, 1), round(z, 1), round(nx, 2), round(nz, 2)])
+        self.events.append(["f", round(x, 1), round(y, 1), round(z, 1), round(dx_, 2), round(dz_, 2)])
 
     def leave(self, conn):
         s = conn.me
@@ -990,7 +1003,7 @@ class NavalRoom:
             for q in [q for q in s.queue if q[0] <= 0]:
                 s.queue.remove(q)
                 if not s.dead:
-                    self.shoot(s, q[1], q[2])
+                    self.shoot(s, q[1], q[2], q[3] if len(q) > 3 else 2)
         if live:
             self.collide_all()
         # cannonballs
