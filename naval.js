@@ -171,10 +171,11 @@ const Naval = (() => {
   const forward = (s) => [Math.sin(s.yaw), Math.cos(s.yaw)];
   const sideNormal = (s, side) => (side > 0 ? [Math.cos(s.yaw), -Math.sin(s.yaw)] : [-Math.cos(s.yaw), Math.sin(s.yaw)]); // +1 = port (left)
 
-  function fireSide(s, side) {
+  function fireSide(s, side, together) {
     if (s.dead || s.cd[side] > 0 || phase !== "battle") return false;
     s.cd[side] = s.player ? 1.6 + 0.2 * s.model.cannons.filter((c) => c.side === side).length : 4.5 + Math.random() * 2; // a bigger broadside reloads slower (three a side: 2.2 s)
-    s.model.cannons.filter((c) => c.side === side).forEach((c, i) => queue.push({ t: i * 0.13 + Math.random() * 0.05, s, side, c }));
+    const guns = s.model.cannons.filter((c) => c.side === side), gap = together ? 0 : Math.min(0.13, 0.4 / Math.max(1, guns.length)); // Space: every cannon at once; Q / E: a quick ripple
+    guns.forEach((c, i) => queue.push({ t: i * gap + Math.random() * 0.04, s, side, c }));
     return true;
   }
 
@@ -185,7 +186,7 @@ const Naval = (() => {
     const th = (c.aim === undefined ? 2 : c.aim) * Math.PI / 4, dx = fx_ * Math.cos(th) + nx * Math.sin(th), dz = fz_ * Math.cos(th) + nz * Math.sin(th); // the way this cannon is aimed
     const x = s.x + fx_ * c.z * s.sc + nx * 1.9 * s.sc + dx * 0.6, z = s.z + fz_ * c.z * s.sc + nz * 1.9 * s.sc + dz * 0.6, y = level() + 1.3 * s.sc;
     const spread = s.player ? 1.5 : 4.2;
-    const wander = (Math.random() - 0.5) * spread, sp = 24 * (0.95 + Math.random() * 0.1);
+    const wander = (Math.random() - 0.5) * spread, sp = 15 * (0.95 + Math.random() * 0.1);   // a weaker shot: it carries about 15 m
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lambert(0x1a1a1c));
     m.position.set(x, y, z);
     scene.add(m);
@@ -251,15 +252,15 @@ const Naval = (() => {
   function aiShip(e, dt) {
     const dx = me.x - e.x, dz = me.z - e.z, dist = Math.hypot(dx, dz) || 1, bearing = Math.atan2(dx, dz);
     let desired;
-    if (dist > 17) desired = bearing;
-    else if (dist < 8) desired = bearing + Math.PI;
+    if (dist > 12) desired = bearing;
+    else if (dist < 6) desired = bearing + Math.PI;
     else {
       const a1 = bearing + Math.PI / 2, a2 = bearing - Math.PI / 2;
       desired = Math.abs(angDiff(e.yaw, a1)) < Math.abs(angDiff(e.yaw, a2)) ? a1 : a2;
     }
     const turn = Math.max(-1, Math.min(1, angDiff(e.yaw, desired) * 2));
-    stepShip(e, dt, dist > 17 ? 1 : dist < 8 ? 0.8 : 0.45, turn);
-    if (phase === "battle" && !me.dead && dist < 22) {
+    stepShip(e, dt, dist > 12 ? 1 : dist < 6 ? 0.8 : 0.45, turn);
+    if (phase === "battle" && !me.dead && dist < 16) {
       const [fx_, fz_] = forward(e), fwdDot = (dx * fx_ + dz * fz_) / dist;
       if (Math.abs(fwdDot) < 0.5) {
         const [lx, lz] = sideNormal(e, 1);
@@ -367,18 +368,13 @@ const Naval = (() => {
     else msg("You leave the naval battle.", 1400);
   }
 
-  // Q = port, E = starboard, Space/click = the side facing the nearest enemy.
+  // Q = port, E = starboard, Space/click = every cannon on both sides at once.
   function fire(k) {
     if (!active || !me || me.dead || phase !== "battle") return;
     if (online) return fireOnline(k);
     if (k === "KeyQ") fireSide(me, 1);
     else if (k === "KeyE") fireSide(me, -1);
-    else {
-      let best = null, bd = Infinity;
-      for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
-      if (!best) return;
-      fireSide(me, bestSide(me, best));
-    }
+    else { fireSide(me, 1, true); fireSide(me, -1, true); }   // Space or click: every cannon on both sides at once
   }
 
   // the side whose cannons bear best on a target (counts the cannons aimed within 50 degrees of it; the facing side if none)
@@ -449,14 +445,9 @@ const Naval = (() => {
   }
 
   function fireOnline(k) {
-    let side = k === "KeyQ" ? 1 : k === "KeyE" ? -1 : 0;
-    if (!side) {
-      let best = null, bd = Infinity;
-      for (const f of foes) { const d = Math.hypot(f.x - me.x, f.z - me.z); if (!f.dead && d < bd) { best = f; bd = d; } }
-      if (!best) return;
-      side = bestSide(me, best);
-    }
-    Online.navalSend({ t: "naval", fire: side });
+    const side = k === "KeyQ" ? 1 : k === "KeyE" ? -1 : 0;
+    if (side) { Online.navalSend({ t: "naval", fire: side }); return; }
+    Online.navalSend({ t: "naval", fire: 1 }); Online.navalSend({ t: "naval", fire: -1 });   // Space or click: both sides at once
   }
 
   function onlineState(m) {

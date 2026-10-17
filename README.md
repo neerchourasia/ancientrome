@@ -29,7 +29,7 @@ Then visit http://localhost:8123. Because it is static, it also works on GitHub 
 | Fight (in the Colosseum arena) | `F` to start. `Space` or click attacks, hold `Shift` or right-click blocks, `WASD` moves, `Esc` leaves |
 | Animal hunt (in the arena) | `U`. Bow and arrows: hold `Space` or the mouse to draw, release to shoot, `Shift` dodge roll, `WASD` move |
 | Lion (in the arena) | `L`. A lion on its own, hunted with the bow (same controls as the animal hunt) |
-| Naval battle (in the arena) | `N`. The arena floods and you command a galley. `W` `S` sail, `A` `D` steer, `Q` / `E` fire port / starboard cannons, `Space` or click fires at the nearest enemy |
+| Naval battle (in the arena) | `N`. The arena floods and you command a galley. `W` `S` sail, `A` `D` steer, `Q` / `E` fire port / starboard cannons, `Space` or click fires every cannon on both sides at once (cannonballs carry about 15 m, so you have to get close) |
 | Watch (Colosseum or Circus stands) | `V` to start or stop. In the Colosseum it shows the day's programme: `N` skips to the next act, `1`-`5` picks one. `C` switches to a cinematic camera, `WASD` lets you walk around the stands |
 | Race (on the Circus Maximus track) | `R` to start. `W` gas, `S` brake, `A` `D` steer (hold `Shift` for fine steering), `Q` `E` hop a lane, `1`-`9` speed level (1 slowest, 9 gallop), `Space` whip, `X` cruise control, `C` cycle camera, hold `B` to look back, `Esc` leaves |
 

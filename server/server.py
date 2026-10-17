@@ -902,7 +902,7 @@ class NavalRoom:
             return False
         s.cd[side] = 1.6 + 0.2 * len(guns) if not s.bot else 4.5 + random.random() * 2   # a bigger broadside reloads slower (three: 2.2 s)
         for k, (cz, aim) in enumerate(guns):
-            s.queue.append([k * 0.13 + random.random() * 0.05, side, cz, aim])
+            s.queue.append([k * min(0.13, 0.4 / max(1, len(guns))) + random.random() * 0.04, side, cz, aim])   # a quick ripple, so a big broadside is over in under half a second
         return True
 
     def shoot(self, s, side, cz, aim=2):
@@ -916,7 +916,7 @@ class NavalRoom:
         dx_, dz_ = fx * math.cos(th) + nx * math.sin(th), fz * math.cos(th) + nz * math.sin(th)
         x, z = x + dx_ * 0.6, z + dz_ * 0.6
         off = (random.random() - 0.5) * spread             # the shot wanders a little across its line
-        sp = 24.0 * (0.95 + random.random() * 0.1)
+        sp = 15.0 * (0.95 + random.random() * 0.1)             # a weaker shot: it carries about 15 m
         self.balls.append({"id": self.next_ball, "x": x, "y": y, "z": z, "vx": dx_ * sp - dz_ * off + fx * s.v,
                            "vz": dz_ * sp + dx_ * off + fz * s.v, "vy": 5.5 + random.random(), "by": s})
         self.next_ball += 1
@@ -962,17 +962,17 @@ class NavalRoom:
         dx, dz = t.x - b.x, t.z - b.z
         dist = math.hypot(dx, dz) or 1.0
         bearing = math.atan2(dx, dz)
-        if dist > 17:
+        if dist > 12:
             want = bearing
-        elif dist < 8:
+        elif dist < 6:
             want = bearing + math.pi
         else:
             a1, a2 = bearing + math.pi / 2, bearing - math.pi / 2
             want = a1 if abs(ang_diff(b.yaw, a1)) < abs(ang_diff(b.yaw, a2)) else a2
         turn = max(-1.0, min(1.0, ang_diff(b.yaw, want) * 2))
-        thr = 1.0 if dist > 17 else 0.8 if dist < 8 else 0.45
+        thr = 1.0 if dist > 12 else 0.8 if dist < 6 else 0.45
         self.move(b, dt, thr, turn)
-        if dist < 22:
+        if dist < 16:
             fx, fz = ship_fwd(b)
             if abs((dx * fx + dz * fz) / dist) < 0.5:
                 lx, lz = ship_side(b, 1)
