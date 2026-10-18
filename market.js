@@ -38,11 +38,20 @@ const Market = (() => {
     shield: { type: "wear", slot: "hand", name: "Round shield", price: 110, note: "Painted red, with a bronze boss." },
     hound: { type: "pet", slot: "pet", name: "Hound", price: 150, note: "A loyal dog that trots along behind you." },
     eagle: { type: "pet", slot: "pet", name: "Eagle", price: 220, note: "The eagle of Rome, circling above you." },
+    cat: { type: "pet", slot: "pet", name: "Cat", price: 90, note: "A sleek tabby that pads along behind you." },
+    parrot: { type: "pet", slot: "pet", name: "Parrot", price: 130, note: "A bright green parrot that flutters around your head." },
+    monkey: { type: "pet", slot: "pet", name: "Monkey", price: 140, note: "A cheeky monkey with long arms that scampers after you." },
+    peacock: { type: "pet", slot: "pet", name: "Peacock", price: 160, note: "A blue and green peacock, its long tail fanning out behind it." },
+    owl: { type: "pet", slot: "pet", name: "Owl", price: 170, note: "The owl of Minerva, gliding in slow circles above you." },
+    cub: { type: "pet", slot: "pet", name: "Lion cub", price: 260, note: "A golden lion cub that trots at your heel." },
     scooter: { type: "car", name: "Vespa scooter", price: 250, note: "Quick and nimble. Top speed 54 km/h." },
     citycar: { type: "car", name: "City car", price: 500, note: "A blue runabout. Top speed 86 km/h." },
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
     rickshaw: { type: "car", name: "Cycle rickshaw", price: 200, note: "Pedal-powered, in bright colours. Top speed 25 km/h." },
     oxcart: { type: "mount", name: "Bullock cart", price: 150, note: "A wooden cart pulled by an ox. Top speed 18 km/h." },
+    horse: { type: "mount", name: "Horse", price: 300, note: "A fast brown horse with a saddle. Top speed 65 km/h." },
+    camel: { type: "mount", name: "Camel", price: 220, note: "A tall camel with a red saddle cloth, from the caravans. Top speed 40 km/h, and you ride high above the crowd." },
+    donkey: { type: "mount", name: "Donkey", price: 70, note: "A hardy little donkey: slow but cheap. Top speed 29 km/h." },
     elephant: { type: "mount", name: "Elephant", price: 800, note: "A tall elephant with a red and gold howdah. Top speed 50 km/h, and you can see over the crowd." },
     banners: { type: "decor", name: "Door banners", price: 60, note: "Two crimson banners either side of your front door." },
     mosaic: { type: "decor", name: "Mosaic floor", price: 90, note: "A patterned floor of coloured tiles inside your house." },
@@ -112,7 +121,7 @@ const Market = (() => {
   };
   let stall = "food";
   const SECTIONS = [
-    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -239,7 +248,7 @@ const Market = (() => {
       if (need && era !== need && def.ownedOnly) return []; // your garage only lists what exists in this era
       if (need && era !== need) { // these only exist in one era
         const li = document.createElement("li"), note = document.createElement("small");
-        note.textContent = need === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there, then come back to buy one." : "Carts and elephants only live in the ancient cities (Ancient Rome and Mughal Delhi). Press K to go there, then come back to buy one.";
+        note.textContent = need === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there, then come back to buy one." : "Carts and the animals you ride (horse, camel, donkey, elephant) only live in the ancient cities (Ancient Rome and Mughal Delhi). Press K to go there, then come back to buy one.";
         li.append(note); ul.append(li);
         return [h, ul];
       }

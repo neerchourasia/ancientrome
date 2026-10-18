@@ -12,6 +12,9 @@ const Car = (() => {
     sportscar: { name: "Sports car", max: 36, accel: 16, turn: 1.9, color: 0xc0262b, len: 4.4, wid: 1.9 },
     rickshaw: { name: "Cycle rickshaw", max: 7, accel: 4.5, turn: 2.4, color: 0x2f8f4a, len: 2.6, wid: 1.2, motor: false },
     oxcart: { name: "Bullock cart", max: 5, accel: 2.2, turn: 1.6, color: 0x6b4a2b, len: 4.6, wid: 1.6, era: "ancient", motor: false, verb: "climb on" },
+    horse: { name: "Horse", max: 18, accel: 9, turn: 2.2, color: 0x7a4a2a, len: 2.8, wid: 1.0, era: "ancient", motor: false, camH: 2.5, verb: "climb on" },
+    camel: { name: "Camel", max: 11, accel: 5, turn: 1.8, color: 0xc9a46a, len: 3.4, wid: 1.2, era: "ancient", motor: false, camH: 3.3, verb: "climb on" },
+    donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
   };
   const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
@@ -50,6 +53,20 @@ const Car = (() => {
       for (const sx of [-1, 1]) { const w = wheel(0.8, 0.1, sx * 0.9, 0.8, 1.0); g.add(w); wheels.push(w); }
       g.add(box(0.8, 0.85, 1.6, ox, 0, 1.2, -2.3), box(0.55, 0.55, 0.7, ox, 0, 1.45, -3.3), box(0.9, 0.08, 0.1, horn, 0, 1.8, -3.2));
       for (const [x, z] of [[-0.28, -1.7], [0.28, -1.7], [-0.28, -2.9], [0.28, -2.9]]) { const l = leg(0.2, 0.85, ox, x, 0.85, z); g.add(l); legs.push(l); }
+    } else if (id === "horse" || id === "donkey" || id === "camel") { // animals to ride: a body, a neck and head, a tail, four legs and a saddle
+      const fur = lam(M.color), dark = lam(id === "horse" ? 0x241810 : id === "camel" ? 0x8a6a3a : 0x5a5650), cloth = lam(id === "camel" ? 0xb3262b : 0x2f6b8f), gold = lam(0xd9a928);
+      const big = id === "camel" ? 1.25 : id === "horse" ? 1 : 0.78, bodyY = (id === "camel" ? 1.85 : id === "horse" ? 1.45 : 1.05), legL = bodyY - 0.2, bl = M.len * 0.62;
+      g.add(box(0.75 * big, 0.8 * big, bl, fur, 0, bodyY, 0.1));
+      const neckH = id === "camel" ? 1.4 : 0.9;
+      const neck = box(0.3 * big, neckH, 0.35 * big, fur, 0, bodyY + neckH / 2 - 0.05, -bl / 2 - 0.1); neck.rotation.x = id === "camel" ? 0.15 : 0.45; g.add(neck);
+      g.add(box(0.32 * big, 0.36 * big, 0.75 * big, fur, 0, bodyY + neckH + 0.05, -bl / 2 - (id === "camel" ? 0.55 : 0.75)));
+      g.add(box(0.1, id === "donkey" ? 0.5 : 0.2, 0.08, fur, 0.1 * big, bodyY + neckH + 0.4, -bl / 2 - 0.3), box(0.1, id === "donkey" ? 0.5 : 0.2, 0.08, fur, -0.1 * big, bodyY + neckH + 0.4, -bl / 2 - 0.3));
+      if (id === "horse") g.add(box(0.1, 0.8, 0.14, dark, 0, bodyY + 0.9, -bl / 2 - 0.18)); // the mane
+      if (id === "camel") { g.add(box(0.5, 0.55, 0.5, fur, 0, bodyY + 0.65, -0.35), box(0.5, 0.55, 0.5, fur, 0, bodyY + 0.65, 0.55)); }   // two humps
+      const tl = box(0.12, 0.7, 0.12, dark, 0, bodyY - 0.1, bl / 2 + 0.2); tl.rotation.x = -0.3; g.add(tl);
+      g.add(box(0.85 * big, 0.08, 0.9, cloth, 0, bodyY + (id === "camel" ? 1.0 : 0.42), id === "camel" ? 0.1 : 0.1), box(0.9 * big, 0.04, 0.95, gold, 0, bodyY + (id === "camel" ? 0.97 : 0.38), 0.1));
+      g.add(box(0.5, 0.18, 0.6, lam(0x5a3a22), 0, bodyY + (id === "camel" ? 1.12 : 0.55), 0.1));                   // the saddle
+      for (const [x, z] of [[-0.25, -bl * 0.35], [0.25, -bl * 0.35], [-0.25, bl * 0.45], [0.25, bl * 0.45]]) { const l = leg(0.16 * big, legL, id === "horse" ? fur : fur, x * big, legL, z); g.add(l); legs.push(l); }
     } else if (id === "elephant") { // a tall grey elephant with a red howdah
       const gr = lam(0x9c9a95), red = lam(0xa8282b), gold = lam(0xd9a928), ivory = lam(0xf1ead8);
       g.add(box(2.2, 2.1, 3.6, gr, 0, 3.0, 0.2), box(1.5, 1.6, 1.5, gr, 0, 3.3, -2.3));

@@ -212,11 +212,11 @@ const Online = (() => {
     const pet = p.pet, g = pet.g, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = -fz, rz = fx;
     g.visible = show;
     pet.t = (pet.t || 0) + dt;
-    if (pet.kind === "eagle") {
-      pet.a += dt * 0.7;
-      g.position.set(p.x + Math.cos(pet.a) * 2.4, groundAt(p.x, p.z) + 3.8 + Math.sin(pet.t * 1.6) * 0.3, p.z + Math.sin(pet.a) * 2.4);
+    if (pet.fly) {
+      pet.a += dt * pet.fly.rate;
+      g.position.set(p.x + Math.cos(pet.a) * pet.fly.r, groundAt(p.x, p.z) + pet.fly.h + Math.sin(pet.t * 1.6) * 0.3, p.z + Math.sin(pet.a) * pet.fly.r);
       g.rotation.y = -pet.a + Math.PI;
-      const flap = Math.sin(pet.t * 7) * 0.55;
+      const flap = Math.sin(pet.t * pet.fly.flap) * 0.55;
       pet.wings[0].rotation.z = flap; pet.wings[1].rotation.z = -flap;
       return;
     }
