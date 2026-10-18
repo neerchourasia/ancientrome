@@ -979,7 +979,7 @@ function applyEra() {
   $("#era-badge").classList.toggle("ancient", !modern);
   $("#btn-era").innerHTML = modern ? `${oldName} <kbd>K</kbd>` : `${newName} <kbd>K</kbd>`;
   $("#btn-city").innerHTML = city === "rome" ? "✈ Travel to Delhi <kbd>B</kbd>" : "✈ Travel to Rome <kbd>B</kbd>";
-  $("#hud .top-left h1").innerHTML = city === "rome" ? "Walk Ancient Rome <small>c. 128 AD</small>" : (modern ? "Walk Modern Delhi <small>today</small>" : "Walk Mughal Delhi <small>c. 1650</small>");
+  $("#hud .top-left h1").innerHTML = city === "rome" ? (modern ? "Dopamine <small>Modern Rome · today</small>" : "Dopamine <small>Ancient Rome · c. 128 AD</small>") : (modern ? "Dopamine <small>Modern Delhi · today</small>" : "Dopamine <small>Mughal Delhi · c. 1650</small>");
   $("#btn-dgames").hidden = city !== "delhi";
   $("#map-title").textContent = city === "rome" ? "Map of Rome" : "Map of Old Delhi";
   refreshLandmarks();
