@@ -33,6 +33,9 @@ const Disease = (() => {
     const start = 3 + Math.floor(((Math.sin(year * 12.9898 + (c === "delhi" ? 78.233 : 4.1414)) * 43758.5453) % 1 + 1) % 1 * 22);
     return d >= start && d < start + 3 ? start : 0;
   }
+  // at your house: in it, or in its grounds (Rome), or on your plot (Delhi). Being ill anywhere else costs you health.
+  const atHome = () => (typeof city !== "undefined" && city === "delhi" ? (Delhi.built && (Delhi.homeInside(player.x, player.z) || Delhi.inPlot(player.x, player.z))) : (Home.inside(player.x, player.z) || Math.hypot(player.x - Home.X, player.z - Home.Z) < 16));
+  const AWAY = { cold: 0.2, fever: 0.3, poison: 0.35, heat: 0.25, plague: 0.5 };   // health lost per second while ill and away from home
   const indoors = () => (typeof city !== "undefined" && city === "delhi" ? (Delhi.built && Delhi.homeInside(player.x, player.z)) : (Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z))));
 
   function catchIt(k, why) {
@@ -74,12 +77,15 @@ const Disease = (() => {
     }
     // --- being ill
     let drain = 0, regen = 1, slow = 1;
+    const away = any() && !atHome();
+    if (away && !Disease.warned && any()) { Disease.warned = true; toast("You are ill and away from home: you are losing health. Go home to rest, or buy medicine from the healer."); }
+    if (!away) Disease.warned = false;
     for (const k of Object.keys(sick)) {
       if (sick[k] <= 0) continue;
       const home = Vitals.resting || indoors() && Time.isNight;
       sick[k] -= dt * (home ? 3 : 1) * (Vitals.hunger > 60 ? 1.2 : 1);           // rest and good food help you through
       if (k === "heat" && (indoors() || Vitals.resting)) sick[k] -= dt * 6;       // shade
-      drain += D[k].drain; regen = Math.min(regen, D[k].regen); slow = Math.min(slow, D[k].speed);
+      drain += away ? AWAY[k] : 0; regen = Math.min(regen, D[k].regen); slow = Math.min(slow, D[k].speed);
       if (sick[k] <= 0) { sick[k] = 0; toast(`You feel better: the ${D[k].name.toLowerCase()} has passed.`); render(); }
     }
     Disease.regenMul = regen; Disease.speedMul = slow;
@@ -98,13 +104,13 @@ const Disease = (() => {
     const el = $d("v-disease");
     if (!el) return;
     const list = Object.keys(sick).filter((k) => sick[k] > 0);
-    el.textContent = list.map((k) => `${D[k].icon} ${D[k].name} (${Math.floor(sick[k] / 60)}:${String(Math.floor(sick[k] % 60)).padStart(2, "0")})`).join(" · ");
+    el.textContent = (list.length && !atHome() ? "⚠ Ill away from home: losing health. " : "") + list.map((k) => `${D[k].icon} ${D[k].name} (${Math.floor(sick[k] / 60)}:${String(Math.floor(sick[k] % 60)).padStart(2, "0")})`).join(" · ");
     el.className = list.length ? "bad" : "";
   }
 
   return {
     update, catchIt, cure, render, has, any, D,
-    regenMul: 1, speedMul: 1,
+    regenMul: 1, speedMul: 1, warned: false,
     get list() { return Object.keys(sick).filter((k) => sick[k] > 0); },
     snapshot: () => ({ ...sick }),
     restore(r) { sick = {}; if (r && typeof r === "object") for (const k of Object.keys(D)) if (Number.isFinite(r[k]) && r[k] > 0) sick[k] = Math.min(D[k].secs, r[k]); save(); render(); },
