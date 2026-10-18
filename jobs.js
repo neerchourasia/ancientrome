@@ -250,7 +250,7 @@ const Jobs = (() => {
     if (!done) { toast("You walked off the shift and were not paid."); return; }
     const kind = G.kind, job = JOBS[kind], r = rank();
     const score = kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : G.score; // a good winch crew is in the green 80% of the time
-    const pay = Math.round(job.base * r.mul * Math.max(0, Math.min(1, score))) + (score >= 0.95 ? 10 : 0);
+    const pay = Math.round((job.base * r.mul * Math.max(0, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1));   // festival days pay a quarter more
     Vitals.coins += pay; Vitals.hp -= HP_COST; s.shifts++; s.earned += pay; save();
     const oldRank = r, newRank = rank();
     $j("job-area").replaceChildren();

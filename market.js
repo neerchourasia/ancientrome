@@ -75,8 +75,20 @@ const Market = (() => {
     f_momos: F("Plate of momos", 14, 20, "Steamed dumplings with a red chilli sauce.", ["delhi", "modern"]),
     f_butter: F("Butter chicken and naan", 28, 38, "Rich, creamy and filling.", ["delhi", "modern"]),
   };
+  // festival dishes: sold only while their festival lasts
+  const FD = (name, price, heal, note, where, fest) => ({ ...F(name, price, heal, note, where), fest });
+  Object.assign(FOODS, {
+    f_cake: FD("Saturnalia cake", 12, 22, "A honeyed festival cake with nuts and dried fruit.", ["rome", "ancient"], "saturnalia"),
+    f_cakem: FD("Panettone slice", 12, 22, "A slice of sweet festive bread with candied fruit.", ["rome", "modern"], "saturnalia"),
+    f_garland: FD("Floralia honey flowers", 9, 14, "Sweet cakes baked in the shape of flowers.", ["rome", "ancient"], "floralia"),
+    f_garlandm: FD("Floralia honey flowers", 9, 14, "Sweet cakes baked in the shape of flowers.", ["rome", "modern"], "floralia"),
+    f_mithai: FD("Mithai box (gulab jamun)", 14, 24, "Syrup-soaked sweets for Diwali.", ["delhi", "ancient"], "diwali"),
+    f_mithaim: FD("Mithai box (gulab jamun)", 14, 24, "Syrup-soaked sweets for Diwali.", ["delhi", "modern"], "diwali"),
+    f_thandai: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "ancient"], "holi"),
+    f_thandaim: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "modern"], "holi"),
+  });
   Object.assign(ITEMS, FOODS);
-  const foodHere = (it) => it.where[0] === (typeof city !== "undefined" ? city : "rome") && it.where[1] === (typeof era !== "undefined" ? era : "ancient");
+  const foodHere = (it) => it.where[0] === (typeof city !== "undefined" ? city : "rome") && it.where[1] === (typeof era !== "undefined" ? era : "ancient") && (!it.fest || (typeof Festival !== "undefined" && Festival.id === it.fest));   // festival dishes only on their festival
 
   // Each stall in the market sells some kinds of thing (the builder also sells houses)
   const STALLS = {
@@ -117,6 +129,7 @@ const Market = (() => {
 
   // People who hate you (you missed the tax) charge 25% more
   const mark = (p) => Math.round(p * (typeof Tax !== "undefined" ? Tax.priceMul : 1));
+  const markFood = (p, it) => (it && it.type === "food" && typeof Festival !== "undefined" ? Math.round(mark(p) * Festival.foodMul) : mark(p));   // festival days: food a quarter cheaper
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } };
   const $m = (id) => document.getElementById(id);
 
@@ -144,11 +157,11 @@ const Market = (() => {
   function buyItem(id) {
     const it = ITEMS[id];
     if (!it || (it.type !== "supply" && it.type !== "food" && s.items.includes(id))) return;
-    if (Vitals.coins < mark(it.price)) { toast(`The ${it.name.toLowerCase()} costs ${mark(it.price)} denarii (you have ${Vitals.coins}).`); return; }
+    if (Vitals.coins < markFood(it.price, it)) { toast(`The ${it.name.toLowerCase()} costs ${markFood(it.price, it)} denarii (you have ${Vitals.coins}).`); return; }
     if (it.type === "food") {
       if (!foodHere(it)) return;
       if (Vitals.hunger >= 90 && Vitals.hp >= 99) { toast("You are not hungry."); return; }
-      Vitals.coins -= mark(it.price);
+      Vitals.coins -= markFood(it.price, it);
       Vitals.eat(it.heal, it.heal * 2.5);
       { const hb = document.getElementById("v-hunger"); if (hb) { hb.classList.add("ate"); setTimeout(() => hb.classList.remove("ate"), 700); } }
       Sfx.play("coin"); render();
@@ -216,7 +229,7 @@ const Market = (() => {
         txt.append(name, note);
         b.type = "button";
         const owned = s.items.includes(id);
-        if (it.type === "supply" || it.type === "food" || !owned) { b.textContent = `Buy · ${mark(it.price)}`; b.disabled = Vitals.coins < mark(it.price); b.addEventListener("click", () => buyItem(id)); }
+        if (it.type === "supply" || it.type === "food" || !owned) { b.textContent = `Buy · ${markFood(it.price, it)}${it.type === "food" && typeof Festival !== "undefined" && Festival.active ? " (festival price)" : ""}`; b.disabled = Vitals.coins < markFood(it.price, it); b.addEventListener("click", () => buyItem(id)); }
         else if (it.type === "car" || it.type === "mount") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
         else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }

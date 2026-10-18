@@ -168,6 +168,7 @@ const Sfx = (() => {
     horn: () => { tone(196, 0.9, "sawtooth", 0.16); tone(294, 0.9, "sawtooth", 0.11); tone(392, 0.9, "sawtooth", 0.07); },
     discover: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.55, "sine", 0.16, null, null, i * 0.11)); },
     coin: () => { tone(1320, 0.09, "sine", 0.16); tone(1760, 0.16, "sine", 0.14, null, null, 0.07); },
+    firework: () => { puff(0.9, 220, 0.6, 0.35, null, "lowpass", 0.01); tone(95, 0.7, "sine", 0.35, 45); for (let i = 0; i < 6; i++) tone(1800 + Math.random() * 1800, 0.09, "square", 0.04, 800, null, 0.15 + i * 0.07); },
     hail: () => { tone(2300 + Math.random() * 1600, 0.05, "square", 0.07, 1400); puff(0.05, 3200, 2, 0.12); },
     tornado: () => { puff(2.2, 140, 0.6, 0.5, null, "lowpass", 0.4); tone(55, 2, "sawtooth", 0.25, 38); },
     thunder: () => { puff(2.6, 120, 0.4, 0.8, null, "lowpass", 0.08); puff(1.4, 260, 0.5, 0.5, null, "lowpass", 0.02, 0.15); tone(48, 2.2, "sine", 0.55, 28); },
@@ -272,6 +273,7 @@ const Sfx = (() => {
     init,
     debug: () => sources.map((s) => ({ id: s.id, ...s.target })),
     get state() { return ctx ? ctx.state : "off"; },
+    get ctx() { return ctx; }, get master() { return master; },   // so the music can play through the same output
     get on() { return on; },
     toggle() {
       on = !on;

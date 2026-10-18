@@ -137,7 +137,8 @@ const Stalls = (() => {
       s.t -= dt;
       if (s.t <= 0 && Math.hypot(player.x - s.x, player.z - s.z) < 9 && typeof Speech !== "undefined") {
         s.t = 22 + Math.random() * 10;
-        Speech.say(s.vendor, s.say[Math.floor(Math.random() * s.say.length)], 3.2);
+        const fl = typeof Festival !== "undefined" ? Festival.line() : null;
+        Speech.say(s.vendor, fl && Math.random() < 0.6 ? fl : s.say[Math.floor(Math.random() * s.say.length)], 3.2);
       }
     }
   }

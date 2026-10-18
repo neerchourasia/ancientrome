@@ -41,6 +41,7 @@ function init() {
   Stalls.build(scene, Stalls.SITES.rome.x, Stalls.SITES.rome.z, "rome");
   Jobs.build(scene);
   Robbery.init(scene);
+  Festival.init(scene);
   Home.build();
   buildInsulae(scene);
   buildTrees(scene);
@@ -247,6 +248,8 @@ function wireInput(canvas) {
   $("#btn-places").addEventListener("click", togglePlaces);
   $("#btn-dirs").addEventListener("click", toggleDirections);
   $("#btn-sound").addEventListener("click", toggleSound);
+  $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); toast(Music.on ? "Music on" : "Music off"); });
+  refreshMusicButton();
   $("#btn-voice").addEventListener("click", toggleVoice);
   refreshVoiceButton();
   refreshSoundButton();
@@ -940,6 +943,7 @@ function toggleVoice() {
   if (Narrator.on) Narrator.say("The narrator is on.", { repeat: true });
 }
 function refreshSoundButton() { $("#btn-sound").firstChild.textContent = Sfx.on ? "Sound on " : "Sound off "; }
+function refreshMusicButton() { $("#btn-music").textContent = Music.on ? "Music on" : "Music off"; }
 function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); toast(Sfx.on ? "Sound on" : "Sound off"); }
 
 // ---------- Ancient Rome / Modern Rome ----------
@@ -1482,13 +1486,14 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
   updateNavHud(dt);
+  Music.update(dt, mode === "walk" || mode === "drive" || mode === "watch");
   Sfx.update(dt, { mode, engine: Car.speed01(), driving: Car.driving && Car.motor, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
   placesTimer += dt;
   if (placesTimer > 0.6 && $("#places").classList.contains("show")) { placesTimer = 0; refreshPlaceDistances(); }
