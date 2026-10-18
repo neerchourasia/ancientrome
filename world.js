@@ -725,6 +725,73 @@ function buildColossus() {
 // (evoking the real Porta Collina, near the Quirinal) you can walk through, and stairs up either side of it so
 // you can walk along the top.
 
+// The Temple of Hercules Victor in the Forum Boarium (c. 120 BC): a round temple of white marble, with a ring of twenty
+// Corinthian columns round a round cella and a tiled roof. It still stands today (the oldest surviving marble building in Rome).
+function buildHerculesVictor() {
+  const cx = -130, cz = 140, colR = 7.6, colH = 8.2, base = 1.5;
+  planeAt(cx, cz, 50, 50, pavingTex("#bcb198", "rgba(90,70,40,.3)", 32, 16, 16));
+  MAP_SHAPES.push({ k: "e", cx, cz, ax: 11, az: 11, c: "#e2d9c4" });
+  // the stepped podium
+  for (const [r, top] of [[11, 0.5], [10, 1.0], [9, base]]) {
+    const m = shadowed(new T.Mesh(new T.CylinderGeometry(r, r, top, 36), M.travertine));
+    m.position.set(cx, top / 2, cz); worldScene.add(m); addPlatformCircle(cx, cz, r, top);
+  }
+  const F = frame(cx, cz, 0, 0);
+  // twenty columns round the cella (one more or fewer stands or falls with the ruin rule: they all stand today)
+  for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2; F.column(Math.cos(a) * colR, Math.sin(a) * colR, 0.46, colH, base); }
+  // the cella: a white marble drum with a dark doorway to the east
+  const cella = shadowed(new T.Mesh(new T.CylinderGeometry(5.1, 5.1, colH + 0.6, 32, 1, true), M.marble2));
+  cella.position.set(cx, base + (colH + 0.6) / 2, cz); worldScene.add(cella);
+  const cap = shadowed(new T.Mesh(new T.CylinderGeometry(5.1, 5.1, 0.2, 32), M.marble2)); cap.position.set(cx, base + colH + 0.5, cz); worldScene.add(cap);
+  const door = new T.Mesh(new T.PlaneGeometry(2.0, 4.4), M.dark); door.position.set(cx + 5.15, base + 2.3, cz); door.rotation.y = Math.PI / 2; worldScene.add(door);
+  addBlockerCircle(cx, cz, 5.2, 0, base + colH + 1);
+  // the entablature ring and the roof
+  const ring = shadowed(new T.Mesh(new T.CylinderGeometry(colR + 0.9, colR + 0.9, 1.0, 40, 1, false), M.marble2)); ring.position.set(cx, base + colH + 0.5, cz); worldScene.add(ring);
+  const roof = shadowed(new T.Mesh(new T.ConeGeometry(colR + 1.0, 4.2, 40), M.roof)); roof.position.set(cx, base + colH + 1 + 2.1, cz); worldScene.add(roof);
+  RUIN.roofs.push(roof, ring);                                           // the roof and the beam above the columns are gone today
+  const finial = shadowed(new T.Mesh(new T.SphereGeometry(0.45, 8, 6), M.bronze)); finial.position.set(cx, base + colH + 1 + 4.4, cz); worldScene.add(finial); RUIN.roofs.push(finial);
+}
+
+// The Theatre of Pompey in the Campus Martius (55 BC): Rome's first stone theatre. A half-round of seats (the cavea) facing a stage
+// building (the scaena), with the Temple of Venus Victrix at the top of the seats, and behind the stage a great garden with
+// colonnades (the Porticus of Pompey), where Julius Caesar was murdered in 44 BC. Only the curve of its streets survives today.
+let pompeyGroup = null;
+function buildPompey() {
+  const cx = -330, cz = -128, R0 = 15, R1 = 45, rows = 13, rise = 0.62, tread = (R1 - R0) / rows;
+  const g = new T.Group(); worldScene.add(g); pompeyGroup = g;
+  const stone = M.travertine, seatMat = new T.MeshStandardMaterial({ color: 0xd8c59b, roughness: 1, flatShading: true, side: T.DoubleSide, map: seatingTex() });
+  // the seats: a lathe of steps, the half facing south
+  const profile = [new T.Vector2(R0, 0)];
+  for (let k = 1; k <= rows; k++) { profile.push(new T.Vector2(R0 + (k - 1) * tread, k * rise)); profile.push(new T.Vector2(R0 + k * tread, k * rise)); }
+  profile.push(new T.Vector2(R1, 0));
+  const seats = shadowed(new T.Mesh(new T.LatheGeometry(profile, 48, -Math.PI / 2, Math.PI), seatMat)); seats.position.set(cx, 0, cz); g.add(seats);
+  const orch = shadowed(new T.Mesh(new T.CircleGeometry(R0, 36, -Math.PI / 2, Math.PI), new T.MeshLambertMaterial({ map: pavingTex("#d8cba8", "rgba(110,80,50,.3)", 32, 10, 10), side: T.DoubleSide })), false);
+  orch.rotation.x = -Math.PI / 2; orch.rotation.z = Math.PI; orch.position.set(cx, 0.06, cz); g.add(orch);
+  for (let k = 1; k <= rows; k++) addPlatformRing({ cx, cz, ax: R0 + k * tread, az: R0 + k * tread, u0: (R0 + (k - 1) * tread) / (R0 + k * tread), u1: 1, gap: 0, axis: "x", side: 0, top: k * rise, zs: 1, era: "ancient" });
+  // the outer wall behind the seats, and the temple of Venus Victrix on top
+  addBlockerRing({ cx, cz, ax: R1 + 0.6, az: R1 + 0.6, u0: R1 / (R1 + 0.6), u1: 1.0, gap: 0, axis: "x", side: 0, y0: 0, y1: 14, zs: 1, era: "ancient" });
+  const wall = shadowed(new T.Mesh(new T.CylinderGeometry(R1 + 0.3, R1 + 0.3, 14, 48, 1, true, -Math.PI / 2, Math.PI), new T.MeshLambertMaterial({ map: arcadeWallTex(), side: T.DoubleSide }))); wall.position.set(cx, 7, cz); g.add(wall);
+  const tw = frame(cx, cz + R1 + 10, 2, 0); // the little temple, turned to face the stage
+  tw.box(0, 0, 0, 14, 1.6, 14, stone, { walk: true, era: "ancient" });
+  for (let i = 0; i < 4; i++) { tw.column(-5.4 + i * 3.6, 5.4, 0.55, 7.5, 1.6); tw.column(-5.4 + i * 3.6, -5.4, 0.55, 7.5, 1.6); }
+  tw.box(0, 9.1, 0, 14.4, 1.2, 14.4, M.marble2); tw.gable(0, 10.3, 0, 14.4, 3.4, 14.4, M.roof);
+  // the stage building: a long wall of three storeys of niches and columns, and a low stage in front
+  const sw = 2 * R0 + 30, sz = cz - 10;
+  const stage = shadowed(new T.Mesh(BOX, M.travertine)); stage.scale.set(sw, 1.3, 9); stage.position.set(cx, 0.65, sz + 3); g.add(stage); addPlatformBox(cx - sw / 2, cx + sw / 2, sz - 1.5, sz + 7.5, 1.3, { era: "ancient" });
+  const front = shadowed(new T.Mesh(BOX, new T.MeshLambertMaterial({ map: arcadeWallTex() }))); front.scale.set(sw, 15, 2.6); front.position.set(cx, 7.5, sz - 3.8); g.add(front); addBlockerBox(cx - sw / 2, cx + sw / 2, sz - 5.2, sz - 2.4, 0, 15, { era: "ancient" });
+  for (let i = 0; i < 10; i++) { const c = shadowed(new T.Mesh(new T.CylinderGeometry(0.5, 0.6, 9, 12), M.marble)); c.position.set(cx - sw / 2 + 4 + i * ((sw - 8) / 9), 4.5 + 1.3, sz - 2.1); g.add(c); }
+  // the garden portico behind the stage: a long colonnade round a garden of plane trees, with a pool
+  const pz0 = sz - 8, pz1 = sz - 56, pw = 88;
+  const garden = new T.Mesh(new T.PlaneGeometry(pw, pz0 - pz1), new T.MeshLambertMaterial({ color: 0x6b9a4a })); garden.rotation.x = -Math.PI / 2; garden.position.set(cx, 0.07, (pz0 + pz1) / 2); garden.receiveShadow = true; g.add(garden);
+  for (let i = 0; i <= 14; i++) for (const zz of [pz0 - 1.5, pz1 + 1.5]) { const c = shadowed(new T.Mesh(new T.CylinderGeometry(0.45, 0.55, 6, 10), M.marble)); c.position.set(cx - pw / 2 + 1.5 + i * ((pw - 3) / 14), 3, zz); g.add(c); addBlockerCircle(c.position.x, zz, 0.55, 0, 6, { era: "ancient" }); }
+  for (const xx of [cx - pw / 2 + 1.5, cx + pw / 2 - 1.5]) for (let j = 0; j <= 8; j++) { const zz = pz0 - 1.5 - j * ((pz0 - pz1 - 3) / 8); const c = shadowed(new T.Mesh(new T.CylinderGeometry(0.45, 0.55, 6, 10), M.marble)); c.position.set(xx, 3, zz); g.add(c); addBlockerCircle(xx, zz, 0.55, 0, 6, { era: "ancient" }); }
+  for (const zz of [pz0 - 0.3, pz1 + 0.3]) { const e = shadowed(new T.Mesh(BOX, M.marble2)); e.scale.set(pw, 0.8, 4.2); e.position.set(cx, 6.4, zz + (zz === pz0 - 0.3 ? -1.5 : 1.5)); g.add(e); }
+  const pool = new T.Mesh(new T.PlaneGeometry(24, 6), M.water); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.12, (pz0 + pz1) / 2); g.add(pool);
+  for (const [dx, dz] of [[-28, 8], [-14, -8], [14, -8], [28, 8], [-34, -4], [34, -4], [0, 10], [0, -12]]) { const zz = (pz0 + pz1) / 2 + dz; const t = shadowed(new T.Mesh(new T.CylinderGeometry(0.4, 0.5, 5, 8), lambert(0x5a4630))); t.position.set(cx + dx, 2.5, zz); g.add(t); const l = shadowed(new T.Mesh(new T.SphereGeometry(3.2, 9, 7), lambert(0x4f7f3a))); l.position.set(cx + dx, 6.2, zz); g.add(l); }
+  MAP_SHAPES.push({ k: "e", cx, cz, ax: R1, az: R1, c: "#c9b58c" }, { k: "r", x0: cx - pw / 2, x1: cx + pw / 2, z0: pz1, z1: pz0, c: "#8fb06a" });
+  g.visible = true;
+}
+
 function buildServianWall() {
   const F = frame(0, 0, 0, 0); // no rotation: local coordinates are world coordinates
   const T = 3.4, H = 9; // wall thickness and walkway height
@@ -827,6 +894,7 @@ function applyWorldEra(modern) {
   if (colosseumMats.seat) colosseumMats.seat.color.setHex(modern ? 0xaea48c : 0xd8c59b);
   if (circusTrackMat) circusTrackMat.color.setHex(modern ? 0x6f8f52 : 0xffffff);
   if (colossusGroup) colossusGroup.visible = !modern;
+  if (pompeyGroup) pompeyGroup.visible = !modern;   // the Theatre of Pompey is gone: only the curve of its streets remains
   for (const w of colosseumMats.ancientWalls) w.visible = !modern;
   for (const w of colosseumMats.modernWalls) w.visible = modern;
   setPhysicsEra(modern);
@@ -879,4 +947,7 @@ function buildLandmarks(sc) {
   buildPantheon();
   buildColossus();
   buildServianWall();
+  ruinOk = false; // the Temple of Hercules Victor still stands (only its roof is gone)
+  buildHerculesVictor();
+  buildPompey();
 }

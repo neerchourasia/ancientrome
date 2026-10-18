@@ -4,6 +4,20 @@
 
 const LANDMARKS = [
   {
+    id: "hercules", name: "Temple of Hercules Victor", sub: "Forum Boarium · c. 120 BC",
+    x: -130, z: 140, r: 30, stand: [-130, 112],
+    text: "A round temple of white marble beside the Tiber, in the cattle market (the Forum Boarium). Twenty Corinthian columns surround a round cella under a tiled roof. It was built by a wealthy olive merchant to honour Hercules, the patron of traders, who was said to have driven the cattle of Geryon past this very spot.",
+    fact: "It is the oldest surviving marble building in Rome, and one of the best preserved temples from the Republic.",
+    modern: "It still stands, in the Piazza della Bocca della Verità: 19 of its 20 columns survive, though the roof and the beam above the columns are gone. The church of Santa Maria in Cosmedin stands beside it.",
+  },
+  {
+    id: "pompey", name: "Theatre of Pompey", sub: "Campus Martius · dedicated 55 BC",
+    x: -330, z: -120, r: 70, stand: [-330, -40],
+    text: "Rome's first permanent stone theatre, paid for by Pompey the Great. A half-round of seats for about 17,000 people faces a great stage building, and the Temple of Venus Victrix crowns the top of the seats. Behind the stage lies the Porticus of Pompey: a huge garden of plane trees and fountains, ringed by colonnades.",
+    fact: "Julius Caesar was stabbed to death on 15 March 44 BC in a hall of the Porticus, because the Senate House was being repaired.",
+    modern: "The theatre is gone, but its shape survives: houses were built over the curve of its seats, and the streets of the old district still follow it. A plaque marks the spot where Caesar fell, in Largo di Torre Argentina.",
+  },
+  {
     id: "circusjobs", game: true, only: "ancient", name: "The Circus Office", sub: "Work at the Circus Maximus",
     x: -205, z: 98, r: 14, stand: [-205, 88],
     text: "A wooden hut by the starting gates of the Circus Maximus where the racetrack hires hands: horse trainers, track rakers, starting-gate keepers and wheelwrights. Press F at the door.",

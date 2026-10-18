@@ -106,7 +106,7 @@ function groundAt(x, z) {
     } else {
       const dx = x - p.cx, dz = z - p.cz;
       const u = Math.hypot(dx / p.ax, dz / p.az);
-      if (u >= p.u0 && u <= p.u1 && !inCorridor(p, dx, dz)) h = p.top;
+      if (u >= p.u0 && u <= p.u1 && !inCorridor(p, dx, dz) && (!p.zs || Math.sign(dz) === p.zs)) h = p.top;
     }
   }
   return h;
