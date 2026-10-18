@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Game server for Dopamine: live gladiator duels and chariot races against real people.
+"""Game server for Time Machine: live gladiator duels and chariot races against real people.
 
 Standard library only (Python 3.9+), so there is nothing to install:    python3 server/server.py
 
@@ -1685,7 +1685,7 @@ async def serve(host="0.0.0.0", port=None):
 async def main():
     srv = await serve()
     port = srv.sockets[0].getsockname()[1]
-    print("Dopamine game server on port %d" % port)
+    print("Time Machine game server on port %d" % port)
     print("  accounts: %s | bots: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["allow_bots"]))
     if not CFG["origins"]:
         print("  WARNING: ALLOWED_ORIGINS is not set, so only pages on localhost can connect. Set it to your site's address.")
