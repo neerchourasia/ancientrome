@@ -788,6 +788,13 @@ function buildPompey() {
   for (const zz of [pz0 - 0.3, pz1 + 0.3]) { const e = shadowed(new T.Mesh(BOX, M.marble2)); e.scale.set(pw, 0.8, 4.2); e.position.set(cx, 6.4, zz + (zz === pz0 - 0.3 ? -1.5 : 1.5)); g.add(e); }
   const pool = new T.Mesh(new T.PlaneGeometry(24, 6), M.water); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.12, (pz0 + pz1) / 2); g.add(pool);
   for (const [dx, dz] of [[-28, 8], [-14, -8], [14, -8], [28, 8], [-34, -4], [34, -4], [0, 10], [0, -12]]) { const zz = (pz0 + pz1) / 2 + dz; const t = shadowed(new T.Mesh(new T.CylinderGeometry(0.4, 0.5, 5, 8), lambert(0x5a4630))); t.position.set(cx + dx, 2.5, zz); g.add(t); const l = shadowed(new T.Mesh(new T.SphereGeometry(3.2, 9, 7), lambert(0x4f7f3a))); l.position.set(cx + dx, 6.2, zz); g.add(l); }
+  // signs at the two open ends of the seats: the way in is between the end of the seats and the stage building
+  for (const side of [-1, 1]) {
+    const cv = document.createElement("canvas"); cv.width = 320; cv.height = 90; const gg = cv.getContext("2d");
+    gg.fillStyle = "#3a2a1a"; gg.fillRect(0, 0, 320, 90); gg.strokeStyle = "#f2d98a"; gg.lineWidth = 4; gg.strokeRect(4, 4, 312, 82); gg.fillStyle = "#f2d98a"; gg.textAlign = "center"; gg.textBaseline = "middle"; gg.font = "bold 30px sans-serif"; gg.fillText("THEATRUM POMPEI", 160, 32); gg.font = "bold 20px sans-serif"; gg.fillText(side < 0 ? "entrance · enter here →" : "← entrance · enter here", 160, 62);
+    const post = shadowed(new T.Mesh(new T.CylinderGeometry(0.2, 0.25, 4.4, 8), lambert(0x5a4028))); post.position.set(cx + side * (R1 + 4), 2.2, cz - 9); g.add(post);
+    const sg = new T.Mesh(new T.PlaneGeometry(6, 1.7), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide, emissive: 0x201808 })); sg.position.set(cx + side * (R1 + 4), 4.1, cz - 9); sg.rotation.y = side < 0 ? -Math.PI / 2 + 0.5 : Math.PI / 2 - 0.5; g.add(sg);
+  }
   MAP_SHAPES.push({ k: "e", cx, cz, ax: R1, az: R1, c: "#c9b58c" }, { k: "r", x0: cx - pw / 2, x1: cx + pw / 2, z0: pz1, z1: pz0, c: "#8fb06a" });
   g.visible = true;
 }

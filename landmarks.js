@@ -12,8 +12,8 @@ const LANDMARKS = [
   },
   {
     id: "pompey", name: "Theatre of Pompey", sub: "Campus Martius · dedicated 55 BC",
-    x: -690, z: -125, r: 70, stand: [-690, -45],
-    text: "Rome's first permanent stone theatre, paid for by Pompey the Great, in the Campus Martius (the 'field of Mars'), the flat ground inside the bend of the Tiber, far to the west of the Capitoline hill and south-west of the Pantheon. A half-round of seats for about 17,000 people faces a great stage building, and the Temple of Venus Victrix crowns the top of the seats. Behind the stage lies the Porticus of Pompey: a huge garden of plane trees and fountains, ringed by colonnades.",
+    x: -690, z: -125, r: 70, stand: [-690, -112],
+    text: "Rome's first permanent stone theatre, paid for by Pompey the Great, in the Campus Martius (the 'field of Mars'), the flat ground inside the bend of the Tiber, far to the west of the Capitoline hill and south-west of the Pantheon. A half-round of seats for about 17,000 people faces a great stage building, and the Temple of Venus Victrix crowns the top of the seats. To go in, walk round either end of the seats, between them and the stage building: signs mark the way. Behind the stage lies the Porticus of Pompey: a huge garden of plane trees and fountains, ringed by colonnades.",
     fact: "Julius Caesar was stabbed to death on 15 March 44 BC in a hall of the Porticus, because the Senate House was being repaired.",
     modern: "The theatre is gone, but its shape survives: houses were built over the curve of its seats, and the streets of the old district still follow it. A plaque marks the spot where Caesar fell, in Largo di Torre Argentina.",
   },
