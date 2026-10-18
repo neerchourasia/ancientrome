@@ -68,7 +68,7 @@ const Weather = (() => {
     delhi: [{ hail: 0.07, tornado: 0.04 }, { tornado: 0.05, hail: 0.05 }, { cyclone: 0.16, hail: 0.04 }, { hail: 0.03, tornado: 0.01 }],
   };
 
-  const seasonOf = (c, day) => (Math.floor(((day - 1) % 28 + 28) % 28 / 7) + (c === "delhi" ? 2 : 0)) % 4; // Delhi's seasons run two ahead of Rome's
+  const seasonOf = (c, day) => Math.floor(((day - 1) % 28 + 28) % 28 / 7);   // the same season in every city at the same time (spring, summer, autumn or the monsoon, winter); only the weather differs
 
   // the theme of a day (k re-rolls it)
   function dayRaw(c, day, k) {
