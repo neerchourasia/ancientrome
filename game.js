@@ -42,6 +42,7 @@ function init() {
   Jobs.build(scene);
   Robbery.init(scene);
   Festival.init(scene);
+  Guards.build(scene);
   Harbour.build(scene);
   Home.build();
   buildInsulae(scene);
@@ -465,6 +466,7 @@ const knockTimes = [];
 function noteKnock() {
   if (city !== "rome" || era !== "ancient" || mode === "fight") return;
   knockTimes.push(clock);
+  Guards.crime(18, "knocking people over");
   while (knockTimes.length && clock - knockTimes[0] > 150) knockTimes.shift(); // forgotten after two and a half minutes
   if (knockTimes.length === 3) toast("The guards are watching you! Stop knocking people over");
   else if (knockTimes.length === 5) toast("One more and the guards will arrest you!");
@@ -976,6 +978,7 @@ function applyEra() {
   Car.onEra(modern); // cars and rickshaws only exist today, carts and elephants only in the ancient cities
   Crowd.setVisible(!modern);
   Jobs.setEra(modern);
+  Guards.setEra(modern);
   const [oldName, newName] = ERA_NAMES[city];
   $("#era-badge").textContent = modern ? newName : oldName;
   $("#era-badge").classList.toggle("ancient", !modern);
@@ -1493,7 +1496,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Guards.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

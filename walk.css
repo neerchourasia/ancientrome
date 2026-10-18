@@ -493,6 +493,9 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #sick[data-k="heat"] { background: radial-gradient(ellipse at center, rgba(255,230,170,.25) 20%, rgba(255,150,40,.5) 100%); }
 #sick[data-k="plague"] { background: radial-gradient(ellipse at center, rgba(0,0,0,0) 20%, rgba(40,10,50,.75) 100%); animation: sickpulse 2.4s ease-in-out infinite; }
 @keyframes sickpulse { 50% { filter: brightness(.7); } }
+#wanted { position: fixed; top: 128px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; padding: 6px 16px; border-radius: 999px; background: rgba(120,20,20,.9); border: 1px solid #ffd36b; color: #ffe08a; font: 700 .9rem Georgia, serif; pointer-events: none; }
+#wanted.show { display: block; animation: wantedpulse 1s ease-in-out infinite alternate; }
+@keyframes wantedpulse { to { background: rgba(170,30,30,.95); } }
 #v-disease { color: #e8a0a0; font-size: .75rem; } #v-disease:empty { display: none; }
 #lightning { position: fixed; inset: 0; z-index: 8; background: #f4f8ff; opacity: 0; pointer-events: none; transition: opacity .12s; }
 

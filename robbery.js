@@ -132,7 +132,7 @@ const Robbery = (() => {
   function begin(m) {
     heist = { role: m.role, other: m.other, d: null, x: m.x, z: m.z, until: performance.now() + (m.time || 80) * 1000 };
     if (m.role === "thief") {
-      spawnGuards(player.x, player.z, 3);
+      spawnGuards(player.x, player.z, 3); Guards.crime(100, "robbery");
       toast(`You break into ${m.other}'s house and grab ${m.loot} denarii! The guards and ${m.other} are after you. Pick your getaway.`);
       Narrator.say(`You broke in and grabbed the loot. Run before ${m.other} catches you.`, { interrupt: true });
       Sfx.play("bump");
@@ -212,7 +212,7 @@ const Robbery = (() => {
     const loot = 60 + Math.floor(Math.random() * 7) * 10, p = plotAt(t.plot);
     npcCd[t.plot] = now + 300000;
     heist = { role: "thief", npc: true, plot: t.plot, other: t.name, d: null, until: now + 60000, loot, owner: t.name };
-    spawnGuards(p.door[0], p.door[1] + (p.face > 0 ? 3 : -3), 3);
+    spawnGuards(p.door[0], p.door[1] + (p.face > 0 ? 3 : -3), 3); Guards.crime(100, "robbery");
     toast(`You break into ${t.name}'s house and grab ${loot} denarii! The guards have seen you. Pick your getaway.`);
     Narrator.say("You broke in and grabbed the loot. The guards are after you. Run.", { interrupt: true });
     Sfx.play("horn");
@@ -252,6 +252,13 @@ const Robbery = (() => {
     if (near > 150 || left <= 0) guardsEnd("escaped");
   }
 
+  // the patrolling guards caught you in the middle of a robbery
+  function guardsCaught() {
+    if (!heist || heist.role !== "thief") return;
+    if (heist.npc) guardsEnd("caught");
+    else if (!heist.reported) { heist.reported = true; Online.navalSend({ t: "heist_caught" }); }
+  }
+
   function update(dt) {
     panelT -= dt;
     if (heist && panelT <= 0) { panelT = 0.5; hud(); }
@@ -270,7 +277,7 @@ const Robbery = (() => {
         h.id = "npc:" + n.plot; h.g.visible = true; setLabel(h, n.name); h.tiers.forEach((t, k) => { t.visible = n.tier > k; }); h.blockers.forEach((b) => { b.off = false; }); h.tier = n.tier;
       });
     },
-    setHouses, at, act, begin, pos, end, update,
+    setHouses, at, act, begin, pos, end, update, guardsCaught,
     get active() { return !!heist; },
     get role() { return heist ? heist.role : null; },
     PLOTS,
