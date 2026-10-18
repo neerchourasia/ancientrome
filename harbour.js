@@ -9,7 +9,7 @@
 
 const Harbour = (() => {
   const T = THREE;
-  const A = { cx: 80, cz: 110, rx: 42, rz: 28 };                         // the basin (an ellipse): where the ships sail
+  const A = { cx: 50, cz: 140, rx: 78, rz: 50 };                         // the basin (an ellipse): where the ships sail
   const GATE = { x: A.cx, z: A.cz - A.rz - 9, r: 5 };                    // where you stand to board
   const PIERS = [
     { id: "ostia", name: "Ostia wharf", x: A.cx - A.rx + 4, z: A.cz, sell: { wine: 29 }, buy: { item: "grain", price: 14 } },
@@ -31,7 +31,7 @@ const Harbour = (() => {
     built = true; scene = sc; root = new T.Group(); scene.add(root);
     const stone = lam(0xb7ad98), dark = lam(0x8d8574), wood = lam(0x7a5a34);
     // the quay: a ring of stone round the basin (with a gap at the north for the gate), as boxes along the curve
-    const N = 44, rx = A.rx + 3, rz = A.rz + 3;
+    const N = 76, rx = A.rx + 3, rz = A.rz + 3;
     for (let i = 0; i < N; i++) {
       const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2, am = (a0 + a1) / 2;
       const x0 = A.cx + Math.cos(a0) * rx, z0 = A.cz + Math.sin(a0) * rz, x1 = A.cx + Math.cos(a1) * rx, z1 = A.cz + Math.sin(a1) * rz, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -62,7 +62,7 @@ const Harbour = (() => {
     // shoals of fish: rings of ripples on the water while you sail
     const rc = document.createElement("canvas"); rc.width = rc.height = 64; const rg = rc.getContext("2d"); rg.strokeStyle = "rgba(255,255,255,.9)"; rg.lineWidth = 3; for (const r of [12, 20, 28]) { rg.beginPath(); rg.arc(32, 32, r, 0, 6.3); rg.stroke(); }
     const tex = new T.CanvasTexture(rc);
-    for (let i = 0; i < 6; i++) { const s = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.8 })); s.rotation.x = -Math.PI / 2; s.scale.set(6, 6, 1); s.visible = false; scene.add(s); spots.push(s); placeSpot(s); }
+    for (let i = 0; i < 10; i++) { const s = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.8 })); s.rotation.x = -Math.PI / 2; s.scale.set(6, 6, 1); s.visible = false; scene.add(s); spots.push(s); placeSpot(s); }
     if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "e", cx: A.cx, cz: A.cz, ax: A.rx + 5, az: A.rz + 5, c: "#4a86b0" });
   }
 

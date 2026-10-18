@@ -5,7 +5,7 @@
 const LANDMARKS = [
   {
     id: "harbour", game: true, name: "The Harbour (Portus)", sub: "Sail your own ships: fish, trade and fight pirates",
-    x: 80, z: 73, r: 30, stand: [80, 66],
+    x: 50, z: 82, r: 40, stand: [50, 74],
     text: "A stone basin south-west of the Forum where you can sail the ships you designed in the shipyard. Stand at the gate and press F to board. Out on the water, slow down over a ring of ripples and press F to fish; sail up to a pier and press F to sell your fish and trade grain and wine between Ostia wharf and Portus quay. Pirates come for ships that carry something worth taking: sink them for a bounty.",
     fact: "Rome's real harbours were downriver on the Tiber at Ostia and, from 112 AD, at Portus, the great hexagonal basin built by Claudius and Trajan, through which most of the city's grain arrived.",
   },
