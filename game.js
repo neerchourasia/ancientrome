@@ -253,6 +253,7 @@ function wireInput(canvas) {
   $("#btn-places").addEventListener("click", togglePlaces);
   $("#btn-dirs").addEventListener("click", toggleDirections);
   $("#btn-sound").addEventListener("click", toggleSound);
+  $("#btn-jobs").addEventListener("click", () => Jobs.openList());
   $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); toast(Music.on ? "Music on" : "Music off"); });
   refreshMusicButton();
   $("#btn-voice").addEventListener("click", toggleVoice);

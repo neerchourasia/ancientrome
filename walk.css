@@ -427,6 +427,10 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #courier-hud span { font-size: .8rem; }
 .jb-letter { font: 700 5rem Georgia, serif; color: var(--gold); text-align: center; margin: 6px 0; }
 
+.jl-group { margin: 10px 0; padding: 4px 10px 8px; background: rgba(255,255,255,.04); border-radius: 10px; }
+.jl-group.off { opacity: .55; }
+.jl-group h3 { margin: 8px 0 0; font: 700 1rem Georgia, serif; color: var(--gold); }
+
 /* robberies */
 .jb-metal { height: 90px; margin: 10px 0; border-radius: 10px; background: #3c3c42; border: 2px solid #1a1a1d; transition: transform .1s; }
 .jb-metal.hit { transform: scale(1.04); }

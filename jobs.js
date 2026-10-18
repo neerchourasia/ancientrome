@@ -442,6 +442,44 @@ const Jobs = (() => {
     if (game.kind === "water" && (e.code === "KeyD" || e.code === "ArrowRight")) { game.right = false; e.preventDefault(); }
   }, true);
 
+  // ---------------------------------------------------------------- the list of every job (the Jobs button)
+
+  const GROUPS = [
+    { title: "Hypogeum, under the Colosseum", where: "Ancient Rome: the stair-house by the Colosseum's west gate", city: "rome", era: "ancient", lm: "hypogeum", jobs: ["capstan", "keeper", "props"] },
+    { title: "Circus Office, at the Circus Maximus", where: "Ancient Rome: the hut by the starting gates", city: "rome", era: "ancient", lm: "circusjobs", jobs: CIRCUS },
+    { title: "Job board in Rome's market", where: "Rome: the market square south of the Forum (some jobs are Ancient Rome only)", city: "rome", era: null, lm: "market", jobs: BOARD },
+    { title: "Job board in Delhi's market", where: "Old Delhi: the market square south of the Lahori Gate", city: "delhi", era: null, lm: "g-market", jobs: ["baker", "scribe", "groom", "courier"] },
+  ];
+  const nameIn = (kind, c) => { const j = JOBS[kind]; return (j.names && j.names[c]) || j.name; };
+
+  function openList() {
+    if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
+    openPanel("#joblist");
+    const r = rank(), nx = nextRank(), here = typeof city !== "undefined" ? city : "rome", ea = typeof era !== "undefined" ? era : "ancient", box = $j("jl-groups");
+    $j("jl-info").textContent = `Your rank: ${r.name} (pay x${r.mul}).${nx ? ` ${nx.at - s.shifts} more shift${nx.at - s.shifts === 1 ? "" : "s"} to become ${nx.name}.` : ""} Shifts worked: ${s.shifts}, earned ${s.earned} denarii.${typeof Festival !== "undefined" && Festival.active ? ` It is ${Festival.name}: jobs pay a quarter more!` : ""} Each shift costs health and needs at least ${MIN_HP}.`;
+    box.replaceChildren(...GROUPS.map((g) => {
+      const open = g.city === here && (!g.era || g.era === ea), sec = document.createElement("section");
+      sec.className = "jl-group" + (open ? "" : " off");
+      const h = document.createElement("h3"); h.textContent = g.title; const w = document.createElement("p"); w.className = "dnote small"; w.textContent = g.where;
+      sec.append(h, w);
+      const ul = document.createElement("ul"); ul.className = "dlist";
+      for (const kind of g.jobs) {
+        const job = JOBS[kind], li = document.createElement("li"), sp = document.createElement("span"), n = document.createElement("strong"), d = document.createElement("small");
+        const here2 = !job.only || job.only === `${g.city}-${ea}`;
+        n.textContent = `${job.icon} ${nameIn(kind, g.city)}${here2 ? "" : "  (Ancient Rome only)"}`;
+        d.textContent = `${job.text} Pays up to ${Math.round(job.base * r.mul * (typeof Festival !== "undefined" ? Festival.payMul : 1))} denarii.`;
+        sp.append(n, d); li.append(sp); ul.append(li);
+      }
+      sec.append(ul);
+      const lm = (typeof ALL_LANDMARKS !== "undefined" ? ALL_LANDMARKS : []).find((l) => l.id === g.lm), row = document.createElement("div"); row.className = "dbtns";
+      if (open && lm) {
+        row.append(btn("Show me the way", () => { closePanels(); if (typeof startDirections === "function") startDirections(lm); }), btn("Take me there", () => { closePanels(); if (typeof goTo === "function") goTo(lm); }));
+      } else row.append(Object.assign(document.createElement("small"), { textContent: g.city !== here ? `Travel to ${g.city === "delhi" ? "Delhi" : "Rome"} first (press B).` : "Switch to Ancient Rome first (press K)." }));
+      sec.append(row);
+      return sec;
+    }));
+  }
+
   // ---------------------------------------------------------------- the job board at the market square
 
   function openBoard(list = BOARD, title = "📋 The job board") {
@@ -538,7 +576,7 @@ const Jobs = (() => {
   }
 
   return {
-    build, bind, at, act, update, setEra, inHall, SPOTS, H, DOOR, openBoard,
+    build, bind, at, act, update, setEra, inHall, SPOTS, H, DOOR, openBoard, openList,
     snapshot: () => ({ shifts: s.shifts, earned: s.earned }),
     restore(r) { if (r && Number.isFinite(r.shifts)) { s = { shifts: Math.max(0, r.shifts | 0), earned: Math.max(0, (r.earned | 0)) }; save(); } },
     get rank() { return rank().name; },
