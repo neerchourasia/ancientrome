@@ -170,16 +170,16 @@ const Robbery = (() => {
   }
 
   function end(m) {
-    const role = m.role, other = role === "thief" ? m.victim : m.thief, loot = m.loot || LOOT;
+    const role = m.role, other = role === "thief" ? m.victim : m.thief, loot = m.loot || LOOT, byGuards = !!(heist && (heist.reported || heist.npc));
     heist = null; for (const gd of guards) gd.g.visible = false;
     if ($r("getaway").classList.contains("show")) closePanels();
     if (role === "thief") {
       if (m.result === "escaped") { Vitals.coins += loot; toast(`You got away with ${loot} denarii of ${other}'s!`); Narrator.say(`You got away with ${loot} denarii.`, { interrupt: true }); Sfx.play("coin"); }
-      else { const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; toast(`${other} caught you! You lose ${lost} denarii.`); Narrator.say(`${other} caught you. You lose ${lost} denarii.`, { interrupt: true }); Sfx.play("oof"); }
+      else { const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; const who = byGuards ? "The city guards" : other; toast(`${who} caught you! You lose ${lost} denarii.`); Narrator.say(`${who} caught you. You lose ${lost} denarii.`, { interrupt: true }); Sfx.play("oof"); }
     } else if (m.result === "escaped") {
       const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; toast(`${other} got away with ${lost} denarii of yours.`); Narrator.say(`${other} got away with ${lost} denarii.`, { interrupt: true });
     } else { Vitals.coins += loot; toast(`You caught ${other}! They pay you ${loot} denarii.`); Narrator.say(`You caught ${other}. They pay you ${loot} denarii.`, { interrupt: true }); Sfx.play("coin"); }
-    Chat.add({ sys: 1, text: role === "thief" ? (m.result === "escaped" ? `You robbed ${other} and got away.` : `${other} caught you after the robbery.`) : (m.result === "escaped" ? `${other} robbed you and got away.` : `You caught ${other} robbing your house.`) });
+    Chat.add({ sys: 1, text: role === "thief" ? (m.result === "escaped" ? `You robbed ${other} and got away.` : `${byGuards ? "The city guards" : other} caught you after the robbery.`) : (m.result === "escaped" ? `${other} robbed you and got away.` : `You caught ${other} robbing your house.`) });
     hud();
   }
 
