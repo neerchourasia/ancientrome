@@ -97,6 +97,15 @@ const Stalls = (() => {
     // a bench each side of the well
     for (const sx of [-1, 1]) box(g, cx + sx * 9, 0, cz - 1, 3.2, 0.5, 0.8, lam(0x6a4c2a));
 
+    // the job board, at the east end of the square: notices for the baker, scribe, stable hand and messenger
+    {
+      const bx = cx + 28, bz = cz + 4.5;
+      for (const sx of [-1.6, 1.6]) box(g, bx + sx, 0, bz, 0.22, 3.2, 0.22, lam(0x5a4028), true);
+      box(g, bx, 1.1, bz, 3.8, 1.9, 0.18, lam(0x7a5a34), false);
+      for (let k = 0; k < 6; k++) box(g, bx - 1.4 + (k % 3) * 1.4, 1.5 + Math.floor(k / 3) * 0.8, bz - 0.12, 0.9, 0.6, 0.03, lam([0xf1ead8, 0xe8d9a8, 0xf3e2c0][k % 3]), false);
+      sign(g, bx, 3.6, bz - 0.2, 3.4, 0.9, "WORK", "jobs wanted");
+      SPOTS.push({ id: "board", name: "job board", city: delhi ? "delhi" : "rome", x: bx, z: bz - 2.6, r: 3.2, vendor: { x: bx, z: bz }, group: new T.Group(), say: [], t: 1e9, ph: 0 });
+    }
     DEFS.forEach((def, i) => {
       const x = cx + (i - 2) * SPACING, z = cz + 9; // the counter
       const awnMat = new T.MeshLambertMaterial({ map: stripes(def.color[0], def.color[1]), side: T.DoubleSide });
@@ -123,6 +132,7 @@ const Stalls = (() => {
   function open() {
     const s = at(player.x, player.z, player.feet);
     if (!s) return false;
+    if (s.id === "board") { Jobs.openBoard(); return true; }
     Market.open(s.id);
     return true;
   }

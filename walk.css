@@ -421,6 +421,12 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #on-shiprow select { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.4); color: var(--ink); width: 100%; }
 #on-shiprow small { color: var(--muted); }
 
+#courier-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; padding: 8px 16px; background: rgba(30,60,110,.9); border: 1px solid rgba(160,200,255,.6); border-radius: 10px; color: #fff; text-align: center; pointer-events: none; }
+#courier-hud.show { display: flex; }
+#courier-hud strong { font: 700 1rem Georgia, serif; color: #cfe3ff; }
+#courier-hud span { font-size: .8rem; }
+.jb-letter { font: 700 5rem Georgia, serif; color: var(--gold); text-align: center; margin: 6px 0; }
+
 /* robberies */
 #heist-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; gap: 2px; max-width: min(520px, 92vw); padding: 8px 16px; background: rgba(120,24,24,.88); border: 1px solid rgba(255,200,120,.6); border-radius: 10px; color: #fff; text-align: center; pointer-events: none; }
 #heist-hud.show { display: flex; }

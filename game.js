@@ -1063,7 +1063,7 @@ function updatePrompt() {
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
     if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
-    if (!text) { const st = Stalls.at(player.x, player.z, player.feet); if (st) { text = `F: shop at the ${st.name}`; p.dataset.kind = "stall"; } }
+    if (!text) { const st = Stalls.at(player.x, player.z, player.feet); if (st) { text = st.id === "board" ? "F: read the job board" : `F: shop at the ${st.name}`; p.dataset.kind = "stall"; } }
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }

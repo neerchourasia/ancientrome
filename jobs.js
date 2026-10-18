@@ -24,6 +24,15 @@ const Jobs = (() => {
     keeper: { name: "Beast keeper", base: 40, icon: "🦁", text: "The beasts get hungry in turn. When a cage lights up, press its number (1 to 4) quickly to throw it meat." },
     props: { name: "Scenery crew", base: 35, icon: "🏛", text: "Hoist the painted scenery up to the arena. Press Space when the marker is inside the green. Ten hoists to a shift." },
   };
+  // the jobs on the job board at the market square (in both cities); `names` are the local names
+  const BOARD = ["baker", "scribe", "groom", "courier"];
+  Object.assign(JOBS, {
+    baker: { name: "Baker", names: { rome: "Baker", delhi: "Halwai (sweet maker)" }, base: 28, icon: "🍞", board: true, text: "Keep the oven at the right heat. Hold Space (or the button) to feed the fire and let go to let it cool. Keep the heat in the green." },
+    scribe: { name: "Scribe", names: { rome: "Scribe", delhi: "Munshi (clerk)" }, base: 32, icon: "✍", board: true, text: "Copy the letters as they appear: press the same key as fast as you can. Each letter you miss costs you." },
+    groom: { name: "Stable hand", names: { rome: "Stable hand", delhi: "Mahout's helper" }, base: 36, icon: "🐴", board: true, text: "Remember the order the animals are fed in, then repeat it with keys 1 to 4. Each round adds one more." },
+    courier: { name: "Messenger", names: { rome: "Messenger", delhi: "Harkara (runner)" }, base: 55, icon: "📜", board: true, run: true, text: "Carry a message across the city to a landmark before time runs out. The sooner you arrive, the more you are paid." },
+  });
+  const jobName = (kind) => { const j = JOBS[kind]; return (j.names && j.names[typeof city !== "undefined" ? city : "rome"]) || j.name; };
   const BEASTS = [["🦁", "Lion"], ["🐻", "Bear"], ["🐆", "Leopard"], ["🐗", "Boar"]];
 
   let s = { shifts: 0, earned: 0 };
@@ -170,7 +179,7 @@ const Jobs = (() => {
     if (!job) return;
     openPanel("#job");
     game = null;
-    $j("job-title").textContent = `${job.icon} ${job.name}`;
+    $j("job-title").textContent = `${job.icon} ${jobName(kind)}`;
     const r = rank(), nx = nextRank();
     $j("job-text").textContent = job.text;
     $j("job-area").replaceChildren();
@@ -220,7 +229,7 @@ const Jobs = (() => {
         G.score = G.asks ? G.hits / G.asks : 0;
         hud.textContent = `Fed ${G.hits} of ${G.asks}. ${Math.ceil(G.t)} s left.`;
       };
-    } else {
+    } else if (kind === "props") {
       G.hoists = 0; G.hits = 0; G.pos = 0; G.dir = 1; G.zone = 0.4;
       const bar = document.createElement("div"); bar.className = "jb-bar"; bar.innerHTML = '<i class="jb-zone"></i><b class="jb-mark"></b>'; area.append(bar);
       G.mark = bar.querySelector(".jb-mark"); G.zoneEl = bar.querySelector(".jb-zone");
@@ -241,6 +250,54 @@ const Jobs = (() => {
         hud.textContent = `Hoisted ${G.hits} of ${G.hoists} (10 to a shift). ${Math.ceil(G.t)} s left.`;
       };
     }
+    else if (kind === "baker") {
+      G.heat = 30; G.hold = false; G.inZone = 0;
+      const bar = document.createElement("div"); bar.className = "jb-bar"; bar.innerHTML = '<i class="jb-zone" style="left:55%;width:22%"></i><b class="jb-mark"></b>'; area.append(bar); G.mark = bar.querySelector(".jb-mark");
+      const hb = btn("🔥 Feed the fire (hold Space)", () => {}); for (const ev of ["mousedown", "touchstart"]) hb.addEventListener(ev, () => { G.hold = true; }); for (const ev of ["mouseup", "mouseleave", "touchend"]) hb.addEventListener(ev, () => { G.hold = false; }); area.append(hb);
+      G.step = (dt) => {
+        G.heat = Math.max(0, Math.min(100, G.heat + (G.hold ? 34 : -17) * dt));
+        if (G.heat >= 55 && G.heat <= 77) G.inZone += dt;
+        G.mark.style.left = G.heat + "%"; G.score = G.inZone / (SHIFT - G.t || 1);
+        hud.textContent = `Oven ${Math.round(G.heat)}°. Time at the right heat: ${G.inZone.toFixed(0)} s. ${Math.ceil(G.t)} s left.`;
+      };
+    } else if (kind === "scribe") {
+      G.asks = 0; G.hits = 0; G.cur = ""; G.ttl = 0; G.gap = 0.3;
+      const big = document.createElement("div"); big.className = "jb-letter"; area.append(big); G.big = big;
+      G.key = (ch) => {
+        if (!G.cur) return;
+        if (ch === G.cur) { G.hits++; Sfx.play("coin"); } else { Sfx.play("bump"); }
+        G.cur = ""; G.big.textContent = "·"; G.gap = 0.25;
+      };
+      G.step = (dt) => {
+        if (G.cur) { G.ttl -= dt; if (G.ttl <= 0) { G.cur = ""; G.big.textContent = "·"; G.gap = 0.3; } }
+        else { G.gap -= dt; if (G.gap <= 0) { G.cur = "ASDFJKL"[Math.floor(Math.random() * 7)]; G.ttl = 2.2; G.asks++; G.big.textContent = G.cur; } }
+        G.score = Math.min(1, G.hits / Math.max(12, G.asks));
+        hud.textContent = `Copied ${G.hits} of ${G.asks}. ${Math.ceil(G.t)} s left.`;
+      };
+    } else if (kind === "groom") {
+      G.seq = []; G.pos = 0; G.phase = "show"; G.showI = 0; G.tt = 0.8; G.best = 0; G.cages = [];
+      const row = document.createElement("div"); row.className = "jb-cages";
+      ["🐴", "🐘", "🐂", "🐪"].forEach((e, i) => { const c = btn(`${i + 1}\n${e}`, () => G.key(i), "jb-cage"); row.append(c); G.cages.push(c); });
+      area.append(row);
+      const lit = (i, on) => G.cages.forEach((c, j) => c.classList.toggle("hungry", on && j === i));
+      const next = () => { G.seq.push(Math.floor(Math.random() * 4)); G.pos = 0; G.phase = "show"; G.showI = 0; G.tt = 0.7; };
+      next();
+      G.key = (i) => {
+        if (G.phase !== "input") return;
+        lit(i, true); setTimeout(() => lit(i, false), 150);
+        if (i === G.seq[G.pos]) { Sfx.play("coin"); G.pos++; if (G.pos >= G.seq.length) { G.best = G.seq.length; next(); } }
+        else { Sfx.play("bump"); G.seq = G.seq.slice(0, Math.max(1, G.seq.length - 1)); next(); }   // a slip: back one animal
+      };
+      G.step = (dt) => {
+        if (G.phase === "show") {
+          G.tt -= dt;
+          if (G.tt <= 0) { if (G.showI < G.seq.length) { lit(G.seq[G.showI], true); G.tt = 0.5; G.showI++; G.lit = true; } else { lit(0, false); G.phase = "input"; } }
+          else if (G.tt < 0.2 && G.lit) { lit(0, false); G.lit = false; }
+        }
+        G.score = Math.min(1, G.best / 8);
+        hud.textContent = G.phase === "show" ? `Watch... (${G.seq.length} animals)` : `Your turn: repeat ${G.pos + 1} of ${G.seq.length}. Best ${G.best}. ${Math.ceil(G.t)} s left.`;
+      };
+    }
     toast("The shift begins!");
   }
 
@@ -249,18 +306,19 @@ const Jobs = (() => {
     if (!G) return;
     if (!done) { toast("You walked off the shift and were not paid."); return; }
     const kind = G.kind, job = JOBS[kind], r = rank();
-    const score = kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : G.score; // a good winch crew is in the green 80% of the time
+    const score = kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : kind === "baker" ? Math.min(1, G.inZone / SHIFT / 0.75) : G.score; // a good winch crew is in the green 80% of the time
     const pay = Math.round((job.base * r.mul * Math.max(0, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1));   // festival days pay a quarter more
     Vitals.coins += pay; Vitals.hp -= HP_COST; s.shifts++; s.earned += pay; save();
     const oldRank = r, newRank = rank();
     $j("job-area").replaceChildren();
     $j("job-text").textContent = score >= 0.9 ? "Excellent work! The foreman nods." : score >= 0.5 ? "Fair work. The foreman pays you." : "Poor work. The foreman scowls and pays you a few coins.";
-    $j("job-info").textContent = `You earned ${pay} denarii (${Math.round(score * 100)}% of the full pay). Total earned in the hypogeum: ${s.earned}.${newRank !== oldRank ? ` You are promoted: ${newRank.name}!` : ""}`;
+    $j("job-info").textContent = `You earned ${pay} denarii (${Math.round(score * 100)}% of the full pay). Total earned from jobs: ${s.earned}.${newRank !== oldRank ? ` You are promoted: ${newRank.name}!` : ""}`;
     const b = $j("job-btns"); b.replaceChildren();
     b.append(btn("Another shift", () => { closePanels(); open(kind); }), btn("Leave", closePanels));
+    if (JOBS[kind].board) b.append(btn("Back to the job board", () => { closePanels(); openBoard(); }));
     Sfx.play("coin");
     Narrator.say(`Shift over. You earned ${pay} denarii.${newRank !== oldRank ? ` You are now a ${newRank.name}.` : ""}`, { interrupt: true });
-    if (foreman && typeof Speech !== "undefined") Speech.say({ x: foreman.position.x, z: foreman.position.z }, score >= 0.9 ? "Good work, lad!" : score >= 0.5 ? "Not bad. Back to it." : "Lazy hands!", 3);
+    if (foreman && typeof Speech !== "undefined" && inHall(player.x, player.z)) Speech.say({ x: foreman.position.x, z: foreman.position.z }, score >= 0.9 ? "Good work, lad!" : score >= 0.5 ? "Not bad. Back to it." : "Lazy hands!", 3);
   }
 
   // keys while a shift is running (they never reach the rest of the game)
@@ -272,9 +330,68 @@ const Jobs = (() => {
     else if (game.kind === "capstan" && (k === "KeyD" || k === "ArrowRight")) game.key("d");
     else if (game.kind === "keeper" && /^(Digit|Numpad)[1-4]$/.test(k)) game.key(Number(k.slice(-1)) - 1);
     else if (game.kind === "props" && k === "Space") game.key();
+    else if (game.kind === "baker" && k === "Space") game.hold = true;
+    else if (game.kind === "scribe" && /^Key[ASDFJKL]$/.test(k)) game.key(k.slice(3));
+    else if (game.kind === "groom" && /^(Digit|Numpad)[1-4]$/.test(k)) game.key(Number(k.slice(-1)) - 1);
     else used = false;
     if (used && !e.repeat) { e.preventDefault(); e.stopImmediatePropagation(); } else if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
+
+  window.addEventListener("keyup", (e) => { if (game && game.kind === "baker" && e.code === "Space") { game.hold = false; e.preventDefault(); } }, true);
+
+  // ---------------------------------------------------------------- the job board at the market square
+
+  function openBoard() {
+    if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
+    openPanel("#jobboard");
+    const r = rank(), nx = nextRank(), ul = $j("jb-list"); ul.replaceChildren();
+    $j("jb-info").textContent = `Your rank: ${r.name} (pay x${r.mul}).${nx ? ` ${nx.at - s.shifts} more shift${nx.at - s.shifts === 1 ? "" : "s"} to become ${nx.name}.` : ""} Shifts worked: ${s.shifts}.${typeof Festival !== "undefined" && Festival.active ? " Festival days pay a quarter more!" : ""} Each job costs ${HP_COST} health (you need ${MIN_HP}).`;
+    for (const kind of BOARD) {
+      const job = JOBS[kind], li = document.createElement("li"), sp = document.createElement("span"), n = document.createElement("strong"), d = document.createElement("small"), b = document.createElement("button");
+      n.textContent = `${job.icon} ${jobName(kind)}`; d.textContent = `${job.text} Pays up to ${Math.round(job.base * r.mul * (typeof Festival !== "undefined" ? Festival.payMul : 1))} denarii.`;
+      sp.append(n, d); b.type = "button"; b.textContent = Vitals.hp >= MIN_HP ? "Take the job" : "Too tired"; b.disabled = Vitals.hp < MIN_HP;
+      b.addEventListener("click", () => { closePanels(); if (JOBS[kind].run) startCourier(); else open(kind); });
+      li.append(sp, b); ul.append(li);
+    }
+  }
+
+  // The messenger: carry a message to a landmark across the city before the time is up (the game's directions arrow shows the way)
+  let courier = null;
+  function startCourier() {
+    if (courier) { toast("You are already carrying a message."); return; }
+    const list = (typeof LANDMARKS !== "undefined" ? LANDMARKS : []).filter((l) => !l.home && !l.game);
+    const cands = list.map((l) => ({ l, d: Math.hypot(l.x - player.x, l.z - player.z) })).filter((c) => c.d > 120 && c.d < 600);
+    if (!cands.length) { toast("There is nowhere to send a message from here."); return; }
+    const pick = cands[Math.floor(Math.random() * cands.length)], total = Math.round(pick.d / 6.5 + 35);
+    courier = { lm: pick.l, until: performance.now() + total * 1000, total, hudT: 0 };
+    if (typeof startDirections === "function") startDirections(pick.l);
+    toast(`Take this message to ${pick.l.name}: ${Math.round(pick.d)} m, you have ${total} seconds.`);
+    Narrator.say(`Deliver the message to ${pick.l.name} within ${total} seconds.`, { interrupt: true });
+    courierHud();
+  }
+  function courierHud() {
+    const el = $j("courier-hud");
+    if (!courier) { el.classList.remove("show"); return; }
+    const left = Math.max(0, Math.round((courier.until - performance.now()) / 1000)), d = Math.round(Math.hypot(courier.lm.x - player.x, courier.lm.z - player.z));
+    el.innerHTML = `<strong>📜 Message for ${courier.lm.name}</strong><span>${d} m to go. ${left} s left.</span>`; el.classList.add("show");
+  }
+  function courierUpdate(dt) {
+    if (!courier) return;
+    courier.hudT -= dt; if (courier.hudT <= 0) { courier.hudT = 0.5; courierHud(); }
+    if (typeof city !== "undefined" && courier.lm.x > 3000 !== (city === "delhi")) { courier = null; courierHud(); toast("You left the city: the message is lost."); return; }
+    const left = (courier.until - performance.now()) / 1000, d = Math.hypot(courier.lm.x - player.x, courier.lm.z - player.z);
+    if (d < Math.max(14, courier.lm.r * 0.35)) {
+      const r = rank(), pay = Math.round(JOBS.courier.base * r.mul * (0.4 + 0.6 * Math.max(0, left) / courier.total) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
+      Vitals.coins += pay; Vitals.hp -= 5; s.shifts++; s.earned += pay; save(); Sfx.play("coin");
+      toast(`Message delivered to ${courier.lm.name}! You earn ${pay} denarii.`); Narrator.say(`Message delivered. You earn ${pay} denarii.`, { interrupt: true });
+      if (typeof Nav !== "undefined" && Nav.clear) Nav.clear();
+      courier = null; courierHud();
+    } else if (left <= 0) {
+      toast("Too late: the message is worthless now."); Narrator.say("Too late. The message is worthless now.", { interrupt: true });
+      if (typeof Nav !== "undefined" && Nav.clear) Nav.clear();
+      courier = null; courierHud();
+    }
+  }
 
   // ---------------------------------------------------------------- the game hooks
 
@@ -291,6 +408,7 @@ const Jobs = (() => {
 
   function update(dt) {
     clock += dt;
+    courierUpdate(dt);
     if (spin && !game) spin.rotation.y += dt * 0.3;
     if (game) {
       if (!$j("job").classList.contains("show")) { finish(false); return; }
@@ -315,7 +433,7 @@ const Jobs = (() => {
   }
 
   return {
-    build, bind, at, act, update, setEra, inHall, SPOTS, H, DOOR,
+    build, bind, at, act, update, setEra, inHall, SPOTS, H, DOOR, openBoard,
     snapshot: () => ({ shifts: s.shifts, earned: s.earned }),
     restore(r) { if (r && Number.isFinite(r.shifts)) { s = { shifts: Math.max(0, r.shifts | 0), earned: Math.max(0, (r.earned | 0)) }; save(); } },
     get rank() { return rank().name; },
