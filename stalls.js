@@ -122,6 +122,34 @@ const Stalls = (() => {
     return g;
   }
 
+  // ---------------------------------------------------------------- food stalls all over the city
+  // Single food stalls beside the main sights (the same dishes as the market's food stall). `list` is [name, x, z] in world
+  // coordinates; each is moved to the nearest clear spot. The sign and the cries change with the city.
+  const STREET = {
+    rome: { sign: "TABERNA", sub: "hot food · popina", colors: [["#b3262b", "#f1ead8"], ["#d9791f", "#f1ead8"], ["#2f8f4a", "#f1ead8"]], robe: [0xb3262b, 0xd9791f, 0x6a8a4a], say: ["Hot food here! Come and eat!", "Bread, olives and roast pork!", "A hungry man is a poor soldier!"] },
+    delhi: { sign: "KHANA", sub: "chaat · sweets · chai", colors: [["#2f8f4a", "#f1ead8"], ["#d9a928", "#f1ead8"], ["#b3262b", "#f1ead8"]], robe: [0x2f8f4a, 0xd9a928, 0xb3262b], say: ["Garam garam! Come and eat!", "Chaat, jalebi, chai!", "Fresh from the tawa!"] },
+  };
+  const clearAt = (x, z) => { for (let ix = -5; ix <= 5; ix += 2.5) for (let iz = -3; iz <= 5; iz += 2) if (blockedAt(x + ix, z + iz, 0)) return false; return true; };
+  function street(parent, where, list) {
+    const th = STREET[where], delhi = where === "delhi";
+    list.forEach(([name, ox, oz], n) => {
+      let spot = null;
+      for (let r = 0; r <= 40 && !spot; r += 4) for (let k = 0; k < (r === 0 ? 1 : 10) && !spot; k++) { const a = (k / 10) * 6.283, x = ox + Math.cos(a) * r, z = oz + Math.sin(a) * r; if (clearAt(x, z)) spot = [x, z]; }
+      if (!spot) return;
+      const [x, z] = spot, i = n % 3, g = new T.Group(); parent.add(g);
+      const def = { id: "food", sign: th.sign, sub: name.length > 20 ? th.sub : name.toLowerCase(), color: th.colors[i], robe: th.robe[i], goods: DEFS[0].goods, say: { [where]: th.say } };
+      const awnMat = new T.MeshLambertMaterial({ map: stripes(def.color[0], def.color[1]), side: T.DoubleSide });
+      box(g, x, 0, z + 2, 4.6, 1.05, 1.5, lam(0x7a5a34), true);
+      goodsFor(g, { id: "food", goods: def.goods }, x + 0.4, z + 2);
+      for (const sx of [-1, 1]) box(g, x + sx * 2.1, 0, z + 1.2, 0.2, 3.0, 0.2, lam(0x6a4c2a));
+      const awn = new T.Mesh(BOXG, awnMat); awn.scale.set(5.2, 0.14, 3.0); awn.position.set(x, 3.05, z + 2.2); awn.rotation.x = -0.15; awn.castShadow = true; g.add(awn);
+      sign(g, x, 3.9, z + 1.1, 3.6, 0.95, def.sign, def.sub);
+      const v = vendor(g, x, z + 2.9, def.robe, delhi ? 0xf1ead8 : 0x6a3a1a); v.rotation.y = Math.PI;
+      if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "r", x0: x - 2.6, x1: x + 2.6, z0: z + 1, z1: z + 3.6, c: "#d9791f" });
+      SPOTS.push({ id: "food", name: "food stall", city: where, x, z: z - 1, r: 3.2, vendor: { x, z: z + 2.9 }, group: v, say: def.say[where], t: 8 + n * 3, ph: Math.random() * 6 });
+    });
+  }
+
   // the stall you are standing at, if any
   const at = (x, z, feet = 0) => {
     if (feet > 3) return null;
@@ -153,5 +181,5 @@ const Stalls = (() => {
     }
   }
 
-  return { build, at, open, update, SITES, SPOTS };
+  return { build, street, at, open, update, SITES, SPOTS };
 })();

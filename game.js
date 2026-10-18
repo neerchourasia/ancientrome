@@ -45,6 +45,7 @@ function init() {
   Harbour.build(scene);
   Home.build();
   buildInsulae(scene);
+  Stalls.street(scene, "rome", [["Colosseum", 305, 66], ["Via Sacra", 110, 16], ["Forum", 50, 42], ["Capitoline", -235, 8], ["Pantheon", -455, -440], ["Trajan's Forum", -150, -210], ["Circus", -190, 132], ["Harbour", 74, 80], ["Forum Boarium", -405, 55], ["Theatre of Pompey", -655, -50], ["Via Domus", 150, -44]]);
   buildTrees(scene);
   buildCitizens(scene);
   Modern.build(scene);
