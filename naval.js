@@ -2,7 +2,9 @@
 // Naval battle: the Colosseum arena floods and you command a galley armed with cannons against enemy ships.
 
 const Naval = (() => {
-  const CX = ARENA.cx, CZ = ARENA.cz, RX = 29, RZ = 23.5; // sailable area (ellipse half-axes)
+  const ARENA_AREA = { cx: ARENA.cx, cz: ARENA.cz, rx: 29, rz: 23.5 };
+  let CX = ARENA_AREA.cx, CZ = ARENA_AREA.cz, RX = ARENA_AREA.rx, RZ = ARENA_AREA.rz; // sailable area (ellipse half-axes): the Colosseum arena, or the harbour
+  let harbour = null;  // sailing in the harbour: the harbour module's hooks (fishing, trading, pirates)
   const WAVES = [
     [{ hp: 45, scale: 0.8, max: 5.2, sail: 0xb3262b }, { hp: 45, scale: 0.8, max: 5.4, sail: 0x6b3fa0 }],
     [{ hp: 45, scale: 0.8, max: 5.6, sail: 0x6b3fa0 }, { hp: 45, scale: 0.8, max: 5.4, sail: 0x2f6b8f }, { hp: 85, scale: 1.0, max: 4.6, sail: 0x1f1f1f }],
@@ -18,6 +20,8 @@ const Naval = (() => {
   const TEX = {};
 
   const level = () => -0.5 + flood * 1.4;
+  // move the sailable area (the arena, or the harbour) and its water
+  function setArena(a) { CX = a.cx; CZ = a.cz; RX = a.rx; RZ = a.rz; water.position.x = CX; water.position.z = CZ; if (a === ARENA_AREA) water.scale.set(94 / 78, 1, 1); else water.scale.set((RX + 3) / 28, 1, (RZ + 3) / 28); }
 
   // ---------- setup ----------
 
@@ -172,7 +176,7 @@ const Naval = (() => {
   const sideNormal = (s, side) => (side > 0 ? [Math.cos(s.yaw), -Math.sin(s.yaw)] : [-Math.cos(s.yaw), Math.sin(s.yaw)]); // +1 = port (left)
 
   function fireSide(s, side, together) {
-    if (s.dead || s.cd[side] > 0 || phase !== "battle") return false;
+    if (s.dead || s.cd[side] > 0 || (phase !== "battle" && phase !== "harbour")) return false;
     s.cd[side] = s.player ? 1.6 + 0.2 * s.model.cannons.filter((c) => c.side === side).length : 4.5 + Math.random() * 2; // a bigger broadside reloads slower (three a side: 2.2 s)
     const guns = s.model.cannons.filter((c) => c.side === side), gap = together ? 0 : Math.min(0.13, 0.4 / Math.max(1, guns.length)); // Space: every cannon at once; Q / E: a quick ripple
     guns.forEach((c, i) => queue.push({ t: i * gap + Math.random() * 0.04, s, side, c }));
@@ -260,7 +264,7 @@ const Naval = (() => {
     }
     const turn = Math.max(-1, Math.min(1, angDiff(e.yaw, desired) * 2));
     stepShip(e, dt, dist > 12 ? 1 : dist < 6 ? 0.8 : 0.45, turn);
-    if (phase === "battle" && !me.dead && dist < 16) {
+    if ((phase === "battle" || phase === "harbour") && !me.dead && dist < 16) {
       const [fx_, fz_] = forward(e), fwdDot = (dx * fx_ + dz * fz_) / dist;
       if (Math.abs(fwdDot) < 0.5) {
         const [lx, lz] = sideNormal(e, 1);
@@ -336,6 +340,7 @@ const Naval = (() => {
 
   function stop(win, title, text, buttons) {
     if (!active) return;
+    if (harbour) { stopHarbour(true); return; }
     const live = online;                     // leaving a live battle tells the server (it sinks your ship)
     if (live) {
       online = null;
@@ -370,7 +375,7 @@ const Naval = (() => {
 
   // Q = port, E = starboard, Space/click = every cannon on both sides at once.
   function fire(k) {
-    if (!active || !me || me.dead || phase !== "battle") return;
+    if (!active || !me || me.dead || (phase !== "battle" && phase !== "harbour")) return;
     if (online) return fireOnline(k);
     if (k === "KeyQ") fireSide(me, 1);
     else if (k === "KeyE") fireSide(me, -1);
@@ -394,6 +399,63 @@ const Naval = (() => {
     return best;
   }
 
+
+  // ---------- the harbour: sail your own ship in the basin at Portus (fishing, trading and pirates; see harbour.js) ----------
+
+  function startHarbour(design, area, hooks) {
+    if (active) return;
+    setArena(area); harbour = hooks;
+    active = true; mode = "naval"; phase = "harbour"; wave = 0; flood = 1; floodTarget = 1; fx = []; balls = []; queue = []; foes = [];
+    me = makeShip(design || Shipyard.selectedDef(), CX - RX + 9, CZ, Math.PI / 2, true);
+    me.model.g.visible = true; camYaw = me.yaw;
+    el("naval-hud").classList.add("show");
+    closePanels();
+    msg("You cast off from the quay.", 2200);
+  }
+
+  function spawnPirates(n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, f = makeShip({ hp: 45, scale: 0.8, max: 4.8, sail: 0x1a1a1a }, CX + Math.cos(a) * RX * 0.85, CZ + Math.sin(a) * RZ * 0.85, a + Math.PI, false);
+      f.model.g.visible = true; f.pirate = true; foes.push(f);
+    }
+    msg(n > 1 ? "Pirates! Two ships are coming for you." : "Pirates! A ship is coming for you.", 2400); Sfx.play("horn");
+  }
+
+  function updateHarbour(dt, keys) {
+    clock += dt;
+    water.visible = true; water.position.y = level();
+    rippleTex.offset.x = (clock * 0.02) % 1; rippleTex.offset.y = (clock * 0.013) % 1;
+    if (!me.dead) {
+      const gas = keys.has("KeyW") || keys.has("ArrowUp"), back = keys.has("KeyS") || keys.has("ArrowDown");
+      const turn = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+      stepShip(me, dt, gas ? 1 : back ? -1 : 0, turn);
+    } else phaseT -= dt;
+    for (const f of foes) if (!f.dead) aiShip(f, dt);
+    const ships = [me, ...foes].filter((s) => !s.dead);
+    for (let i = 0; i < ships.length; i++) for (let j = i + 1; j < ships.length; j++) collide(ships[i], ships[j]);
+    updateBalls(dt); updateFx(dt); animateShips(dt);
+    // a sunk pirate is a bounty (once)
+    for (const f of foes) if (f.dead && !f.paid) { f.paid = true; harbour.bounty(f); }
+    for (let i = foes.length - 1; i >= 0; i--) if (foes[i].dead && foes[i].sink > 5) { scene.remove(foes[i].model.g); foes.splice(i, 1); }   // sunk pirates are gone
+    if (me.dead && phase !== "sinking") { phase = "sinking"; phaseT = 3; }
+    if (phase === "sinking" && phaseT <= 0) { harbour.sunk(); stopHarbour(false); return; }
+    player.x = me.x; player.z = me.z; player.feet = 0;
+    harbour.update(dt, me, foes.filter((f) => !f.dead).length);
+    el("nv-hull").style.width = `${(me.hp / me.max) * 100}%`;
+    el("nv-port").classList.toggle("ready", me.cd[1] <= 0);
+    el("nv-star").classList.toggle("ready", me.cd[-1] <= 0);
+    const f = el("flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.5);
+  }
+
+  function stopHarbour(announce) {
+    const h = harbour; harbour = null;
+    clear(); active = false; mode = "walk"; phase = "idle"; flood = 0; floodTarget = 0; water.visible = false;
+    el("naval-hud").classList.remove("show"); el("flash").style.opacity = 0;
+    setArena(ARENA_AREA);
+    camera.fov = 70; camera.updateProjectionMatrix();
+    if (h) h.left();
+    if (announce !== false) msg("You tie up at the quay.", 1400);
+  }
 
   // ---------- online: every ship for itself against real people (the server decides hits, rams and the winner) ----------
 
@@ -590,6 +652,7 @@ const Naval = (() => {
   function update(dt, keys) {
     if (!active) return;
     if (online) return updateOnline(dt, keys);
+    if (harbour) return updateHarbour(dt, keys);
     clock += dt;
     flood += Math.max(-dt * 0.6, Math.min(dt * 0.3, floodTarget - flood));
     water.visible = flood > 0.02;
@@ -654,5 +717,5 @@ const Naval = (() => {
     cam.lookAt(f.x + fx_ * 6 * k, L + 1.2, f.z + fz_ * 6 * k);
   }
 
-  return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length, shots: balls.map((b) => ({ vx: b.vx, vz: b.vz })) }) };
+  return { init, start, startHarbour, spawnPirates, get harbour() { return !!harbour; }, startOnline, onlineState, onlineEnd, isOnline: () => !!online, stop: () => stop(false), update, fire, camera: camera_, get active() { return active; }, debug: () => ({ phase, wave, me, foes, balls: balls.length, shots: balls.map((b) => ({ vx: b.vx, vz: b.vz })) }) };
 })();

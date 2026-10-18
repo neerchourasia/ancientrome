@@ -42,6 +42,7 @@ function init() {
   Jobs.build(scene);
   Robbery.init(scene);
   Festival.init(scene);
+  Harbour.build(scene);
   Home.build();
   buildInsulae(scene);
   buildTrees(scene);
@@ -161,6 +162,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Garage.at(player.x, player.z, player.feet)) Garage.open();
       else if (k === "KeyF" && Dresser.at(player.x, player.z, player.feet)) Dresser.open();
       else if (k === "KeyF" && Robbery.at(player.x, player.z, player.feet)) Robbery.act();
+      else if (k === "KeyF" && Harbour.at(player.x, player.z, player.feet)) Harbour.board();
       else if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
@@ -171,6 +173,7 @@ function wireInput(canvas) {
       else if (k === "KeyV" && (inColosseum(player.x, player.z) || inCircusArea(player.x, player.z))) Watch.start(inColosseum(player.x, player.z) ? "duel" : "race");
     } else if (mode === "naval") {
       if (k === "Space" || k === "KeyQ" || k === "KeyE") Naval.fire(k);
+      else if (k === "KeyF" && Naval.harbour) Harbour.action();
     } else if (mode === "race") {
       if (k === "Space") Race.whip();
       else if (k === "KeyQ") Race.hop(-1);
@@ -215,6 +218,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "garage") { Garage.open(); return; }
     if ($("#prompt").dataset.kind === "dresser") { Dresser.open(); return; }
     if ($("#prompt").dataset.kind === "rob") { Robbery.act(); return; }
+    if ($("#prompt").dataset.kind === "harbour") { Harbour.board(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -1067,6 +1071,7 @@ function updatePrompt() {
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
+    if (!text) { const hb = Harbour.at(player.x, player.z, player.feet); if (hb) { text = hb.text; p.dataset.kind = "harbour"; } }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
