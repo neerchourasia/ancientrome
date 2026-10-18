@@ -626,6 +626,27 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         caught = await a.until(lambda m: m["t"] == "heist_end")
         self.assertEqual(caught["result"], "caught")
 
+    async def test_the_city_guards_can_catch_a_thief(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 0, "s": 0})
+        b.send({"t": "walk", "c": "rome", "x": 150, "z": 50, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.3)
+        server.houses_once()
+        ha = await a.until(lambda m: m["t"] == "houses" and m["h"])
+        bx, bz, _, _ = server.plot_pos(ha["h"][0][0])
+        a.send({"t": "walk", "c": "rome", "x": bx, "z": bz, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.2)
+        b.send({"t": "heist_caught"})                       # only the thief can be caught this way: nothing happens
+        a.send({"t": "rob", "target": b.welcome["id"]})
+        await a.until(lambda m: m["t"] == "heist")
+        b.send({"t": "heist_caught"})
+        await asyncio.sleep(0.2)
+        self.assertEqual(len(server.HEISTS), 1)
+        a.send({"t": "heist_caught"})                       # the guards got Ann
+        end = await a.until(lambda m: m["t"] == "heist_end")
+        self.assertEqual(end["result"], "caught")
+        await b.until(lambda m: m["t"] == "heist_end")
+
     async def test_walkers_in_a_game_are_not_in_the_open_world_and_bad_positions_are_clamped(self):
         a, b = await self.player("Ann"), await self.player("Ben")
         a.send({"t": "walk", "c": "rome", "x": "x", "z": float("nan"), "yaw": 1e99, "s": -5})

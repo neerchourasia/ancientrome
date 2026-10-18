@@ -132,7 +132,8 @@ const Robbery = (() => {
   function begin(m) {
     heist = { role: m.role, other: m.other, d: null, x: m.x, z: m.z, until: performance.now() + (m.time || 80) * 1000 };
     if (m.role === "thief") {
-      toast(`You break into ${m.other}'s house and grab ${m.loot} denarii! Pick your getaway.`);
+      spawnGuards(player.x, player.z, 3);
+      toast(`You break into ${m.other}'s house and grab ${m.loot} denarii! The guards and ${m.other} are after you. Pick your getaway.`);
       Narrator.say(`You broke in and grabbed the loot. Run before ${m.other} catches you.`, { interrupt: true });
       Sfx.play("bump");
       openGetaway();
@@ -196,6 +197,12 @@ const Robbery = (() => {
     return g;
   }
 
+  function spawnGuards(x, z, spread) {
+    while (guards.length < 2) guards.push({ g: guardModel(), x: 0, z: 0, t: 0 });
+    guards.forEach((gd, i) => { gd.x = x + (i ? spread : -spread); gd.z = z + spread; gd.t = i * 3; gd.age = 0; gd.g.visible = true; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); });
+    if (typeof Speech !== "undefined") Speech.say({ x: guards[0].x, z: guards[0].z }, "Stop, thief!", 3);
+  }
+
   function beginNpc(t) {
     const now = performance.now();
     if (heist) return;
@@ -205,12 +212,10 @@ const Robbery = (() => {
     const loot = 60 + Math.floor(Math.random() * 7) * 10, p = plotAt(t.plot);
     npcCd[t.plot] = now + 300000;
     heist = { role: "thief", npc: true, plot: t.plot, other: t.name, d: null, until: now + 60000, loot, owner: t.name };
-    while (guards.length < 2) guards.push({ g: guardModel(), x: 0, z: 0, t: 0 });
-    guards.forEach((gd, i) => { gd.x = p.door[0] + (i ? 2.5 : -2.5); gd.z = p.door[1] + (p.face > 0 ? 3 : -3); gd.t = i * 4; gd.g.visible = true; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); });
+    spawnGuards(p.door[0], p.door[1] + (p.face > 0 ? 3 : -3), 3);
     toast(`You break into ${t.name}'s house and grab ${loot} denarii! The guards have seen you. Pick your getaway.`);
     Narrator.say("You broke in and grabbed the loot. The guards are after you. Run.", { interrupt: true });
     Sfx.play("horn");
-    if (typeof Speech !== "undefined") Speech.say({ x: guards[0].x, z: guards[0].z }, "Stop, thief!", 3);
     openGetaway(); hud();
   }
 
@@ -221,18 +226,24 @@ const Robbery = (() => {
     end({ role: "thief", result, loot: h.loot, thief: "You", victim: h.owner });
   }
 
-  function npcUpdate(dt) {
-    const h = heist;
+  // the guards run at you (faster the longer the chase goes on); returns how close the nearest one is
+  function guardsStep(dt) {
     let near = Infinity;
     for (const gd of guards) {
       gd.t -= dt;
       if (gd.t > 0) { gd.g.visible = true; near = Math.min(near, Math.hypot(player.x - gd.x, player.z - gd.z)); continue; }          // the second guard sets off a few seconds later
-      const dx = player.x - gd.x, dz = player.z - gd.z, d = Math.hypot(dx, dz) || 1, sp = 8.2 * dt;
+      gd.age += dt;
+      const dx = player.x - gd.x, dz = player.z - gd.z, d = Math.hypot(dx, dz) || 1, sp = (9 + Math.min(4, gd.age * 0.15)) * dt;
       let nx = gd.x + (dx / d) * sp, nz = gd.z + (dz / d) * sp;
       if (blockedAt(nx, nz, groundAt(gd.x, gd.z))) { if (!blockedAt(nx, gd.z, groundAt(gd.x, gd.z))) nz = gd.z; else if (!blockedAt(gd.x, nz, groundAt(gd.x, gd.z))) nx = gd.x; else { nx = gd.x; nz = gd.z; } }
       gd.x = nx; gd.z = nz; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); gd.g.rotation.y = Math.atan2(dx, dz);
       near = Math.min(near, Math.hypot(player.x - gd.x, player.z - gd.z));
     }
+    return near;
+  }
+
+  function npcUpdate(dt) {
+    const h = heist, near = guardsStep(dt);
     h.d = Math.round(near);
     let nearest = guards[0]; for (const gd of guards) if (Math.hypot(player.x - gd.x, player.z - gd.z) < Math.hypot(player.x - nearest.x, player.z - nearest.z)) nearest = gd;
     h.x = nearest.x; h.z = nearest.z;
@@ -245,6 +256,10 @@ const Robbery = (() => {
     panelT -= dt;
     if (heist && panelT <= 0) { panelT = 0.5; hud(); }
     if (heist && heist.npc) npcUpdate(dt);
+    else if (heist && heist.role === "thief" && guards.some((gd) => gd.g.visible)) {      // a real robbery: the guards chase too, and can catch you
+      const near = guardsStep(dt);
+      if (near < 2.8 && !heist.reported) { heist.reported = true; Online.navalSend({ t: "heist_caught" }); }
+    }
   }
 
   return {

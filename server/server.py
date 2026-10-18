@@ -1329,6 +1329,13 @@ def on_rob(conn, m):
     victim.send({"t": "heist", "role": "owner", "other": conn.name, "loot": HEIST_LOOT, "time": HEIST_TIME, "x": round(conn.px, 1), "z": round(conn.pz, 1)})
 
 
+def on_heist_caught(conn, m):
+    """The thief's browser says the city guards caught them (the guards chase every thief, besides the owner)."""
+    h = conn.heist
+    if h and h["thief"] is conn:
+        heist_end(h, "caught")
+
+
 def heist_end(h, result):
     if h in HEISTS:
         HEISTS.remove(h)
@@ -1551,6 +1558,8 @@ async def handle_msg(conn, m):
         return on_walk(conn, m)
     if t == "rob":
         return on_rob(conn, m)
+    if t == "heist_caught":
+        return on_heist_caught(conn, m)
     if t == "chat":
         return on_chat(conn, m)
     if t == "admin":
