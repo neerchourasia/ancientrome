@@ -66,7 +66,7 @@ CLASS_MODS = {  # only what a duel needs
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 PETS = ("hound", "eagle", "cat", "monkey", "peacock", "owl", "parrot", "cub")
-VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey")   # what a walker can be seen riding or leaving parked
+VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot")   # what a walker can be seen riding or leaving parked
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped

@@ -44,6 +44,13 @@ const Market = (() => {
     peacock: { type: "pet", slot: "pet", name: "Peacock", price: 160, note: "A blue and green peacock, its long tail fanning out behind it." },
     owl: { type: "pet", slot: "pet", name: "Owl", price: 170, note: "The owl of Minerva, gliding in slow circles above you." },
     cub: { type: "pet", slot: "pet", name: "Lion cub", price: 260, note: "A golden lion cub that trots at your heel." },
+    bicycle: { type: "car", name: "Bicycle", price: 60, note: "Pedal-powered and cheap. Top speed 27 km/h." },
+    motorcycle: { type: "car", name: "Motorcycle", price: 350, note: "A fast, light motorbike. Top speed 122 km/h." },
+    taxi: { type: "car", name: "Taxi", price: 450, note: "A yellow cab with a lit sign on the roof. Top speed 90 km/h." },
+    suv: { type: "car", name: "SUV", price: 700, note: "A tall, heavy four-by-four. Top speed 100 km/h." },
+    truck: { type: "car", name: "Delivery truck", price: 600, note: "A white box truck: big and slow to turn. Top speed 72 km/h." },
+    bus: { type: "car", name: "Bus", price: 900, note: "A long red city bus. Top speed 61 km/h. It takes a lot of road." },
+    chariot: { type: "mount", name: "Chariot", price: 280, note: "A light two-wheeled chariot with a horse in harness. Top speed 76 km/h." },
     scooter: { type: "car", name: "Vespa scooter", price: 250, note: "Quick and nimble. Top speed 54 km/h." },
     citycar: { type: "car", name: "City car", price: 500, note: "A blue runabout. Top speed 86 km/h." },
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
@@ -121,7 +128,7 @@ const Market = (() => {
   };
   let stall = "food";
   const SECTIONS = [
-    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 

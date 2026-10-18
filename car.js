@@ -12,6 +12,13 @@ const Car = (() => {
     sportscar: { name: "Sports car", max: 36, accel: 16, turn: 1.9, color: 0xc0262b, len: 4.4, wid: 1.9 },
     rickshaw: { name: "Cycle rickshaw", max: 7, accel: 4.5, turn: 2.4, color: 0x2f8f4a, len: 2.6, wid: 1.2, motor: false },
     oxcart: { name: "Bullock cart", max: 5, accel: 2.2, turn: 1.6, color: 0x6b4a2b, len: 4.6, wid: 1.6, era: "ancient", motor: false, verb: "climb on" },
+    bicycle: { name: "Bicycle", max: 7.5, accel: 3.6, turn: 2.6, color: 0x2f8f4a, len: 1.8, wid: 0.5, motor: false },
+    motorcycle: { name: "Motorcycle", max: 34, accel: 14, turn: 2.4, color: 0x222a33, len: 2.1, wid: 0.8 },
+    suv: { name: "SUV", max: 28, accel: 11, turn: 1.9, color: 0x3a5a3a, len: 4.8, wid: 2.0 },
+    taxi: { name: "Taxi", max: 25, accel: 10, turn: 2.0, color: 0xf2c21b, len: 4.2, wid: 1.8 },
+    truck: { name: "Delivery truck", max: 20, accel: 7, turn: 1.5, color: 0xe8e8e8, len: 6.4, wid: 2.2 },
+    bus: { name: "Bus", max: 17, accel: 5.5, turn: 1.25, color: 0xd9411f, len: 9.0, wid: 2.5 },
+    chariot: { name: "Chariot", max: 21, accel: 9, turn: 1.9, color: 0xb3262b, len: 3.6, wid: 1.4, era: "ancient", motor: false, camH: 2.4, verb: "climb on" },
     horse: { name: "Horse", max: 18, accel: 9, turn: 2.2, color: 0x7a4a2a, len: 2.8, wid: 1.0, era: "ancient", motor: false, camH: 2.5, verb: "climb on" },
     camel: { name: "Camel", max: 11, accel: 5, turn: 1.8, color: 0xc9a46a, len: 3.4, wid: 1.2, era: "ancient", motor: false, camH: 3.3, verb: "climb on" },
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
@@ -53,6 +60,40 @@ const Car = (() => {
       for (const sx of [-1, 1]) { const w = wheel(0.8, 0.1, sx * 0.9, 0.8, 1.0); g.add(w); wheels.push(w); }
       g.add(box(0.8, 0.85, 1.6, ox, 0, 1.2, -2.3), box(0.55, 0.55, 0.7, ox, 0, 1.45, -3.3), box(0.9, 0.08, 0.1, horn, 0, 1.8, -3.2));
       for (const [x, z] of [[-0.28, -1.7], [0.28, -1.7], [-0.28, -2.9], [0.28, -2.9]]) { const l = leg(0.2, 0.85, ox, x, 0.85, z); g.add(l); legs.push(l); }
+    } else if (id === "bicycle") { // two thin wheels, a frame, a seat and handlebars
+      const dark = lam(0x2b2b2b);
+      g.add(box(0.05, 0.05, 1.0, body, 0, 0.62, 0), box(0.05, 0.5, 0.05, body, 0, 0.55, 0.4), box(0.05, 0.5, 0.05, body, 0, 0.55, -0.45), box(0.22, 0.06, 0.4, dark, 0, 0.95, 0.4), box(0.7, 0.05, 0.05, dark, 0, 1.05, -0.5));
+      for (const z of [-0.65, 0.65]) { const w = wheel(0.34, 0.05, 0, 0.34, z); g.add(w); wheels.push(w); }
+    } else if (id === "motorcycle") { // a tank, a seat, handlebars and two bigger wheels
+      const dark = lam(0x2b2b2b), chrome = lam(0xb0b4ba);
+      g.add(box(0.36, 0.38, 0.9, body, 0, 0.7, -0.1), box(0.3, 0.12, 0.8, dark, 0, 0.95, 0.5), box(0.8, 0.06, 0.06, dark, 0, 1.18, -0.6), box(0.08, 0.6, 0.08, chrome, 0, 0.8, -0.65), box(0.2, 0.3, 0.5, dark, 0, 0.4, 0.3));
+      g.add(box(0.12, 0.12, 0.06, lamp, 0, 1.0, -0.78), box(0.18, 0.06, 0.18, tail, 0, 0.95, 1.0));
+      for (const z of [-0.8, 0.85]) { const w = wheel(0.36, 0.14, 0, 0.36, z); g.add(w); wheels.push(w); }
+    } else if (id === "suv" || id === "taxi") { // a tall boxy body with a roof (and a lit sign on a taxi)
+      const L = M.len, W = M.wid, tall = id === "suv";
+      g.add(box(W, tall ? 0.95 : 0.7, L, body, 0, tall ? 0.85 : 0.65, 0));
+      g.add(box(W * 0.86, tall ? 0.7 : 0.55, L * (tall ? 0.62 : 0.5), glass, 0, tall ? 1.55 : 1.15, L * 0.06));
+      g.add(box(W * 0.9, 0.1, 0.1, lamp, 0, 0.7, -L / 2 - 0.02), box(W * 0.9, 0.1, 0.1, tail, 0, 0.7, L / 2 + 0.02));
+      if (tall) g.add(box(W * 0.8, 0.06, L * 0.4, lam(0x2b2b2b), 0, 1.95, L * 0.05)); else { g.add(box(0.7, 0.22, 0.3, lam(0xfff1b0), 0, 1.5, L * 0.05)); g.add(box(W, 0.1, 0.5, lam(0x1a1a1a), 0, 0.8, 0)); }
+      for (const sx of [-1, 1]) for (const z of [-L * 0.32, L * 0.32]) { const w = wheel(tall ? 0.42 : 0.34, 0.24, sx * (W / 2), tall ? 0.42 : 0.34, z); g.add(w); wheels.push(w); }
+    } else if (id === "truck") { // a small cab at the front and a big white box behind
+      const L = M.len, W = M.wid;
+      g.add(box(W, 1.0, 1.7, body, 0, 1.05, -L / 2 + 0.9), box(W * 0.86, 0.6, 1.0, glass, 0, 1.55, -L / 2 + 0.6), box(W, 0.4, L - 1.9, lam(0x3a3a3a), 0, 0.55, 0.9));
+      g.add(box(W * 0.98, 2.3, L - 2.0, lam(0xf0efe8), 0, 2.0, 0.95), box(W * 0.9, 0.5, 0.06, body, 0.0, 2.4, L / 2 + 0.05));
+      g.add(box(W * 0.9, 0.1, 0.1, lamp, 0, 0.7, -L / 2 - 0.02), box(W * 0.9, 0.1, 0.1, tail, 0, 0.7, L / 2 + 0.02));
+      for (const sx of [-1, 1]) for (const z of [-L * 0.34, L * 0.28, L * 0.4]) { const w = wheel(0.5, 0.26, sx * (W / 2), 0.5, z); g.add(w); wheels.push(w); }
+    } else if (id === "bus") { // long and tall, with a band of windows down both sides
+      const L = M.len, W = M.wid;
+      g.add(box(W, 2.2, L, body, 0, 1.6, 0), box(W * 1.02, 0.8, L * 0.9, glass, 0, 2.0, 0), box(W * 0.9, 0.5, 0.06, lam(0xfff1b0), 0, 2.4, -L / 2 - 0.04), box(W * 0.98, 0.08, L, lam(0xeeeeee), 0, 2.75, 0));
+      g.add(box(W * 0.9, 0.1, 0.1, lamp, 0, 0.8, -L / 2 - 0.02), box(W * 0.9, 0.1, 0.1, tail, 0, 0.8, L / 2 + 0.02));
+      for (const sx of [-1, 1]) for (const z of [-L * 0.32, L * 0.3]) { const w = wheel(0.55, 0.3, sx * (W / 2), 0.55, z); g.add(w); wheels.push(w); }
+    } else if (id === "chariot") { // a light two-wheeled chariot with a horse in front
+      const wood = lam(0x6b4a2b), gold = lam(0xd9a928), fur = lam(0x8a5a2b), dark = lam(0x241810);
+      g.add(box(1.1, 0.12, 1.2, body, 0, 0.85, 0.7), box(1.1, 0.5, 0.08, body, 0, 1.15, 0.12), box(0.08, 0.5, 1.2, body, -0.55, 1.15, 0.7), box(0.08, 0.5, 1.2, body, 0.55, 1.15, 0.7), box(1.12, 0.06, 0.1, gold, 0, 1.42, 0.12));
+      g.add(box(0.1, 0.1, 2.2, wood, 0, 0.85, -1.2));
+      for (const sx of [-1, 1]) { const w = wheel(0.6, 0.1, sx * 0.66, 0.6, 0.7); g.add(w); wheels.push(w); }
+      g.add(box(0.6, 0.7, 1.4, fur, 0, 1.3, -2.1), box(0.25, 0.7, 0.3, fur, 0, 1.75, -2.85), box(0.25, 0.3, 0.55, fur, 0, 2.05, -3.15), box(0.08, 0.5, 0.1, dark, 0, 1.9, -2.7), box(0.1, 0.6, 0.1, dark, 0, 1.2, -1.35));
+      for (const [x, z] of [[-0.2, -2.6], [0.2, -2.6], [-0.2, -1.6], [0.2, -1.6]]) { const l = leg(0.14, 1.0, fur, x, 1.0, z); g.add(l); legs.push(l); }
     } else if (id === "horse" || id === "donkey" || id === "camel") { // animals to ride: a body, a neck and head, a tail, four legs and a saddle
       const fur = lam(M.color), dark = lam(id === "horse" ? 0x241810 : id === "camel" ? 0x8a6a3a : 0x5a5650), cloth = lam(id === "camel" ? 0xb3262b : 0x2f6b8f), gold = lam(0xd9a928);
       const big = id === "camel" ? 1.25 : id === "horse" ? 1 : 0.78, bodyY = (id === "camel" ? 1.85 : id === "horse" ? 1.45 : 1.05), legL = bodyY - 0.2, bl = M.len * 0.62;
