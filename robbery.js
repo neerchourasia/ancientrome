@@ -8,13 +8,16 @@
 const Robbery = (() => {
   const T = THREE;
   const BOXG = new T.BoxGeometry(1, 1, 1), CYLG = new T.CylinderGeometry(1, 1, 1, 12), CONEG = new T.ConeGeometry(1, 1, 8), PYRG = new T.ConeGeometry(1, 1, 4);
-  const PLOTS = 12, X0 = 185, DX = 26, NORTH_Z = -55, SOUTH_Z = -25;   // the same numbers as the server's
+  const PLOTS = 12, PLAYER_PLOTS = 8, X0 = 185, DX = 26, NORTH_Z = -55, SOUTH_Z = -25;   // the same numbers as the server's
   const LOOT = 100;
   const lam = (c) => new T.MeshLambertMaterial({ color: c });
   const $r = (id) => document.getElementById(id);
 
   const plotAt = (i) => { const col = i % 6, row = Math.floor(i / 6), x = X0 + col * DX; return row === 0 ? { x, z: NORTH_Z, door: [x, NORTH_Z + 7.5], face: 1 } : { x, z: SOUTH_Z, door: [x, SOUTH_Z - 7.5], face: -1 }; };
 
+  const NPC = [{ plot: 8, name: "Gaius", tier: 1 }, { plot: 9, name: "Livia", tier: 2 }, { plot: 10, name: "Marcus", tier: 2 }, { plot: 11, name: "Julia", tier: 3 }];
+  const npcCd = {}, guards = [];
+  let lieLow = 0;
   let scene = null;
   const houses = [];           // per plot: { g, tierGroups, blockers, sign, label, id, tier }
   let list = [], mine = null;
@@ -87,7 +90,7 @@ const Robbery = (() => {
       h.blockers.forEach((b) => { b.off = false; });
       h.tier = tier;
     }
-    houses.forEach((h, i) => { if (h && !present.has(i)) { h.g.visible = false; h.id = null; h.blockers.forEach((b) => { b.off = true; }); } });
+    houses.forEach((h, i) => { if (h && !present.has(i) && i < PLOTS - 4) { h.g.visible = false; h.id = null; h.blockers.forEach((b) => { b.off = true; }); } });
   }
 
   // ---------------------------------------------------------------- the door
@@ -106,6 +109,7 @@ const Robbery = (() => {
   function act() {
     const t = at(player.x, player.z, player.feet);
     if (!t) return false;
+    if (String(t.id).startsWith("npc:")) { beginNpc(t); return true; }
     if (!Online.connected) { toast("You need to be online to rob a house."); return true; }
     Online.navalSend({ t: "rob", target: t.id });
     return true;
@@ -120,7 +124,7 @@ const Robbery = (() => {
     if (!heist) { el.classList.remove("show"); return; }
     el.classList.add("show");
     const left = Math.max(0, Math.round((heist.until - performance.now()) / 1000));
-    if (heist.role === "thief") el.innerHTML = `<strong>🏃 Run! ${esc(heist.other)} is after you</strong><span>${heist.d != null ? `${heist.d} m behind you. ` : ""}You are clear in ${left} s, or at 230 m. If they catch you, you lose ${LOOT} denarii.</span>`;
+    if (heist.role === "thief") el.innerHTML = `<strong>🏃 Run! ${heist.npc ? "The city guards are" : esc(heist.other) + " is"} after you</strong><span>${heist.d != null ? `${heist.d} m behind you${heist.x !== undefined && heist.d > 0 ? `, to the ${dirWord(heist.x - player.x, heist.z - player.z)}: run ${dirWord(player.x - heist.x, player.z - heist.z)}` : ""}. ` : ""}There is no place to reach: just get away. You are clear in ${left} s, or at 230 m. Cars, carts and elephants are faster than running. If they catch you, you lose ${LOOT} denarii.</span>`;
     else el.innerHTML = `<strong>⚠ ${esc(heist.other)} is robbing your house!</strong><span>${heist.d != null ? `${heist.d} m away, to the ${dirWord(heist.x - player.x, heist.z - player.z)}. ` : ""}Catch them within ${left} s to win back ${LOOT} denarii.</span>`;
   }
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -166,7 +170,7 @@ const Robbery = (() => {
 
   function end(m) {
     const role = m.role, other = role === "thief" ? m.victim : m.thief, loot = m.loot || LOOT;
-    heist = null;
+    heist = null; for (const gd of guards) gd.g.visible = false;
     if ($r("getaway").classList.contains("show")) closePanels();
     if (role === "thief") {
       if (m.result === "escaped") { Vitals.coins += loot; toast(`You got away with ${loot} denarii of ${other}'s!`); Narrator.say(`You got away with ${loot} denarii.`, { interrupt: true }); Sfx.play("coin"); }
@@ -178,13 +182,79 @@ const Robbery = (() => {
     hud();
   }
 
+  // ---------------------------------------------------------------- robbing the houses of the people who are always at home: the city guards chase you
+
+  function guardModel() {
+    const g = new T.Group(), robe = lam(0x9a2a2a), grey = lam(0x8a8d92);
+    const body = new T.Mesh(CYLG, robe); body.scale.set(0.38, 1.3, 0.38); body.position.y = 0.65; g.add(body);
+    const head = new T.Mesh(new T.SphereGeometry(0.23, 10, 8), lam(0xd8a77a)); head.position.y = 1.55; g.add(head);
+    const helm = new T.Mesh(new T.CylinderGeometry(0.22, 0.27, 0.22, 10), grey); helm.position.y = 1.78; g.add(helm);
+    const spear = new T.Mesh(CYLG, lam(0x6a4c2a)); spear.scale.set(0.03, 2.2, 0.03); spear.position.set(0.4, 1.1, 0); g.add(spear);
+    const tip = new T.Mesh(CONEG, grey); tip.scale.set(0.07, 0.3, 0.07); tip.position.set(0.4, 2.3, 0); g.add(tip);
+    g.traverse((m) => { m.castShadow = true; });
+    g.visible = false; scene.add(g);
+    return g;
+  }
+
+  function beginNpc(t) {
+    const now = performance.now();
+    if (heist) return;
+    if (typeof city === "undefined" || city !== "rome") return;
+    if (now < lieLow) { toast("Lie low for a moment: the guards are still about."); return; }
+    if (now < (npcCd[t.plot] || 0)) { toast(`The guards are watching ${t.name}'s house after the last robbery. Try another.`); return; }
+    const loot = 60 + Math.floor(Math.random() * 7) * 10, p = plotAt(t.plot);
+    npcCd[t.plot] = now + 300000;
+    heist = { role: "thief", npc: true, plot: t.plot, other: t.name, d: null, until: now + 60000, loot, owner: t.name };
+    while (guards.length < 2) guards.push({ g: guardModel(), x: 0, z: 0, t: 0 });
+    guards.forEach((gd, i) => { gd.x = p.door[0] + (i ? 2.5 : -2.5); gd.z = p.door[1] + (p.face > 0 ? 3 : -3); gd.t = i * 4; gd.g.visible = true; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); });
+    toast(`You break into ${t.name}'s house and grab ${loot} denarii! The guards have seen you. Pick your getaway.`);
+    Narrator.say("You broke in and grabbed the loot. The guards are after you. Run.", { interrupt: true });
+    Sfx.play("horn");
+    if (typeof Speech !== "undefined") Speech.say({ x: guards[0].x, z: guards[0].z }, "Stop, thief!", 3);
+    openGetaway(); hud();
+  }
+
+  function guardsEnd(result) {
+    for (const gd of guards) gd.g.visible = false;
+    const h = heist;
+    lieLow = performance.now() + 60000;
+    end({ role: "thief", result, loot: h.loot, thief: "You", victim: h.owner });
+  }
+
+  function npcUpdate(dt) {
+    const h = heist;
+    let near = Infinity;
+    for (const gd of guards) {
+      gd.t -= dt;
+      if (gd.t > 0) { gd.g.visible = true; near = Math.min(near, Math.hypot(player.x - gd.x, player.z - gd.z)); continue; }          // the second guard sets off a few seconds later
+      const dx = player.x - gd.x, dz = player.z - gd.z, d = Math.hypot(dx, dz) || 1, sp = 8.2 * dt;
+      let nx = gd.x + (dx / d) * sp, nz = gd.z + (dz / d) * sp;
+      if (blockedAt(nx, nz, groundAt(gd.x, gd.z))) { if (!blockedAt(nx, gd.z, groundAt(gd.x, gd.z))) nz = gd.z; else if (!blockedAt(gd.x, nz, groundAt(gd.x, gd.z))) nx = gd.x; else { nx = gd.x; nz = gd.z; } }
+      gd.x = nx; gd.z = nz; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); gd.g.rotation.y = Math.atan2(dx, dz);
+      near = Math.min(near, Math.hypot(player.x - gd.x, player.z - gd.z));
+    }
+    h.d = Math.round(near);
+    let nearest = guards[0]; for (const gd of guards) if (Math.hypot(player.x - gd.x, player.z - gd.z) < Math.hypot(player.x - nearest.x, player.z - nearest.z)) nearest = gd;
+    h.x = nearest.x; h.z = nearest.z;
+    const left = (h.until - performance.now()) / 1000;
+    if (near < 2.8 && mode !== "dgame") { guardsEnd("caught"); return; }
+    if (near > 150 || left <= 0) guardsEnd("escaped");
+  }
+
   function update(dt) {
     panelT -= dt;
     if (heist && panelT <= 0) { panelT = 0.5; hud(); }
+    if (heist && heist.npc) npcUpdate(dt);
   }
 
   return {
-    init(sc) { scene = sc; },
+    init(sc) {
+      scene = sc;
+      NPC.forEach((n) => {                                         // four houses on the street are always occupied, so you can rob on your own
+        const h = houses[n.plot] || buildHouse(n.plot);
+        h.id = "npc:" + n.plot; h.g.visible = true; setLabel(h, n.name); h.tiers.forEach((t, k) => { t.visible = n.tier > k; }); h.blockers.forEach((b) => { b.off = false; }); h.tier = n.tier;
+      });
+    },
     setHouses, at, act, begin, pos, end, update,
     get active() { return !!heist; },
     get role() { return heist ? heist.role : null; },

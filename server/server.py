@@ -1238,7 +1238,7 @@ async def world_loop():
 # (they must be online and in Rome), run with the loot, and the owner chases you. Caught, you lose 100 denarii (to the owner);
 # get away and you keep 100 denarii of theirs. Coins are kept by the browsers; the server only decides who got caught.
 
-HOUSE_PLOTS = 12
+HOUSE_PLOTS = 8             # plots 0 to 7 are for players; the other four on the street belong to people who are always at home (the game draws those)
 PLOT_X0, PLOT_DX = 185.0, 26.0
 PLOT_NORTH_Z, PLOT_SOUTH_Z = -55.0, -25.0
 HEIST_LOOT = 100
@@ -1366,7 +1366,7 @@ def heist_once():
         if t - h["last"] > 1.0:
             h["last"] = t
             vi.send({"t": "heistpos", "x": round(th.px, 1), "z": round(th.pz, 1), "d": round(d), "left": max(0, round(HEIST_TIME - (t - h["t0"])))})
-            th.send({"t": "heistpos", "d": round(d), "left": max(0, round(HEIST_TIME - (t - h["t0"])))})
+            th.send({"t": "heistpos", "d": round(d), "left": max(0, round(HEIST_TIME - (t - h["t0"]))), "x": round(vi.px, 1), "z": round(vi.pz, 1)})   # where the owner is, so the thief knows which way to run
 
 
 # ---------------------------------------------------------------------------------------------------------------
