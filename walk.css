@@ -428,6 +428,8 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .jb-letter { font: 700 5rem Georgia, serif; color: var(--gold); text-align: center; margin: 6px 0; }
 
 /* robberies */
+.jb-metal { height: 90px; margin: 10px 0; border-radius: 10px; background: #3c3c42; border: 2px solid #1a1a1d; transition: transform .1s; }
+.jb-metal.hit { transform: scale(1.04); }
 #heist-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; gap: 2px; max-width: min(520px, 92vw); padding: 8px 16px; background: rgba(120,24,24,.88); border: 1px solid rgba(255,200,120,.6); border-radius: 10px; color: #fff; text-align: center; pointer-events: none; }
 #heist-hud.show { display: flex; }
 #heist-hud strong { font: 700 1rem Georgia, serif; color: #ffd36b; }

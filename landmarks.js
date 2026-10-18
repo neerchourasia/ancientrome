@@ -4,6 +4,12 @@
 
 const LANDMARKS = [
   {
+    id: "circusjobs", game: true, only: "ancient", name: "The Circus Office", sub: "Work at the Circus Maximus",
+    x: -205, z: 98, r: 14, stand: [-205, 88],
+    text: "A wooden hut by the starting gates of the Circus Maximus where the racetrack hires hands: horse trainers, track rakers, starting-gate keepers and wheelwrights. Press F at the door.",
+    fact: "The Circus Maximus ran on its workers: grooms, trainers, track-menders and the gatekeepers who dropped the rope for every race.",
+  },
+  {
     id: "harbour", game: true, name: "The Harbour (Portus)", sub: "Sail your own ships: fish, trade and fight pirates",
     x: 50, z: 82, r: 40, stand: [50, 74],
     text: "A stone basin south-west of the Forum where you can sail the ships you designed in the shipyard. Stand at the gate and press F to board. Out on the water, slow down over a ring of ripples and press F to fish; sail up to a pier and press F to sell your fish and trade grain and wine between Ostia wharf and Portus quay. Pirates come for ships that carry something worth taking: sink them for a bounty.",
