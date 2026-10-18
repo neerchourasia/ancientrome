@@ -516,7 +516,8 @@ const Jobs = (() => {
     const el = $j("courier-hud");
     if (!courier) { el.classList.remove("show"); return; }
     const left = Math.max(0, Math.round((courier.until - performance.now()) / 1000)), d = Math.round(Math.hypot(courier.lm.x - player.x, courier.lm.z - player.z));
-    el.innerHTML = `<strong>📜 Message for ${courier.lm.name}</strong><span>${d} m to go. ${left} s left.</span>`; el.classList.add("show");
+    const ang = Math.atan2(courier.lm.x - player.x, -(courier.lm.z - player.z)), dir = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8];
+    el.innerHTML = `<strong>📜 Deliver the message to ${courier.lm.name}</strong><span>${d} m to the ${dir}. ${left} s left. Follow the directions arrow, or open Places (P) to see it.</span>`; el.classList.add("show");
   }
   function courierUpdate(dt) {
     if (!courier) return;
