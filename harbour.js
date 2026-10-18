@@ -77,10 +77,24 @@ const Harbour = (() => {
 
   const at = (x, z, feet = 0) => (feet <= 3 && typeof city !== "undefined" && city === "rome" && Math.hypot(x - GATE.x, z - GATE.z) < GATE.r ? { text: "F: board your ship and sail the harbour" } : null);
 
+  // at the gate: choose which of your saved ships to sail (you cannot build one here: that is the shipyard in the arena)
   function board() {
     if (!at(player.x, player.z, player.feet)) return false;
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return true; }
     if (!Vitals.canFight()) { toast(`You are too tired to sail (health ${Math.round(Vitals.hp)}/100). Press Z to rest.`); return true; }
+    const ul = $h("hp-list"); ul.replaceChildren();
+    for (const s of Shipyard.list()) {
+      const f = Shipyard.info(s.i), li = document.createElement("li"), b = document.createElement("button"), t = document.createElement("span"), n = document.createElement("strong"), d = document.createElement("small");
+      n.textContent = `${s.i === Shipyard.sel ? "▶ " : ""}${f.name}`; d.textContent = `${f.type} · hull ${f.hp} · ${f.kmh} km/h · ${f.cannons} cannons · holds ${f.hold}`;
+      t.append(n, d); b.type = "button"; b.append(Shipyard.miniAt(s.i), t);
+      b.addEventListener("click", () => { Shipyard.choose(s.i); closePanels(); sailOut(); });
+      li.append(b); ul.append(li);
+    }
+    openPanel("#harborpick");
+    return true;
+  }
+
+  function sailOut() {
     water.visible = false; spots.forEach((s) => { s.visible = true; });
     sailing = true; cast = { phase: "idle", t: 0 }; pirateT = 80 + Math.random() * 40;
     Naval.startHarbour(Shipyard.selectedDef(), A, { update, bounty, sunk, left });

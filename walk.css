@@ -433,6 +433,11 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #heist-hud strong { font: 700 1rem Georgia, serif; color: #ffd36b; }
 #heist-hud span { font-size: .8rem; }
 
+#hp-list li { padding: 0; background: none; }
+#hp-list li > button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; }
+#hp-list button span { display: grid; gap: 2px; }
+#hp-list button small { color: var(--muted); }
+
 /* the shipyard */
 .dpanel .box.wide { width: min(640px, 100%); }
 .sy-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }

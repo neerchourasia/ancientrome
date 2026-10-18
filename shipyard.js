@@ -258,6 +258,9 @@ const Shipyard = (() => {
   return {
     bind, open, def, sail,
     selectedDef: () => def(ships[sel]),
+    // for the harbour: a picture and the main figures of each saved ship
+    miniAt: (i) => mini(ships[i]),
+    info: (i) => { const d = ships[i], t = TYPES[d.type]; return { i, name: d.name, type: t.name, hp: t.hp, kmh: Math.round(t.max * 3.6), cannons: count(d), hold: 3 + Math.floor(t.max / 35) }; },
     // for the online lobby: choose one of your saved ships (you cannot build one there)
     list: () => ships.map((s, i) => ({ i, label: `${s.name} (${TYPES[s.type].name}, ${count(s)} cannons)` })),
     get sel() { return sel; },
