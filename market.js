@@ -87,6 +87,16 @@ const Market = (() => {
     f_thandai: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "ancient"], "holi"),
     f_thandaim: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "modern"], "holi"),
   });
+  // medicines from the healer: each cures some illnesses (see disease.js); where: the city that sells it
+  const CURES = {
+    c_tea: { type: "cure", name: "Hot honey and herb drink", price: 10, note: "Cures a cold.", cures: ["cold"], where: ["rome"] },
+    c_tonic: { type: "cure", name: "Bitter bark tonic", price: 40, note: "Cures marsh fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["rome"] },
+    c_theriac: { type: "cure", name: "Theriac", price: 130, note: "The great antidote of Rome: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["rome"] },
+    c_kadha: { type: "cure", name: "Tulsi and ginger kadha", price: 10, note: "A hot herbal drink that cures a cold.", cures: ["cold"], where: ["delhi"] },
+    c_neem: { type: "cure", name: "Neem and giloy tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["delhi"] },
+    c_rasa: { type: "cure", name: "Ayurvedic rasayana", price: 130, note: "The strongest medicine of the vaidyas: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["delhi"] },
+  };
+  Object.assign(ITEMS, CURES);
   Object.assign(ITEMS, FOODS);
   const foodHere = (it) => it.where[0] === (typeof city !== "undefined" ? city : "rome") && it.where[1] === (typeof era !== "undefined" ? era : "ancient") && (!it.fest || (typeof Festival !== "undefined" && Festival.id === it.fest));   // festival dishes only on their festival
 
@@ -96,13 +106,13 @@ const Market = (() => {
     clothes: { title: "Clothier", types: ["wear"] },
     pets: { title: "Animals and rides", types: ["pet", "car", "mount"] },
     builder: { title: "Builder and decorator", types: ["decor"], house: true },
-    healer: { title: "Healer and trainer", types: ["supply", "perk"] },
+    healer: { title: "Healer and trainer", types: ["cure", "supply", "perk"] },
     garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
     dresser: { title: "Your dresser", types: ["wear"], ownedOnly: true, empty: "You do not own anything to wear yet. The clothier in the market square sells hats, cloaks, armour and boots. You cannot buy things here." },
   };
   let stall = "food";
   const SECTIONS = [
-    ["Hot food and drink", "food"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars and rickshaws (modern cities only)", "car"], ["Carts and elephants (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -158,6 +168,14 @@ const Market = (() => {
     const it = ITEMS[id];
     if (!it || (it.type !== "supply" && it.type !== "food" && s.items.includes(id))) return;
     if (Vitals.coins < markFood(it.price, it)) { toast(`The ${it.name.toLowerCase()} costs ${markFood(it.price, it)} denarii (you have ${Vitals.coins}).`); return; }
+    if (it.type === "cure") {
+      if (it.where[0] !== (typeof city !== "undefined" ? city : "rome")) return;
+      if (!it.cures.some((k) => Disease.has(k))) { toast("You are not ill with anything this cures."); return; }
+      Vitals.coins -= mark(it.price);
+      Disease.cure(it.cures); Sfx.play("coin"); render();
+      toast(`${it.name}: you feel better already.`); Narrator.say("The medicine works. You feel better.", { interrupt: true });
+      return;
+    }
     if (it.type === "food") {
       if (!foodHere(it)) return;
       if (Vitals.hunger >= 90 && Vitals.hp >= 99) { toast("You are not hungry."); return; }
@@ -166,6 +184,9 @@ const Market = (() => {
       { const hb = document.getElementById("v-hunger"); if (hb) { hb.classList.add("ate"); setTimeout(() => hb.classList.remove("ate"), 700); } }
       Sfx.play("coin"); render();
       toast(`${it.name}: delicious. Hunger ${Math.round(Vitals.hunger)}/100, health ${Math.round(Vitals.hp)}/100.`);
+      if (["f_lassi", "f_chai", "f_thandai", "f_thandaim", "f_gelato"].includes(id)) Disease.cure(["heat"]);          // a cool drink
+      if (["f_tea"].includes(id)) Disease.cure(["cold"]);
+      if (Math.random() < 0.03 + (typeof Weather !== "undefined" && Weather.season === 1 ? 0.04 : 0)) { Disease.catchIt("poison", "that street food was off"); Vitals.hunger = Math.max(0, Vitals.hunger - 35); Vitals.hp = Math.max(5, Vitals.hp - 8); }   // street food is sometimes bad, more often in summer
       return;
     }
     if (it.type === "supply") {
@@ -222,7 +243,7 @@ const Market = (() => {
         li.append(note); ul.append(li);
         return [h, ul];
       }
-      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => x.type === type && (type !== "food" || foodHere(x)) && (!def.ownedOnly || s.items.includes(fid)))) {
+      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => x.type === type && (type !== "food" || foodHere(x)) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
         name.textContent = it.name; note.textContent = it.note;

@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=214">
+  <link rel="stylesheet" href="walk.css?v=215">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=214"></script>
+  <script src="boot.js?v=215"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -77,6 +77,7 @@
       <div class="row"><span>Horses</span><div class="bar"><div id="v-horse"></div></div></div>
       <div class="row coins"><span>Denarii</span><b id="v-coins">300</b></div>
       <p id="v-tax"></p>
+      <p id="v-disease"></p>
       <p id="v-char"></p>
       <p id="v-peers"></p>
       <p id="v-rest"></p>
@@ -173,6 +174,7 @@
   <div id="flash"></div>
 
   <div id="sleep" aria-hidden="true"><p>Sleeping...</p></div>
+  <div id="sick" aria-hidden="true"></div>
   <div id="lightning" aria-hidden="true"></div>
   <div id="death" aria-hidden="true"><h2></h2><p></p></div>
   <div id="result" role="dialog" aria-live="polite">
@@ -435,44 +437,45 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=214"></script>
-  <script src="delhi-data.js?v=214"></script>
-  <script src="config.js?v=214"></script>
-  <script src="character.js?v=214"></script>
-  <script src="physics.js?v=214"></script>
-  <script src="vitals.js?v=214"></script>
-  <script src="narrator.js?v=214"></script>
-  <script src="audio.js?v=214"></script>
-  <script src="music.js?v=214"></script>
-  <script src="world.js?v=214"></script>
-  <script src="city.js?v=214"></script>
-  <script src="weather.js?v=214"></script>
-  <script src="modern.js?v=214"></script>
-  <script src="delhi.js?v=214"></script>
-  <script src="delhi-games.js?v=214"></script>
-  <script src="home.js?v=214"></script>
-  <script src="spectators.js?v=214"></script>
-  <script src="fight.js?v=214"></script>
-  <script src="nav.js?v=214"></script>
-  <script src="show.js?v=214"></script>
-  <script src="shipyard.js?v=214"></script>
-  <script src="naval.js?v=214"></script>
-  <script src="watch.js?v=214"></script>
-  <script src="race.js?v=214"></script>
-  <script src="account.js?v=214"></script>
-  <script src="online.js?v=214"></script>
-  <script src="chat.js?v=214"></script>
-  <script src="tax.js?v=214"></script>
-  <script src="pets.js?v=214"></script>
-  <script src="car.js?v=214"></script>
-  <script src="market.js?v=214"></script>
-  <script src="garage.js?v=214"></script>
-  <script src="dresser.js?v=214"></script>
-  <script src="festival.js?v=214"></script>
-  <script src="harbour.js?v=214"></script>
-  <script src="stalls.js?v=214"></script>
-  <script src="robbery.js?v=214"></script>
-  <script src="jobs.js?v=214"></script>
-  <script src="game.js?v=214"></script>
+  <script src="landmarks.js?v=215"></script>
+  <script src="delhi-data.js?v=215"></script>
+  <script src="config.js?v=215"></script>
+  <script src="character.js?v=215"></script>
+  <script src="physics.js?v=215"></script>
+  <script src="vitals.js?v=215"></script>
+  <script src="narrator.js?v=215"></script>
+  <script src="audio.js?v=215"></script>
+  <script src="music.js?v=215"></script>
+  <script src="world.js?v=215"></script>
+  <script src="city.js?v=215"></script>
+  <script src="weather.js?v=215"></script>
+  <script src="modern.js?v=215"></script>
+  <script src="delhi.js?v=215"></script>
+  <script src="delhi-games.js?v=215"></script>
+  <script src="home.js?v=215"></script>
+  <script src="spectators.js?v=215"></script>
+  <script src="fight.js?v=215"></script>
+  <script src="nav.js?v=215"></script>
+  <script src="show.js?v=215"></script>
+  <script src="shipyard.js?v=215"></script>
+  <script src="naval.js?v=215"></script>
+  <script src="watch.js?v=215"></script>
+  <script src="race.js?v=215"></script>
+  <script src="account.js?v=215"></script>
+  <script src="online.js?v=215"></script>
+  <script src="chat.js?v=215"></script>
+  <script src="tax.js?v=215"></script>
+  <script src="pets.js?v=215"></script>
+  <script src="car.js?v=215"></script>
+  <script src="market.js?v=215"></script>
+  <script src="garage.js?v=215"></script>
+  <script src="dresser.js?v=215"></script>
+  <script src="festival.js?v=215"></script>
+  <script src="harbour.js?v=215"></script>
+  <script src="disease.js?v=215"></script>
+  <script src="stalls.js?v=215"></script>
+  <script src="robbery.js?v=215"></script>
+  <script src="jobs.js?v=215"></script>
+  <script src="game.js?v=215"></script>
 </body>
 </html>

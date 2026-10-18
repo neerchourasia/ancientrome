@@ -393,7 +393,7 @@ let crashCd = 0, scrapeCd = 0;
 // Number keys 1-9 pick how fast you walk (4 is a normal walking pace, 9 is a sprint).
 const WALK_SPEEDS = [1.5, 2.5, 4, 5.5, 7, 8.5, 10, 11.5, 13];
 let walkLevel = 4;
-const walkSpeed = () => WALK_SPEEDS[walkLevel - 1];
+const walkSpeed = () => WALK_SPEEDS[walkLevel - 1] * Disease.speedMul;   // illness slows you
 function setWalkLevel(n) {
   walkLevel = n;
   toast(`Walking speed ${n}/9${n === 1 ? " (a slow stroll)" : n === 4 ? " (normal)" : n === 9 ? " (sprint)" : ""}`);
@@ -522,7 +522,7 @@ function updatePlayer(dt) {
   if (keys.has("KeyE")) turn -= 1;
   player.yaw += turn * 1.9 * dt;
 
-  const speed = mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13, walkSpeed()) : walkSpeed(); // in a duel everyone is the same speed (Shift blocks)
+  const speed = mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul, walkSpeed()) : walkSpeed(); // in a duel everyone is the same speed (Shift blocks)
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   const rx = -fz, rz = fx;
   let tx = fx * fwd + rx * side, tz = fz * fwd + rz * side;
@@ -1491,9 +1491,9 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
-  Vitals.update(dt, { mode, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
+  Vitals.update(dt, { mode, regenMul: Disease.regenMul, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();

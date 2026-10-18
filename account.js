@@ -81,6 +81,7 @@ const Account = (() => {
         tax: Tax.snapshot(),
         jobs: Jobs.snapshot(),
         ships: Shipyard.snapshot(),
+        disease: Disease.snapshot(),
         era,
       },
     };
@@ -105,6 +106,7 @@ const Account = (() => {
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
     if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);
+    if (p.disease && typeof p.disease === "object") Disease.restore(p.disease);
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 
