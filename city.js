@@ -176,6 +176,11 @@ const EXCLUDE = [ // [x0, x1, z0, z1]
   [222, 290, 24, 78],      // your house
 ];
 
+const CARVE = [ // [x0, x1, z0, z1] where no apartment blocks stand
+  [-775, -605, -215, -45],   // the Theatre of Pompey and its portico
+  [-470, -390, 40, 110],     // the Temple of Hercules Victor
+];
+
 function excluded(x, z, m) {
   for (const [x0, x1, z0, z1] of EXCLUDE) if (x > x0 - m && x < x1 + m && z > z0 - m && z < z1 + m) return true;
   return false;
@@ -197,6 +202,12 @@ function buildInsulae(scene) {
       const ci = Math.floor(rnd() * PLASTER_ANCIENT.length);
       list.push({ x: px, z: pz, w, d, h, ci });
     }
+  }
+  // the Temple of Hercules Victor and the Theatre of Pompey stand in the packed western districts: clear the blocks from their sites
+  // (done after the blocks are laid out, so the rest of the city stays exactly as it was)
+  for (let i = list.length - 1; i >= 0; i--) {
+    const b = list[i];
+    if (CARVE.some(([x0, x1, z0, z1]) => b.x + b.w / 2 > x0 && b.x - b.w / 2 < x1 && b.z + b.d / 2 > z0 && b.z - b.d / 2 < z1)) list.splice(i, 1);
   }
   const geo = new THREE.BoxGeometry(1, 1, 1);
   geo.translate(0, 0.5, 0);

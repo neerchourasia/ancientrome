@@ -728,7 +728,7 @@ function buildColossus() {
 // The Temple of Hercules Victor in the Forum Boarium (c. 120 BC): a round temple of white marble, with a ring of twenty
 // Corinthian columns round a round cella and a tiled roof. It still stands today (the oldest surviving marble building in Rome).
 function buildHerculesVictor() {
-  const cx = -290, cz = 70, colR = 7.6, colH = 8.2, base = 1.5;
+  const cx = -430, cz = 75, colR = 7.6, colH = 8.2, base = 1.5;
   planeAt(cx, cz, 50, 50, pavingTex("#bcb198", "rgba(90,70,40,.3)", 32, 16, 16));
   MAP_SHAPES.push({ k: "e", cx, cz, ax: 11, az: 11, c: "#e2d9c4" });
   // the stepped podium
@@ -757,7 +757,7 @@ function buildHerculesVictor() {
 // colonnades (the Porticus of Pompey), where Julius Caesar was murdered in 44 BC. Only the curve of its streets survives today.
 let pompeyGroup = null;
 function buildPompey() {
-  const cx = -360, cz = -128, R0 = 15, R1 = 45, rows = 13, rise = 0.62, tread = (R1 - R0) / rows;
+  const cx = -690, cz = -125, R0 = 15, R1 = 45, rows = 13, rise = 0.62, tread = (R1 - R0) / rows;
   const g = new T.Group(); worldScene.add(g); pompeyGroup = g;
   const stone = M.travertine, seatMat = new T.MeshStandardMaterial({ color: 0xd8c59b, roughness: 1, flatShading: true, side: T.DoubleSide, map: seatingTex() });
   // the seats: a lathe of steps, the half facing south

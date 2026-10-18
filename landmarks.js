@@ -5,15 +5,15 @@
 const LANDMARKS = [
   {
     id: "hercules", name: "Temple of Hercules Victor", sub: "Forum Boarium · c. 120 BC",
-    x: -290, z: 70, r: 30, stand: [-290, 42],
-    text: "A round temple of white marble in the cattle market (the Forum Boarium), the riverside quarter between the Capitoline, the Palatine and the Tiber, just beyond the start of the Circus Maximus. Twenty Corinthian columns surround a round cella under a tiled roof. It was built by a wealthy olive merchant to honour Hercules, the patron of traders, who was said to have driven the cattle of Geryon past this very spot.",
+    x: -430, z: 75, r: 30, stand: [-430, 47],
+    text: "A round temple of white marble in the cattle market (the Forum Boarium), the riverside quarter at the north-west end of the Circus Maximus, between the Capitoline, the Palatine and the Tiber. Twenty Corinthian columns surround a round cella under a tiled roof. It was built by a wealthy olive merchant to honour Hercules, the patron of traders, who was said to have driven the cattle of Geryon past this very spot.",
     fact: "It is the oldest surviving marble building in Rome, and one of the best preserved temples from the Republic.",
     modern: "It still stands, in the Piazza della Bocca della Verità: 19 of its 20 columns survive, though the roof and the beam above the columns are gone. The church of Santa Maria in Cosmedin stands beside it.",
   },
   {
     id: "pompey", name: "Theatre of Pompey", sub: "Campus Martius · dedicated 55 BC",
-    x: -360, z: -120, r: 70, stand: [-360, -40],
-    text: "Rome's first permanent stone theatre, paid for by Pompey the Great, in the Campus Martius (the 'field of Mars') on the flat ground west of the Capitoline hill. A half-round of seats for about 17,000 people faces a great stage building, and the Temple of Venus Victrix crowns the top of the seats. Behind the stage lies the Porticus of Pompey: a huge garden of plane trees and fountains, ringed by colonnades.",
+    x: -690, z: -125, r: 70, stand: [-690, -45],
+    text: "Rome's first permanent stone theatre, paid for by Pompey the Great, in the Campus Martius (the 'field of Mars'), the flat ground inside the bend of the Tiber, far to the west of the Capitoline hill and south-west of the Pantheon. A half-round of seats for about 17,000 people faces a great stage building, and the Temple of Venus Victrix crowns the top of the seats. Behind the stage lies the Porticus of Pompey: a huge garden of plane trees and fountains, ringed by colonnades.",
     fact: "Julius Caesar was stabbed to death on 15 March 44 BC in a hall of the Porticus, because the Senate House was being repaired.",
     modern: "The theatre is gone, but its shape survives: houses were built over the curve of its seats, and the streets of the old district still follow it. A plaque marks the spot where Caesar fell, in Largo di Torre Argentina.",
   },
