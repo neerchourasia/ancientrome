@@ -233,7 +233,7 @@ const Robbery = (() => {
       gd.t -= dt;
       if (gd.t > 0) { gd.g.visible = true; near = Math.min(near, Math.hypot(player.x - gd.x, player.z - gd.z)); continue; }          // the second guard sets off a few seconds later
       gd.age += dt;
-      const dx = player.x - gd.x, dz = player.z - gd.z, d = Math.hypot(dx, dz) || 1, sp = (9 + Math.min(4, gd.age * 0.15)) * dt;
+      const dx = player.x - gd.x, dz = player.z - gd.z, d = Math.hypot(dx, dz) || 1, sp = (5.5 + Math.min(2.5, gd.age * 0.08)) * dt;   // slower: 5.5 m/s at first, up to 8 m/s after half a minute
       let nx = gd.x + (dx / d) * sp, nz = gd.z + (dz / d) * sp;
       if (blockedAt(nx, nz, groundAt(gd.x, gd.z))) { if (!blockedAt(nx, gd.z, groundAt(gd.x, gd.z))) nz = gd.z; else if (!blockedAt(gd.x, nz, groundAt(gd.x, gd.z))) nx = gd.x; else { nx = gd.x; nz = gd.z; } }
       gd.x = nx; gd.z = nz; gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); gd.g.rotation.y = Math.atan2(dx, dz);
