@@ -137,6 +137,7 @@ function wireInput(canvas) {
     if (Vitals.resting && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(k)) Vitals.stopRest(); // moving stands you up
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
 
+    if ((k === "KeyL" || k === "KeyU") && mode === "walk" && !panelOpen && !inArena(player.x, player.z) && Festival.key(k)) return;   // festival activities: L a lantern, U colours
     if (k === "KeyT") cycleTime();
     if (k === "KeyO") toggleSound();
     if (k === "KeyJ") toggleVoice();

@@ -1080,5 +1080,5 @@ const Delhi = (() => {
 
   const show = (v) => { if (root) root.visible = v; };
 
-  return { build, show, setEra, setTier, get tier() { return houseTier; }, update, hits, homeInside, inPlot, homeSpot, venueAt, VENUES, cannonShow: (v) => { if (cannonG) cannonG.visible = v; }, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
+  return { build, show, setEra, setTier, get tier() { return houseTier; }, update, hits, homeInside, inPlot, homeSpot, venueAt, VENUES, cannonShow: (v) => { if (cannonG) cannonG.visible = v; }, BOUNDS: BOUNDS_D, MAP: MAP_D, SPAWN, get built() { return built; }, people: () => people.list, peopleMesh: () => people.body, debug: () => ({ people: people.list, rides: rides.list, jumbos }) };
 })();

@@ -16,7 +16,7 @@ const Festival = (() => {
     holi: { city: "delhi", name: "Holi", icon: "🎨", from: 17, to: 18, note: "coloured powder, cheaper food, better pay", say: ["Holi hai!", "Bura na mano, Holi hai!", "Happy Holi!", "Come, play with colours!"] },
   };
   const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b] };
-  let scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
+  let clock = 0, lanterns = [], diyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
   const mats = {};
 
   const dayOfYear = () => ((Math.floor(Time.day) - 1) % 28 + 28) % 28 + 1;
@@ -77,11 +77,88 @@ const Festival = (() => {
     }
   }
 
+  // ---------------------------------------------------------------- things to do: lanterns (Diwali, Saturnalia), colours (Holi, Floralia)
+
+  const LANT_COLORS = [0xff7a3a, 0xffd36b, 0xe23b8a, 0x5ac8ff, 0xa6ff7a, 0xffffff];
+  const can = (k) => cur && ((k === "KeyL" && (curKey === "diwali" || curKey === "saturnalia")) || (k === "KeyU" && (curKey === "holi" || curKey === "floralia")));
+
+  function lanternMesh(col) {
+    const g = new T.Group(), paper = new T.MeshBasicMaterial({ color: col });
+    const body = new T.Mesh(new T.CylinderGeometry(0.3, 0.42, 0.8, 8, 1, true), paper); body.material.side = T.DoubleSide; g.add(body);
+    const cap = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.05, 8), new T.MeshBasicMaterial({ color: 0x3a2a1a })); cap.position.y = 0.42; g.add(cap);
+    const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffb347, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false })); glow.scale.set(2.6, 2.6, 1); glow.position.y = 0.1; g.add(glow);
+    return g;
+  }
+
+  // release a sky lantern in front of you (it drifts up and away, with your wish said above it)
+  function release(col, wish) {
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), g = lanternMesh(col);
+    g.position.set(player.x + fx * 1.4, player.feet + 1.3, player.z + fz * 1.4); scene.add(g);
+    lanterns.push({ g, vy: 1.4 + Math.random() * 0.6, ph: Math.random() * 6, t: 0, dx: (Math.random() - 0.3) * 0.6, dz: (Math.random() - 0.5) * 0.6 });
+    while (lanterns.length > 36) { const o = lanterns.shift(); scene.remove(o.g); }
+    if (wish) Speech.say({ x: player.x + fx * 1.4, z: player.z + fz * 1.4 }, wish, 4);
+    Sfx.play("coin");
+  }
+  // set a little clay lamp (a diya) down where you stand; it burns until the festival is over
+  function placeDiya() {
+    const g = new T.Group(), bowl = new T.Mesh(new T.CylinderGeometry(0.22, 0.14, 0.12, 10), new T.MeshLambertMaterial({ color: 0xb5593a })); bowl.position.y = 0.06; g.add(bowl);
+    const flame = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffc860, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false })); flame.scale.set(1.1, 1.1, 1); flame.position.y = 0.25; g.add(flame);
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), x = player.x + fx * 1.1, z = player.z + fz * 1.1;
+    g.position.set(x, groundAt(x, z), z); scene.add(g); diyas.push(g);
+    while (diyas.length > 16) scene.remove(diyas.shift());
+    Sfx.play("coin");
+  }
+
+  // shoot a burst of coloured powder (Holi) or throw flowers (Floralia) in front of you; people it hits are splashed with colour
+  function shoot() {
+    if (shotCd > 0) return; shotCd = 0.35;
+    const pal = COLORS[curKey] || COLORS.holi, fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), flowers = curKey === "floralia";
+    for (let i = 0; i < 28; i++) {
+      const sp = 11 + Math.random() * 6, a = (Math.random() - 0.5) * 0.45, c = Math.cos(a), s = Math.sin(a), dx = fx * c - fz * s, dz = fx * s + fz * c;
+      const sprite_ = sprite(pal[Math.floor(Math.random() * pal.length)], 0.7 + Math.random() * 0.9, false);
+      sprite_.position.set(player.x + fx * 0.9, player.feet + 1.5, player.z + fz * 0.9);
+      parts.push({ s: sprite_, vx: dx * sp, vy: 1.5 + Math.random() * 2, vz: dz * sp, life: 1.1, max: 1.1, g: flowers ? 3 : 4.5, op: 0.85 });
+    }
+    // anyone in front of you within about 14 m is splashed
+    const list = typeof city !== "undefined" && city === "delhi" ? (Delhi.built ? Delhi.people() : []) : CITIZENS.list, mesh = city === "delhi" ? Delhi.peopleMesh() : CITIZENS.body;
+    list.forEach((p, i) => {
+      const dx = p.x - player.x, dz = p.z - player.z, d = Math.hypot(dx, dz);
+      if (d > 14 || d < 0.5 || (dx * fx + dz * fz) / d < 0.86) return;
+      if (mesh) { mesh.setColorAt(i, new T.Color(pal[Math.floor(Math.random() * pal.length)])); mesh.instanceColor.needsUpdate = true; if (!tinted.includes(i)) tinted.push(i); }
+      burst(p.x, 1.2, p.z, pal, 8, 4, 1.2, 1.6, false, 3);
+      if (Math.random() < 0.6) Speech.say(p, cur.say[Math.floor(Math.random() * cur.say.length)], 2.6);
+      hits++;
+    });
+    if (hits && hits % 8 === 0) toast(`${cur.icon} ${hits} people splashed with ${flowers ? "flowers" : "colour"}!`);
+    Sfx.play("splash");
+  }
+
+  function restoreTints() {
+    if (!tinted.length) return;
+    tinted = []; hits = 0;
+    try { if (city === "delhi") { Delhi.setEra(era === "modern"); } else applyCitizensEra(era === "modern"); } catch (e) { /* ignore */ }
+  }
+
+  function openLantern() {
+    openPanel("#lantern");
+    const row = document.getElementById("ln-colors"); row.replaceChildren();
+    LANT_COLORS.forEach((c, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "sy-sw" + (i === (openLantern.sel || 0) ? " on" : ""); b.style.background = "#" + c.toString(16).padStart(6, "0"); b.setAttribute("aria-label", `colour ${i + 1}`); b.addEventListener("click", () => { openLantern.sel = i; for (const x of row.children) x.classList.remove("on"); b.classList.add("on"); }); row.append(b); });
+    document.getElementById("ln-title").textContent = curKey === "diwali" ? "🪔 Make a lantern for Diwali" : "🕯 Light a lantern for Saturnalia";
+  }
+  function key(k) {
+    if (!can(k)) return false;
+    if (k === "KeyL") { openLantern(); return true; }
+    shoot(); return true;
+  }
+
   function init(sc) {
     scene = sc;
     const c = document.createElement("canvas"); c.width = c.height = 64;
     const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 1, 32, 32, 30); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.4, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new T.CanvasTexture(c);
+    document.getElementById("ln-release").addEventListener("click", () => { const w = document.getElementById("ln-wish").value.replace(/[<>]/g, "").slice(0, 60).trim(); closePanels(); release(LANT_COLORS[openLantern.sel || 0], w); document.getElementById("ln-wish").value = ""; });
+    document.getElementById("ln-diya").addEventListener("click", () => { closePanels(); placeDiya(); });
+    document.getElementById("fest-act").addEventListener("click", () => { if (mode === "walk" && !panelOpen) key(cur && (curKey === "diwali" || curKey === "saturnalia") ? "KeyL" : "KeyU"); });
   }
 
   // ---------------------------------------------------------------- each frame
@@ -99,10 +176,21 @@ const Festival = (() => {
     if (key !== curKey) {
       curKey = key; cur = key ? FEASTS[key] : null;
       for (const [k, g] of Object.entries(deco)) g.visible = k === key;
+      for (const l of lanterns.splice(0)) scene.remove(l.g); for (const d of diyas.splice(0)) scene.remove(d); restoreTints();
       if (key) { build(key).visible = true; toast(`${cur.icon} ${cur.name}! ${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
       badge();
+      const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = (curKey === "diwali" || curKey === "saturnalia") ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : "🕯 Light a lantern (L)") : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
     }
     if (!cur) { for (const p of parts.splice(0)) { scene.remove(p.s); p.s.material.dispose(); } return; }
+    shotCd = Math.max(0, shotCd - dt);
+    for (let i = lanterns.length - 1; i >= 0; i--) {   // sky lanterns drift up and away
+      const l = lanterns[i]; l.t += dt; l.vy = Math.min(3.4, l.vy + dt * 0.04);
+      l.g.position.x += (l.dx + Math.sin(l.t * 0.6 + l.ph) * 0.4) * dt; l.g.position.z += (l.dz + Math.cos(l.t * 0.5 + l.ph) * 0.4) * dt; l.g.position.y += l.vy * dt;
+      l.g.children[2].material.opacity = Math.max(0, Math.min(1, (190 - l.g.position.y) / 60));
+      if (l.g.position.y > 200) { scene.remove(l.g); lanterns.splice(i, 1); }
+    }
+    for (const d of diyas) d.children[1].scale.setScalar(1.0 + Math.sin(clock * 9 + d.position.x) * 0.12);
+    clock += dt;
     // people wish you well
     sayT -= dt;
     if (sayT <= 0 && typeof Speech !== "undefined" && (mode === "walk" || mode === "drive")) {
@@ -138,7 +226,7 @@ const Festival = (() => {
   }
 
   return {
-    init, update, FEASTS,
+    init, update, FEASTS, key, release, shoot,
     get active() { return !!cur; },
     get id() { return curKey; },
     get name() { return cur ? cur.name : ""; },

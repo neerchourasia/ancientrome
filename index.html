@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=233">
+  <link rel="stylesheet" href="walk.css?v=235">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=233"></script>
+  <script src="boot.js?v=235"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <div class="top-center"><span id="compass">N 0°</span><span id="clock"></span><span id="era-badge" class="ancient">Ancient Rome</span><span id="wx-badge"></span><span id="fest-badge"></span><span id="sleep-hint">Press <kbd>Z</kbd> to sleep until morning</span></div>
+    <div class="top-center"><span id="compass">N 0°</span><span id="clock"></span><span id="era-badge" class="ancient">Ancient Rome</span><span id="wx-badge"></span><span id="fest-badge"></span><button id="fest-act" type="button" hidden></button><span id="sleep-hint">Press <kbd>Z</kbd> to sleep until morning</span></div>
     <div id="nav" hidden>
       <div id="nav-arrow" aria-hidden="true">▲</div>
       <div class="txt"><strong id="nav-name"></strong><span id="nav-dist"></span><span id="nav-step"></span></div>
@@ -323,6 +323,16 @@
     </div>
   </div>
 
+  <div id="lantern" class="dpanel" role="dialog" aria-label="Make a lantern">
+    <div class="box">
+      <header><h2 id="ln-title">🪔 Make a lantern</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
+      <p class="dnote">Choose the colour of the paper, make a wish, and let it go. A sky lantern drifts up into the night; a diya is a little clay lamp you set down on the ground to burn all festival.</p>
+      <div id="ln-colors" class="sy-sws"></div>
+      <label class="dnote">Your wish <input id="ln-wish" type="text" maxlength="60" placeholder="a short wish (optional)"></label>
+      <div class="dbtns"><button id="ln-release" type="button">✨ Release into the sky</button><button id="ln-diya" type="button">🪔 Place a diya here</button></div>
+    </div>
+  </div>
+
   <div id="jobboard" class="dpanel" role="dialog" aria-label="Job board">
     <div class="box">
       <header><h2 id="jb-title">📋 The job board</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
@@ -448,48 +458,48 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=233"></script>
-  <script src="delhi-data.js?v=233"></script>
-  <script src="config.js?v=233"></script>
-  <script src="character.js?v=233"></script>
-  <script src="physics.js?v=233"></script>
-  <script src="vitals.js?v=233"></script>
-  <script src="narrator.js?v=233"></script>
-  <script src="audio.js?v=233"></script>
-  <script src="music.js?v=233"></script>
-  <script src="world.js?v=233"></script>
-  <script src="city.js?v=233"></script>
-  <script src="weather.js?v=233"></script>
-  <script src="modern.js?v=233"></script>
-  <script src="delhi.js?v=233"></script>
-  <script src="delhi-games.js?v=233"></script>
-  <script src="home.js?v=233"></script>
-  <script src="spectators.js?v=233"></script>
-  <script src="fight.js?v=233"></script>
-  <script src="nav.js?v=233"></script>
-  <script src="show.js?v=233"></script>
-  <script src="shipyard.js?v=233"></script>
-  <script src="naval.js?v=233"></script>
-  <script src="theatre.js?v=233"></script>
-  <script src="watch.js?v=233"></script>
-  <script src="race.js?v=233"></script>
-  <script src="account.js?v=233"></script>
-  <script src="online.js?v=233"></script>
-  <script src="chat.js?v=233"></script>
-  <script src="tax.js?v=233"></script>
-  <script src="pets.js?v=233"></script>
-  <script src="car.js?v=233"></script>
-  <script src="market.js?v=233"></script>
-  <script src="garage.js?v=233"></script>
-  <script src="dresser.js?v=233"></script>
-  <script src="festival.js?v=233"></script>
-  <script src="harbour.js?v=233"></script>
-  <script src="disease.js?v=233"></script>
-  <script src="jail.js?v=233"></script>
-  <script src="guards.js?v=233"></script>
-  <script src="stalls.js?v=233"></script>
-  <script src="robbery.js?v=233"></script>
-  <script src="jobs.js?v=233"></script>
-  <script src="game.js?v=233"></script>
+  <script src="landmarks.js?v=235"></script>
+  <script src="delhi-data.js?v=235"></script>
+  <script src="config.js?v=235"></script>
+  <script src="character.js?v=235"></script>
+  <script src="physics.js?v=235"></script>
+  <script src="vitals.js?v=235"></script>
+  <script src="narrator.js?v=235"></script>
+  <script src="audio.js?v=235"></script>
+  <script src="music.js?v=235"></script>
+  <script src="world.js?v=235"></script>
+  <script src="city.js?v=235"></script>
+  <script src="weather.js?v=235"></script>
+  <script src="modern.js?v=235"></script>
+  <script src="delhi.js?v=235"></script>
+  <script src="delhi-games.js?v=235"></script>
+  <script src="home.js?v=235"></script>
+  <script src="spectators.js?v=235"></script>
+  <script src="fight.js?v=235"></script>
+  <script src="nav.js?v=235"></script>
+  <script src="show.js?v=235"></script>
+  <script src="shipyard.js?v=235"></script>
+  <script src="naval.js?v=235"></script>
+  <script src="theatre.js?v=235"></script>
+  <script src="watch.js?v=235"></script>
+  <script src="race.js?v=235"></script>
+  <script src="account.js?v=235"></script>
+  <script src="online.js?v=235"></script>
+  <script src="chat.js?v=235"></script>
+  <script src="tax.js?v=235"></script>
+  <script src="pets.js?v=235"></script>
+  <script src="car.js?v=235"></script>
+  <script src="market.js?v=235"></script>
+  <script src="garage.js?v=235"></script>
+  <script src="dresser.js?v=235"></script>
+  <script src="festival.js?v=235"></script>
+  <script src="harbour.js?v=235"></script>
+  <script src="disease.js?v=235"></script>
+  <script src="jail.js?v=235"></script>
+  <script src="guards.js?v=235"></script>
+  <script src="stalls.js?v=235"></script>
+  <script src="robbery.js?v=235"></script>
+  <script src="jobs.js?v=235"></script>
+  <script src="game.js?v=235"></script>
 </body>
 </html>

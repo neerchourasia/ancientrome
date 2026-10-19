@@ -394,17 +394,22 @@ const Jobs = (() => {
     toast("The shift begins!");
   }
 
+  // what a shift pays: at least 30% of the full pay for finishing a shift, up to all of it for doing it perfectly (and 10 more for a perfect one)
+  const MIN_PAY = 0.3;
+  const payFor = (job, r, score) => Math.round((job.base * r.mul * Math.max(MIN_PAY, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
+  const liveScore = (G) => (G.kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : G.kind === "baker" ? Math.min(1, G.inZone / SHIFT / 0.75) : G.kind === "water" ? Math.min(1, Math.max(0, G.score / 0.75)) : G.score);
+
   function finish(done) {
     const G = game; game = null;
     if (!G) return;
     if (!done) { toast("You walked off the shift and were not paid."); return; }
     const kind = G.kind, jobKind = G.job || G.kind, job = JOBS[jobKind], r = rank();
     const score = kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : kind === "baker" || kind === "water" ? Math.min(1, Math.max(0, kind === "water" ? G.score / 0.75 : G.inZone / SHIFT / 0.75)) : G.score; // a good winch crew is in the green 80% of the time
-    const pay = Math.round((job.base * r.mul * Math.max(0, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1));   // festival days pay a quarter more
+    const pay = payFor(job, r, score);   // festival days pay a quarter more
     Vitals.coins += pay; Vitals.hp -= HP_COST; s.shifts++; s.earned += pay; save();
     const oldRank = r, newRank = rank();
     $j("job-area").replaceChildren();
-    $j("job-text").textContent = score >= 0.9 ? "Excellent work! The foreman nods." : score >= 0.5 ? "Fair work. The foreman pays you." : "Poor work. The foreman scowls and pays you a few coins.";
+    $j("job-text").textContent = score >= 0.9 ? "Excellent work! The foreman nods." : score >= 0.5 ? "Fair work. The foreman pays you." : "Poor work. The foreman scowls and pays you the least he can.";
     $j("job-info").textContent = `You earned ${pay} denarii (${Math.round(score * 100)}% of the full pay). Total earned from jobs: ${s.earned}.${newRank !== oldRank ? ` You are promoted: ${newRank.name}!` : ""}`;
     const b = $j("job-btns"); b.replaceChildren();
     b.append(btn("Another shift", () => { closePanels(); open(jobKind); }), btn("Leave", closePanels));
@@ -558,6 +563,7 @@ const Jobs = (() => {
       if (!$j("job").classList.contains("show")) { finish(false); return; }
       game.t -= Math.min(dt, 0.1);
       game.step(Math.min(dt, 0.1));
+      if (game.hud) game.hud.textContent += ` · Pay so far: about ${payFor(JOBS[game.job || game.kind], rank(), liveScore(game))} denarii`;
       if (game.t <= 0) finish(true);
       return;
     }
