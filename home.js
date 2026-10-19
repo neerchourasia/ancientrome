@@ -116,6 +116,7 @@ const Home = (() => {
     lamp = new T.PointLight(0xffc477, 0.3, 17);
     lamp.position.set(lx, F.y + 3, lz);
     worldScene.add(lamp);
+    Cage.build(worldScene, 255, 53.3, -1);   // the menagerie, against the back wall between the bed and the chest
     buildExtensions();
 
     // door banners, bought in the Market (hidden until then)

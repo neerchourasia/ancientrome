@@ -1566,6 +1566,7 @@ function tick(dt) {
   DGames.tickRun(dt);
   updateAvatar(dt);
   Pets.update(dt);
+  Cage.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

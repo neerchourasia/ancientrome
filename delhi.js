@@ -555,6 +555,8 @@ const Delhi = (() => {
     hb(3, -92, 4.6, -62, 6, 0.4, 6, D.marble, false);
     hdome(3, -92, 5, -62, 2.4, 3, D.gold, 0.4);
     for (const sx of [-1, 1]) hb(3, -100 + sx * 4.2, 0, -19, 1.2, 8, 1.2, D.marble, false);
+    // the menagerie: a cage in the bedroom of every house, against a wall clear of the bed and the dresser
+    [[-99.4, -36.2, 1], [-100, -48.2, 1], [-79.6, -67.7, 1], [-79.6, -67.7, 1]].forEach(([cx, cz, f], t) => Cage.build(houses[t].g, X(cx), cz, f, houses[t].blockers));
     for (const h of houses) scene.add(h.g);
     setTier(pendingTier);
   }

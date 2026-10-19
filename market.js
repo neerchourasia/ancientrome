@@ -296,6 +296,8 @@ const Market = (() => {
     bind, open, render, ITEMS, STALLS,
     get house() { return s.house; },
     get worn() { return s.worn.filter((id) => ITEMS[id].type === "wear"); }, // what other players can see
+    get pets() { return s.items.filter((id) => ITEMS[id] && ITEMS[id].type === "pet"); },
+    itemName: (id) => (ITEMS[id] ? ITEMS[id].name : id),
     get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },
     owns: (id) => s.items.includes(id),
     perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),
