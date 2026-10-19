@@ -92,6 +92,11 @@ const Social = (() => {
     if (tl && top) {
       tl.replaceChildren(...(top.list.length ? top.list : [{ name: "nobody yet", r: "", w: 0, l: 0 }]).map((x, i) => { const e = document.createElement("li"); e.textContent = x.r === "" ? x.name : `${x.name}: ${x.r} (${x.w}-${x.l})`; return e; }));
     }
+    const vc = $s("v-char");                         // the badge beside your name on the main screen
+    if (vc && Character.exists) {
+      vc.textContent = `${Character.name} · ${Character.className}`;
+      if (Account.loggedIn) { const t = tier(rank.r), bd = span(`${t[2]} ${rank.r}`, "rank-badge"); bd.title = `Ranked rating: ${rankText()}`; vc.append(" ", bd); }
+    }
     const panel = $s("friends");
     if (!panel || !panel.classList.contains("show")) return;
     const login = !Account.loggedIn;

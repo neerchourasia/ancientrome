@@ -781,6 +781,7 @@ function applyLook(look) {
 function applyCharacter() {
   applyLook(Character.look);
   $("#v-char").textContent = Character.exists ? `${Character.name} · ${Character.className}` : "";
+  if (typeof Social !== "undefined") Social.render();   // puts your rank badge back beside your name
 }
 
 // Slides the 3D view to the right so you can see yourself beside the character panel.
