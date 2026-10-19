@@ -218,6 +218,9 @@ class Conn:
         self.rob_cd = 0.0          # when they may rob again
         self.houses_sig = None
         self.admin = False         # set from the database when they log in with an admin account
+        self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
+        self.hints = {}            # friend id -> the name their own browser remembers for that friend
+        self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
         self.ctok, self.ctok_t = 3.0, now()   # chat: how many messages they may send right now
         self.tokens, self.tok_t = 60.0, now()
@@ -303,8 +306,9 @@ class DuelRoom:
     kind = "duel"
     TICK = 0.05
 
-    def __init__(self, conns, with_bot=False):
+    def __init__(self, conns, with_bot=False, ranked=False):
         self.id = os.urandom(3).hex()
+        self.ranked = ranked
         self.players = [Duelist(c, i) for i, c in enumerate(conns)]
         if with_bot:
             self.players.append(Duelist(None, 1, bot=True))
@@ -316,8 +320,8 @@ class DuelRoom:
                 p.conn.room, p.conn.me, p.conn.queue = self, p, None
         for p in self.players:
             if p.conn:
-                p.conn.send({"t": "match", "mode": "duel", "room": self.id, "you": p.i, "radius": ARENA_R,
-                             "players": [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else ""), "cls": q.cls, "look": q.look} for q in self.players]})
+                p.conn.send({"t": "match", "mode": "duel", "room": self.id, "you": p.i, "radius": ARENA_R, "ranked": ranked,
+                             "players": [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else "") + (" (%d)" % rating_of(q.conn)["r"] if ranked and q.conn else ""), "cls": q.cls, "look": q.look} for q in self.players]})
         self.task = asyncio.ensure_future(self.run())
 
     # --- messages from a player
@@ -421,9 +425,11 @@ class DuelRoom:
         self.over = True
         msg = {"t": "end", "mode": "duel", "winner": winner, "reason": reason,
                "hp": [round(p.hp, 1) for p in self.players]}
+        ranks = rate_match(self.players, winner) if self.ranked else {}
         for p in self.players:
             if p.conn:
-                p.conn.send(msg)
+                out = dict(msg, ranked=self.ranked, rank=ranks.get(p.i)) if self.ranked else msg
+                p.conn.send(out)
                 p.conn.room = p.conn.me = None
         self.task.cancel()
 
@@ -1096,7 +1102,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "ranked": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1122,6 +1128,8 @@ def match_once():
         DuelRoom([a, b])
     if q and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DuelRoom([q.pop(0)], with_bot=True)
+
+    match_ranked(t)
 
     q = QUEUES["race"]
     q[:] = [c for c in q if not c.closed]
@@ -1532,6 +1540,275 @@ def on_admin(conn, m):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# ranked matches, friends and friend chats (these need an account: the game server only knows who you are when you log in)
+#
+# Ratings, friend lists and requests live in this server's memory, and each player's browser keeps its own copy in their saved
+# game and sends it back when they connect, so a restart of the server does not lose them. A friendship counts only when BOTH
+# sides have it, so nobody can make themselves somebody's friend by just saying so. Friends are named by a public friend id
+# (a hash of the account id), never by the account id itself.
+
+START_RATING = 1000
+RATINGS = {}      # account id -> {"r": rating, "w": wins, "l": losses, "d": draws, "name": last name}
+CLAIMS = {}       # friend id -> set of friend ids they list as friends
+FID_UID = {}      # friend id -> account id
+NAMES = {}        # friend id -> the name they last played under
+REQS = {}         # friend id -> {friend id of the one asking: their name}
+MAIL = {}         # friend id -> messages sent to them while they were away
+RECENT = collections.defaultdict(list)    # (account id, account id) -> times they played a ranked match against each other
+MAIL_MAX, REQ_MAX, FRIENDS_MAX = 30, 20, 60
+
+
+def fid_of(uid):
+    return hashlib.sha256(("tm-friend:" + str(uid)).encode()).hexdigest()[:12]
+
+
+def clean_fid(v):
+    return v if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{12}", v) else None
+
+
+def conns_of(fid):
+    return [c for c in CONNS if c.hello and not c.closed and c.fid == fid]
+
+
+def rating_of(conn):
+    """The rating record of a logged-in player (guests get a throwaway one)."""
+    if not conn or not conn.uid:
+        return {"r": START_RATING, "w": 0, "l": 0, "d": 0, "name": conn.name if conn else ""}
+    return RATINGS.setdefault(conn.uid, {"r": START_RATING, "w": 0, "l": 0, "d": 0, "name": conn.name})
+
+
+def public_rank(rec):
+    return {"r": rec["r"], "w": rec["w"], "l": rec["l"], "d": rec["d"]}
+
+
+def claim_rank(conn, claimed):
+    """A player's browser remembers their rating; the first time this server sees them, that is where they start from."""
+    if not conn.uid or conn.uid in RATINGS or not isinstance(claimed, dict):
+        return
+    r = int(num(claimed.get("r"), 0, 4000, START_RATING))
+    RATINGS[conn.uid] = {"r": r, "w": int(num(claimed.get("w"), 0, 100000)), "l": int(num(claimed.get("l"), 0, 100000)), "d": int(num(claimed.get("d"), 0, 100000)), "name": conn.name}
+
+
+def elo_change(ra, rb, score, games):
+    k = 40 if games < 10 else 24
+    expected = 1.0 / (1.0 + 10 ** ((rb - ra) / 400.0))
+    return int(round(k * (score - expected)))
+
+
+def rate_match(players, winner):
+    """Updates both ratings after a ranked duel. Returns {player index: {r, w, l, d, delta}}. Playing the same person over and over
+    (more than 3 times in 10 minutes) changes nothing, so two friends cannot farm points."""
+    duelists = [p for p in players if p.conn and p.conn.uid]
+    if len(duelists) != 2:
+        return {}
+    a, b = duelists
+    ra, rb = rating_of(a.conn), rating_of(b.conn)
+    key = tuple(sorted((a.conn.uid, b.conn.uid)))
+    t = now()
+    RECENT[key] = [x for x in RECENT[key] if t - x < 600] + [t]
+    farm = len(RECENT[key]) > 3
+    out = {}
+    sa = 0.5 if winner == -1 else (1.0 if winner == a.i else 0.0)
+    before = (ra["r"], rb["r"])
+    for me, other, rme, rother, score in ((a, b, ra, rb, sa), (b, a, rb, ra, 1.0 - sa)):
+        games = rme["w"] + rme["l"] + rme["d"]
+        mine, theirs = (before[0], before[1]) if me is a else (before[1], before[0])   # both changes use the ratings from before the match
+        delta = 0 if farm else elo_change(mine, theirs, score, games)
+        if rme["r"] + delta < 0:
+            delta = -rme["r"]
+        rme["r"] += delta
+        rme["w" if score == 1.0 else "l" if score == 0.0 else "d"] += 1
+        rme["name"] = me.conn.name
+        out[me.i] = dict(public_rank(rme), delta=delta, farm=farm)
+    return out
+
+
+def match_ranked(t):
+    """Pairs ranked players with someone of a similar rating. The longer you wait, the wider the search gets (40 points per second)."""
+    q = QUEUES["ranked"]
+    q[:] = [c for c in q if not c.closed]
+    while len(q) >= 2:
+        best = None
+        for i in range(len(q)):
+            for j in range(i + 1, len(q)):
+                a, b = q[i], q[j]
+                gap = abs(rating_of(a)["r"] - rating_of(b)["r"])
+                window = 100 + 40 * max(t - a.queued_at, t - b.queued_at)
+                if gap <= window and (best is None or gap < best[0]):
+                    best = (gap, a, b)
+        if not best:
+            return
+        _, a, b = best
+        q.remove(a)
+        q.remove(b)
+        DuelRoom([a, b], ranked=True)
+
+
+def top_list(n=10):
+    rows = sorted(RATINGS.values(), key=lambda x: (-x["r"], -x["w"]))[:n]
+    return [{"name": x["name"], "r": x["r"], "w": x["w"], "l": x["l"]} for x in rows]
+
+
+def mutual(a, b):
+    return bool(a and b and b in CLAIMS.get(a, ()) and a in CLAIMS.get(b, ()))
+
+
+def friend_rows(conn):
+    rows = []
+    for f in sorted(CLAIMS.get(conn.fid, ())):
+        if mutual(conn.fid, f):
+            rows.append({"fid": f, "name": NAMES.get(f) or conn.hints.get(f) or "Friend", "online": bool(conns_of(f))})
+    return rows[:FRIENDS_MAX]
+
+
+def send_social(conn):
+    if not conn.fid:
+        return
+    conn.send({"t": "fr_state", "fid": conn.fid, "friends": friend_rows(conn), "rank": public_rank(rating_of(conn)),
+               "requests": [{"fid": f, "name": n} for f, n in REQS.get(conn.fid, {}).items()]})
+    for e in MAIL.pop(conn.fid, []):
+        conn.send(e)
+
+
+def presence(conn, online):
+    for f in list(CLAIMS.get(conn.fid, ())):
+        if mutual(conn.fid, f):
+            for c in conns_of(f):
+                c.send({"t": "fr_presence", "fid": conn.fid, "name": conn.name, "online": online})
+
+
+def social_start(conn, m):
+    """Called when a logged-in player says hello: remember who they are and what their browser says about them."""
+    if not conn.uid:
+        return
+    conn.fid = fid_of(conn.uid)
+    FID_UID[conn.fid] = conn.uid
+    NAMES[conn.fid] = conn.name
+    claim_rank(conn, m.get("rank"))
+    rating_of(conn)["name"] = conn.name
+    mine = CLAIMS.setdefault(conn.fid, set())
+    for f in (m.get("friends") if isinstance(m.get("friends"), list) else [])[:FRIENDS_MAX]:
+        fid = clean_fid(f.get("fid") if isinstance(f, dict) else None)
+        if fid and fid != conn.fid:
+            mine.add(fid)
+            conn.hints[fid] = clean_name(f.get("name"))
+    presence(conn, True)
+
+
+def social_drop(conn):
+    if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
+        presence(conn, False)
+
+
+def social_msg(conn, text):
+    conn.send({"t": "fr_msg", "msg": text})
+
+
+def on_social(conn, m):
+    a = m.get("a")
+    if not conn.fid:
+        return social_msg(conn, "Log in to your account to use friends and ranked matches.")
+    t = now()
+    conn.social_n = min(8.0, conn.social_n + (t - conn.social_t) * 1.0)   # eight lookups at once, then one a second
+    conn.social_t = t
+    if conn.social_n < 1:
+        return social_msg(conn, "Slow down a little.")
+    conn.social_n -= 1
+    if a == "online":
+        rows = [{"fid": c.fid, "name": c.name, "friend": mutual(conn.fid, c.fid), "sent": conn.fid in REQS.get(c.fid, {})}
+                for c in CONNS if c.hello and not c.closed and c.fid and c is not conn]
+        return conn.send({"t": "fr_online", "list": rows[:40]})
+    if a == "top":
+        return conn.send({"t": "top", "list": top_list(), "me": public_rank(rating_of(conn))})
+    if a == "req":
+        target = None
+        fid = clean_fid(m.get("fid"))
+        if fid:
+            cs = conns_of(fid)
+            target = cs[0] if cs else None
+        elif m.get("name"):
+            c = find_player(clean_name(m.get("name")))
+            target = c if c and c.fid else None
+        if not target:
+            return social_msg(conn, "Nobody online with an account has that name. They need to be online and logged in.")
+        if target is conn or target.fid == conn.fid:
+            return social_msg(conn, "That is you!")
+        if mutual(conn.fid, target.fid):
+            return social_msg(conn, "%s is already your friend." % target.name)
+        if conn.fid in REQS.get(target.fid, {}):
+            return social_msg(conn, "You already asked %s." % target.name)
+        if target.fid in REQS.get(conn.fid, {}):          # they asked you first: that is a yes
+            return accept_friend(conn, target.fid)
+        pending = REQS.setdefault(target.fid, {})
+        if len(pending) >= REQ_MAX:
+            return social_msg(conn, "%s has too many requests waiting." % target.name)
+        pending[conn.fid] = conn.name
+        for c in conns_of(target.fid):
+            c.send({"t": "fr_in", "fid": conn.fid, "name": conn.name})
+        return social_msg(conn, "Friend request sent to %s." % target.name)
+    if a == "ans":
+        fid = clean_fid(m.get("fid"))
+        if not fid or fid not in REQS.get(conn.fid, {}):
+            return
+        if m.get("ok"):
+            return accept_friend(conn, fid)
+        REQS[conn.fid].pop(fid, None)
+        return conn.send({"t": "fr_state", "fid": conn.fid, "friends": friend_rows(conn), "rank": public_rank(rating_of(conn)),
+                          "requests": [{"fid": f, "name": n} for f, n in REQS.get(conn.fid, {}).items()]})
+    if a == "del":
+        fid = clean_fid(m.get("fid"))
+        if not fid:
+            return
+        CLAIMS.get(conn.fid, set()).discard(fid)
+        CLAIMS.get(fid, set()).discard(conn.fid)
+        for c in conns_of(fid):
+            c.send({"t": "fr_removed", "fid": conn.fid})
+        return conn.send({"t": "fr_removed", "fid": fid})
+    if a == "dm":
+        return on_dm(conn, m)
+
+
+def accept_friend(conn, fid):
+    them = REQS.get(conn.fid, {}).pop(fid, None)
+    REQS.get(fid, {}).pop(conn.fid, None)
+    if len(CLAIMS.get(conn.fid, ())) >= FRIENDS_MAX or len(CLAIMS.get(fid, ())) >= FRIENDS_MAX:
+        return social_msg(conn, "Friend lists are full (%d friends)." % FRIENDS_MAX)
+    CLAIMS.setdefault(conn.fid, set()).add(fid)
+    CLAIMS.setdefault(fid, set()).add(conn.fid)
+    conn.send({"t": "fr_added", "fid": fid, "name": NAMES.get(fid) or them or "Friend", "online": bool(conns_of(fid))})
+    for c in conns_of(fid):
+        c.send({"t": "fr_added", "fid": conn.fid, "name": conn.name, "online": True})
+
+
+def on_dm(conn, m):
+    t = now()
+    if t < conn.muted_until:
+        return social_msg(conn, "You are muted for another %d minute(s)." % (int((conn.muted_until - t) / 60) + 1))
+    conn.ctok = min(3.0, conn.ctok + (t - conn.ctok_t) / 1.5)
+    conn.ctok_t = t
+    if conn.ctok < 1:
+        return social_msg(conn, "Slow down a little.")
+    fid = clean_fid(m.get("to"))
+    text = clean_chat(m.get("text"))
+    if not fid or not text:
+        return
+    if not mutual(conn.fid, fid):
+        conn.send({"t": "fr_removed", "fid": fid})
+        return social_msg(conn, "You are not friends any more.")
+    conn.ctok -= 1
+    entry = {"t": "dm", "from": conn.fid, "to": fid, "name": conn.name, "text": text, "at": int(time.time())}
+    cs = conns_of(fid)
+    for c in cs:
+        c.send(entry)
+    if not cs:
+        box = MAIL.setdefault(fid, [])
+        box.append(entry)
+        del box[:-MAIL_MAX]
+    for c in conns_of(conn.fid):
+        c.send(entry)
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # message handling
 
 async def handle_msg(conn, m):
@@ -1550,8 +1827,11 @@ async def handle_msg(conn, m):
             conn.send({"t": "error", "code": "kicked", "msg": "You were kicked for a while. Try again later."})
             return conn.close()
         conn.admin = bool(conn.uid) and await is_admin(m.get("token"))
-        conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "admin": conn.admin, "bots": CFG["allow_bots"]})
-        return conn.send({"t": "chat_log", "m": list(CHAT_LOG)})
+        social_start(conn, m)
+        conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "admin": conn.admin, "bots": CFG["allow_bots"],
+                   "rank": public_rank(rating_of(conn)) if conn.uid else None})
+        conn.send({"t": "chat_log", "m": list(CHAT_LOG)})
+        return send_social(conn)
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "walk":
@@ -1562,6 +1842,8 @@ async def handle_msg(conn, m):
         return on_heist_caught(conn, m)
     if t == "chat":
         return on_chat(conn, m)
+    if t == "social":
+        return on_social(conn, m)
     if t == "admin":
         return on_admin(conn, m)
     if t == "queue":
@@ -1570,9 +1852,11 @@ async def handle_msg(conn, m):
             return conn.send({"t": "error", "code": "mode", "msg": "Unknown game"})
         if conn.room:
             return conn.send({"t": "error", "code": "busy", "msg": "You are already in a game"})
+        if mode == "ranked" and not conn.uid:
+            return conn.send({"t": "error", "code": "login", "msg": "Log in to your account to play ranked matches."})
         if mode == "naval":
             conn.ship = clean_ship(m.get("ship"))
-        return enqueue(conn, mode, m.get("bot"))
+        return enqueue(conn, mode, False if mode == "ranked" else m.get("bot"))
     if t == "leave":
         leave_queue(conn)
         if conn.room:
@@ -1584,6 +1868,7 @@ async def handle_msg(conn, m):
 
 
 def drop(conn):
+    social_drop(conn)
     if conn.heist:
         heist_end(conn.heist, "caught" if conn.heist["thief"] is conn else "escaped")
     leave_queue(conn)

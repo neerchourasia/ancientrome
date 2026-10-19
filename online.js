@@ -32,7 +32,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet } });
+      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet }, rank: Social.rank, friends: Social.helloFriends() });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -52,12 +52,13 @@ const Online = (() => {
 
   function onMessage(m) {
     switch (m.t) {
-      case "welcome": welcome = m; Admin.server = !!m.admin; setMsg(""); break;
+      case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); setMsg(""); break;
+      case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
       case "adminwho": Admin.showOnline(m.who || []); break;
       case "kicked": Chat.add({ sys: 1, text: `An admin kicked you for ${m.minutes || 10} minutes.` }); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "ranked" ? "an opponent of your level" : m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
@@ -70,7 +71,7 @@ const Online = (() => {
       case "heist_end": Robbery.end(m); break;
       case "race": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
-      case "end": if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
+      case "end": if (m.rank && !duel) { Social.setRank(m.rank); toast(`You left a ranked duel: rating ${m.rank.r} (${m.rank.delta >= 0 ? "+" : ""}${m.rank.delta})`); break; } if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -83,6 +84,9 @@ const Online = (() => {
     const ready = !!welcome && !waiting;
     $o("on-status").textContent = !URL ? "Online play is not switched on yet." : (lobbyMsg || (welcome ? (waiting ? "" : "Pick a game.") : "Connecting..."));
     $o("on-duel").disabled = !ready;
+    $o("on-ranked").disabled = !ready || !Account.loggedIn;
+    $o("on-ranked").title = Account.loggedIn ? "" : "Log in to your account to play ranked matches";
+    if (typeof Social !== "undefined") Social.render();
     $o("on-race").disabled = !ready;
     $o("on-coop").disabled = !ready;
     $o("on-naval").disabled = !ready;
@@ -101,7 +105,7 @@ const Online = (() => {
 
   function queue(game) {
     if (!welcome) { connect(); return; }
-    send({ t: "queue", mode: game, bot: $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
+    send({ t: "queue", mode: game, bot: game !== "ranked" && $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
   }
 
   // the ship picker for the naval battle: your saved ships (you build them in the shipyard in the arena, not here)
@@ -251,6 +255,7 @@ const Online = (() => {
   function bind() {
     setInterval(() => { if (started && Character.exists && !document.hidden && (mode === "walk" || mode === "drive") && !duel && !waiting) connect(); }, 4000); // stay connected, so you see the others
     $o("on-duel").addEventListener("click", () => queue("duel"));
+    $o("on-ranked").addEventListener("click", () => queue("ranked"));
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-naval").addEventListener("click", () => queue("naval"));
@@ -292,7 +297,7 @@ const Online = (() => {
     closePanels();
     Vitals.stopRest();
     const me = m.you, coop = m.mode === "coop";
-    duel = { kind: m.mode, you: me, radius: m.radius, players: m.players, figs: {}, st: {}, block: false, sendT: 0, over: false, rev: {}, enemies: m.enemies || 0, notice: "" };
+    duel = { kind: m.mode, ranked: !!m.ranked, you: me, radius: m.radius, players: m.players, figs: {}, st: {}, block: false, sendT: 0, over: false, rev: {}, enemies: m.enemies || 0, notice: "" };
     for (const p of m.players) {
       const x = p.x !== undefined ? p.x : (p.i === 0 ? -12 : 12), z = p.z || 0, yaw = p.yaw !== undefined ? p.yaw : (p.i === 0 ? -Math.PI / 2 : Math.PI / 2);
       duel.st[p.i] = { x, z, yaw, hp: 100, st: 100, swing: -1, block: 0, down: 0, team: p.role === "enemy" ? 1 : 0 };
@@ -327,7 +332,7 @@ const Online = (() => {
       chip.append(nm, bar);
       return chip;
     }) : []));
-    toast(coop ? "Team battle! Beat all 5 bots together. Stand next to a fallen teammate for 3 seconds to revive them." : "Duel! Space swings, hold Shift to block");
+    toast(coop ? "Team battle! Beat all 5 bots together. Stand next to a fallen teammate for 3 seconds to revive them." : m.ranked ? "Ranked duel! Win to climb the ladder. Space swings, hold Shift to block" : "Duel! Space swings, hold Shift to block");
     Sfx.play("horn");
   }
 
@@ -440,14 +445,20 @@ const Online = (() => {
     }
     const won = m.winner === duel.you, draw = m.winner === -1;
     const why = { ko: won ? "You knocked your opponent out." : "You were knocked out.", time: "Time ran out.", left: won ? "Your opponent left the arena." : "You left." }[m.reason] || "";
-    const prize = won ? 30 : 0;
+    const prize = won ? (duel.ranked ? 40 : 30) : 0;
     Vitals.coins += prize;
-    endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, draw ? "A draw" : won ? "Victory in the arena!" : "Defeat");
+    let ladder = "";
+    if (duel.ranked && m.rank) {
+      const before = Social.rank.r;
+      Social.setRank(m.rank);
+      ladder = m.rank.farm ? " Your rating did not change: you have played this opponent a lot lately." : ` Rating ${before} → ${m.rank.r} (${m.rank.delta >= 0 ? "+" : ""}${m.rank.delta}), ${Social.tier(m.rank.r)[1]}.`;
+    }
+    endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, draw ? "A draw" : won ? (duel.ranked ? "Ranked victory!" : "Victory in the arena!") : "Defeat");
   }
 
   function endFight(text, title) {
     if (!duel) return;
-    const kind = duel.kind;
+    const kind = duel.kind, ranked = duel.ranked;
     duel.over = true;
     for (const i of Object.keys(duel.figs)) scene.remove(duel.figs[i].g);
     duel = null;
@@ -458,7 +469,7 @@ const Online = (() => {
     mode = "walk";
     placeAt(ARENA.cx - 16, ARENA.cz, -Math.PI / 2);
     showResult(title, text, [
-      { label: kind === "coop" ? "Fight again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
+      { label: kind === "coop" ? "Fight again" : ranked ? "Ranked again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
       { label: "Leave the arena", fn: closePanels },
     ]);
   }
@@ -481,5 +492,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

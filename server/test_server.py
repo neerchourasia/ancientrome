@@ -103,6 +103,8 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.srv.close()
         server.CONNS.clear()
         server.BLOCKED.clear(); server.CHAT_LOG.clear()
+        for d in (server.RATINGS, server.CLAIMS, server.FID_UID, server.NAMES, server.REQS, server.MAIL, server.RECENT):
+            d.clear()
         for q in server.QUEUES.values():
             q.clear()
         server.CFG.clear()
@@ -738,6 +740,102 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         again.send({"t": "hello", "name": "Pal", "cls": "gladiator", "token": "pal", "look": {}})
         err = await again.until(lambda m: m["t"] == "error")
         self.assertEqual(err["code"], "kicked")
+
+
+    # ---------------------------------------------------------------- ranked matches and friends
+
+    def accounts(self, *names):
+        server.CFG["supabase_url"] = "https://example.supabase.co"
+
+        async def fake_verify(token):
+            return ("u-" + token) if token in names else None
+        server.verify_token = fake_verify
+
+    async def test_ranked_needs_an_account_and_moves_ratings(self):
+        self.accounts("ann", "bob")
+        guest = await self.player("Guest")
+        guest.send({"t": "queue", "mode": "ranked"})
+        self.assertEqual((await guest.until(lambda m: m["t"] == "error"))["code"], "login")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        self.assertEqual(ann.welcome["rank"]["r"], 1000)
+        ann.send({"t": "queue", "mode": "ranked", "bot": True})      # no bots in ranked
+        bob.send({"t": "queue", "mode": "ranked"})
+        ma = await ann.until(lambda m: m["t"] == "match")
+        mb = await bob.until(lambda m: m["t"] == "match")
+        self.assertTrue(ma["ranked"])
+        self.assertIn("(1000)", ma["players"][0]["name"])
+        bob.send({"t": "leave"})                                      # Bob gives up: Ann wins
+        ea = await ann.until(lambda m: m["t"] == "end")
+        self.assertEqual(ea["winner"], ma["you"])
+        self.assertEqual(ea["rank"]["delta"], 20)                    # even match, new player: K=40, so +20
+        self.assertEqual((ea["rank"]["r"], ea["rank"]["w"]), (1020, 1))
+        rec = server.RATINGS["u-bob"]
+        self.assertEqual((rec["r"], rec["l"]), (980, 1))
+        ann.send({"t": "social", "a": "top"})
+        top = await ann.until(lambda m: m["t"] == "top")
+        self.assertEqual([x["name"] for x in top["list"]], ["Ann", "Bob"])
+
+    async def test_ranked_matches_similar_ratings_first(self):
+        self.accounts("hi", "lo", "mid")
+        hi = await self.player("Hi", token="hi")
+        lo = await self.player("Lo", token="lo")
+        server.RATINGS["u-hi"]["r"], server.RATINGS["u-lo"]["r"] = 1800, 800
+        hi.send({"t": "queue", "mode": "ranked"})
+        lo.send({"t": "queue", "mode": "ranked"})
+        with self.assertRaises(asyncio.TimeoutError):                  # 1000 points apart: they must wait for the search to widen
+            await hi.until(lambda m: m["t"] == "match", timeout=1.2)
+
+    async def test_friend_requests_and_chats(self):
+        self.accounts("ann", "bob", "cy")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        guest = await self.player("Guest")
+        guest.send({"t": "social", "a": "req", "name": "Ann"})
+        self.assertIn("Log in", (await guest.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "online"})
+        rows = (await ann.until(lambda m: m["t"] == "fr_online"))["list"]
+        self.assertEqual([r["name"] for r in rows], ["Bob"])
+        ann.send({"t": "social", "a": "req", "name": "bob"})
+        asked = await bob.until(lambda m: m["t"] == "fr_in")
+        self.assertEqual(asked["name"], "Ann")
+        ann.send({"t": "social", "a": "dm", "to": bob.welcome and asked["fid"], "text": "hi before we are friends"})   # not friends yet
+        self.assertIn("not friends", (await ann.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
+        bob.send({"t": "social", "a": "ans", "fid": asked["fid"], "ok": True})
+        added_b = await bob.until(lambda m: m["t"] == "fr_added")
+        added_a = await ann.until(lambda m: m["t"] == "fr_added")
+        self.assertEqual((added_b["name"], added_a["name"]), ("Ann", "Bob"))
+        ann.send({"t": "social", "a": "dm", "to": added_a["fid"], "text": "hello friend"})
+        got = await bob.until(lambda m: m["t"] == "dm")
+        self.assertEqual((got["name"], got["text"], got["from"]), ("Ann", "hello friend", asked["fid"]))
+        echo = await ann.until(lambda m: m["t"] == "dm")
+        self.assertEqual(echo["to"], added_a["fid"])
+        # a message left for a friend who is away waits for them
+        bob.w.close()
+        await asyncio.sleep(0.3)
+        ann.send({"t": "social", "a": "dm", "to": added_a["fid"], "text": "see you later"})
+        await ann.until(lambda m: m["t"] == "dm")
+        bob2 = await self.player("Bob", token="bob")
+        state = await bob2.until(lambda m: m["t"] == "fr_state")
+        self.assertEqual([f["name"] for f in state["friends"]], ["Ann"])
+        mail = await bob2.until(lambda m: m["t"] == "dm")
+        self.assertEqual(mail["text"], "see you later")
+        # removing a friend ends the chat on both sides
+        bob2.send({"t": "social", "a": "del", "fid": asked["fid"]})
+        await ann.until(lambda m: m["t"] == "fr_removed")
+        ann.send({"t": "social", "a": "dm", "to": added_a["fid"], "text": "still there?"})
+        self.assertIn("not friends", (await ann.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
+
+    async def test_nobody_can_make_themselves_a_friend(self):
+        self.accounts("ann", "mal")
+        ann = await self.player("Ann", token="ann")
+        fid_ann = server.fid_of("u-ann")
+        mal = await WS.connect(self.port)
+        self.clients.append(mal)
+        mal.send({"t": "hello", "name": "Mal", "token": "mal", "look": {}, "friends": [{"fid": fid_ann, "name": "Ann"}]})   # claims Ann is a friend
+        await mal.until(lambda m: m["t"] == "welcome")
+        mal.send({"t": "social", "a": "dm", "to": fid_ann, "text": "hi bestie"})
+        self.assertIn("not friends", (await mal.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
+        with self.assertRaises(asyncio.TimeoutError):
+            await ann.until(lambda m: m["t"] == "dm", timeout=0.6)
 
     # ---------------------------------------------------------------- abuse
 

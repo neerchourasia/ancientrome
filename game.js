@@ -58,6 +58,8 @@ function init() {
   Account.bind();
   Online.bind();
   Chat.bind();
+  Social.bind();
+  Gifts.bind();
   Tax.bind();
   Admin.bind();
   Market.bind();

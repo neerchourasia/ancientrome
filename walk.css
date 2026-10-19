@@ -486,6 +486,21 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 
 #wx-badge { padding: 2px 10px; border-radius: 999px; background: rgba(40,52,66,.85); color: #dbe7f2; font-size: .75rem; white-space: nowrap; }
 #wx-badge:empty { display: none; }
+#btn-gift.ready { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); animation: giftpulse 1.6s ease-in-out infinite; }
+@keyframes giftpulse { 50% { box-shadow: 0 0 14px rgba(255,211,107,1); } }
+#friends h3 { margin: 12px 0 4px; color: var(--gold); font: 700 1rem Georgia, serif; }
+.fr-list { list-style: none; margin: 0; padding: 0; }
+.fr-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.fr-list li > span:nth-child(2), .fr-list li > span:first-child:not(:only-child) + span { flex: 1; }
+.fr-list li > span:only-child, .fr-list li > span.dim { color: var(--muted); }
+#fr-log { max-height: 180px; overflow-y: auto; padding: 6px; border-radius: 8px; background: rgba(0,0,0,.3); font-size: .9rem; }
+#fr-log .me { color: #ffe8a8; } #fr-log .them { color: #cfe8ff; } #fr-log .dim { color: var(--muted); }
+#fr-form, #fr-add { display: flex; gap: 6px; margin: 6px 0; }
+#friends input[type=text] { flex: 1; font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: var(--ink); min-width: 0; }
+#gf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+.gf-day { padding: 8px 6px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.25); font-size: .78rem; display: flex; flex-direction: column; gap: 4px; white-space: pre-line; }
+.gf-day.done { opacity: .5; border-color: #7fcf8a; } .gf-day.today { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(226,185,85,.5); }
+#on-board { margin-top: 10px; } #on-board summary { cursor: pointer; color: var(--gold); } #on-top { margin: 6px 0 0 18px; padding: 0; font-size: .9rem; }
 #fest-act { padding: 2px 10px; border-radius: 999px; border: 1px solid #ffd36b; background: rgba(150,60,20,.95); color: #fff1d0; font: inherit; font-size: .75rem; cursor: pointer; white-space: nowrap; }
 #fest-act[hidden] { display: none; }
 #lantern input { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: var(--ink); width: 100%; margin-top: 4px; }
