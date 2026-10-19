@@ -175,7 +175,7 @@ const Robbery = (() => {
     if ($r("getaway").classList.contains("show")) closePanels();
     if (role === "thief") {
       if (m.result === "escaped") { Vitals.coins += loot; toast(`You got away with ${loot} denarii of ${other}'s!`); Narrator.say(`You got away with ${loot} denarii.`, { interrupt: true }); Sfx.play("coin"); }
-      else { const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; const who = byGuards ? "The city guards" : other; toast(`${who} caught you! You lose ${lost} denarii.`); Narrator.say(`${who} caught you. You lose ${lost} denarii.`, { interrupt: true }); Sfx.play("oof"); }
+      else { setTimeout(() => Jail.arrest("robbery"), 1500); const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; const who = byGuards ? "The city guards" : other; toast(`${who} caught you! You lose ${lost} denarii.`); Narrator.say(`${who} caught you. You lose ${lost} denarii.`, { interrupt: true }); Sfx.play("oof"); }
     } else if (m.result === "escaped") {
       const lost = Math.min(loot, Vitals.coins); Vitals.coins -= lost; toast(`${other} got away with ${lost} denarii of yours.`); Narrator.say(`${other} got away with ${lost} denarii.`, { interrupt: true });
     } else { Vitals.coins += loot; toast(`You caught ${other}! They pay you ${loot} denarii.`); Narrator.say(`You caught ${other}. They pay you ${loot} denarii.`, { interrupt: true }); Sfx.play("coin"); }

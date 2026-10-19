@@ -496,6 +496,11 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #wanted { position: fixed; top: 128px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; padding: 6px 16px; border-radius: 999px; background: rgba(120,20,20,.9); border: 1px solid #ffd36b; color: #ffe08a; font: 700 .9rem Georgia, serif; pointer-events: none; }
 #wanted.show { display: block; animation: wantedpulse 1s ease-in-out infinite alternate; }
 @keyframes wantedpulse { to { background: rgba(170,30,30,.95); } }
+#jail-hud { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 8; display: none; flex-direction: column; align-items: center; gap: 6px; padding: 10px 18px; background: rgba(20,20,26,.92); border: 1px solid #8a8d92; border-radius: 10px; color: #e8e8ee; text-align: center; }
+#jail-hud.show { display: flex; }
+#jail-hud strong { font: 700 1.1rem Georgia, serif; }
+#jail-hud button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--gold); background: var(--panel); color: var(--ink); cursor: pointer; }
+#jail-hud button:disabled { opacity: .5; cursor: not-allowed; }
 #v-disease { color: #e8a0a0; font-size: .75rem; } #v-disease:empty { display: none; }
 #lightning { position: fixed; inset: 0; z-index: 8; background: #f4f8ff; opacity: 0; pointer-events: none; transition: opacity .12s; }
 

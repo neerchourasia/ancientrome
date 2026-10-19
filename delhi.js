@@ -763,6 +763,7 @@ const Delhi = (() => {
     // the market square on the open ground before the Lahori Gate
     Stalls.build(vg, X(-50), 60, "delhi");
     Guards.buildDelhi(scene);
+    Jail.buildDelhi(scene);
     Stalls.street(vg, "delhi", [["Lahori Gate", X(-30), -22], ["Red Fort", X(70), 22], ["Chandni Chowk", X(-300), 24], ["Fatehpuri Masjid", X(-615), 36], ["Jama Masjid", X(-140), 205], ["Kite square", X(-18), -62], ["Your plot", X(-60), -10], ["Town hall", X(-420), 30]]);
   }
 

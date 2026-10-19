@@ -17,7 +17,7 @@ const Guards = (() => {
     delhi: [[[-48, -6]], [[-40, 24]], [[-100, 3]], [[-50, 58]], [[-140, 210]], [[-615, 38]], [[70, 18]], [[-215, 6]], [[-45, 0], [-200, 5], [-350, 8], [-500, 5]], [[-60, 45], [-50, 56], [-20, 30], [20, 8]], [[70, 20], [20, -30], [-40, -40], [-30, -10]], [[-140, 205], [-150, 120], [-110, 40], [-200, 10]], [[-615, 36], [-560, 4], [-450, 12], [-300, 20]], [[-420, 20], [-380, -8], [-250, 6], [-120, 12]]],
   };
   const guards = [];                // { g, city, route, wp, x, z, state: "walk" | "chase", ...}
-  let scene = null, wanted = 0, lastSeen = 0, jailT = 0, hudT = 0, shoutT = 0, delhiMade = false;
+  let robbedAt = -1e9, scene = null, wanted = 0, lastSeen = 0, jailT = 0, hudT = 0, shoutT = 0, delhiMade = false;
   const $g = (id) => document.getElementById(id);
 
   function model(c, e) {
@@ -63,6 +63,7 @@ const Guards = (() => {
   function crime(amount, why, at) {
     if (!started) return;
     wanted = Math.min(100, wanted + amount);
+    if (why === "robbery") robbedAt = performance.now();
     if (wanted >= 35) { toast(`⭐ Wanted${why ? ` for ${why}` : ""}! The guards are after you.`); }
     if (amount >= 60) for (const gd of guards) if (gd.city === (typeof city !== "undefined" ? city : "rome") && Math.hypot(gd.x - (at ? at.x : player.x), gd.z - (at ? at.z : player.z)) < 160) gd.state = "chase";
     render();
@@ -96,6 +97,7 @@ const Guards = (() => {
     if (jailT > 0) return;
     // in the middle of a robbery the guards ending it is the robbery's own rule (lose 100 denarii to the owner)
     if (typeof Robbery !== "undefined" && Robbery.active && Robbery.role === "thief") { Robbery.guardsCaught(); wanted = 0; for (const g of guards) g.state = "walk"; render(); return; }
+    if ((performance.now() - robbedAt < 240000 || wanted >= 75) && Jail.arrest(performance.now() - robbedAt < 240000 ? "stealing" : "your crimes")) { wanted = 0; for (const g of guards) g.state = "walk"; render(); return; }   // a thief goes to jail
     jailT = 3.2;
     const fine = Math.min(FINE, Vitals.coins); Vitals.coins -= fine; wanted = 0;
     if (mode === "drive") Car.exit(true);

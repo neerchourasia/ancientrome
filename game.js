@@ -44,9 +44,11 @@ function init() {
   Festival.init(scene);
   Theatre.init(scene);
   Guards.build(scene);
+  Jail.bind();
   Harbour.build(scene);
   Home.build();
   buildInsulae(scene);
+  Jail.buildRome(scene);
   Stalls.street(scene, "rome", [["Colosseum", 305, 66], ["Via Sacra", 110, 16], ["Forum", 50, 42], ["Capitoline", -235, 8], ["Pantheon", -455, -440], ["Trajan's Forum", -150, -210], ["Circus", -190, 132], ["Harbour", 74, 80], ["Forum Boarium", -405, 55], ["Theatre of Pompey", -655, -50], ["Via Domus", 150, -44]]);
   buildTrees(scene);
   buildCitizens(scene);
@@ -592,6 +594,7 @@ function placeAt(x, z, yaw) {
 const yawToward = (fx, fz, tx, tz) => Math.atan2(-(tx - fx), -(tz - fz));
 
 function goTo(lm) {
+  if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   const [sx, sz] = lm.stand;
   placeAt(sx, sz, yawToward(sx, sz, lm.x, lm.z));
   player.pitch = -0.02;
@@ -1013,6 +1016,7 @@ function toggleEra() {
 let travelBusy = false;
 const mapCache = {};
 function travel(to) {
+  if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
   if (to === city || travelBusy) return;
   travelBusy = true;
@@ -1508,7 +1512,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Guards.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

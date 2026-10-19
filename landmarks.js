@@ -4,6 +4,13 @@
 
 const LANDMARKS = [
   {
+    id: "carcer", name: "The Carcer (Mamertine Prison)", sub: "Rome's state prison · 7th century BC",
+    x: -112, z: -30, r: 28, stand: [-112, -12],
+    text: "Rome's oldest and most feared state prison, built into the slope of the Capitoline hill beside the Forum. It held enemies of the state, foreign kings and traitors awaiting execution, and its lower chamber, the Tullianum, was dark, damp and crowded. If the guards catch you stealing, this is where you are locked up: wait out your sentence or bribe the guard.",
+    fact: "Imprisonment was not a normal sentence in Rome: the Carcer held people before trial, execution or exile. Jugurtha of Numidia and the Gallic chieftain Vercingetorix both died here.",
+    modern: "The Carcer survives today under the church of San Giuseppe dei Falegnami: its two chambers can still be visited, and tradition says Saint Peter was held here.",
+  },
+  {
     id: "hercules", name: "Temple of Hercules Victor", sub: "Forum Boarium · c. 120 BC",
     x: -430, z: 75, r: 30, stand: [-430, 47],
     text: "A round temple of white marble in the cattle market (the Forum Boarium), the riverside quarter at the north-west end of the Circus Maximus, between the Capitoline, the Palatine and the Tiber. Twenty Corinthian columns surround a round cella under a tiled roof. It was built by a wealthy olive merchant to honour Hercules, the patron of traders, who was said to have driven the cattle of Geryon past this very spot.",
