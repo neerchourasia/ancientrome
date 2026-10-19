@@ -76,11 +76,19 @@ const Guards = (() => {
     el.classList.toggle("show", stars > 0);
   }
 
+  // walk (or run) towards a point; when something is in the way, slide along it or steer round it (no map of the streets, just feelers)
   function moveTo(gd, tx, tz, sp, dt) {
-    const dx = tx - gd.x, dz = tz - gd.z, d = Math.hypot(dx, dz) || 1, st = Math.min(d, sp * dt);
-    let nx = gd.x + (dx / d) * st, nz = gd.z + (dz / d) * st; const y = groundAt(gd.x, gd.z);
-    if (blockedAt(nx, nz, y)) { if (!blockedAt(nx, gd.z, y)) nz = gd.z; else if (!blockedAt(gd.x, nz, y)) nx = gd.x; else { gd.stuck += dt; return d; } }
-    gd.stuck = 0; gd.x = nx; gd.z = nz; gd.g.position.set(nx, groundAt(nx, nz), nz); gd.g.rotation.y = Math.atan2(dx, dz);
+    const dx = tx - gd.x, dz = tz - gd.z, d = Math.hypot(dx, dz) || 1, st = Math.min(d, sp * dt), y = groundAt(gd.x, gd.z), base = Math.atan2(dx, dz);
+    const tries = gd.turn ? [gd.turn, 0, -gd.turn] : [0, 0.7, -0.7, 1.4, -1.4, 2.2, -2.2];       // keep going the way that worked until the way ahead is clear again
+    for (const off of tries) {
+      const a = base + off, nx = gd.x + Math.sin(a) * st * (off ? 1.1 : 1), nz = gd.z + Math.cos(a) * st * (off ? 1.1 : 1);
+      if (!blockedAt(nx, nz, y) && !blockedAt(gd.x + Math.sin(a) * 1.4, gd.z + Math.cos(a) * 1.4, y)) {
+        gd.turn = off === 0 && gd.turn ? 0 : off; if (off === 0) gd.turn = 0;
+        gd.stuck = 0; gd.x = nx; gd.z = nz; gd.g.position.set(nx, groundAt(nx, nz), nz); gd.g.rotation.y = a;
+        return d;
+      }
+    }
+    gd.stuck += dt; gd.turn = (gd.turn ? -gd.turn : 1.4);
     return d;
   }
 
