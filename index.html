@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=242">
+  <link rel="stylesheet" href="walk.css?v=243">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=242"></script>
+  <script src="boot.js?v=243"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -339,7 +339,7 @@
     <div class="box">
       <header><h2>👥 Friends</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
       <p id="fr-status" class="dnote"></p>
-      <p id="fr-login" class="dnote" hidden>Friends, friend chats and ranked matches need an account. Press <b>Log in</b> in the menu, then come back.</p>
+      <p id="fr-login" class="dnote" hidden>Friends, friend chats and your rank need an account. Press <b>Log in</b> in the menu, then come back.</p>
       <div id="fr-main">
         <p id="fr-rank" class="dnote small"></p>
         <section id="fr-reqs" hidden><h3>Friend requests</h3><ul id="fr-reqlist" class="fr-list"></ul></section>
@@ -434,7 +434,8 @@
       <header><h2>Play real people</h2><button id="on-close" type="button" aria-label="Close">×</button></header>
       <p id="on-status"></p>
       <p id="on-rank" class="dnote"></p>
-      <div class="on-games"><button id="on-ranked" type="button">🏅 Ranked duel: climb the ladder</button><button id="on-duel" type="button">⚔ Duel a real person (just for fun)</button><button id="on-race" type="button">🏁 Race real people</button><button id="on-coop" type="button">🛡 Team up: beat 5 bots together</button><button id="on-naval" type="button">⚓ Naval battle: every ship for itself</button></div>
+      <p class="dnote small">Every game against real people counts towards your rank: duels, races, naval battles and team battles. Win to climb. Practice bots never count, and you need an account to keep a rank.</p>
+      <div class="on-games"><button id="on-duel" type="button">⚔ Duel a real person</button><button id="on-race" type="button">🏁 Race real people</button><button id="on-coop" type="button">🛡 Team up: beat 5 bots together</button><button id="on-naval" type="button">⚓ Naval battle: every ship for itself</button></div>
       <div id="on-shiprow"><label for="on-ship"><strong>⚓ Your ship for the naval battle</strong></label><select id="on-ship"></select><small>Pick one of your saved ships. Build and save ships in the shipyard (press N in the arena).</small></div>
       <label id="on-botrow" class="ac-check"><input id="on-bot" type="checkbox" checked> <span>If nobody is around, let bots fill in (a practice opponent or practice ships, or friendly teammates in the team battle)</span></label>
       <button id="on-cancel" type="button" hidden>Stop looking</button>
@@ -497,51 +498,51 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=242"></script>
-  <script src="delhi-data.js?v=242"></script>
-  <script src="config.js?v=242"></script>
-  <script src="character.js?v=242"></script>
-  <script src="physics.js?v=242"></script>
-  <script src="vitals.js?v=242"></script>
-  <script src="narrator.js?v=242"></script>
-  <script src="audio.js?v=242"></script>
-  <script src="music.js?v=242"></script>
-  <script src="world.js?v=242"></script>
-  <script src="city.js?v=242"></script>
-  <script src="weather.js?v=242"></script>
-  <script src="modern.js?v=242"></script>
-  <script src="delhi.js?v=242"></script>
-  <script src="delhi-games.js?v=242"></script>
-  <script src="home.js?v=242"></script>
-  <script src="spectators.js?v=242"></script>
-  <script src="fight.js?v=242"></script>
-  <script src="nav.js?v=242"></script>
-  <script src="show.js?v=242"></script>
-  <script src="shipyard.js?v=242"></script>
-  <script src="naval.js?v=242"></script>
-  <script src="theatre.js?v=242"></script>
-  <script src="watch.js?v=242"></script>
-  <script src="race.js?v=242"></script>
-  <script src="account.js?v=242"></script>
-  <script src="online.js?v=242"></script>
-  <script src="chat.js?v=242"></script>
-  <script src="social.js?v=242"></script>
-  <script src="gifts.js?v=242"></script>
-  <script src="tax.js?v=242"></script>
-  <script src="pets.js?v=242"></script>
-  <script src="cage.js?v=242"></script>
-  <script src="car.js?v=242"></script>
-  <script src="market.js?v=242"></script>
-  <script src="garage.js?v=242"></script>
-  <script src="dresser.js?v=242"></script>
-  <script src="festival.js?v=242"></script>
-  <script src="harbour.js?v=242"></script>
-  <script src="disease.js?v=242"></script>
-  <script src="jail.js?v=242"></script>
-  <script src="guards.js?v=242"></script>
-  <script src="stalls.js?v=242"></script>
-  <script src="robbery.js?v=242"></script>
-  <script src="jobs.js?v=242"></script>
-  <script src="game.js?v=242"></script>
+  <script src="landmarks.js?v=243"></script>
+  <script src="delhi-data.js?v=243"></script>
+  <script src="config.js?v=243"></script>
+  <script src="character.js?v=243"></script>
+  <script src="physics.js?v=243"></script>
+  <script src="vitals.js?v=243"></script>
+  <script src="narrator.js?v=243"></script>
+  <script src="audio.js?v=243"></script>
+  <script src="music.js?v=243"></script>
+  <script src="world.js?v=243"></script>
+  <script src="city.js?v=243"></script>
+  <script src="weather.js?v=243"></script>
+  <script src="modern.js?v=243"></script>
+  <script src="delhi.js?v=243"></script>
+  <script src="delhi-games.js?v=243"></script>
+  <script src="home.js?v=243"></script>
+  <script src="spectators.js?v=243"></script>
+  <script src="fight.js?v=243"></script>
+  <script src="nav.js?v=243"></script>
+  <script src="show.js?v=243"></script>
+  <script src="shipyard.js?v=243"></script>
+  <script src="naval.js?v=243"></script>
+  <script src="theatre.js?v=243"></script>
+  <script src="watch.js?v=243"></script>
+  <script src="race.js?v=243"></script>
+  <script src="account.js?v=243"></script>
+  <script src="online.js?v=243"></script>
+  <script src="chat.js?v=243"></script>
+  <script src="social.js?v=243"></script>
+  <script src="gifts.js?v=243"></script>
+  <script src="tax.js?v=243"></script>
+  <script src="pets.js?v=243"></script>
+  <script src="cage.js?v=243"></script>
+  <script src="car.js?v=243"></script>
+  <script src="market.js?v=243"></script>
+  <script src="garage.js?v=243"></script>
+  <script src="dresser.js?v=243"></script>
+  <script src="festival.js?v=243"></script>
+  <script src="harbour.js?v=243"></script>
+  <script src="disease.js?v=243"></script>
+  <script src="jail.js?v=243"></script>
+  <script src="guards.js?v=243"></script>
+  <script src="stalls.js?v=243"></script>
+  <script src="robbery.js?v=243"></script>
+  <script src="jobs.js?v=243"></script>
+  <script src="game.js?v=243"></script>
 </body>
 </html>

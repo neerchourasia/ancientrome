@@ -87,7 +87,7 @@ const Social = (() => {
     const b = $s("btn-friends");
     if (b) b.textContent = badge ? `👥 Friends (${badge})` : "👥 Friends";
     const rk = $s("on-rank");
-    if (rk) rk.textContent = Account.loggedIn ? `Your rank: ${rankText()}` : "Log in to your account to play ranked matches.";
+    if (rk) rk.textContent = Account.loggedIn ? `Your rank: ${rankText()}` : "Log in to your account to keep a rank.";
     const tl = $s("on-top");
     if (tl && top) {
       tl.replaceChildren(...(top.list.length ? top.list : [{ name: "nobody yet", r: "", w: 0, l: 0 }]).map((x, i) => { const e = document.createElement("li"); e.textContent = x.r === "" ? x.name : `${x.name}: ${x.r} (${x.w}-${x.l})`; return e; }));

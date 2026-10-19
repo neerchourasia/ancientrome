@@ -58,7 +58,7 @@ const Online = (() => {
       case "chat_log": Chat.history(m.m); break;
       case "adminwho": Admin.showOnline(m.who || []); break;
       case "kicked": Chat.add({ sys: 1, text: `An admin kicked you for ${m.minutes || 10} minutes.` }); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "ranked" ? "an opponent of your level" : m.mode === "duel" ? "an opponent" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
@@ -71,7 +71,7 @@ const Online = (() => {
       case "heist_end": Robbery.end(m); break;
       case "race": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
-      case "end": if (m.rank && !duel) { Social.setRank(m.rank); toast(`You left a ranked duel: rating ${m.rank.r} (${m.rank.delta >= 0 ? "+" : ""}${m.rank.delta})`); break; } if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
+      case "end": if ((m.mode === "race" || m.mode === "naval" || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -84,8 +84,6 @@ const Online = (() => {
     const ready = !!welcome && !waiting;
     $o("on-status").textContent = !URL ? "Online play is not switched on yet." : (lobbyMsg || (welcome ? (waiting ? "" : "Pick a game.") : "Connecting..."));
     $o("on-duel").disabled = !ready;
-    $o("on-ranked").disabled = !ready || !Account.loggedIn;
-    $o("on-ranked").title = Account.loggedIn ? "" : "Log in to your account to play ranked matches";
     if (typeof Social !== "undefined") Social.render();
     $o("on-race").disabled = !ready;
     $o("on-coop").disabled = !ready;
@@ -105,7 +103,7 @@ const Online = (() => {
 
   function queue(game) {
     if (!welcome) { connect(); return; }
-    send({ t: "queue", mode: game, bot: game !== "ranked" && $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
+    send({ t: "queue", mode: game, bot: $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
   }
 
   // the ship picker for the naval battle: your saved ships (you build them in the shipyard in the arena, not here)
@@ -255,7 +253,6 @@ const Online = (() => {
   function bind() {
     setInterval(() => { if (started && Character.exists && !document.hidden && (mode === "walk" || mode === "drive") && !duel && !waiting) connect(); }, 4000); // stay connected, so you see the others
     $o("on-duel").addEventListener("click", () => queue("duel"));
-    $o("on-ranked").addEventListener("click", () => queue("ranked"));
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-naval").addEventListener("click", () => queue("naval"));
@@ -434,25 +431,29 @@ const Online = (() => {
     if (s.down) avatar.position.y += 0.3;
   }
 
+  // after a game against real people: your new rating (the server worked it out; it is only shown here)
+  function ladderText(rk) {
+    if (!rk || !Account.loggedIn) return "";
+    const before = Social.rank.r;
+    Social.setRank(rk);
+    return rk.farm ? " Your rating did not change: you have played these people a lot lately." : ` Rating ${before} → ${rk.r} (${rk.delta >= 0 ? "+" : ""}${rk.delta}), ${Social.tier(rk.r)[1]}.`;
+  }
+  function rankNote(rk) { const t = ladderText(rk).trim(); if (t) { toast(t); Chat.add({ sys: 1, text: t }); } }
+
   function onFightEnd(m) {
     if (!duel) return;
     if (m.mode === "coop") {
       const prize = m.won ? 50 : 0;
       Vitals.coins += prize;
       const why = { cleared: "All five bots are beaten. Well fought, team!", defeated: `Your whole team was knocked out. You beat ${m.kills} of ${m.enemies} bots.`, time: `Time ran out. You beat ${m.kills} of ${m.enemies} bots.`, empty: "Everyone left." }[m.reason] || "";
-      endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, m.won ? "Victory for the team!" : "Defeat");
+      endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladderText(m.rank)}`, m.won ? "Victory for the team!" : "Defeat");
       return;
     }
     const won = m.winner === duel.you, draw = m.winner === -1;
     const why = { ko: won ? "You knocked your opponent out." : "You were knocked out.", time: "Time ran out.", left: won ? "Your opponent left the arena." : "You left." }[m.reason] || "";
     const prize = won ? (duel.ranked ? 40 : 30) : 0;
     Vitals.coins += prize;
-    let ladder = "";
-    if (duel.ranked && m.rank) {
-      const before = Social.rank.r;
-      Social.setRank(m.rank);
-      ladder = m.rank.farm ? " Your rating did not change: you have played this opponent a lot lately." : ` Rating ${before} → ${m.rank.r} (${m.rank.delta >= 0 ? "+" : ""}${m.rank.delta}), ${Social.tier(m.rank.r)[1]}.`;
-    }
+    const ladder = duel.ranked ? ladderText(m.rank) : "";
     endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, draw ? "A draw" : won ? (duel.ranked ? "Ranked victory!" : "Victory in the arena!") : "Defeat");
   }
 

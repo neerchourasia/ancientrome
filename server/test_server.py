@@ -751,17 +751,14 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             return ("u-" + token) if token in names else None
         server.verify_token = fake_verify
 
-    async def test_ranked_needs_an_account_and_moves_ratings(self):
-        self.accounts("ann", "bob")
-        guest = await self.player("Guest")
-        guest.send({"t": "queue", "mode": "ranked"})
-        self.assertEqual((await guest.until(lambda m: m["t"] == "error"))["code"], "login")
+    async def test_every_duel_between_people_is_rated_and_bot_duels_are_not(self):
+        self.accounts("ann", "bob", "cy")
         ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
         self.assertEqual(ann.welcome["rank"]["r"], 1000)
-        ann.send({"t": "queue", "mode": "ranked", "bot": True})      # no bots in ranked
-        bob.send({"t": "queue", "mode": "ranked"})
+        ann.send({"t": "queue", "mode": "duel", "bot": True})
+        bob.send({"t": "queue", "mode": "duel"})
         ma = await ann.until(lambda m: m["t"] == "match")
-        mb = await bob.until(lambda m: m["t"] == "match")
+        await bob.until(lambda m: m["t"] == "match")
         self.assertTrue(ma["ranked"])
         self.assertIn("(1000)", ma["players"][0]["name"])
         bob.send({"t": "leave"})                                      # Bob gives up: Ann wins
@@ -774,14 +771,78 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "social", "a": "top"})
         top = await ann.until(lambda m: m["t"] == "top")
         self.assertEqual([x["name"] for x in top["list"]], ["Ann", "Bob"])
+        cy = await self.player("Cy", token="cy")                      # a practice match against a bot changes nothing
+        cy.send({"t": "queue", "mode": "duel", "bot": True})
+        mc = await cy.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertFalse(mc["ranked"])
+        cy.send({"t": "leave"})
+        self.assertEqual(server.RATINGS["u-cy"]["r"], 1000)
+
+    async def test_a_guest_can_duel_an_account_and_only_the_account_is_rated(self):
+        self.accounts("ann")
+        ann, guest = await self.player("Ann", token="ann"), await self.player("Guest")
+        ann.send({"t": "queue", "mode": "duel"})
+        guest.send({"t": "queue", "mode": "duel"})
+        ma = await ann.until(lambda m: m["t"] == "match")
+        await guest.until(lambda m: m["t"] == "match")
+        guest.send({"t": "leave"})
+        end = await ann.until(lambda m: m["t"] == "end")
+        self.assertEqual(end["rank"]["delta"], 20)
+        self.assertEqual(list(server.RATINGS), ["u-ann"])             # the guest has no saved rating
+
+    def test_races_naval_battles_and_team_fights_change_ratings_too(self):
+        class C:                                                      # a stand-in for a connection
+            def __init__(self, uid, name):
+                self.uid, self.id, self.name = uid, "id-" + name, name
+        a, b, c, d = C("u-a", "A"), C("u-b", "B"), C("u-c", "C"), C("u-d", "D")
+        r = server.rate_placements([(a, 0), (b, 1), (c, 2), (d, 3)])    # first, second, third and last of four
+        self.assertGreater(r[id(a)]["delta"], 0)
+        self.assertLess(r[id(d)]["delta"], 0)
+        self.assertGreater(r[id(a)]["delta"], r[id(b)]["delta"])
+        self.assertEqual((server.RATINGS["u-a"]["w"], server.RATINGS["u-d"]["l"], server.RATINGS["u-b"]["d"]), (1, 1, 1))   # first wins, last loses, the middle is neither
+        self.assertEqual(sum(v["delta"] for v in r.values()), 0)         # points only move between people
+        self.assertEqual(server.rate_placements([(a, 0)]), {})            # a match against nobody changes nothing
+        server.RECENT.clear()
+        t = server.rate_team([a, b], True)                                # a team win against the bots: +8
+        self.assertEqual((t[id(a)]["delta"], t[id(b)]["delta"]), (8, 8))
+        server.RECENT.clear()
+        self.assertEqual(server.rate_team([a, b], False)[id(a)]["delta"], -6)
+        self.assertEqual(server.rate_team([a], True), {})                 # nobody to team up with: nothing
+        server.RECENT.clear()
+        for _ in range(4):                                                # the same people over and over: no more points
+            last = server.rate_placements([(a, 0), (b, 1)])
+        self.assertEqual(last[id(a)]["delta"], 0)
+        self.assertTrue(last[id(a)]["farm"])
+
+    async def test_a_race_between_accounts_sends_the_new_rating(self):
+        self.accounts("ann", "ben")
+        server.RACE_COUNTDOWN, server.RACE_TOTAL, server.RACE_GRACE = 0.4, 100.0, 1.5
+        a, b = await self.player("Ann", token="ann"), await self.player("Ben", token="ben")
+        a.send({"t": "queue", "mode": "race"})
+        b.send({"t": "queue", "mode": "race"})
+        await a.until(lambda m: m["t"] == "match", timeout=4)
+        await b.until(lambda m: m["t"] == "match", timeout=4)
+        await asyncio.sleep(0.5)
+        s = [0.0, 0.0]
+        for _ in range(60):
+            s[0] += 4.0
+            s[1] += 2.5
+            a.send({"t": "race", "s": s[0], "d": 5})
+            b.send({"t": "race", "s": s[1], "d": -3})
+            await asyncio.sleep(0.12)
+            if s[0] >= 100.0:
+                break
+        ea = await a.until(lambda m: m["t"] == "end", timeout=30)
+        eb = await b.until(lambda m: m["t"] == "end", timeout=30)
+        self.assertEqual((ea["rank"]["delta"], eb["rank"]["delta"]), (20, -20))
 
     async def test_ranked_matches_similar_ratings_first(self):
         self.accounts("hi", "lo", "mid")
         hi = await self.player("Hi", token="hi")
         lo = await self.player("Lo", token="lo")
         server.RATINGS["u-hi"]["r"], server.RATINGS["u-lo"]["r"] = 1800, 800
-        hi.send({"t": "queue", "mode": "ranked"})
-        lo.send({"t": "queue", "mode": "ranked"})
+        hi.send({"t": "queue", "mode": "duel"})
+        lo.send({"t": "queue", "mode": "duel"})
         with self.assertRaises(asyncio.TimeoutError):                  # 1000 points apart: they must wait for the search to widen
             await hi.until(lambda m: m["t"] == "match", timeout=1.2)
 

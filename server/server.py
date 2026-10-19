@@ -261,6 +261,7 @@ class Conn:
 class Duelist:
     def __init__(self, conn, index, bot=False, name=None):
         self.conn, self.i, self.bot = conn, index, bot
+        self.who = conn            # who they started as (stays when they leave, so leaving still counts for the rating)
         self.name = name or (conn.name if conn else "Brutus")
         self.cls = conn.cls if conn else "gladiator"
         self.look = conn.look if conn else clean_look({"toga": 2, "sash": 1})
@@ -308,7 +309,7 @@ class DuelRoom:
 
     def __init__(self, conns, with_bot=False, ranked=False):
         self.id = os.urandom(3).hex()
-        self.ranked = ranked
+        self.ranked = ranked and not with_bot       # a practice match against a bot does not count
         self.players = [Duelist(c, i) for i, c in enumerate(conns)]
         if with_bot:
             self.players.append(Duelist(None, 1, bot=True))
@@ -320,8 +321,8 @@ class DuelRoom:
                 p.conn.room, p.conn.me, p.conn.queue = self, p, None
         for p in self.players:
             if p.conn:
-                p.conn.send({"t": "match", "mode": "duel", "room": self.id, "you": p.i, "radius": ARENA_R, "ranked": ranked,
-                             "players": [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else "") + (" (%d)" % rating_of(q.conn)["r"] if ranked and q.conn else ""), "cls": q.cls, "look": q.look} for q in self.players]})
+                p.conn.send({"t": "match", "mode": "duel", "room": self.id, "you": p.i, "radius": ARENA_R, "ranked": self.ranked,
+                             "players": [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else "") + (" (%d)" % rating_of(q.conn)["r"] if self.ranked and q.conn and q.conn.uid else ""), "cls": q.cls, "look": q.look} for q in self.players]})
         self.task = asyncio.ensure_future(self.run())
 
     # --- messages from a player
@@ -425,10 +426,10 @@ class DuelRoom:
         self.over = True
         msg = {"t": "end", "mode": "duel", "winner": winner, "reason": reason,
                "hp": [round(p.hp, 1) for p in self.players]}
-        ranks = rate_match(self.players, winner) if self.ranked else {}
+        ranks = rate_placements([(p.who, 0 if p.i == winner else 1 if winner != -1 else 0) for p in self.players if p.who]) if self.ranked else {}
         for p in self.players:
             if p.conn:
-                out = dict(msg, ranked=self.ranked, rank=ranks.get(p.i)) if self.ranked else msg
+                out = dict(msg, ranked=self.ranked, rank=ranks.get(id(p.who))) if self.ranked else msg
                 p.conn.send(out)
                 p.conn.room = p.conn.me = None
         self.task.cancel()
@@ -616,9 +617,10 @@ class CoopRoom:
         self.over = True
         kills = sum(1 for f in self.fighters if f.team == 1 and f.down)
         msg = {"t": "end", "mode": "coop", "won": won, "reason": reason, "kills": kills, "enemies": ENEMIES}
+        ranks = rate_team([f.who for f in self.fighters if f.who and f.role == "player"], won) if reason != "empty" else {}
         for f in self.fighters:
             if f.conn:
-                f.conn.send(msg)
+                f.conn.send(dict(msg, rank=ranks.get(id(f.who))) if ranks.get(id(f.who)) else msg)
                 f.conn.room = f.conn.me = None
         self.task.cancel()
 
@@ -626,6 +628,7 @@ class CoopRoom:
 class Racer:
     def __init__(self, conn, index, bot=False):
         self.conn, self.i, self.bot = conn, index, bot
+        self.who = conn
         self.name = conn.name if conn else "Practice bot %d" % index
         self.cls = conn.cls if conn else "charioteer"
         self.look = conn.look if conn else clean_look({"toga": index, "sash": index})
@@ -725,9 +728,10 @@ class RaceRoom:
         order = sorted(self.players, key=lambda p: (p.fin if p.fin is not None else float("inf"), -p.s))
         msg = {"t": "end", "mode": "race", "reason": reason,
                "order": [{"i": p.i, "name": p.name, "time": (round(p.fin, 2) if p.fin not in (None, float("inf")) else None)} for p in order]}
+        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who])
         for p in self.players:
             if p.conn:
-                p.conn.send(msg)
+                p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
                 p.conn.room = p.conn.me = None
         self.task.cancel()
 
@@ -800,6 +804,7 @@ def clean_ship(d):
 class Ship:
     def __init__(self, conn, index, count, bot=False):
         self.conn, self.i, self.bot = conn, index, bot
+        self.who = conn
         self.name = conn.name if conn else "%s (practice ship)" % BOT_SHIP_NAMES[index % len(BOT_SHIP_NAMES)]
         self.cls = conn.cls if conn else "gladiator"
         self.look = conn.look if conn else clean_look({"toga": index, "sash": index})
@@ -1091,9 +1096,10 @@ class NavalRoom:
         order = sorted(self.ships, key=lambda s: (0, -s.hp) if not s.dead else (1, -s.dead_at))
         msg = {"t": "end", "mode": "naval", "reason": reason,
                "order": [{"i": s.i, "name": s.name, "hp": round(s.hp), "bot": s.bot} for s in order]}
+        ranks = rate_placements([(s.who, k) for k, s in enumerate(order) if s.who])
         for s in self.ships:
             if s.conn:
-                s.conn.send(msg)
+                s.conn.send(dict(msg, rank=ranks[id(s.who)]) if id(s.who) in ranks else msg)
                 s.conn.room = s.conn.me = None
         self.task.cancel()
 
@@ -1102,7 +1108,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "ranked": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1121,15 +1127,11 @@ def leave_queue(conn):
 def match_once():
     """Pairs up whoever is waiting. Called twice a second."""
     t = now()
+    match_rated(t)
     q = QUEUES["duel"]
-    q[:] = [c for c in q if not c.closed]
-    while len(q) >= 2:
-        a, b = q.pop(0), q.pop(0)
-        DuelRoom([a, b])
     if q and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DuelRoom([q.pop(0)], with_bot=True)
 
-    match_ranked(t)
 
     q = QUEUES["race"]
     q[:] = [c for c in q if not c.closed]
@@ -1595,37 +1597,67 @@ def elo_change(ra, rb, score, games):
     return int(round(k * (score - expected)))
 
 
-def rate_match(players, winner):
-    """Updates both ratings after a ranked duel. Returns {player index: {r, w, l, d, delta}}. Playing the same person over and over
-    (more than 3 times in 10 minutes) changes nothing, so two friends cannot farm points."""
-    duelists = [p for p in players if p.conn and p.conn.uid]
-    if len(duelists) != 2:
+def rate_placements(entries):
+    """Updates ratings after any match between real people: entries is [(connection, place)] for the humans in it (a lower place is
+    better, equal places are a tie). Each pair of people is scored like a duel and the results are averaged, so the same function does
+    duels (two people), races and naval battles (up to four). Returns {id(connection): {r, w, l, d, delta, farm}}. Practice bots do not
+    count, a match with fewer than two real people changes nothing, and meeting the same people more than three times in ten minutes
+    changes nothing, so friends cannot farm points. Guests (no account) count as opponents but have no saved rating."""
+    entries = [(c, k) for c, k in entries if c]
+    n = len(entries)
+    if n < 2:
         return {}
-    a, b = duelists
-    ra, rb = rating_of(a.conn), rating_of(b.conn)
-    key = tuple(sorted((a.conn.uid, b.conn.uid)))
     t = now()
+    key = tuple(sorted(str(c.uid or c.id) for c, _ in entries))
     RECENT[key] = [x for x in RECENT[key] if t - x < 600] + [t]
     farm = len(RECENT[key]) > 3
+    recs = [rating_of(c) for c, _ in entries]
+    before = [r["r"] for r in recs]
     out = {}
-    sa = 0.5 if winner == -1 else (1.0 if winner == a.i else 0.0)
-    before = (ra["r"], rb["r"])
-    for me, other, rme, rother, score in ((a, b, ra, rb, sa), (b, a, rb, ra, 1.0 - sa)):
-        games = rme["w"] + rme["l"] + rme["d"]
-        mine, theirs = (before[0], before[1]) if me is a else (before[1], before[0])   # both changes use the ratings from before the match
-        delta = 0 if farm else elo_change(mine, theirs, score, games)
-        if rme["r"] + delta < 0:
-            delta = -rme["r"]
-        rme["r"] += delta
-        rme["w" if score == 1.0 else "l" if score == 0.0 else "d"] += 1
-        rme["name"] = me.conn.name
-        out[me.i] = dict(public_rank(rme), delta=delta, farm=farm)
+    for i, (c, ki) in enumerate(entries):
+        total = 0.0
+        for j, (_, kj) in enumerate(entries):
+            if i != j:
+                total += (1.0 if ki < kj else 0.0 if ki > kj else 0.5) - 1.0 / (1.0 + 10 ** ((before[j] - before[i]) / 400.0))
+        rec = recs[i]
+        games = rec["w"] + rec["l"] + rec["d"]
+        delta = 0 if farm else int(round((40 if games < 10 else 24) * total / (n - 1)))
+        if rec["r"] + delta < 0:
+            delta = -rec["r"]
+        better = sum(1 for _, kj in entries if kj < ki)
+        worse = sum(1 for _, kj in entries if kj > ki)
+        rec["r"] += delta
+        rec["w" if better == 0 and worse > 0 else "l" if worse == 0 and better > 0 else "d"] += 1
+        rec["name"] = c.name
+        out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
     return out
 
 
-def match_ranked(t):
-    """Pairs ranked players with someone of a similar rating. The longer you wait, the wider the search gets (40 points per second)."""
-    q = QUEUES["ranked"]
+def rate_team(conns, won):
+    """A team battle against bots: with at least two real people on the team, a win is worth +8 and a defeat costs 6."""
+    conns = [c for c in conns if c]
+    if len(conns) < 2:
+        return {}
+    t = now()
+    key = tuple(sorted(str(c.uid or c.id) for c in conns))
+    RECENT[key] = [x for x in RECENT[key] if t - x < 600] + [t]
+    farm = len(RECENT[key]) > 3
+    out = {}
+    for c in conns:
+        rec = rating_of(c)
+        delta = 0 if farm else (8 if won else -6)
+        if rec["r"] + delta < 0:
+            delta = -rec["r"]
+        rec["r"] += delta
+        rec["w" if won else "l"] += 1
+        rec["name"] = c.name
+        out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
+    return out
+
+
+def match_rated(t):
+    """Pairs duel players with someone of a similar rating (guests count as 1000). The longer you wait, the wider the search gets (40 points per second)."""
+    q = QUEUES["duel"]
     q[:] = [c for c in q if not c.closed]
     while len(q) >= 2:
         best = None
@@ -1847,16 +1879,14 @@ async def handle_msg(conn, m):
     if t == "admin":
         return on_admin(conn, m)
     if t == "queue":
-        mode = m.get("mode")
+        mode = "duel" if m.get("mode") == "ranked" else m.get("mode")      # every duel between real people is ranked now
         if mode not in QUEUES:
             return conn.send({"t": "error", "code": "mode", "msg": "Unknown game"})
         if conn.room:
             return conn.send({"t": "error", "code": "busy", "msg": "You are already in a game"})
-        if mode == "ranked" and not conn.uid:
-            return conn.send({"t": "error", "code": "login", "msg": "Log in to your account to play ranked matches."})
         if mode == "naval":
             conn.ship = clean_ship(m.get("ship"))
-        return enqueue(conn, mode, False if mode == "ranked" else m.get("bot"))
+        return enqueue(conn, mode, m.get("bot"))
     if t == "leave":
         leave_queue(conn)
         if conn.room:
