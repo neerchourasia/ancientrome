@@ -42,6 +42,7 @@ function init() {
   Jobs.build(scene);
   Robbery.init(scene);
   Festival.init(scene);
+  Theatre.init(scene);
   Guards.build(scene);
   Harbour.build(scene);
   Home.build();
@@ -172,6 +173,7 @@ function wireInput(canvas) {
       else if (k === "KeyU" && inArena(player.x, player.z)) Fight.start({ hunt: true });
       else if (k === "KeyN" && inArena(player.x, player.z)) Shipyard.open();
       else if (k === "KeyR" && inCircusTrack(player.x, player.z)) Race.start();
+      else if (k === "KeyV" && era === "ancient" && city === "rome" && Theatre.inTheatre(player.x, player.z)) Watch.start("theatre");
       else if (k === "KeyV" && (inColosseum(player.x, player.z) || inCircusArea(player.x, player.z))) Watch.start(inColosseum(player.x, player.z) ? "duel" : "race");
     } else if (mode === "naval") {
       if (k === "Space" || k === "KeyQ" || k === "KeyE") Naval.fire(k);
@@ -224,6 +226,7 @@ function wireInput(canvas) {
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
+    else if (era === "ancient" && city === "rome" && Theatre.inTheatre(player.x, player.z)) Watch.start("theatre");
     else if (inColosseum(player.x, player.z)) Watch.start("duel");
     else if (inCircusStands(player.x, player.z)) Watch.start("race");
   });
@@ -1069,6 +1072,7 @@ function updatePrompt() {
     else if (era === "modern" && (inArena(player.x, player.z) || inCircusTrack(player.x, player.z) || inColosseum(player.x, player.z) || inCircusStands(player.x, player.z))) text = "The games only ran in Ancient Rome. Press K to go back";
     else if (inArena(player.x, player.z)) text = Vitals.canFight() ? "F: gladiators · U: animal hunt · L: lion · N: build your ship and fight a naval battle · V: watch the games" : "Too wounded to fight. Press Z to rest and heal · V: watch the games";
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
+    else if (era === "ancient" && city === "rome" && Theatre.inTheatre(player.x, player.z)) text = "Press V to watch a play";
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
     if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
@@ -1304,6 +1308,10 @@ function drawMiniMap() {
     g.beginPath(); g.arc(lm.x, lm.z, 7 / k, 0, Math.PI * 2); g.fill();
     g.strokeStyle = "#fff"; g.lineWidth = 1.5 / k; g.stroke();
   }
+  for (const gd of Guards.positions()) {   // the city guards: small red dots (they flash when they are after you)
+    g.fillStyle = gd.chase && Math.floor(performance.now() / 250) % 2 ? "#ffd36b" : "#c0262b"; g.strokeStyle = "#fff"; g.lineWidth = 1.2 / k;
+    g.beginPath(); g.arc(gd.x, gd.z, 4.5 / k, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
   g.restore();
   // player arrow (always points up)
   g.fillStyle = "#1a5fd0"; g.strokeStyle = "#fff"; g.lineWidth = 2;
@@ -1329,6 +1337,10 @@ function drawBigMap() {
     g.strokeStyle = "#fff"; g.lineWidth = 2; g.stroke();
     g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,.9)"; g.strokeText(lm.name, x + 10, y);
     g.fillStyle = "#2a2118"; g.fillText(lm.name, x + 10, y);
+  }
+  for (const gd of Guards.positions()) {
+    g.fillStyle = "#c0262b"; g.strokeStyle = "#fff"; g.lineWidth = 1.5;
+    g.beginPath(); g.arc((gd.x - MAP.x0) * s, (gd.z - MAP.z0) * s, 4, 0, Math.PI * 2); g.fill(); g.stroke();
   }
   const px = (player.x - MAP.x0) * s, py = (player.z - MAP.z0) * s;
   g.save();

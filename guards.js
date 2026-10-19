@@ -13,8 +13,8 @@ const Guards = (() => {
   const WATCH = 45, CATCH = 2.4, GIVE_UP = 100;                       // metres: how far they see you, how close to grab you, when they lose you
   // each city's rounds: lists of waypoints (the guards walk from one to the next, and so on)
   const ROUTES = {
-    rome: [[[30, 0], [150, 6], [250, 0], [310, 44]], [[170, 60], [250, -42], [150, -40], [50, 42]], [[-200, -10], [-150, -190], [-100, -60], [30, -8]], [[-205, 100], [-170, 70], [-200, 20], [-230, 0]], [[50, 78], [100, 70], [60, 100], [0, 60]], [[-480, -440], [-420, -360], [-300, -300], [-200, -200]], [[310, 44], [380, 80], [300, 100], [250, 60]], [[-290, 40], [-300, -20], [-330, -90], [-400, 20]]],
-    delhi: [[[-45, 0], [-200, 5], [-350, 8], [-500, 5]], [[-60, 45], [-50, 56], [-20, 30], [20, 8]], [[70, 20], [20, -30], [-40, -40], [-30, -10]], [[-140, 205], [-150, 120], [-110, 40], [-200, 10]], [[-615, 36], [-560, 4], [-450, 12], [-300, 20]], [[-420, 20], [-380, -8], [-250, 6], [-120, 12]]],
+    rome: [[[60, -14]], [[-30, 10]], [[300, 36]], [[150, 50]], [[50, 76]], [[-205, 108]], [[-235, 12]], [[200, -30]], [[240, 30]], [[-690, -60]], [[-480, -440]], [[30, -6], [80, -10]], [[180, 6], [260, 4]], [[30, 0], [150, 6], [250, 0], [310, 44]], [[170, 60], [250, -42], [150, -40], [50, 42]], [[-200, -10], [-150, -190], [-100, -60], [30, -8]], [[-205, 100], [-170, 70], [-200, 20], [-230, 0]], [[50, 78], [100, 70], [60, 100], [0, 60]], [[-480, -440], [-420, -360], [-300, -300], [-200, -200]], [[310, 44], [380, 80], [300, 100], [250, 60]], [[-290, 40], [-300, -20], [-330, -90], [-400, 20]]],
+    delhi: [[[-48, -6]], [[-40, 24]], [[-100, 3]], [[-50, 58]], [[-140, 210]], [[-615, 38]], [[70, 18]], [[-215, 6]], [[-45, 0], [-200, 5], [-350, 8], [-500, 5]], [[-60, 45], [-50, 56], [-20, 30], [20, 8]], [[70, 20], [20, -30], [-40, -40], [-30, -10]], [[-140, 205], [-150, 120], [-110, 40], [-200, 10]], [[-615, 36], [-560, 4], [-450, 12], [-300, 20]], [[-420, 20], [-380, -8], [-250, 6], [-120, 12]]],
   };
   const guards = [];                // { g, city, route, wp, x, z, state: "walk" | "chase", ...}
   let scene = null, wanted = 0, lastSeen = 0, jailT = 0, hudT = 0, shoutT = 0, delhiMade = false;
@@ -31,7 +31,10 @@ const Guards = (() => {
       const spear = new T.Mesh(CYLG, lam(0x6a4c2a)); spear.scale.set(0.03, 2.2, 0.03); spear.position.set(0.4, 1.1, 0); g.add(spear);
       const tip = new T.Mesh(CONEG, lam(0xb0b4ba)); tip.scale.set(0.07, 0.3, 0.07); tip.position.set(0.4, 2.3, 0); g.add(tip);
     } else { const stick = new T.Mesh(CYLG, lam(0x1a1a1a)); stick.scale.set(0.04, 0.6, 0.04); stick.position.set(0.4, 0.9, 0.1); g.add(stick); }
+    const cloak = new T.Mesh(new T.BoxGeometry(0.62, 1.1, 0.07), lam(police ? 0x3a5a9a : delhi ? 0xd9a928 : 0xc0262b)); cloak.position.set(0, 1.0, 0.24); g.add(cloak);   // a bright cloak, so you can see them from afar
+    const lantern = new T.Mesh(new T.SphereGeometry(0.1, 8, 6), new T.MeshBasicMaterial({ color: police ? 0x9ad0ff : 0xffb347 })); lantern.position.set(-0.42, 1.0, -0.1); g.add(lantern);   // and a lantern that glows after dark
     g.traverse((m) => { m.castShadow = true; });
+    g.scale.setScalar(1.12);
     return g;
   }
 
@@ -40,7 +43,7 @@ const Guards = (() => {
     routes.forEach((route, i) => {
       for (let k = 0; k < (c === "rome" ? 1 : 1); k++) {
         const [wx, wz] = route[0], g = model(c, "ancient"); parent.add(g);
-        guards.push({ g, city: c, route: route.map(([x, z]) => [x + offset, z]), wp: 1, x: wx + offset, z: wz, state: "walk", sp: 1.5 + (i % 3) * 0.2, stuck: 0, hold: 0, lost: 0, shout: 0, ph: Math.random() * 6 });
+        guards.push({ g, city: c, route: route.map(([x, z]) => [x + offset, z]), wp: route.length > 1 ? 1 : 0, x: wx + offset, z: wz, state: "walk", sp: 1.5 + (i % 3) * 0.2, stuck: 0, hold: 0, lost: 0, shout: 0, ph: Math.random() * 6 });
         guards[guards.length - 1].g.position.set(wx + offset, 0, wz);
       }
     });
@@ -139,5 +142,6 @@ const Guards = (() => {
   }
 
   const nearest = () => Math.min(...guards.filter((g) => g.city === (typeof city !== "undefined" ? city : "rome")).map((g) => Math.hypot(g.x - player.x, g.z - player.z)));
-  return { build, buildDelhi, update, crime, setEra, caught, nearest, count: () => guards.length, get wanted() { return wanted; }, set wanted(v) { wanted = v; render(); } };
+  const positions = () => guards.filter((g) => g.city === (typeof city !== "undefined" ? city : "rome")).map((g) => ({ x: g.x, z: g.z, chase: g.state === "chase" }));
+  return { build, buildDelhi, update, crime, positions, setEra, caught, nearest, count: () => guards.length, get wanted() { return wanted; }, set wanted(v) { wanted = v; render(); } };
 })();

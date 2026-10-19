@@ -45,7 +45,12 @@ const Watch = (() => {
     closePanels();
     Crowd.setCheer(true);
     el("watch-keys").classList.add("show");
-    if (k === "duel") {
+    if (k === "theatre") {
+      if (!Theatre.inTheatre(player.x, player.z) || player.z < Theatre.C.z + 4) placeAt(Theatre.C.x, Theatre.C.z + 26, 0);   // a seat in the middle, facing the stage
+      Crowd.setCheer(false);
+      el("duel-hud").classList.add("show");
+      startTheatre(0);
+    } else if (k === "duel") {
       if (!inColosseum(player.x, player.z) || inArena(player.x, player.z)) placeAt(430, 80, 0); // south seats, facing the arena
       el("duel-hud").classList.add("show");
       startAct(0);
@@ -61,7 +66,7 @@ const Watch = (() => {
     Narrator.stop();
     if (Race.active) Race.stop();
     clearBout();
-    Show.clear();
+    Show.clear(); Theatre.clear();
     el("subtitle").textContent = "";
     kind = null; chase = false; mode = "walk";
     el("duel-hud").classList.remove("show");
@@ -87,8 +92,18 @@ const Watch = (() => {
     else { Show.start(name); msg(ACT_TITLES[name], 2600); }
   }
 
-  const nextAct = () => { if (kind === "duel") startAct(actIdx + 1); };
-  const setAct = (i) => { if (kind === "duel") startAct(i); };
+  // the plays at the Theatre of Pompey
+  function startTheatre(i) {
+    actIdx = ((i % Theatre.ORDER.length) + Theatre.ORDER.length) % Theatre.ORDER.length; actPause = 0;
+    const name = Theatre.ORDER[actIdx], def = Theatre.ACTS[name];
+    Theatre.start(name);
+    el("act-title").textContent = def.title; el("act-step").textContent = `Act ${actIdx + 1} of ${Theatre.ORDER.length}`;
+    el("duel-bars").style.display = "none"; el("subtitle").textContent = "";
+    msg(def.title, 2600);
+  }
+
+  const nextAct = () => { if (kind === "duel") startAct(actIdx + 1); else if (kind === "theatre") startTheatre(actIdx + 1); };
+  const setAct = (i) => { if (kind === "duel") startAct(i); else if (kind === "theatre") startTheatre(i); };
 
   function toggleChase() {
     chase = !chase;
@@ -219,6 +234,12 @@ const Watch = (() => {
 
   function update(dt) {
     if (!kind) return;
+    if (kind === "theatre") {
+      const r = Theatre.update(dt);
+      el("subtitle").textContent = Theatre.subtitle; Narrator.say(Theatre.subtitle);
+      if (r.done) { actPause += dt; if (actPause > 3) { Sfx.play("cheer"); startTheatre(actIdx + 1); } }
+      return;
+    }
     if (kind === "duel") {
       if (PROGRAM[actIdx] === "duel") updateDuel(dt);
       else {
@@ -236,6 +257,11 @@ const Watch = (() => {
   // Returns true when the cinematic camera drove the view this frame.
   function camera_(cam, dt) {
     if (!kind || !chase) return false;
+    if (kind === "theatre") {   // from the front of the orchestra, looking up at the stage
+      const f = Theatre.focus(); orbit += dt * 0.3;
+      cam.position.set(Theatre.C.x + Math.sin(orbit) * 9, 3.4, Theatre.C.z + 8); cam.lookAt(f.x, 2.4, f.z);
+      return true;
+    }
     if (kind === "race") {
       if (!Race.active) return false;
       Race.camera(cam, dt, Race.leader());
