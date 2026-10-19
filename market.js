@@ -124,6 +124,7 @@ const Market = (() => {
     builder: { title: "Builder and decorator", types: ["decor"], house: true },
     healer: { title: "Healer and trainer", types: ["cure", "supply", "perk"] },
     garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
+    menagerie: { title: "Your menagerie", types: ["pet"], ownedOnly: true, empty: "You do not own any animals yet. Buy one at the animals and rides stall in the market square, and it will live here. Press Bring along to take one with you." },
     dresser: { title: "Your dresser", types: ["wear"], ownedOnly: true, empty: "You do not own anything to wear yet. The clothier in the market square sells hats, cloaks, armour and boots. You cannot buy things here." },
   };
   let stall = "food";

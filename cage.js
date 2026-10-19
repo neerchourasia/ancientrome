@@ -113,5 +113,16 @@ const Cage = (() => {
     }
   }
 
-  return { build, update, sync, get all() { return cages; } };
+  // standing in front of the cage (on the side with the sign): press F to choose which animal comes along with you
+  function at(x, z, feet = 0) {
+    if (feet > 3) return null;
+    for (const c of cages) {
+      if (Math.abs(x - c.x) > 6 || Math.abs(z - c.z) > 6 || !shown(c.g)) continue;
+      if (Math.hypot(x - c.x, z - (c.z + c.face * (D / 2 + 1.0))) < 1.7) return c;
+    }
+    return null;
+  }
+  function open() { if (!at(player.x, player.z, player.feet)) return false; Market.open("menagerie"); return true; }
+
+  return { build, update, sync, at, open, get all() { return cages; } };
 })();
