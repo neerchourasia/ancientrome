@@ -514,7 +514,7 @@ const Cancun = (() => {
     }
     return false;
   }
-  const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.38 : 0.5) : 1);
+  const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1);   // swimming is about as fast as walking, a little faster at the surface
   const avatarDrop = () => (inWater(player.x, player.z) ? -0.95 : 0);
   const camDrop = () => (inWater(player.x, player.z) ? (snorkeling ? -2.4 : -0.95) : 0);
   let lastDt = 0.016;
