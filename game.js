@@ -528,6 +528,14 @@ function shove() {
     best = c; bd = d;
   }
   Sfx.play("swing");
+  let peer = null, pd = bd;                                   // other players count too (the game server checks they really are that close)
+  for (const p of Online.peerList()) {
+    if (p.x === null || !p.id) continue;
+    const dx = p.x - player.x, dz = p.z - player.z, d = Math.hypot(dx, dz);
+    if (d > 2.1 || d < 0.05 || (dx * fx + dz * fz) / d < 0.6 || d >= pd) continue;
+    peer = p; pd = d;
+  }
+  if (peer) { Online.shovePeer(peer.id); noteKnock(); peer.down = 1.4; return; }
   if (!best) { toast("Nobody within reach. Step up to someone and press R to shove them"); return; }
   best.down = 1.8;
   noteKnock();

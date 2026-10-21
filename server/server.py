@@ -225,6 +225,7 @@ class Conn:
         self.admin = False         # set from the database when they log in with an admin account
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
+        self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
         self.fest_t = 0.0          # when they last put a festival lamp or lantern down
         self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
@@ -1789,6 +1790,33 @@ def on_fest(conn, m):
             c.send(msg)
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# shoving: two players walking in the same city can push each other over (a knock-back, no damage). The server checks that they really are
+# standing close together, and nobody can be shoved twice within a moment.
+
+SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the game allows, for lag)
+
+
+def on_shove(conn, m):
+    t = now()
+    target = next((c for c in CONNS if c.hello and not c.closed and c.id == m.get("to")), None)
+    if not target or target is conn or conn.room or target.room or not conn.city or conn.city != target.city:
+        return
+    if t - conn.walk_at > 4 or t - target.walk_at > 4 or t - conn.shove_t < 0.7 or t < target.immune_t:
+        return
+    d = math.hypot(target.px - conn.px, target.pz - conn.pz)
+    if d > SHOVE_RANGE:
+        return
+    conn.shove_t, target.immune_t = t, t + 1.6
+    dx, dz = ((target.px - conn.px) / d, (target.pz - conn.pz) / d) if d > 0.05 else (-math.sin(conn.pyaw), -math.cos(conn.pyaw))
+    target.send({"t": "shoved", "by": conn.name, "dx": round(dx, 2), "dz": round(dz, 2)})
+    conn.send({"t": "shove_ok", "name": target.name})
+    for c in list(CONNS):
+        if c is not conn and c is not target and c.hello and not c.closed and target.id in c.seen:
+            c.send({"t": "shove_fx", "id": target.id})
+    conn.send({"t": "shove_fx", "id": target.id})
+
+
 def on_social(conn, m):
     a = m.get("a")
     if not conn.fid:
@@ -1931,6 +1959,8 @@ async def handle_msg(conn, m):
         return on_social(conn, m)
     if t == "fest":
         return on_fest(conn, m)
+    if t == "shove":
+        return on_shove(conn, m)
     if t == "admin":
         return on_admin(conn, m)
     if t == "queue":

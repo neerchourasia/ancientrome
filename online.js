@@ -54,6 +54,9 @@ const Online = (() => {
     switch (m.t) {
       case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); Festival.sync(); setMsg(""); break;
       case "fest": case "diyas": Festival.remote(m); break;
+      case "shoved": gotShoved(m); break;
+      case "shove_ok": toast(`You shoved ${m.name}`); break;
+      case "shove_fx": { const p = peers.get(m.id); if (p) p.down = 1.4; break; }
       case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
@@ -141,7 +144,7 @@ const Online = (() => {
       scene.add(fig.g);
       const pet = look && Pets.make(look.pet);
       if (pet) { pet.g.visible = false; scene.add(pet.g); pet.kind = look.pet; pet.x = null; pet.a = Math.random() * 6; }
-      peers.set(id, { fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
+      peers.set(id, { id, fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
       toast(`${name || "A player"} is nearby`);
     }
     for (const [id, x, z, yaw, spd, veh, park] of m.p || []) {
@@ -170,6 +173,7 @@ const Online = (() => {
       g.visible = show;
       g.position.set(p.x, groundAt(p.x, p.z), p.z);
       g.rotation.y = p.yaw;
+      if (p.down > 0) { p.down -= dt; g.rotation.x = 1.35 * Math.min(1, Math.max(0, p.down) / 0.35); } else if (g.rotation.x) g.rotation.x = 0;   // a player who was shoved lies on the ground for a moment
       p.ph += dt * (p.spd / 5.5) * 6.2;
       const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
       a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
@@ -177,6 +181,17 @@ const Online = (() => {
       if (p.pet) petUpdate(p, dt, show && !p.vm);
     }
   }
+
+  // Another player shoved you: you are pushed back a couple of steps and stumble (no damage)
+  function gotShoved(m) {
+    if (mode !== "walk") return;
+    const nx = player.x + (m.dx || 0) * 2.2, nz = player.z + (m.dz || 0) * 2.2;
+    if (canMove(player.x, player.z, nx, nz)) { player.x = nx; player.z = nz; }
+    player.vx = player.vz = 0; player.stun = Math.max(player.stun || 0, 0.8); player.shake = Math.max(player.shake || 0, 0.6);
+    Sfx.play("oof");
+    toast(`${m.by || "Someone"} shoved you!`);
+  }
+  function shovePeer(id) { send({ t: "shove", to: id }); }
 
   // the vehicle they are in (they sit in it, or are hidden inside a closed car) and the one they left parked
   function dropVehicles(p) {
@@ -496,5 +511,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

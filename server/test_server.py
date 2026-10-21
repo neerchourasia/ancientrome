@@ -241,6 +241,27 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.TimeoutError):
             await b.until(lambda m: m["t"] == "fest", timeout=0.6)
 
+    async def test_players_can_shove_each_other_only_when_close(self):
+        a, b, c = await self.player("Ann"), await self.player("Ben"), await self.player("Cy")
+        ca, cb, cc = [next(x for x in server.CONNS if x.name == n) for n in ("Ann", "Ben", "Cy")]
+        for conn, x, z in ((ca, 0.0, 0.0), (cb, 2.0, 0.0), (cc, 30.0, 0.0)):
+            conn.city, conn.px, conn.pz, conn.walk_at = "rome", x, z, server.now()
+        cb.seen = {ca.id}
+        cc.seen = {cb.id}
+        a.send({"t": "shove", "to": cc.id})                                        # too far away
+        with self.assertRaises(asyncio.TimeoutError):
+            await c.until(lambda m: m["t"] == "shoved", timeout=0.6)
+        a.send({"t": "shove", "to": cb.id})
+        hit = await b.until(lambda m: m["t"] == "shoved")
+        self.assertEqual((hit["by"], hit["dx"], hit["dz"]), ("Ann", 1.0, 0.0))     # pushed away from Ann
+        self.assertEqual((await a.until(lambda m: m["t"] == "shove_ok"))["name"], "Ben")
+        await c.until(lambda m: m["t"] == "shove_fx")                              # people who can see Ben see him fall
+        cb.walk_at = ca.walk_at = server.now()
+        await asyncio.sleep(0.8)
+        a.send({"t": "shove", "to": cb.id})                                         # Ben cannot be shoved again straight away
+        with self.assertRaises(asyncio.TimeoutError):
+            await b.until(lambda m: m["t"] == "shoved", timeout=0.6)
+
     async def test_duel_block_cuts_damage_and_range_is_checked(self):
         a, b = await self.start_duel()
         a.send({"t": "swing"})                           # far away: a miss, no damage
