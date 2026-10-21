@@ -271,7 +271,7 @@ function wireInput(canvas) {
     let open = false;
     try { open = localStorage.getItem("rome-menu") === "open"; } catch (e) { /* ignore */ }
     const show = (v) => {
-      open = v; bar.classList.toggle("collapsed", !v); mb.setAttribute("aria-expanded", String(v)); mb.firstChild.textContent = v ? "✕ Hide menu " : "☰ Menu ";
+      open = v; bar.classList.toggle("collapsed", !v); mb.setAttribute("aria-expanded", String(v)); mb.querySelector(".mi").textContent = v ? "✕" : "☰"; mb.title = v ? "Hide the menu" : "Menu";
       try { localStorage.setItem("rome-menu", v ? "open" : "closed"); } catch (e) { /* ignore */ }
     };
     mb.addEventListener("click", () => show(!open));

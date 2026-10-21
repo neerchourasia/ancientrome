@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=245">
+  <link rel="stylesheet" href="walk.css?v=247">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=245"></script>
+  <script src="boot.js?v=247"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -38,7 +38,7 @@
     <div class="top-right">
       <canvas id="minimap" width="200" height="200" title="Click to open the full map"></canvas>
       <div class="buttons collapsed">
-        <button id="btn-menu" type="button" aria-expanded="false">☰ Menu</button>
+        <button id="btn-menu" type="button" aria-expanded="false" aria-label="Menu" title="Menu"><svg class="spark" viewBox="-335 -335 670 670" aria-hidden="true" focusable="false"><defs><path id="spk" d="M0 -1 Q0.22 -0.22 1 0 Q0.22 0.22 0 1 Q-0.22 0.22 -1 0 Q-0.22 -0.22 0 -1Z"/></defs><g fill="#ffd666"><use href="#spk" transform="translate(0 -248) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(250 0) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(-250 0) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(0 248) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(-175 -175) rotate(0) scale(46)" opacity="1"/><use href="#spk" transform="translate(175 -175) rotate(0) scale(46)" opacity="1"/><use href="#spk" transform="translate(-175 175) rotate(0) scale(46)" opacity="0.55"/><use href="#spk" transform="translate(175 175) rotate(0) scale(46)" opacity="0.55"/><use href="#spk" transform="translate(-62 -148) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(63 -148) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(-153 -63) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(153 -63) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(-153 67) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(153 67) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(-70 157) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(65 157) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(-110 -288) rotate(-14) scale(30)" opacity="0.85"/><use href="#spk" transform="translate(122 -288) rotate(14) scale(30)" opacity="0.8"/><use href="#spk" transform="translate(-298 -118) rotate(-14) scale(30)" opacity="0.4"/><use href="#spk" transform="translate(300 -118) rotate(14) scale(30)" opacity="0.4"/><use href="#spk" transform="translate(-305 112) rotate(-14) scale(30)" opacity="0.95"/><use href="#spk" transform="translate(300 117) rotate(14) scale(30)" opacity="0.9"/><use href="#spk" transform="translate(-130 277) rotate(-14) scale(30)" opacity="0.9"/><use href="#spk" transform="translate(110 277) rotate(14) scale(30)" opacity="0.6"/></g></svg><span class="mi">☰</span></button>
         <button id="btn-map" type="button">Map <kbd>M</kbd></button>
         <button id="btn-dirs" type="button">Directions <kbd>G</kbd></button>
         <button id="btn-places" type="button">Places <kbd>P</kbd></button>
@@ -499,51 +499,51 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=245"></script>
-  <script src="delhi-data.js?v=245"></script>
-  <script src="config.js?v=245"></script>
-  <script src="character.js?v=245"></script>
-  <script src="physics.js?v=245"></script>
-  <script src="vitals.js?v=245"></script>
-  <script src="narrator.js?v=245"></script>
-  <script src="audio.js?v=245"></script>
-  <script src="music.js?v=245"></script>
-  <script src="world.js?v=245"></script>
-  <script src="city.js?v=245"></script>
-  <script src="weather.js?v=245"></script>
-  <script src="modern.js?v=245"></script>
-  <script src="delhi.js?v=245"></script>
-  <script src="delhi-games.js?v=245"></script>
-  <script src="home.js?v=245"></script>
-  <script src="spectators.js?v=245"></script>
-  <script src="fight.js?v=245"></script>
-  <script src="nav.js?v=245"></script>
-  <script src="show.js?v=245"></script>
-  <script src="shipyard.js?v=245"></script>
-  <script src="naval.js?v=245"></script>
-  <script src="theatre.js?v=245"></script>
-  <script src="watch.js?v=245"></script>
-  <script src="race.js?v=245"></script>
-  <script src="account.js?v=245"></script>
-  <script src="online.js?v=245"></script>
-  <script src="chat.js?v=245"></script>
-  <script src="social.js?v=245"></script>
-  <script src="gifts.js?v=245"></script>
-  <script src="tax.js?v=245"></script>
-  <script src="pets.js?v=245"></script>
-  <script src="cage.js?v=245"></script>
-  <script src="car.js?v=245"></script>
-  <script src="market.js?v=245"></script>
-  <script src="garage.js?v=245"></script>
-  <script src="dresser.js?v=245"></script>
-  <script src="festival.js?v=245"></script>
-  <script src="harbour.js?v=245"></script>
-  <script src="disease.js?v=245"></script>
-  <script src="jail.js?v=245"></script>
-  <script src="guards.js?v=245"></script>
-  <script src="stalls.js?v=245"></script>
-  <script src="robbery.js?v=245"></script>
-  <script src="jobs.js?v=245"></script>
-  <script src="game.js?v=245"></script>
+  <script src="landmarks.js?v=247"></script>
+  <script src="delhi-data.js?v=247"></script>
+  <script src="config.js?v=247"></script>
+  <script src="character.js?v=247"></script>
+  <script src="physics.js?v=247"></script>
+  <script src="vitals.js?v=247"></script>
+  <script src="narrator.js?v=247"></script>
+  <script src="audio.js?v=247"></script>
+  <script src="music.js?v=247"></script>
+  <script src="world.js?v=247"></script>
+  <script src="city.js?v=247"></script>
+  <script src="weather.js?v=247"></script>
+  <script src="modern.js?v=247"></script>
+  <script src="delhi.js?v=247"></script>
+  <script src="delhi-games.js?v=247"></script>
+  <script src="home.js?v=247"></script>
+  <script src="spectators.js?v=247"></script>
+  <script src="fight.js?v=247"></script>
+  <script src="nav.js?v=247"></script>
+  <script src="show.js?v=247"></script>
+  <script src="shipyard.js?v=247"></script>
+  <script src="naval.js?v=247"></script>
+  <script src="theatre.js?v=247"></script>
+  <script src="watch.js?v=247"></script>
+  <script src="race.js?v=247"></script>
+  <script src="account.js?v=247"></script>
+  <script src="online.js?v=247"></script>
+  <script src="chat.js?v=247"></script>
+  <script src="social.js?v=247"></script>
+  <script src="gifts.js?v=247"></script>
+  <script src="tax.js?v=247"></script>
+  <script src="pets.js?v=247"></script>
+  <script src="cage.js?v=247"></script>
+  <script src="car.js?v=247"></script>
+  <script src="market.js?v=247"></script>
+  <script src="garage.js?v=247"></script>
+  <script src="dresser.js?v=247"></script>
+  <script src="festival.js?v=247"></script>
+  <script src="harbour.js?v=247"></script>
+  <script src="disease.js?v=247"></script>
+  <script src="jail.js?v=247"></script>
+  <script src="guards.js?v=247"></script>
+  <script src="stalls.js?v=247"></script>
+  <script src="robbery.js?v=247"></script>
+  <script src="jobs.js?v=247"></script>
+  <script src="game.js?v=247"></script>
 </body>
 </html>
