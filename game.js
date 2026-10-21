@@ -265,6 +265,19 @@ function wireInput(canvas) {
   $("#btn-dirs").addEventListener("click", toggleDirections);
   $("#btn-sound").addEventListener("click", toggleSound);
   $("#btn-jobs").addEventListener("click", () => Jobs.openList());
+  // the menu of buttons: closed until you want it (☰ Menu); a dot on it says a gift or a friend's message is waiting
+  {
+    const bar = document.querySelector(".top-right .buttons"), mb = $("#btn-menu");
+    let open = false;
+    try { open = localStorage.getItem("rome-menu") === "open"; } catch (e) { /* ignore */ }
+    const show = (v) => {
+      open = v; bar.classList.toggle("collapsed", !v); mb.setAttribute("aria-expanded", String(v)); mb.firstChild.textContent = v ? "✕ Hide menu " : "☰ Menu ";
+      try { localStorage.setItem("rome-menu", v ? "open" : "closed"); } catch (e) { /* ignore */ }
+    };
+    mb.addEventListener("click", () => show(!open));
+    show(open);
+    setInterval(() => mb.classList.toggle("alert", !open && ((typeof Gifts !== "undefined" && Gifts.ready) || (typeof Social !== "undefined" && Social.unread() > 0))), 1500);
+  }
   $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); toast(Music.on ? "Music on" : "Music off"); });
   refreshMusicButton();
   $("#btn-voice").addEventListener("click", toggleVoice);

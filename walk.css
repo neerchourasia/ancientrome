@@ -487,6 +487,9 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #wx-badge { padding: 2px 10px; border-radius: 999px; background: rgba(40,52,66,.85); color: #dbe7f2; font-size: .75rem; white-space: nowrap; }
 #wx-badge:empty { display: none; }
 .rank-badge { display: inline-block; padding: 0 7px; margin-left: 2px; border-radius: 999px; background: rgba(226,185,85,.2); border: 1px solid rgba(226,185,85,.55); color: #ffe8a8; font-size: .78rem; white-space: nowrap; }
+#btn-menu { order: -2; flex-basis: 100%; font-weight: 700; }
+#btn-menu.alert::after { content: " ●"; color: #ffd36b; }
+.buttons.collapsed button:not(#btn-dirs):not(#btn-menu) { display: none !important; }
 #btn-gift.ready { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); animation: giftpulse 1.6s ease-in-out infinite; }
 @keyframes giftpulse { 50% { box-shadow: 0 0 14px rgba(255,211,107,1); } }
 #friends h3 { margin: 12px 0 4px; color: var(--gold); font: 700 1rem Georgia, serif; }

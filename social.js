@@ -152,5 +152,5 @@ const Social = (() => {
     load();
   }
 
-  return { bind, on, load, open, render, restore, snapshot, setRank, tier, rankText, get rank() { return { ...rank }; }, helloFriends: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name })) };
+  return { unread: unreadTotal, bind, on, load, open, render, restore, snapshot, setRank, tier, rankText, get rank() { return { ...rank }; }, helloFriends: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name })) };
 })();
