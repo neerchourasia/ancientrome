@@ -13,20 +13,21 @@ const Stalls = (() => {
   const SITES = {
     rome: { x: 170, z: 62 },
     delhi: { x: 6000 - 50, z: 60 },
+    cancun: { x: 12000, z: 150 },
   };
 
   // what each stall is called, what the vendor shouts, the colour of its awning, and the goods on its counter
   const DEFS = [
     { id: "food", sign: "FOOD", sub: "hot and fresh", color: ["#b3262b", "#f1ead8"], robe: 0xb3262b, goods: [0xd9a05b, 0xe8c27a, 0x8a5a2b, 0xc9743a],
-      say: { rome: ["Fresh bread! Hot from the oven!", "Honey cakes, three for a denarius!"], delhi: ["Garam garam! Come and taste!", "Fresh jalebi, hot hot!"] } },
+      say: { rome: ["Fresh bread! Hot from the oven!", "Honey cakes, three for a denarius!"], delhi: ["Garam garam! Come and taste!", "Fresh jalebi, hot hot!"], cancun: ["¡Tacos, tamales, ceviche!", "Fresh from the fire! ¡Pruébalo!"] } },
     { id: "clothes", sign: "CLOTHES", sub: "to wear", color: ["#2f6b8f", "#f1ead8"], robe: 0x2f6b8f, goods: [0xb3262b, 0x6a2c8a, 0xd9b640, 0x2f8f4a],
-      say: { rome: ["Cloaks and crowns fit for a senator!", "Look at this purple, friend!"], delhi: ["Silk and gold, come and see!", "Best cloth in Chandni Chowk!"] } },
+      say: { rome: ["Cloaks and crowns fit for a senator!", "Look at this purple, friend!"], delhi: ["Silk and gold, come and see!", "Best cloth in Chandni Chowk!"], cancun: ["Embroidered huipiles, fine cotton!", "Hats for the sun, amigo!"] } },
     { id: "pets", sign: "ANIMALS", sub: "and rides", color: ["#2f8f4a", "#f1ead8"], robe: 0x2f8f4a, goods: [0x8a6a3a, 0xa88858, 0x6a4c2a],
-      say: { rome: ["Hounds, eagles and carts for sale!", "A loyal friend for the road!"], delhi: ["Elephants and carts, finest in Delhi!", "Come, look at my animals!"] } },
+      say: { rome: ["Hounds, eagles and carts for sale!", "A loyal friend for the road!"], delhi: ["Elephants and carts, finest in Delhi!", "Come, look at my animals!"], cancun: ["Parrots, monkeys and good dogs!", "A friend for the jungle road!"] } },
     { id: "builder", sign: "BUILDER", sub: "houses and decor", color: ["#d9791f", "#f1ead8"], robe: 0xd9791f, goods: [0xb86a4a, 0xa0a0a0, 0xc9b27a, 0x8a5a2b],
-      say: { rome: ["A finer house? I can build it!", "Mosaics and banners for your door!"], delhi: ["A grand haveli? I will build it!", "Carved doors and fine floors!"] } },
+      say: { rome: ["A finer house? I can build it!", "Mosaics and banners for your door!"], delhi: ["A grand haveli? I will build it!", "Carved doors and fine floors!"], cancun: ["Lime plaster for your walls!", "Hammocks and carved doors!"] } },
     { id: "healer", sign: "HEALER", sub: "and trainer", color: ["#7a2d8a", "#f1ead8"], robe: 0x7a2d8a, goods: [0x3aa557, 0xc0392b, 0xe2b955, 0x2c7fe0],
-      say: { rome: ["Salves for every wound!", "Train with me and hit harder!"], delhi: ["Herbs and balms for every ache!", "Strong horses, strong warriors!"] } },
+      say: { rome: ["Salves for every wound!", "Train with me and hit harder!"], delhi: ["Herbs and balms for every ache!", "Strong horses, strong warriors!"], cancun: ["Herbs and balms from the jungle!", "The healer will cure you!"] } },
   ];
   const NAMES = { weapons: "armourer's stall", food: "food stall", clothes: "clothier", pets: "animals and rides stall", builder: "builder's stall", healer: "healer's stall" };
 
@@ -85,8 +86,8 @@ const Stalls = (() => {
   // Build the square at world (cx, cz): the paving, a well in the middle and the five stalls along the south side
   function build(parent, cx, cz, where) {
     const g = new T.Group(); parent.add(g);
-    const delhi = where === "delhi";
-    const paving = new T.Mesh(new T.PlaneGeometry(62, 26), lam(delhi ? 0xc2a77a : 0xb7a98b));
+    const delhi = where === "delhi", cancun = where === "cancun";
+    const paving = new T.Mesh(new T.PlaneGeometry(62, 26), lam(delhi ? 0xc2a77a : cancun ? 0xe4dcc3 : 0xb7a98b));
     paving.rotation.x = -Math.PI / 2; paving.position.set(cx, 0.06, cz); paving.receiveShadow = true; g.add(paving);
     if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "r", x0: cx - 31, x1: cx + 31, z0: cz - 13, z1: cz + 13, c: "#d9b46a" });
     // the well, with a little roof on two posts
@@ -98,13 +99,13 @@ const Stalls = (() => {
     for (const sx of [-1, 1]) box(g, cx + sx * 9, 0, cz - 1, 3.2, 0.5, 0.8, lam(0x6a4c2a));
 
     // the job board, at the east end of the square: notices for the baker, scribe, stable hand and messenger
-    {
+    if (!cancun) {
       const bx = cx + 28, bz = cz + 4.5;
       for (const sx of [-1.6, 1.6]) box(g, bx + sx, 0, bz, 0.22, 3.2, 0.22, lam(0x5a4028), true);
       box(g, bx, 1.1, bz, 3.8, 1.9, 0.18, lam(0x7a5a34), false);
       for (let k = 0; k < 6; k++) box(g, bx - 1.4 + (k % 3) * 1.4, 1.5 + Math.floor(k / 3) * 0.8, bz - 0.12, 0.9, 0.6, 0.03, lam([0xf1ead8, 0xe8d9a8, 0xf3e2c0][k % 3]), false);
       sign(g, bx, 3.6, bz - 0.2, 3.4, 0.9, "WORK", "jobs wanted");
-      SPOTS.push({ id: "board", name: "job board", city: delhi ? "delhi" : "rome", x: bx, z: bz - 2.6, r: 3.2, vendor: { x: bx, z: bz }, group: new T.Group(), say: [], t: 1e9, ph: 0 });
+      SPOTS.push({ id: "board", name: "job board", city: where, x: bx, z: bz - 2.6, r: 3.2, vendor: { x: bx, z: bz }, group: new T.Group(), say: [], t: 1e9, ph: 0 });
     }
     DEFS.forEach((def, i) => {
       const x = cx + (i - 2) * SPACING, z = cz + 9; // the counter
@@ -117,7 +118,7 @@ const Stalls = (() => {
       sign(g, x, 4.3, z - 0.9, 4.6, 1.15, def.sign, def.sub);
       const v = vendor(g, x, z + 0.55, def.robe, delhi ? 0xf1ead8 : 0x6a3a1a);
       v.rotation.y = Math.PI; // faces the customers (north)
-      SPOTS.push({ id: def.id, name: NAMES[def.id], city: delhi ? "delhi" : "rome", x, z: cz + 5.6, r: 3.6, vendor: { x, z: z + 0.55 }, group: v, say: def.say[delhi ? "delhi" : "rome"], t: 0, ph: Math.random() * 6 });
+      SPOTS.push({ id: def.id, name: NAMES[def.id], city: where, x, z: cz + 5.6, r: 3.6, vendor: { x, z: z + 0.55 }, group: v, say: def.say[where] || def.say.rome, t: 0, ph: Math.random() * 6 });
     });
     return g;
   }

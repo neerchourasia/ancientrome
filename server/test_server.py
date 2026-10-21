@@ -317,6 +317,11 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         who = {w["name"]: w for w in (await boss.until(lambda m: m["t"] == "adminwho"))["who"]}
         self.assertEqual((who["Ann"]["where_city"], who["Ann"]["where_place"]), ("Old Delhi", "at Lahori Gate"))
         self.assertEqual(who["Ann"]["where_xz"], "0, 1")                                   # Delhi's x counts from its Lahori Gate
+        ann.send({"t": "walk", "c": "cancun", "x": 12000, "z": 30, "yaw": 0, "s": 0})      # and Cancún, with Chichén Itzá's pyramid
+        await asyncio.sleep(0.3)
+        boss.send({"t": "admin", "a": "who"})
+        who = {w["name"]: w for w in (await boss.until(lambda m: m["t"] == "adminwho"))["who"]}
+        self.assertEqual((who["Ann"]["where_city"], who["Ann"]["where_place"], who["Ann"]["where_xz"]), ("Cancún", "at El Castillo (Temple of Kukulcán)", "0, 30"))
 
     async def test_the_chat_can_sing_a_song(self):
         server.SING_GAP = 0.15

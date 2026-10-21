@@ -13,9 +13,11 @@ const Festival = (() => {
     floralia: { city: "rome", name: "Floralia", icon: "🌸", from: 4, to: 6, note: "flower garlands, cheaper food, better pay", say: ["Io Floralia!", "Flowers for the goddess!", "Happy Floralia!"] },
     saturnalia: { city: "rome", name: "Saturnalia", icon: "🕯", from: 25, to: 28, note: "lanterns, cheaper food, better pay", say: ["Io Saturnalia!", "Happy Saturnalia!", "Masters serve the slaves today!", "Let the feast begin!"] },
     diwali: { city: "delhi", name: "Diwali", icon: "🪔", from: 9, to: 12, note: "lamps, fireworks at night, sweets, cheaper food, better pay", say: ["Shubh Deepavali!", "Happy Diwali!", "Light the diyas!", "Have some mithai!"] },
+    equinox: { city: "cancun", name: "Equinox of Kukulcán", icon: "🐍", from: 1, to: 3, note: "the serpent of light slides down El Castillo, flags, cheaper food, better pay", say: ["Kukulcán descends!", "¡Feliz equinoccio!", "Look, the serpent is coming down!", "Let the feast begin!"] },
+    muertos: { city: "cancun", name: "Día de Muertos", icon: "💀", from: 21, to: 23, note: "marigolds, candles, sugar skulls, cheaper food, better pay", say: ["¡Feliz Día de Muertos!", "Pan de muerto, ¡pruébalo!", "For our ancestors!", "Light a candle for them!"] },
     holi: { city: "delhi", name: "Holi", icon: "🎨", from: 17, to: 18, note: "coloured powder, cheaper food, better pay", say: ["Holi hai!", "Bura na mano, Holi hai!", "Happy Holi!", "Come, play with colours!"] },
   };
-  const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b] };
+  const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b], equinox: [0x2f8f4a, 0x27a3c2, 0xf2c21b, 0xffffff], muertos: [0xff9a1f, 0xffb800, 0xb04fd0, 0xffffff, 0xe84a8a] };
   let clock = 0, lanterns = [], diyas = [], rdiyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
   const mats = {};
 
@@ -48,7 +50,11 @@ const Festival = (() => {
     if (deco[key]) return deco[key];
     const DX = typeof DELHI_X !== "undefined" ? DELHI_X : 6000;
     let g;
-    if (key === "diwali" || key === "holi") {
+    if (key === "equinox" || key === "muertos") {                    // Cancún: flags and marigold garlands across the plaza and the market
+      const CX = typeof CANCUN_X !== "undefined" ? CANCUN_X : 12000, lines = [[CX - 110, -45, CX + 110, -45], [CX - 110, 45, CX + 110, 45], [CX - 70, 128, CX + 70, 128], [CX - 70, 172, CX + 70, 172]];
+      for (let x = -100; x <= 100; x += 50) lines.push([CX + x, -45, CX + x, 45]);
+      g = strings(key, lines, 6.0, 2.8);
+    } else if (key === "diwali" || key === "holi") {
       const lines = [];
       for (let x = -560; x <= -60; x += 100) lines.push([DX + x, -11, DX + x, 11]);               // across the avenue
       lines.push([DX - 560, -11, DX - 40, -11], [DX - 560, 11, DX - 40, 11], [DX - 100, 56, DX - 20, 56], [DX - 90, 74, DX - 10, 74]);   // along both sides, and over the market square
@@ -80,7 +86,7 @@ const Festival = (() => {
   // ---------------------------------------------------------------- things to do: lanterns (Diwali, Saturnalia), colours (Holi, Floralia)
 
   const LANT_COLORS = [0xff7a3a, 0xffd36b, 0xe23b8a, 0x5ac8ff, 0xa6ff7a, 0xffffff];
-  const can = (k) => cur && ((k === "KeyL" && (curKey === "diwali" || curKey === "saturnalia")) || (k === "KeyU" && (curKey === "holi" || curKey === "floralia")));
+  const can = (k) => cur && ((k === "KeyL" && (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos")) || (k === "KeyU" && (curKey === "holi" || curKey === "floralia")));
 
   function lanternMesh(col) {
     const g = new T.Group(), paper = new T.MeshBasicMaterial({ color: col });
@@ -119,7 +125,7 @@ const Festival = (() => {
 
   // lamps and lanterns put down by other players (from the game server): only while the festival is on in this city
   function remote(m) {
-    if (!cur || m.c !== city || !(curKey === "diwali" || curKey === "saturnalia")) return;
+    if (!cur || m.c !== city || !(curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos")) return;
     const add = (x, z) => {
       if (rdiyas.some((d) => Math.abs(d.position.x - x) < 0.05 && Math.abs(d.position.z - z) < 0.05)) return;
       rdiyas.push(makeDiya(x, z));
@@ -165,7 +171,7 @@ const Festival = (() => {
     openPanel("#lantern");
     const row = document.getElementById("ln-colors"); row.replaceChildren();
     LANT_COLORS.forEach((c, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "sy-sw" + (i === (openLantern.sel || 0) ? " on" : ""); b.style.background = "#" + c.toString(16).padStart(6, "0"); b.setAttribute("aria-label", `colour ${i + 1}`); b.addEventListener("click", () => { openLantern.sel = i; for (const x of row.children) x.classList.remove("on"); b.classList.add("on"); }); row.append(b); });
-    document.getElementById("ln-title").textContent = curKey === "diwali" ? "🪔 Make a lantern for Diwali" : "🕯 Light a lantern for Saturnalia";
+    document.getElementById("ln-title").textContent = curKey === "diwali" ? "🪔 Make a lantern for Diwali" : curKey === "muertos" ? "🕯 Light a candle for the Day of the Dead" : "🕯 Light a lantern for Saturnalia";
   }
   function key(k) {
     if (!can(k)) return false;
@@ -180,7 +186,7 @@ const Festival = (() => {
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new T.CanvasTexture(c);
     document.getElementById("ln-release").addEventListener("click", () => { const w = document.getElementById("ln-wish").value.replace(/[<>]/g, "").slice(0, 60).trim(); closePanels(); release(LANT_COLORS[openLantern.sel || 0], w); document.getElementById("ln-wish").value = ""; });
     document.getElementById("ln-diya").addEventListener("click", () => { closePanels(); placeDiya(); });
-    document.getElementById("fest-act").addEventListener("click", () => { if (mode === "walk" && !panelOpen) key(cur && (curKey === "diwali" || curKey === "saturnalia") ? "KeyL" : "KeyU"); });
+    document.getElementById("fest-act").addEventListener("click", () => { if (curKey === "equinox") { toast("🐍 Walk to El Castillo, the big pyramid, and look at its north stairway: the serpent of light is coming down."); return; } if (mode === "walk" && !panelOpen) key(cur && (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos") ? "KeyL" : "KeyU"); });
   }
 
   // ---------------------------------------------------------------- each frame
@@ -199,9 +205,10 @@ const Festival = (() => {
       curKey = key; cur = key ? FEASTS[key] : null;
       for (const [k, g] of Object.entries(deco)) g.visible = k === key;
       for (const l of lanterns.splice(0)) scene.remove(l.g); for (const d of diyas.splice(0)) scene.remove(d); for (const d of rdiyas.splice(0)) scene.remove(d); restoreTints();
+      if (typeof Cancun !== "undefined") Cancun.setEquinox(key === "equinox");     // the serpent of light on El Castillo
       if (key) { sync(); build(key).visible = true; toast(`${cur.icon} ${cur.name}! ${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
       badge();
-      const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = (curKey === "diwali" || curKey === "saturnalia") ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : "🕯 Light a lantern (L)") : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
+      const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos") ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : curKey === "muertos" ? "🕯 Light a candle (L)" : "🕯 Light a lantern (L)") : curKey === "equinox" ? "🐍 Watch the serpent" : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
     }
     if (!cur) { for (const p of parts.splice(0)) { scene.remove(p.s); p.s.material.dispose(); } return; }
     shotCd = Math.max(0, shotCd - dt);

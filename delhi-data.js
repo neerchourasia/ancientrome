@@ -161,4 +161,4 @@ const DELHI_LANDMARKS = [
   }),
 ];
 
-const ALL_LANDMARKS = [...LANDMARKS, ...DELHI_LANDMARKS];
+const ALL_LANDMARKS = [...LANDMARKS, ...DELHI_LANDMARKS, ...(typeof CANCUN_LANDMARKS !== "undefined" ? CANCUN_LANDMARKS : [])];

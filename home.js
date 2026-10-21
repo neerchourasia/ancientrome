@@ -73,6 +73,7 @@ const Home = (() => {
     F.box(0, H, 0, W + 1.2, 0.45, D + 1.2, M.roof);
     F.box(0, H + 0.45, 0, W + 0.4, 0.5, D + 0.4, M.roof);
     F.stairs(0, D / 2, 2.4, 1, 0.15, 0.7, M.marble2); // a doorstep
+    { const [dx, dz] = F.toW(0, D / 2 - t / 2); Doors.add(worldScene, dx, dz, "x", 2.4, 2.8, -1, null, F.y + 0.15); }   // the front door: it opens inwards when you come near
 
     // a sign over the door
     const plaque = canvasTex(256, 64, (g, w, h) => {

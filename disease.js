@@ -34,9 +34,9 @@ const Disease = (() => {
     return d >= start && d < start + 3 ? start : 0;
   }
   // at your house: in it, or in its grounds (Rome), or on your plot (Delhi). Being ill anywhere else costs you health.
-  const atHome = () => (typeof city !== "undefined" && city === "delhi" ? (Delhi.built && (Delhi.homeInside(player.x, player.z) || Delhi.inPlot(player.x, player.z))) : (Home.inside(player.x, player.z) || Math.hypot(player.x - Home.X, player.z - Home.Z) < 16));
+  const atHome = () => (typeof city !== "undefined" && city === "cancun" ? (Cancun.built && (Cancun.homeInside(player.x, player.z) || Cancun.inHome(player.x, player.z))) : typeof city !== "undefined" && city === "delhi" ? (Delhi.built && (Delhi.homeInside(player.x, player.z) || Delhi.inPlot(player.x, player.z))) : (Home.inside(player.x, player.z) || Math.hypot(player.x - Home.X, player.z - Home.Z) < 16));
   const AWAY = { cold: 0.2, fever: 0.3, poison: 0.35, heat: 0.25, plague: 0.5 };   // health lost per second while ill and away from home
-  const indoors = () => (typeof city !== "undefined" && city === "delhi" ? (Delhi.built && Delhi.homeInside(player.x, player.z)) : (Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z))));
+  const indoors = () => (typeof city !== "undefined" && city === "cancun" ? (Cancun.built && Cancun.homeInside(player.x, player.z)) : typeof city !== "undefined" && city === "delhi" ? (Delhi.built && Delhi.homeInside(player.x, player.z)) : (Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z))));
 
   let grace = 0;     // for a few minutes after you get better (or are cured) you cannot catch anything common again
   function catchIt(k, why) {
@@ -65,14 +65,14 @@ const Disease = (() => {
     const night = Time.isNight, harbourNear = c === "rome" && Math.hypot(player.x - 50, player.z - 140) < 110, monsoon = c === "delhi" && seasonIdx === 2;
     marshT = out && night && (harbourNear || monsoon) ? marshT + dt : Math.max(0, marshT - dt);
     if (marshT > 80 && Math.random() < 0.0015 * dt * wellFed) catchIt("fever", c === "delhi" ? "the monsoon night air" : "the marshy air by the harbour at night");
-    const hot = c === "delhi" && seasonIdx === 1 && Time.hour > 11 && Time.hour < 16 && Weather.rain < 0.1;
+    const hot = (c === "delhi" || c === "cancun") && seasonIdx === 1 && Time.hour > 11 && Time.hour < 16 && Weather.rain < 0.1;
     sunT = out && hot && !Vitals.resting ? sunT + dt : Math.max(0, sunT - dt * 1.5);
     if (sunT > 120 && Math.random() < 0.002 * dt * wellFed) catchIt("heat", "the midday sun");
     // plague: an outbreak in this city, in a crowd
     const ob = outbreak(c);
-    if (ob && shownOutbreak !== c + ob + Math.floor((Time.day - 1) / 28)) { shownOutbreak = c + ob + Math.floor((Time.day - 1) / 28); toast(`☠ A sickness is spreading through ${c === "delhi" ? "Delhi" : "Rome"}. Keep away from crowds for three days.`); Narrator.say("A sickness is spreading through the city. Keep away from crowds.", { interrupt: true }); }
+    if (ob && shownOutbreak !== c + ob + Math.floor((Time.day - 1) / 28)) { shownOutbreak = c + ob + Math.floor((Time.day - 1) / 28); toast(`☠ A sickness is spreading through ${CITY_NAMES[c] || "the city"}. Keep away from crowds for three days.`); Narrator.say("A sickness is spreading through the city. Keep away from crowds.", { interrupt: true }); }
     if (ob && out && Math.random() < 0.9 * dt) {
-      const list = c === "delhi" ? (Delhi.built ? Delhi.people() : []) : CITIZENS.list;
+      const list = peopleHere();
       let near = 0; for (const p of list) if (Math.hypot(p.x - player.x, p.z - player.z) < 7) near++;
       if (near >= 5 && Math.random() < 0.0012 * wellFed * cloak) catchIt("plague", "in the crowd");
     }

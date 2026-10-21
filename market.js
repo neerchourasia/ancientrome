@@ -25,8 +25,10 @@ const Market = (() => {
     { name: "Shahi palace", price: 2500, rest: 4, rent: 90, perk: "A red sandstone Diwan-i-Aam behind the mahal: a long pillared hall with a throne alcove and corner chhatris. Resting heals 4 times faster, and rent is 90 denarii each morning." },
     { name: "Imperial Qila", price: 6000, rest: 5, rent: 200, perk: "Four minarets, golden domes and a grand marble pavilion. Resting heals 5 times faster, and rent is 200 denarii each morning." },
   ];
-  const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : HOUSES);
-  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : s.house);
+  // Your home in Cancún: one small casita (the builder has nothing bigger to sell you there)
+  const HOUSES_C = [{ name: "Casita", price: 0, rest: 1, rent: 0, perk: "A small lime-plastered house with a hammock, west of the great plaza. Sleep here after dark." }];
+  const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : typeof city !== "undefined" && city === "cancun" ? HOUSES_C : HOUSES);
+  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : typeof city !== "undefined" && city === "cancun" ? 0 : s.house);
 
   // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
   // supply (used up at once) or perk (a permanent bonus in single-player games).
@@ -102,6 +104,25 @@ const Market = (() => {
   };
   // festival dishes: sold only while their festival lasts
   const FD = (name, price, heal, note, where, fest) => ({ ...F(name, price, heal, note, where), fest });
+  Object.assign(FOODS, {   // Cancún and Chichén Itzá: Maya cooking in the ancient city, Yucatán dishes today
+    f_tamal: F("Tamal", 8, 12, "Maize dough steamed in a banana leaf round beans or turkey.", ["cancun", "ancient"]),
+    f_pozol: F("Pozol", 5, 8, "A cool drink of ground maize and cacao, in a gourd.", ["cancun", "ancient"]),
+    f_atole: F("Atole", 6, 9, "A thick warm maize drink sweetened with honey.", ["cancun", "ancient"]),
+    f_fishc: F("Grilled fish", 18, 26, "Fresh fish from the Caribbean, grilled over a wood fire.", ["cancun", "ancient"]),
+    f_cacao: F("Cacao drink", 12, 14, "Bitter, frothy chocolate with chilli: a drink for nobles.", ["cancun", "ancient"]),
+    f_turkey: F("Roast turkey with pumpkin seeds", 26, 36, "A feast dish, roasted in a pit.", ["cancun", "ancient"]),
+    f_taco: F("Tacos al pastor", 14, 20, "Spiced pork from a spinning spit, with pineapple, in a soft corn tortilla.", ["cancun", "modern"]),
+    f_cochinita: F("Cochinita pibil", 24, 34, "Pork slow-cooked in orange juice and achiote: a Yucatán speciality.", ["cancun", "modern"]),
+    f_ceviche: F("Ceviche", 20, 28, "Raw fish cured in lime juice, with onion, coriander and chilli.", ["cancun", "modern"]),
+    f_elote: F("Elote", 7, 9, "Street corn on a stick, with mayonnaise, cheese and chilli.", ["cancun", "modern"]),
+    f_horchata: F("Horchata", 6, 8, "A cold sweet rice and cinnamon drink.", ["cancun", "modern"]),
+    f_agua: F("Agua de jamaica", 5, 7, "A cold, tart drink of hibiscus flowers.", ["cancun", "modern"]),
+    f_guac: F("Guacamole and tostadas", 12, 16, "Fresh avocado with lime, and crisp tortillas.", ["cancun", "modern"]),
+    f_mucbil: FD("Mucbil pollo", 14, 22, "A great festival tamal baked in a pit, for the day of the dead.", ["cancun", "ancient"], "muertos"),
+    f_pan: FD("Pan de muerto", 10, 18, "Sweet bread with bone shapes on top, for the Day of the Dead.", ["cancun", "modern"], "muertos"),
+    f_maizecake: FD("Maize cake of Kukulcán", 10, 16, "A sweet maize cake for the equinox, in the shape of a serpent.", ["cancun", "ancient"], "equinox"),
+    f_maizecakem: FD("Maize cake of Kukulcán", 10, 16, "A sweet maize cake for the equinox, in the shape of a serpent.", ["cancun", "modern"], "equinox"),
+  });
   Object.assign(FOODS, {
     f_cake: FD("Saturnalia cake", 12, 22, "A honeyed festival cake with nuts and dried fruit.", ["rome", "ancient"], "saturnalia"),
     f_cakem: FD("Panettone slice", 12, 22, "A slice of sweet festive bread with candied fruit.", ["rome", "modern"], "saturnalia"),
@@ -117,6 +138,9 @@ const Market = (() => {
     c_tea: { type: "cure", name: "Hot honey and herb drink", price: 10, note: "Cures a cold.", cures: ["cold"], where: ["rome"] },
     c_tonic: { type: "cure", name: "Bitter bark tonic", price: 40, note: "Cures marsh fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["rome"] },
     c_theriac: { type: "cure", name: "Theriac", price: 130, note: "The great antidote of Rome: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["rome"] },
+    c_lime: { type: "cure", name: "Honey and lime tea", price: 10, note: "A hot tea of lime leaves and honey that cures a cold.", cures: ["cold"], where: ["cancun"] },
+    c_soursop: { type: "cure", name: "Soursop leaf tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["cancun"] },
+    c_chilam: { type: "cure", name: "The h-men's great remedy", price: 130, note: "The strongest cure of the Maya healers: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["cancun"] },
     c_kadha: { type: "cure", name: "Tulsi and ginger kadha", price: 10, note: "A hot herbal drink that cures a cold.", cures: ["cold"], where: ["delhi"] },
     c_neem: { type: "cure", name: "Neem and giloy tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["delhi"] },
     c_rasa: { type: "cure", name: "Ayurvedic rasayana", price: 130, note: "The strongest medicine of the vaidyas: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["delhi"] },
@@ -212,7 +236,7 @@ const Market = (() => {
       { const hb = document.getElementById("v-hunger"); if (hb) { hb.classList.add("ate"); setTimeout(() => hb.classList.remove("ate"), 700); } }
       Sfx.play("coin"); render();
       toast(`${it.name}: delicious. Hunger ${Math.round(Vitals.hunger)}/100, health ${Math.round(Vitals.hp)}/100.`);
-      if (["f_lassi", "f_chai", "f_thandai", "f_thandaim", "f_gelato"].includes(id)) Disease.cure(["heat"]);          // a cool drink
+      if (["f_lassi", "f_chai", "f_thandai", "f_thandaim", "f_gelato", "f_horchata", "f_pozol", "f_agua"].includes(id)) Disease.cure(["heat"]);          // a cool drink
       if (["f_tea"].includes(id)) Disease.cure(["cold"]);
       if (Math.random() < 0.01 + (typeof Weather !== "undefined" && Weather.season === 1 ? 0.02 : 0)) { Disease.catchIt("poison", "that street food was off"); Vitals.hunger = Math.max(0, Vitals.hunger - 35); Vitals.hp = Math.max(5, Vitals.hp - 8); }   // street food is sometimes bad, more often in summer
       return;
@@ -258,7 +282,7 @@ const Market = (() => {
       $m("mk-house-next").textContent = `Next: ${next.name}. ${next.perk}`;
       $m("mk-house-buy").textContent = `Buy for ${mark(next.price)} denarii`;
       $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
-    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : " It is the finest house in Rome.";
+    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : homes() === HOUSES_C ? " (The Rome and Delhi houses are bigger: your Rome and Delhi houses stay as they were.)" : " It is the finest house in Rome.";
 
     const intro = def.note ? [Object.assign(document.createElement("p"), { className: "mk-note", textContent: def.note })] : [];
     $m("mk-sections").replaceChildren(...intro, ...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {

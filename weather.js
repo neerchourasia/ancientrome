@@ -10,6 +10,7 @@ const Weather = (() => {
   const SEASONS = {
     rome: ["Spring", "Summer", "Autumn", "Winter"],
     delhi: ["Spring", "Summer", "Monsoon", "Winter"],
+    cancun: ["Dry season", "Hot season", "Hurricane season", "Cooler season"],
   };
   const TYPES = ["clear", "partly", "cloudy", "windy", "drizzle", "rain", "storm", "fog", "mist", "snow", "hail", "blizzard", "tornado", "cyclone"];
   // the chance of each kind of weather in each season (they are scaled to add up to one)
@@ -19,6 +20,12 @@ const Weather = (() => {
       { clear: 0.50, partly: 0.22, cloudy: 0.05, windy: 0.08, drizzle: 0.02, rain: 0.04, storm: 0.06, fog: 0.01, mist: 0.02, hail: 0.025, tornado: 0.008 },
       { clear: 0.16, partly: 0.14, cloudy: 0.14, windy: 0.12, drizzle: 0.12, rain: 0.17, storm: 0.05, fog: 0.04, mist: 0.06, hail: 0.01, cyclone: 0.02 },
       { clear: 0.14, partly: 0.10, cloudy: 0.16, windy: 0.08, drizzle: 0.08, rain: 0.14, storm: 0.02, fog: 0.12, mist: 0.08, snow: 0.08, blizzard: 0.02 },
+    ],
+    cancun: [   // tropical: warm all year, a dry season, a hot humid one, and hurricanes in the autumn (never snow, hail or fog)
+      { clear: 0.45, partly: 0.25, cloudy: 0.08, windy: 0.10, drizzle: 0.04, rain: 0.05, storm: 0.02, mist: 0.01 },
+      { clear: 0.40, partly: 0.22, cloudy: 0.06, windy: 0.06, drizzle: 0.05, rain: 0.10, storm: 0.08, mist: 0.01, tornado: 0.002 },
+      { clear: 0.15, partly: 0.15, cloudy: 0.14, windy: 0.08, drizzle: 0.10, rain: 0.20, storm: 0.14, cyclone: 0.04 },
+      { clear: 0.35, partly: 0.22, cloudy: 0.10, windy: 0.14, drizzle: 0.06, rain: 0.08, storm: 0.04, mist: 0.01 },
     ],
     delhi: [
       { clear: 0.40, partly: 0.20, cloudy: 0.10, windy: 0.15, drizzle: 0.04, rain: 0.04, storm: 0.04, fog: 0.02, mist: 0.01, hail: 0.03, tornado: 0.006 },
@@ -66,13 +73,15 @@ const Weather = (() => {
   const SEVERE_DAY = { // the chance that a day in this season is a severe day, and what kind
     rome: [{ hail: 0.07, tornado: 0.04 }, { hail: 0.09, tornado: 0.05 }, { cyclone: 0.12, hail: 0.05, tornado: 0.02 }, { blizzard: 0.13, hail: 0.03 }],
     delhi: [{ hail: 0.07, tornado: 0.04 }, { tornado: 0.05, hail: 0.05 }, { cyclone: 0.16, hail: 0.04 }, { hail: 0.03, tornado: 0.01 }],
+    cancun: [{ tornado: 0.01 }, { tornado: 0.01, cyclone: 0.02 }, { cyclone: 0.22 }, { cyclone: 0.03 }],
   };
+  const SEED = { rome: [15485863, 1299709], delhi: [7919, 104729], cancun: [32452843, 7368787] };   // what makes each city's weather its own
 
   const seasonOf = (c, day) => Math.floor(((day - 1) % 28 + 28) % 28 / 7);   // the same season in every city at the same time (spring, summer, autumn or the monsoon, winter); only the weather differs
 
   // the theme of a day (k re-rolls it)
   function dayRaw(c, day, k) {
-    const s = seasonOf(c, day), r = mulberry(day * 104729 + (c === "delhi" ? 7919 : 15485863) + s * 977 + k * 6700417);
+    const s = seasonOf(c, day), r = mulberry(day * 104729 + SEED[c][0] + s * 977 + k * 6700417);
     let x = r();
     for (const [kind, p] of Object.entries(SEVERE_DAY[c][s])) { if (x < p) return { kind, severe: true, w: Math.floor(r() * 4) }; x -= p; }
     const odds = ODDS[c][s], list = TYPES.filter((t) => !SEVERE.includes(t) && odds[t]), total = list.reduce((a, t) => a + odds[t], 0);
@@ -90,7 +99,7 @@ const Weather = (() => {
   // One roll of the weather for a city (`bump` re-rolls it with another seed)
   function roll(c, day, hour, bump) {
     const s = seasonOf(c, day), th = dayTheme(c, day), slot = Math.min(4, Math.floor(hour / 5));
-    const r = mulberry(day * 7919 + slot * 31337 + (c === "delhi" ? 104729 : 1299709) + s * 31 + bump * 15485863);
+    const r = mulberry(day * 7919 + slot * 31337 + SEED[c][1] + s * 31 + bump * 15485863);
     if (th.severe && slot >= th.w && slot <= th.w + 1) return { season: s, kind: th.kind };      // the storm itself
     if (th.severe && (slot === th.w - 1 || slot === th.w + 2)) return { season: s, kind: s === 3 && c === "rome" && th.kind === "blizzard" ? "snow" : th.kind === "cyclone" ? "storm" : "cloudy" }; // the build-up and the aftermath
     if (r() < 0.65) return { season: s, kind: th.kind };                                           // most of the day follows its theme
@@ -105,6 +114,7 @@ const Weather = (() => {
   // are clearly different. (A severe event in either city is never rolled away.)
   const GROUP = { clear: "dry", partly: "dry", windy: "dry", cloudy: "grey", mist: "grey", fog: "grey", drizzle: "wet", rain: "wet", storm: "wet", hail: "wet", cyclone: "wet", snow: "snow", blizzard: "snow", tornado: "tornado" };
   function forecast(c, day, hour) {
+    if (c === "cancun") return roll("cancun", day, hour, 0);
     if (c !== "delhi") return roll("rome", day, hour, 0);
     const other = GROUP[roll("rome", day, hour, 0).kind];
     let w = roll("delhi", day, hour, 0);
@@ -123,23 +133,25 @@ const Weather = (() => {
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 6), 3));
     drops = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xc4d6e8, transparent: true, opacity: 0.5, depthWrite: false, fog: false }));
     drops.frustumCulled = false; drops.visible = false; drops.renderOrder = 5;
+    // the little specks (snow, hail, leaves) are soft round dots, not hard squares
+    const dotTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d"), gr = g.createRadialGradient(16, 16, 1, 16, 16, 15); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.6, "rgba(255,255,255,.85)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
     // snow: drifting white flakes
     flakePos = new Float32Array(NF * 3);
     for (let i = 0; i < NF; i++) { flakePos[i * 3] = (Math.random() - 0.5) * 70; flakePos[i * 3 + 1] = Math.random() * 36; flakePos[i * 3 + 2] = (Math.random() - 0.5) * 70; }
     const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(NF * 3), 3));
-    flakes = new THREE.Points(fg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.22, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+    flakes = new THREE.Points(fg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16, map: dotTex, alphaTest: 0.05, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
     flakes.frustumCulled = false; flakes.visible = false; flakes.renderOrder = 5;
     // wind: leaves, petals or dust blowing along
     bitPos = new Float32Array(NB * 3); bitSeed = new Float32Array(NB);
-    for (let i = 0; i < NB; i++) { bitPos[i * 3] = (Math.random() - 0.5) * 70; bitPos[i * 3 + 1] = Math.random() * 9; bitPos[i * 3 + 2] = (Math.random() - 0.5) * 70; bitSeed[i] = Math.random() * 6.3; }
+    for (let i = 0; i < NB; i++) { bitPos[i * 3] = (Math.random() - 0.5) * 70; bitPos[i * 3 + 1] = Math.random() * 3.5; bitPos[i * 3 + 2] = (Math.random() - 0.5) * 70; bitSeed[i] = Math.random() * 6.3; }
     const bg = new THREE.BufferGeometry(); bg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(NB * 3), 3));
-    bits = new THREE.Points(bg, new THREE.PointsMaterial({ color: 0xc46a1c, size: 0.32, transparent: true, opacity: 0.85, depthWrite: false }));
+    bits = new THREE.Points(bg, new THREE.PointsMaterial({ color: 0xc46a1c, size: 0.2, map: dotTex, alphaTest: 0.05, transparent: true, opacity: 0.85, depthWrite: false }));
     bits.frustumCulled = false; bits.visible = false; bits.renderOrder = 5;
     // hail: hard white pellets, much faster than snow
     hailPos = new Float32Array(NH * 3);
     for (let i = 0; i < NH; i++) { hailPos[i * 3] = (Math.random() - 0.5) * 50; hailPos[i * 3 + 1] = Math.random() * 30; hailPos[i * 3 + 2] = (Math.random() - 0.5) * 50; }
     const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(NH * 3), 3));
-    hail = new THREE.Points(hg, new THREE.PointsMaterial({ color: 0xf2f8ff, size: 0.34, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
+    hail = new THREE.Points(hg, new THREE.PointsMaterial({ color: 0xf2f8ff, size: 0.2, map: dotTex, alphaTest: 0.05, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
     hail.frustumCulled = false; hail.visible = false; hail.renderOrder = 5;
     // tornado: a tall grey funnel that turns, with a skirt of dust
     funnel = new THREE.Group();
@@ -191,7 +203,7 @@ const Weather = (() => {
   }
 
   function badge() {
-    const look = Object.assign({}, LOOK[kind], kind === "cyclone" && city === "rome" ? { name: "Hurricane (medicane)" } : {}), name = (SEASONS[city] || SEASONS.rome)[season], text = `${look.icon} ${look.name} · ${name}`;
+    const look = Object.assign({}, LOOK[kind], kind === "cyclone" && city === "rome" ? { name: "Hurricane (medicane)" } : kind === "cyclone" && city === "cancun" ? { name: "Hurricane" } : {}), name = (SEASONS[city] || SEASONS.rome)[season], text = `${look.icon} ${look.name} · ${name}`;
     if (text !== lastBadge) { lastBadge = text; const b = el("wx-badge"); if (b) b.textContent = text; }
   }
 
@@ -224,9 +236,10 @@ const Weather = (() => {
       if (lastSky > 0.25) { lastSky = 0; sky.setHour(Time.hour, true); refreshLand(); }
     }
     const windSpeed = 3 + cur.wind * 9;
+    const inside = typeof indoorsNow === "function" && indoorsNow();            // under a roof: no rain, snow, hail, leaves or dust come in
     // rain streaks around the camera
     const rain = cur.rain;
-    drops.visible = rain > 0.03;
+    drops.visible = rain > 0.03 && !inside;
     if (drops.visible) {
       const pos = drops.geometry.attributes.position, n = Math.floor(N * Math.min(1, rain)), wind = windSpeed * (0.5 + rain * 0.5);
       for (let i = 0; i < N; i++) {
@@ -244,7 +257,7 @@ const Weather = (() => {
       drops.material.opacity = 0.18 + 0.4 * Math.min(1, rain);
     }
     // snowflakes: slow, swirling, a little blown by the wind
-    flakes.visible = cur.snow > 0.03;
+    flakes.visible = cur.snow > 0.03 && !inside;
     if (flakes.visible) {
       const pos = flakes.geometry.attributes.position, n = Math.floor(NF * Math.min(1, cur.snow));
       for (let i = 0; i < NF; i++) {
@@ -260,7 +273,7 @@ const Weather = (() => {
       pos.needsUpdate = true;
     }
     // wind: leaves (or dust) streaming across
-    bits.visible = cur.wind > 0.3 && cur.snow < 0.3;
+    bits.visible = cur.wind > 0.3 && cur.snow < 0.3 && !inside;
     if (bits.visible) {
       const pos = bits.geometry.attributes.position, speed = 2 + cur.wind * 11, n = Math.floor(NB * Math.min(1, (cur.wind - 0.2)));
       for (let i = 0; i < NB; i++) {
@@ -269,13 +282,14 @@ const Weather = (() => {
         bitPos[o] += speed * dt * (0.7 + (i % 5) * 0.12);
         bitPos[o + 1] += Math.sin(clock * 1.6 + bitSeed[i]) * 0.9 * dt;
         bitPos[o + 2] += Math.cos(clock * 1.1 + bitSeed[i] * 2) * 1.2 * dt;
-        if (bitPos[o] > 35) { bitPos[o] = -35; bitPos[o + 1] = Math.random() * 9; bitPos[o + 2] = (Math.random() - 0.5) * 70; }
+        bitPos[o + 1] = Math.min(3.5, bitPos[o + 1]);                       // leaves stay low, near the ground: none float up against the sky
+        if (bitPos[o] > 35) { bitPos[o] = -35; bitPos[o + 1] = Math.random() * 3.5; bitPos[o + 2] = (Math.random() - 0.5) * 70; }
         pos.array[o] = camera.position.x + bitPos[o]; pos.array[o + 1] = Math.max(0.2, bitPos[o + 1]) + (camera.position.y > 4 ? camera.position.y - 3 : 0); pos.array[o + 2] = camera.position.z + bitPos[o + 2];
       }
       pos.needsUpdate = true;
     }
     // hail: pellets that rattle down; they sting if you stand out in them
-    hail.visible = cur.hail > 0.03;
+    hail.visible = cur.hail > 0.03 && !inside;
     if (hail.visible) {
       const pos = hail.geometry.attributes.position;
       for (let i = 0; i < NH; i++) {
@@ -342,7 +356,7 @@ const Weather = (() => {
       const grow = 0.8 + 0.7 * cur.cover;                          // clouds swell as the sky clouds over: a heavy ceiling in a storm
       for (const sp of c.children) { sp.material.opacity = (0.55 + 0.4 * cur.cover) * u.fade; sp.material.color.setScalar(ground); sp.userData.k = sp.userData.k || sp.scale.x; sp.scale.set(sp.userData.k * grow, sp.userData.k * grow * 0.45, 1); }
     }
-    Sfx.setWeather(rain, cur.wind);
+    Sfx.setWeather(inside ? rain * 0.25 : rain, inside ? cur.wind * 0.2 : cur.wind);   // muffled behind walls
     lightning(dt);
     hudT += dt; if (hudT > 1) { hudT = 0; badge(); }
   }

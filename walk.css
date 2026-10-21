@@ -492,6 +492,11 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 
 #wx-badge { padding: 2px 10px; border-radius: 999px; background: rgba(40,52,66,.85); color: #dbe7f2; font-size: .75rem; white-space: nowrap; }
 #wx-badge:empty { display: none; }
+#underwater { position: fixed; inset: 0; z-index: 2; display: none; pointer-events: none; background: radial-gradient(ellipse at 50% 38%, rgba(60,190,215,.12), rgba(10,90,130,.52) 78%), linear-gradient(rgba(20,120,160,.2), rgba(8,60,100,.38)); animation: uwsway 5s ease-in-out infinite; }
+#underwater.show { display: block; }
+@keyframes uwsway { 50% { background-position: 0 6px, 0 0; filter: hue-rotate(6deg); } }
+#snorkel-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; max-width: min(560px, 92vw); padding: 7px 14px; border-radius: 10px; background: rgba(8,70,100,.82); border: 1px solid rgba(180,240,255,.5); color: #e8fbff; font-size: .82rem; text-align: center; pointer-events: none; }
+#snorkel-hud.show { display: block; }
 .mk-note { margin: 6px 0; font-size: .82rem; color: var(--muted); }
 .rank-badge { display: inline-block; padding: 0 7px; margin-left: 2px; border-radius: 999px; background: rgba(226,185,85,.2); border: 1px solid rgba(226,185,85,.55); color: #ffe8a8; font-size: .78rem; white-space: nowrap; }
 /* the menu button: a fireball (a cream ring of flame round a dark, glowing core) with the menu icon in the middle */

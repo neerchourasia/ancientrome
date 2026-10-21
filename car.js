@@ -268,12 +268,12 @@ const Car = (() => {
     // other cars on the road
     const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw);
     for (const k of [0, M.len * 0.4, -M.len * 0.4]) {
-      const h2 = city === "delhi" ? Delhi.hits(car.x + fx * k, car.z + fz * k) : Modern.hits(car.x + fx * k, car.z + fz * k);
+      const h2 = hitsHere(car.x + fx * k, car.z + fz * k);
       if (h2 && bumpCd <= 0) { bumpCd = 0.9; car.v *= 0.2; player.shake = 0.6; Sfx.play("crash"); toast(h2.what ? `You ran into ${h2.what}!` : "You hit another car!"); break; }
     }
     // pedestrians
     if (Math.abs(car.v) > 2.5) {
-      for (const c of (city === "delhi" ? Delhi.people() : CITIZENS.list)) {
+      for (const c of peopleHere()) {
         if ((c.down || 0) > 0) continue;
         if (Math.hypot(c.x - (car.x + fx * M.len * 0.3), c.z - (car.z + fz * M.len * 0.3)) < 1.7) {
           c.down = Math.abs(car.v) > 10 ? 2.6 : 1.6;

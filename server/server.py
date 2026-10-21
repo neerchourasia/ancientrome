@@ -1262,6 +1262,25 @@ PLACES = {
     ('The Pantheon', -480, -380, 55),
     ('the Armourer in the arena', 430, 46.5, 8),
 ],
+    "cancun": [
+        ("a player's casita", 11930.0, 95.0, 14.0),
+        ('El Castillo (Temple of Kukulcán)', 12000.0, 0.0, 62.0),
+        ('The Great Ball Court', 11850.0, -35.0, 50.0),
+        ('Temple of the Warriors', 12105.0, -45.0, 46.0),
+        ('Group of the Thousand Columns', 12110.0, 8.0, 34.0),
+        ('El Caracol', 11925.0, -135.0, 36.0),
+        ('The Sacred Cenote', 12000.0, -235.0, 58.0),
+        ('The Sacbé (the white road)', 12000.0, -115.0, 28.0),
+        ('Platform of Venus', 12050.0, 62.0, 20.0),
+        ('The Tzompantli', 11952.0, -32.0, 20.0),
+        ('The coast: Tulum', 12770.0, 0.0, 70.0),
+        ('Cancún Hotel Zone', 12770.0, 0.0, 80.0),
+        ('The Caribbean beach', 12880.0, 130.0, 55.0),
+        ('The Coral Reef', 13050.0, 0.0, 120.0),
+        ('Cenote Azul', 11670.0, 215.0, 40.0),
+        ('Snorkel Hire', 12860.0, 130.0, 12.0),
+        ('The Market', 12000.0, 150.0, 26.0),
+    ],
     "delhi": [
     ("a player's plot off Chandni Chowk", 5900, -50, 22),
     ('Lahori Gate', 6000, 0, 40),
@@ -1288,7 +1307,7 @@ PLACES = {
     ('The Chaat Stall', 5785, 13, 8),
 ],
 }
-CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi"}
+CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún"}
 ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle"}
 QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle"}
 
@@ -1317,7 +1336,7 @@ def where_is(c):
         place = ("at " if best and best[0] <= 0 else "near ") + best[1] if best else "out in the streets"
     elif c.room:
         place = "in the arena"
-    x, z = (round(c.px - 6000) if c.city == "delhi" else round(c.px)), round(c.pz)
+    x, z = round(c.px - {"delhi": 6000, "cancun": 12000}.get(c.city, 0)), round(c.pz)
     return {"city": CITY_NAMES.get(c.city, "-"), "place": place, "doing": what, "xz": ("%d, %d" % (x, z)) if c.city and not c.room else ""}
 
 
@@ -1326,7 +1345,7 @@ def where_is(c):
 
 WORLD_RANGE = 260.0     # metres: you see people this close
 WORLD_MAX = 30          # and at most this many at once (the nearest)
-WORLD_CITIES = ("rome", "delhi")
+WORLD_CITIES = ("rome", "delhi", "cancun")
 
 
 def on_walk(conn, m):

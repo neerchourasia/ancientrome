@@ -494,6 +494,7 @@ const Delhi = (() => {
     hb(t, cx - w / 2 + left / 2, 0, cz + d / 2 - k / 2, left, h, k, D.cream);
     hb(t, cx + w / 2 - right / 2, 0, cz + d / 2 - k / 2, right, h, k, D.cream);
     hb(t, doorX, h - 1.4, cz + d / 2 - k / 2, doorW, 1.4, k, D.cream, false);
+    Doors.add(houses[t].g, X(doorX), cz + d / 2 - k / 2, "x", doorW, h - 1.4, 1, houses[t].blockers);   // the front door, opening inwards when you come near
     hb(t, cx, h, cz, w + 1, 0.45, d + 1, D.redDark, false);
     hb(t, cx - w / 2 + 2.2, 0, cz - d / 2 + 2.6, 1.3, 0.55, 2.6, lambert(0x9a2f2f), false);
     hb(t, cx - w / 2 + 2.2, 0.55, cz - d / 2 + 2.6, 1.3, 0.2, 2.6, D.white, false);

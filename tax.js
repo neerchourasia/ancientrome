@@ -60,6 +60,7 @@ const Speech = (() => {
   // What people say when you run into them (angrier if you were running), by place and time.
   const RAM = {
     rome: ["Watch where you're going!", "By Jupiter, are you blind?", "Barbarian!", "Guards! Guards!", "My toga!", "Have you no manners?", "Gods above, what was that?"],
+    cancun: ["¡Oye! ¡Cuidado!", "¡Ay, mi pie!", "Hey, watch it!", "¿Qué te pasa?!", "¡Ándale, fíjate!", "Look where you are going!", "¡Ay, caramba!"],
     delhi: ["Arre! Dekh ke chalo!", "Oye! Are you mad?", "Hey, watch it!", "Kya kar rahe ho?!", "Arre baba, my feet!", "Look where you're going!", "Hai Ram!"],
     modern: ["Hey! Watch it!", "Are you blind?!", "I'll call the police!", "My phone!", "What is wrong with you?!", "Ow! That hurt!", "Idiot!"],
   };
@@ -68,7 +69,7 @@ const Speech = (() => {
   const pickOne = (a) => a[Math.floor(Math.random() * a.length)];
 
   function rammed(who, hard) {
-    const set = era === "modern" && city === "rome" ? RAM.modern : city === "delhi" ? RAM.delhi : RAM.rome;
+    const set = era === "modern" && city === "rome" ? RAM.modern : city === "delhi" ? RAM.delhi : city === "cancun" ? RAM.cancun : RAM.rome;
     say(who, hard && Math.random() < 0.5 ? pickOne(HARD) : pickOne(set));
   }
   const jeer = (who) => say(who, pickOne(JEER), 3);
@@ -164,7 +165,7 @@ const Tax = (() => {
       jeerT -= dt;
       if (jeerT <= 0) {
         jeerT = Math.max(2.5, 8 - hate / 18) + Math.random() * 4;
-        const list = city === "delhi" ? Delhi.people() : CITIZENS.list;
+        const list = peopleHere();
         let best = null, bd = 16;
         for (const c of list) { if ((c.down || 0) > 0) continue; const d = Math.hypot(c.x - player.x, c.z - player.z); if (d < bd) { best = c; bd = d; } }
         if (best) Speech.jeer(best);
