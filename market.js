@@ -210,7 +210,7 @@ const Market = (() => {
       toast(`${it.name}: delicious. Hunger ${Math.round(Vitals.hunger)}/100, health ${Math.round(Vitals.hp)}/100.`);
       if (["f_lassi", "f_chai", "f_thandai", "f_thandaim", "f_gelato"].includes(id)) Disease.cure(["heat"]);          // a cool drink
       if (["f_tea"].includes(id)) Disease.cure(["cold"]);
-      if (Math.random() < 0.03 + (typeof Weather !== "undefined" && Weather.season === 1 ? 0.04 : 0)) { Disease.catchIt("poison", "that street food was off"); Vitals.hunger = Math.max(0, Vitals.hunger - 35); Vitals.hp = Math.max(5, Vitals.hp - 8); }   // street food is sometimes bad, more often in summer
+      if (Math.random() < 0.01 + (typeof Weather !== "undefined" && Weather.season === 1 ? 0.02 : 0)) { Disease.catchIt("poison", "that street food was off"); Vitals.hunger = Math.max(0, Vitals.hunger - 35); Vitals.hp = Math.max(5, Vitals.hp - 8); }   // street food is sometimes bad, more often in summer
       return;
     }
     if (it.type === "supply") {

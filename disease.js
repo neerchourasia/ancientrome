@@ -38,8 +38,9 @@ const Disease = (() => {
   const AWAY = { cold: 0.2, fever: 0.3, poison: 0.35, heat: 0.25, plague: 0.5 };   // health lost per second while ill and away from home
   const indoors = () => (typeof city !== "undefined" && city === "delhi" ? (Delhi.built && Delhi.homeInside(player.x, player.z)) : (Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z))));
 
+  let grace = 0;     // for a few minutes after you get better (or are cured) you cannot catch anything common again
   function catchIt(k, why) {
-    if (has(k) || !D[k]) return;
+    if (has(k) || !D[k] || (grace > 0 && k !== "plague")) return;
     sick[k] = D[k].secs; save();
     toast(`${D[k].icon} You have caught ${k === "cold" ? "a cold" : k === "heat" ? "heatstroke" : D[k].name.toLowerCase()}${why ? ` (${why})` : ""}. ${D[k].name === "Plague" ? "Find the healer in the market: you need theriac." : `Cure: ${D[k].cure}.`}`);
     Narrator.say(`You have caught ${D[k].name}.`, { interrupt: true });
@@ -47,7 +48,7 @@ const Disease = (() => {
   }
   function cure(list, quiet) {
     let any_ = false;
-    for (const k of list === "all" ? Object.keys(D) : list) if (has(k)) { sick[k] = 0; any_ = true; }
+    for (const k of list === "all" ? Object.keys(D) : list) if (has(k)) { sick[k] = 0; any_ = true; grace = 300; }
     save(); render();
     return any_;
   }
@@ -60,23 +61,24 @@ const Disease = (() => {
     // --- catching things
     const wet = Math.max(Weather.rain > 0.2 ? Weather.rain : 0, Weather.snow, Weather.hail);
     wetT = out && wet > 0.2 ? wetT + dt : Math.max(0, wetT - dt * 2);
-    if (wetT > 40 && Math.random() < 0.025 * dt * cloak * wellFed) catchIt("cold", "you were out in the wet");
+    if (wetT > 120 && Math.random() < 0.0012 * dt * cloak * wellFed) catchIt("cold", "you were out in the wet");
     const night = Time.isNight, harbourNear = c === "rome" && Math.hypot(player.x - 50, player.z - 140) < 110, monsoon = c === "delhi" && seasonIdx === 2;
     marshT = out && night && (harbourNear || monsoon) ? marshT + dt : Math.max(0, marshT - dt);
-    if (marshT > 35 && Math.random() < 0.02 * dt * wellFed) catchIt("fever", c === "delhi" ? "the monsoon night air" : "the marshy air by the harbour at night");
+    if (marshT > 80 && Math.random() < 0.0015 * dt * wellFed) catchIt("fever", c === "delhi" ? "the monsoon night air" : "the marshy air by the harbour at night");
     const hot = c === "delhi" && seasonIdx === 1 && Time.hour > 11 && Time.hour < 16 && Weather.rain < 0.1;
     sunT = out && hot && !Vitals.resting ? sunT + dt : Math.max(0, sunT - dt * 1.5);
-    if (sunT > 70 && Math.random() < 0.03 * dt * wellFed) catchIt("heat", "the midday sun");
+    if (sunT > 120 && Math.random() < 0.002 * dt * wellFed) catchIt("heat", "the midday sun");
     // plague: an outbreak in this city, in a crowd
     const ob = outbreak(c);
     if (ob && shownOutbreak !== c + ob + Math.floor((Time.day - 1) / 28)) { shownOutbreak = c + ob + Math.floor((Time.day - 1) / 28); toast(`☠ A sickness is spreading through ${c === "delhi" ? "Delhi" : "Rome"}. Keep away from crowds for three days.`); Narrator.say("A sickness is spreading through the city. Keep away from crowds.", { interrupt: true }); }
     if (ob && out && Math.random() < 0.9 * dt) {
       const list = c === "delhi" ? (Delhi.built ? Delhi.people() : []) : CITIZENS.list;
       let near = 0; for (const p of list) if (Math.hypot(p.x - player.x, p.z - player.z) < 7) near++;
-      if (near >= 4 && Math.random() < 0.012 * wellFed * cloak) catchIt("plague", "in the crowd");
+      if (near >= 5 && Math.random() < 0.0012 * wellFed * cloak) catchIt("plague", "in the crowd");
     }
     // --- being ill
     let drain = 0, regen = 1, slow = 1;
+    grace = Math.max(0, grace - dt);
     const away = any() && !atHome();
     if (away && !Disease.warned && any()) { Disease.warned = true; toast("You are ill and away from home: you are losing health. Go home to rest, or buy medicine from the healer."); }
     if (!away) Disease.warned = false;
@@ -86,7 +88,7 @@ const Disease = (() => {
       sick[k] -= dt * (home ? 3 : 1) * (Vitals.hunger > 60 ? 1.2 : 1);           // rest and good food help you through
       if (k === "heat" && (indoors() || Vitals.resting)) sick[k] -= dt * 6;       // shade
       drain += away ? AWAY[k] : 0; regen = Math.min(regen, D[k].regen); slow = Math.min(slow, D[k].speed);
-      if (sick[k] <= 0) { sick[k] = 0; toast(`You feel better: the ${D[k].name.toLowerCase()} has passed.`); render(); }
+      if (sick[k] <= 0) { sick[k] = 0; grace = 300; toast(`You feel better: the ${D[k].name.toLowerCase()} has passed.`); render(); }
     }
     Disease.regenMul = regen; Disease.speedMul = slow;
     if (drain > 0) { Vitals.hp = Math.max(Math.min(Vitals.hp, 5), Vitals.hp - drain * dt); }
