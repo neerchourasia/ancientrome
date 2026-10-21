@@ -314,7 +314,7 @@ const Cancun = (() => {
     // ancient: Tulum's little walled port above the sea, thatched huts and canoes on the sand
     {
       const g = ancientG, cx = 770;
-      for (const [x, z, w, d] of [[cx - 38, 0, 3, 90], [cx + 38, 0, 3, 90], [cx, -45, 78, 3], [cx, 45, 78, 3]]) mbox(g, X(x), 0, z, w, 3.6, d, C.lime2, { solid: true, era: "ancient" });   // the city wall
+      for (const [x, z, w, d] of [[cx - 38, -26, 3, 38], [cx - 38, 26, 3, 38], [cx + 38, 0, 3, 90], [cx - 21, -45, 34, 3], [cx + 21, -45, 34, 3], [cx - 21, 45, 34, 3], [cx + 21, 45, 34, 3]]) mbox(g, X(x), 0, z, w, 3.6, d, C.lime2, { solid: true, era: "ancient" });   // the city wall, with a gate on the west, north and south sides
       mbox(g, X(cx), 0, 0, 22, 4, 18, C.lime, { walk: true, era: "ancient" }); mbox(g, X(cx), 4, 0, 16, 3, 12, C.lime, { walk: true, era: "ancient" });
       steps(g, X(cx - 8), 0, "-x", 8, 8, 0.5, 0.7, null, "ancient");
       mbox(g, X(cx), 7, 0, 10, 4.4, 8, C.lime, { solid: true, era: "ancient" }); mbox(g, X(cx), 11.4, 0, 11, 0.7, 9, C.lime2);        // El Castillo of Tulum
@@ -492,7 +492,8 @@ const Cancun = (() => {
     if (!built || city !== "cancun") return "";
     const nearHut = modernNow && Math.hypot(player.x - X(HIRE.x), player.z - HIRE.z) < 6;
     if (nearHut && !haveGear) return `F: rent snorkel gear (${HIRE_PRICE} denarii)`;
-    if (inWater(player.x, player.z)) return !modernNow || haveGear ? (snorkeling ? "F: lift your head out of the water" : "F: put your face in the water (snorkel)") : "Rent snorkel gear from the hut on the beach to snorkel";
+    if (inWater(player.x, player.z)) return !modernNow || haveGear ? (snorkeling ? "F: lift your head out of the water" : "F: put your face in the water (snorkel)") : `F: snorkel (a mask, snorkel and fins: ${HIRE_PRICE} denarii)`;
+    if (player.x > X(860) && player.x < X(SEA_SHORE) && Math.abs(player.z) < 380) return "Walk east into the sea to swim, then press F to snorkel";
     return "";
   }
   function act() {
@@ -505,7 +506,10 @@ const Cancun = (() => {
       return true;
     }
     if (inWater(player.x, player.z)) {
-      if (modernNow && !haveGear) { toast("Rent snorkel gear from the hut on the beach first."); return true; }
+      if (modernNow && !haveGear) {                                                   // gear hired on the spot, if you did not hire it at the hut
+        if (Vitals.coins < HIRE_PRICE) { toast(`A mask, snorkel and fins cost ${HIRE_PRICE} denarii.`); return true; }
+        Vitals.coins -= HIRE_PRICE; haveGear = true; Sfx.play("coin");
+      }
       setSnorkel(!snorkeling); return true;
     }
     return false;
