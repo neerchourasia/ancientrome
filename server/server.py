@@ -227,6 +227,7 @@ class Conn:
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
         self.singing, self.sang_at = None, -1e9    # the song they are singing in the chat, and when they last started one
+        self.pic_t = -1e9          # when they last sent a picture in the chat
         self.fest_t = 0.0          # when they last put a festival lamp or lantern down
         self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
@@ -1592,6 +1593,25 @@ def blocked(conn):
     return BLOCKED.get(conn.ip, 0) > t or (conn.uid and BLOCKED.get(conn.uid, 0) > t)
 
 
+PIC_RE = re.compile(r"^data:image/jpeg;base64,([A-Za-z0-9+/]+={0,2})$")
+PIC_MAX = 3400             # characters: the browser shrinks a picture to a small thumbnail so it fits in one message
+PIC_GAP = 8.0              # seconds between two pictures from the same person
+
+
+def clean_pic(v):
+    """A chat picture must be a small JPEG thumbnail sent as a data address: anything else is thrown away."""
+    if not isinstance(v, str) or len(v) > PIC_MAX:
+        return None
+    mt = PIC_RE.match(v)
+    if not mt:
+        return None
+    try:
+        raw = base64.b64decode(mt.group(1), validate=True)
+    except Exception:
+        return None
+    return v if len(raw) > 100 and raw[:3] == b"\xff\xd8\xff" and raw[-2:] == b"\xff\xd9" else None
+
+
 def on_chat(conn, m):
     t = now()
     if t < conn.muted_until:
@@ -1601,13 +1621,27 @@ def on_chat(conn, m):
     if conn.ctok < 1:
         return say_to(conn, "Slow down a little.")
     text = clean_chat(m.get("text"))
-    if not text:
+    pic = None
+    if m.get("pic"):
+        if not conn.uid:
+            return say_to(conn, "Log in to your account to send pictures.")
+        if t - conn.pic_t < PIC_GAP:
+            return say_to(conn, "One picture every few seconds, please.")
+        pic = clean_pic(m.get("pic"))
+        if not pic:
+            return say_to(conn, "That picture could not be sent. Try a smaller one.")
+        conn.pic_t = t
+    if not text and not pic:
         return
     conn.ctok -= 1
     if text.startswith("/"):
         return chat_command(conn, text)
     entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0}
-    CHAT_LOG.append(entry)
+    if pic:
+        CHAT_LOG.append(dict(entry, text=text or "(sent a picture)"))      # people who join later do not get the picture, only that there was one
+        entry["pic"] = pic
+    else:
+        CHAT_LOG.append(entry)
     broadcast_chat(entry)
 
 

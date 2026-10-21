@@ -337,6 +337,26 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         a.send({"t": "chat", "text": "/sing legion"})                                 # too soon after the last song
         self.assertIn("rest", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "rest" in m["text"]))["text"])
 
+    async def test_chat_pictures_are_small_jpegs_from_accounts_only(self):
+        self.accounts("ann")
+        ann, ben, guest = await self.player("Ann", token="ann"), await self.player("Ben"), await self.player("Guest")
+        jpeg = base64.b64encode(b"\xff\xd8\xff" + b"x" * 300 + b"\xff\xd9").decode()
+        pic = "data:image/jpeg;base64," + jpeg
+        guest.send({"t": "chat", "text": "look", "pic": pic})
+        self.assertIn("Log in", (await guest.until(lambda m: m["t"] == "chat" and m.get("sys")))["text"])
+        ann.send({"t": "chat", "text": "my cat", "pic": pic})
+        got = await ben.until(lambda m: m["t"] == "chat" and m.get("pic"))
+        self.assertEqual((got["name"], got["text"], got["pic"]), ("Ann", "my cat", pic))
+        self.assertNotIn("pic", server.CHAT_LOG[-1])                                       # later arrivals are not sent old pictures
+        self.assertEqual(server.CHAT_LOG[-1]["text"], "my cat")
+        ann.send({"t": "chat", "text": "another", "pic": pic})                             # too soon
+        self.assertIn("every few seconds", (await ann.until(lambda m: m["t"] == "chat" and m.get("sys")))["text"])
+        ann_conn = next(c for c in server.CONNS if c.name == "Ann")
+        for bad in ("data:image/svg+xml;base64," + jpeg, "data:image/jpeg;base64,!!!", "http://evil.example/x.jpg", "data:image/jpeg;base64," + base64.b64encode(b"GIF89a" + b"x" * 300).decode(), "data:image/jpeg;base64," + "A" * 4000):
+            ann_conn.pic_t = -1e9
+            ann.send({"t": "chat", "text": "x", "pic": bad})
+            self.assertIn("could not be sent", (await ann.until(lambda m: m["t"] == "chat" and m.get("sys") and "sent" in m["text"]))["text"])
+
     async def test_duel_block_cuts_damage_and_range_is_checked(self):
         a, b = await self.start_duel()
         a.send({"t": "swing"})                           # far away: a miss, no damage

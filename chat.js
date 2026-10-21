@@ -14,7 +14,13 @@ const Chat = (() => {
   function add(entry) {
     const li = document.createElement("li");
     if (entry.sys) { li.className = "sys"; li.textContent = entry.text; }
-    else if (entry.sing) {                                           // a line of a song: shown in the chat and over the singer's head
+    else if (entry.pic && PIC_OK.test(entry.pic)) {                  // a small picture, with what they wrote under it
+      const who = document.createElement("b");
+      who.textContent = entry.name; if (entry.adm) { who.className = "adm"; who.textContent = "★ " + who.textContent; }
+      li.append(who, document.createTextNode(entry.text ? ": " + entry.text : ": sent a picture"));
+      const im = document.createElement("img"); im.className = "chat-pic"; im.alt = "A picture from " + entry.name; im.src = entry.pic;
+      im.addEventListener("click", () => bigPic(entry.pic)); li.append(im);
+    } else if (entry.sing) {                                           // a line of a song: shown in the chat and over the singer's head
       li.className = "sing"; const who = document.createElement("b"); who.textContent = entry.name; li.append(who, document.createTextNode(" " + entry.text));
       singBubble(entry);
     } else {
@@ -39,6 +45,35 @@ const Chat = (() => {
       const p = Online.peerList().find((q) => q.name === entry.name && q.x !== null);
       if (p) Speech.say({ x: p.x, z: p.z }, entry.text, 2.4);
     } catch (e) { /* no bubble */ }
+  }
+
+  // ---- pictures: shrunk to a tiny JPEG in the browser (the game server takes only small ones), sent as text
+  const PIC_OK = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/, PIC_MAX = 3400;
+  function bigPic(src) {
+    let box = $c("pic-big");
+    if (!box) { box = document.createElement("div"); box.id = "pic-big"; box.append(document.createElement("img")); box.addEventListener("click", () => box.classList.remove("show")); document.body.append(box); }
+    box.firstChild.src = src; box.classList.add("show");
+  }
+  async function shrink(file) {
+    const bmp = await createImageBitmap(file);
+    for (const side of [96, 80, 64, 52, 40]) {
+      const k = Math.min(1, side / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+      for (const q of [0.6, 0.45, 0.3, 0.2]) { const url = c.toDataURL("image/jpeg", q); if (url.length <= PIC_MAX && PIC_OK.test(url)) return url; }
+    }
+    return null;
+  }
+  async function sendPic(file) {
+    if (!file || !/^image\//.test(file.type)) { add({ sys: 1, text: "That is not a picture." }); return; }
+    if (!Account.loggedIn) { add({ sys: 1, text: "Log in to your account to send pictures." }); return; }
+    if (!Online.connected) { add({ sys: 1, text: "Not connected to the game server yet. Try again in a moment." }); return; }
+    try {
+      const pic = await shrink(file);
+      if (!pic) { add({ sys: 1, text: "That picture could not be made small enough." }); return; }
+      const input = $c("chat-input"), text = input.value.trim(); input.value = "";
+      send({ t: "chat", text, pic });
+    } catch (e) { add({ sys: 1, text: "That picture could not be read." }); }
   }
 
   function history(list) {
@@ -87,6 +122,9 @@ const Chat = (() => {
     $c("chat-form").addEventListener("submit", submit);
     $c("chat-input").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeChat(); } });
     $c("btn-chat").addEventListener("click", () => (open ? closeChat() : openChat()));
+    $c("chat-pic").addEventListener("click", () => $c("chat-file").click());
+    $c("chat-file").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; sendPic(f); });
+    $c("chat-input").addEventListener("paste", (e) => { const f = [...(e.clipboardData ? e.clipboardData.files : [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); sendPic(f); } });
     timer = setInterval(refresh, 1500);
     add({ sys: 1, text: "Press Enter to chat. /help lists the commands. /sing sings a song." });
     lines[0].at = performance.now();

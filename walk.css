@@ -554,6 +554,12 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #chat-log li.sing { background: rgba(110,70,10,.72); color: #ffe8a8; font-style: italic; }
 #chat-form { display: flex; gap: 6px; margin-top: 6px; pointer-events: auto; }
 #chat-form[hidden] { display: none; }
+#chat-pic { padding: 0 9px; border-radius: 8px; border: 1px solid rgba(226,185,85,.6); background: rgba(20,15,10,.9); color: #f3ead7; font-size: 1rem; cursor: pointer; }
+#chat-pic:hover { border-color: var(--gold); }
+#chat-log li img.chat-pic { display: block; margin-top: 3px; max-width: 120px; max-height: 120px; border-radius: 6px; border: 1px solid rgba(255,255,255,.3); cursor: zoom-in; pointer-events: auto; }
+#pic-big { position: fixed; inset: 0; z-index: 9; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.8); cursor: zoom-out; }
+#pic-big.show { display: flex; }
+#pic-big img { max-width: min(80vw, 480px); max-height: 80vh; image-rendering: auto; border-radius: 8px; border: 2px solid #f2d98a; }
 #chat-input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(226,185,85,.6); background: rgba(20,15,10,.9); color: #f3ead7; font: inherit; }
 #chat-form button { padding: 7px 12px; border-radius: 8px; border: 0; background: var(--gold); color: #2a2118; font-weight: 700; cursor: pointer; }
 body.playing #chat:not(.open) { display: none; }
