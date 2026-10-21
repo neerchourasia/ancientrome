@@ -485,14 +485,14 @@ const Cancun = (() => {
       hud = document.createElement("div"); hud.id = "snorkel-hud"; document.body.append(hud);
     }
     overlay.classList.toggle("show", snorkeling); hud.classList.toggle("show", snorkeling);
-    if (snorkeling) hud.textContent = `🤿 Snorkelling · ${seen.size} of ${SPECIES.length} creatures seen. Swim to the reef out to sea (or around the cenote): fish swim close by.`;
+    if (snorkeling) hud.textContent = `🤿 Snorkelling · ${seen.size} of ${SPECIES.length} creatures seen. Swim to the reef out to sea (or around the cenote): fish swim close by. Press Esc or F to come up.`;
   }
   // the one key for water things: hire the gear on the beach, or put your face in the water
   function promptText() {
     if (!built || city !== "cancun") return "";
     const nearHut = modernNow && Math.hypot(player.x - X(HIRE.x), player.z - HIRE.z) < 6;
     if (nearHut && !haveGear) return `F: rent snorkel gear (${HIRE_PRICE} denarii)`;
-    if (inWater(player.x, player.z)) return !modernNow || haveGear ? (snorkeling ? "F: lift your head out of the water" : "F: put your face in the water (snorkel)") : `F: snorkel (a mask, snorkel and fins: ${HIRE_PRICE} denarii)`;
+    if (inWater(player.x, player.z)) return !modernNow || haveGear ? (snorkeling ? "F or Esc: lift your head out of the water" : "F: put your face in the water (snorkel)") : `F: snorkel (a mask, snorkel and fins: ${HIRE_PRICE} denarii)`;
     if (player.x > X(860) && player.x < X(SEA_SHORE) && Math.abs(player.z) < 380) return "Walk east into the sea to swim, then press F to snorkel";
     return "";
   }

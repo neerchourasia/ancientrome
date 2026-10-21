@@ -132,7 +132,7 @@ const canStart = () => performance.now() > startLockUntil && !panelOpen && death
 function wireInput(canvas) {
   addEventListener("keydown", (e) => {
     const k = keyCode(e);
-    if (k === "Escape") { leaveMode(); return; }
+    if (k === "Escape") { if (city === "cancun" && Cancun.snorkeling && mode === "walk" && !panelOpen) { Cancun.stopSnorkel(); toast("You lift your head out of the water."); return; } leaveMode(); return; }   // Esc: come up for air when snorkelling
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // typing a name: leave the keys alone
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(k)) e.preventDefault();
     if (!started) return;
