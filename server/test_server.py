@@ -322,7 +322,11 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.SING_GAP = 0.15
         a, b = await self.player("Ann"), await self.player("Ben")
         a.send({"t": "chat", "text": "/songs"})
-        self.assertIn("row", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "Songs" in m["text"]))["text"])
+        listed = (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "Songs" in m["text"]))["text"]
+        self.assertIn("row", listed)
+        self.assertGreaterEqual(len(server.SONGS), 28)                                   # a good long list
+        self.assertTrue(all(len(v) == 4 and all(line.strip() for line in v) for v in server.SONGS.values()))
+        self.assertIn("holi", listed)
         a.send({"t": "chat", "text": "/sing nonsense"})
         self.assertIn("do not know", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "know" in m["text"]))["text"])
         a.send({"t": "chat", "text": "/sing row"})

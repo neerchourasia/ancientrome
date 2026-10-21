@@ -1620,6 +1620,26 @@ SONGS = {   # traditional songs (long out of copyright) and a few new ones for t
     "legion": ["Marching, marching to the Forum,", "Shields held high and spirits bright,", "Rome is ours and Rome is mighty,", "Sing it out into the night!"],
     "gladiator": ["Sand beneath and sun above,", "Swords of steel and hearts of fire,", "The crowd is roaring out our names,", "Rise up, rise up, higher and higher!"],
     "delhi": ["Chai, chai, garam chai,", "Chandni Chowk in the morning light,", "Jalebi sweet and kites on high,", "Delhi, Delhi, shining bright!"],
+    "london": ["London Bridge is falling down,", "Falling down, falling down.", "London Bridge is falling down,", "My fair lady."],
+    "lamb": ["Mary had a little lamb,", "Its fleece was white as snow;", "And everywhere that Mary went", "The lamb was sure to go."],
+    "macdonald": ["Old MacDonald had a farm,", "E-I-E-I-O!", "And on that farm he had a cow,", "E-I-E-I-O!"],
+    "yankee": ["Yankee Doodle went to town,", "Riding on a pony;", "Stuck a feather in his cap", "And called it macaroni."],
+    "susanna": ["Oh! Susanna, oh, don't you cry for me,", "For I come from Alabama", "With my banjo on my knee.", "Oh! Susanna!"],
+    "greensleeves": ["Alas, my love, you do me wrong,", "To cast me off discourteously;", "For I have loved you well and long,", "Delighting in your company."],
+    "frere": ["Brother John, Brother John,", "Are you sleeping? Are you sleeping?", "Morning bells are ringing, morning bells are ringing,", "Ding, dang, dong; ding, dang, dong."],
+    "mountain": ["She'll be coming round the mountain when she comes,", "She'll be coming round the mountain when she comes,", "She'll be coming round the mountain,", "She'll be coming round the mountain when she comes."],
+    "oldman": ["This old man, he played one,", "He played knick-knack on my thumb;", "With a knick-knack paddy-whack, give a dog a bone,", "This old man came rolling home."],
+    "spider": ["The itsy bitsy spider climbed up the waterspout;", "Down came the rain and washed the spider out;", "Out came the sun and dried up all the rain,", "And the itsy bitsy spider climbed up the spout again."],
+    "silent": ["Silent night, holy night,", "All is calm, all is bright;", "Round yon virgin mother and child,", "Holy infant so tender and mild."],
+    "deck": ["Deck the halls with boughs of holly,", "Fa la la la la, la la la la;", "'Tis the season to be jolly,", "Fa la la la la, la la la la."],
+    "shanty": ["Heave away, my sailors bold,", "The harbour wind is blowing free;", "Hoist the sail and raise the gold,", "We'll sail the wide blue sea!"],
+    "chariot": ["Round the Circus, wheels a-flying,", "Dust and thunder, horses strong;", "Hear the cheering, none denying,", "Here we come, we race along!"],
+    "saturnalia": ["Io Saturnalia, light the lamps tonight,", "Masters serve the slaves today,", "Candles bright and hearts so light,", "Come and feast and dance and play!"],
+    "diwali": ["Diyas glowing, rows of light,", "Fireworks bloom across the sky;", "Sweets to share on Diwali night,", "Lanterns floating, drifting high!"],
+    "holi": ["Throw the colours, red and gold,", "Pink and green and blue and white;", "Holi hai, be young, be bold,", "Everyone is dancing bright!"],
+    "market": ["Bread and honey, figs and cheese,", "Come and see my fine display;", "Bargain here, and buy with ease,", "Best of all the market day!"],
+    "friends": ["Friends are sailing, friends are near,", "Side by side we'll face the sea;", "Share the laughter, share the cheer,", "Friends together, you and me!"],
+    "rain": ["Rain on the rooftops, rain on the street,", "Puddles are dancing round my feet;", "Wrap in a cloak and hurry home,", "Warm by the fire, never alone."],
 }
 SING_GAP = 2.4          # seconds between the lines of a song
 SING_COOLDOWN = 25.0    # seconds before the same person can start another one
@@ -1656,7 +1676,7 @@ def chat_command(conn, text):
     if cmd in ("sing", "song"):
         return start_song(conn, rest)
     if cmd == "songs":
-        return say_to(conn, "Songs: " + ", ".join(SONGS) + ". Type /sing and a name (or just /sing for a surprise).")
+        return say_to(conn, "Songs (%d): " % len(SONGS) + ", ".join(SONGS) + ". Type /sing and a name (or just /sing for a surprise).")
     if cmd in ("w", "whisper", "msg"):
         target, msg = match_name(rest)
         if not target:
