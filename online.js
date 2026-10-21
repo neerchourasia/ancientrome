@@ -32,7 +32,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet }, rank: Social.rank, friends: Social.helloFriends() });
+      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon }, rank: Social.rank, friends: Social.helloFriends() });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -52,7 +52,8 @@ const Online = (() => {
 
   function onMessage(m) {
     switch (m.t) {
-      case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); setMsg(""); break;
+      case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); Festival.sync(); setMsg(""); break;
+      case "fest": case "diyas": Festival.remote(m); break;
       case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
@@ -302,6 +303,7 @@ const Online = (() => {
       const f = createFigure();
       paintFigure(f.mats, p.look);
       applyAccessories(f, p.look.acc);
+      Weapons.setFigure(f, p.look.weapon);
       f.sword.visible = true;
       f.g.rotation.order = "YXZ";
       f.g.add(label(p.name, p.role === "enemy" ? "#ff9d8c" : p.role === "ally" ? "#9fd8a8" : "#fff"));
@@ -311,6 +313,7 @@ const Online = (() => {
       duel.figs[p.i] = f;
     }
     mode = "online";
+    Weapons.setFigure(avFig, Market.weapon);
     avFig.sword.visible = true;
     avatar.rotation.order = "YXZ";
     const mine = duel.st[me];
@@ -336,7 +339,7 @@ const Online = (() => {
   function swing() {
     if (!duel || duel.over) return;
     const s = duel.st[duel.you];
-    if (s.down || s.swing >= 0 || s.st < 14) return;
+    if (s.down || s.swing >= 0 || s.st < 14 * Weapons.cur().cost) return;
     send({ t: "swing" });
     s.swing = 0; Sfx.play("swing"); // show it at once; the server confirms
   }
@@ -399,7 +402,7 @@ const Online = (() => {
       f.parts.armL.rotation.x = -w; f.parts.armR.rotation.x = w; f.parts.legL.rotation.x = -w; f.parts.legR.rotation.x = w;
       pose(f.parts, s.swing, s.block);
     }
-    if (me.swing >= 0) me.swing = Math.min(me.swing + dt, 0.69); // keep the animation moving between server updates
+    if (me.swing >= 0) me.swing = Math.min(me.swing + dt / Weapons.cur().time, 0.69); // keep the animation moving between server updates
     $o("od-me-hp").style.width = `${me.hp}%`;
     $o("od-st").style.width = `${me.st}%`;
     if (duel.kind === "coop") {

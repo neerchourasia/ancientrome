@@ -28,7 +28,7 @@ const Stalls = (() => {
     { id: "healer", sign: "HEALER", sub: "and trainer", color: ["#7a2d8a", "#f1ead8"], robe: 0x7a2d8a, goods: [0x3aa557, 0xc0392b, 0xe2b955, 0x2c7fe0],
       say: { rome: ["Salves for every wound!", "Train with me and hit harder!"], delhi: ["Herbs and balms for every ache!", "Strong horses, strong warriors!"] } },
   ];
-  const NAMES = { food: "food stall", clothes: "clothier", pets: "animals and rides stall", builder: "builder's stall", healer: "healer's stall" };
+  const NAMES = { weapons: "armourer's stall", food: "food stall", clothes: "clothier", pets: "animals and rides stall", builder: "builder's stall", healer: "healer's stall" };
 
   const tex = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new T.CanvasTexture(c); t.anisotropy = 4; return t; };
   const stripes = (a, b) => tex(64, 64, (g, w, h) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? b : a; g.fillRect(i * 8, 0, 8, h); } });
@@ -150,6 +150,30 @@ const Stalls = (() => {
     });
   }
 
+  // The armourer: a stall at the edge of the gladiator arena that sells weapons to fight with (see weapons.js). `x, z` is where its counter stands;
+  // customers come from the north (the middle of the arena).
+  function armoury(parent, x, z) {
+    const g = new T.Group(); parent.add(g);
+    const awnMat = new T.MeshLambertMaterial({ map: stripes("#7a1f1f", "#d9b44a"), side: T.DoubleSide });
+    box(g, x, 0, z + 2, 6.4, 1.05, 1.5, lam(0x5a3a22), true);
+    box(g, x, 0, z + 3.3, 6.8, 3.0, 0.2, lam(0x8a7a5a), true);                       // the back wall, with the weapons hung on it
+    for (const sx of [-1, 1]) box(g, x + sx * 3.1, 0, z + 1.2, 0.22, 3.1, 0.22, lam(0x6a4c2a));
+    const ids = ["gladius", ...Weapons.IDS];
+    ids.forEach((id, i) => {
+      const m = Weapons.model(id); m.scale.setScalar(0.95);
+      m.position.set(x - 2.5 + i, id === "spear" || id === "trident" ? 0.5 : 1.3, z + 3.15); m.rotation.z = (i % 2 ? 1 : -1) * 0.12;
+      g.add(m);
+    });
+    box(g, x, 1.05, z + 2, 2.6, 0.12, 0.9, lam(0x3a2a1a), false);                    // a cloth on the counter with a shield on it
+    cyl(g, x, 1.2, z + 1.9, 0.5, 0.08, lam(0xa8342c), false);
+    const awn = new T.Mesh(BOXG, awnMat); awn.scale.set(7, 0.14, 3.0); awn.position.set(x, 3.2, z + 2.2); awn.rotation.x = -0.15; awn.castShadow = true; g.add(awn);
+    sign(g, x, 4.0, z + 1.1, 4.0, 1.0, "ARMOURER", "weapons for the arena");
+    const v = vendor(g, x, z + 2.9, 0x6a2a1a, 0x888a90); v.rotation.y = Math.PI;
+    if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "r", x0: x - 3.4, x1: x + 3.4, z0: z + 1, z1: z + 3.6, c: "#a8342c" });
+    SPOTS.push({ id: "weapons", name: "armourer's stall", city: "rome", x, z: z - 1, r: 3.4, vendor: { x, z: z + 2.9 }, group: v, say: ["Swords, spears and axes! Fight like a champion!", "A sharp blade wins the crowd!", "The arena rewards the well-armed!"], t: 6, ph: Math.random() * 6 });
+    return g;
+  }
+
   // the stall you are standing at, if any
   const at = (x, z, feet = 0) => {
     if (feet > 3) return null;
@@ -181,5 +205,5 @@ const Stalls = (() => {
     }
   }
 
-  return { build, street, at, open, update, SITES, SPOTS };
+  return { build, street, armoury, at, open, update, SITES, SPOTS };
 })();

@@ -184,6 +184,7 @@ const Fight = (() => {
     bow = !!(opts.hunt || opts.lion); // hunting animals, including the lone lion, is done with a bow
     P.draw = 0; P.drawing = false; P.ammo = quiverSize(); P.ammoT = 0; P.dodgeT = 0; P.dodgeCd = 0; P.iframes = 0;
     sword.visible = shield.visible = !bow;
+    Weapons.mountFp(sword, Market.weapon);   // the weapon you bought from the armourer, or the gladius
     bowG.visible = bow;
     el("bow-hud").hidden = !bow;
     el("reticle").hidden = !bow;
@@ -254,8 +255,8 @@ const Fight = (() => {
       P.drawing = true; P.draw = 0;
       return;
     }
-    if (!active || phase !== "fight" || P.swing >= 0 || P.block || P.stam < 14 || !foe.alive) return;
-    P.swing = 0; P.hit = false; P.stam -= 14;
+    if (!active || phase !== "fight" || P.swing >= 0 || P.block || P.stam < 14 * Weapons.cur().cost || !foe.alive) return;
+    P.swing = 0; P.hit = false; P.stam -= 14 * Weapons.cur().cost;
     Sfx.play("swing");
     if ((foe.state === "approach" || foe.state === "recover") && Math.random() < foe.def.blockP) foe.blockT = 0.5;
   }
@@ -342,8 +343,9 @@ const Fight = (() => {
 
   function playerHit() {
     const f = foe, d = Math.hypot(f.x - player.x, f.z - player.z);
-    if (!f.alive || d > 3.1) return;
-    hurtFoe(20 * (0.85 + Math.random() * 0.3) * Character.mod("melee"), true);
+    const w = Weapons.cur();
+    if (!f.alive || d > w.reach) return;
+    hurtFoe(20 * w.dmg * (0.85 + Math.random() * 0.3) * Character.mod("melee"), true);
   }
 
   function foeStrike() {
@@ -480,7 +482,7 @@ const Fight = (() => {
 
     // player swing
     if (P.swing >= 0) {
-      P.swing += dt / 0.34;
+      P.swing += dt / (0.34 * Weapons.cur().time);
       if (P.swing >= 0.4 && !P.hit) { P.hit = true; playerHit(); }
       if (P.swing >= 1) P.swing = -1;
     }

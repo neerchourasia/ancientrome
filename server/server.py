@@ -72,6 +72,9 @@ ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
 DUEL_TIME = 150.0
 SWING_HIT_AT, SWING_END, SWING_COST, REACH, REACH_SLACK = 0.28, 0.7, 14.0, 3.1, 0.5
+# weapons from the armourer: (damage multiplier, reach in metres, how long a swing takes, stamina a swing costs). Must match weapons.js.
+WEAPONS = {"dagger": (0.7, 2.5, 0.65, 0.6), "spear": (1.0, 4.3, 1.25, 1.1), "trident": (1.15, 3.9, 1.15, 1.1), "axe": (1.55, 3.0, 1.45, 1.4), "spatha": (1.35, 3.4, 1.2, 1.25)}
+WEAPON_DEFAULT = (1.0, REACH, 1.0, 1.0)
 
 RACE_LEN = 2 * 340 + 2 * math.pi * 22   # one lap of the Circus Maximus path
 RACE_LAPS = int(os.environ.get("RACE_LAPS", "3"))   # 3 in the game; set lower to test a whole race quickly
@@ -100,6 +103,8 @@ def clean_look(look):
     out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:5] if isinstance(acc, list) else []
     pet = look.get("pet") if isinstance(look, dict) else None
     out["pet"] = pet if pet in PETS else None      # a companion that follows them (shown to others)
+    w = look.get("weapon") if isinstance(look, dict) else None
+    out["weapon"] = w if w in WEAPONS else None    # the weapon they fight with (the gladius when none)
     return out
 
 
@@ -220,6 +225,7 @@ class Conn:
         self.admin = False         # set from the database when they log in with an admin account
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
+        self.fest_t = 0.0          # when they last put a festival lamp or lantern down
         self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
         self.ctok, self.ctok_t = 3.0, now()   # chat: how many messages they may send right now
@@ -275,10 +281,12 @@ class Duelist:
         self.next_act = now() + 1.5
         self.block_until = 0.0
         self.speed, self.cool, self.cool_span = 3.4, 1.3, 1.4   # how fast a bot walks, and how often it swings
+        self.wdmg, self.reach, self.wtime, wcost = WEAPONS.get(self.look.get("weapon"), WEAPON_DEFAULT)
+        self.hit_at, self.end_at, self.swing_cost = SWING_HIT_AT * self.wtime, SWING_END * self.wtime, SWING_COST * wcost
 
     def state(self):
         return [self.i, round(self.x, 2), round(self.z, 2), round(self.yaw, 2), round(self.hp, 1), round(self.st, 1),
-                round(self.swing, 2), 1 if self.block else 0]
+                round(self.swing if self.swing < 0 else self.swing / self.wtime, 2), 1 if self.block else 0]   # a swing is reported on the standard timeline, so every weapon animates the same
 
 
 def bot_think(p, target, dt):
@@ -298,8 +306,8 @@ def bot_think(p, target, dt):
     p.block = t < p.block_until and p.swing < 0
     if target.swing >= 0 and d < 4 and random.random() < 0.02 and t > p.block_until + 0.8:
         p.block_until = t + 0.6
-    if p.swing < 0 and d < 3.0 and p.st >= SWING_COST and t >= p.next_act and not p.block:
-        p.swing, p.hit_done, p.st = 0.0, False, p.st - SWING_COST
+    if p.swing < 0 and d < p.reach - 0.1 and p.st >= p.swing_cost and t >= p.next_act and not p.block:
+        p.swing, p.hit_done, p.st = 0.0, False, p.st - p.swing_cost
         p.next_act = t + p.cool + random.random() * p.cool_span
 
 
@@ -333,8 +341,8 @@ class DuelRoom:
         if t == "pos":
             self.move(p, num(m.get("x"), -100, 100), num(m.get("z"), -100, 100), num(m.get("yaw"), -50, 50))
         elif t == "swing":
-            if p.swing < 0 and p.st >= SWING_COST and not p.block:
-                p.swing, p.hit_done, p.st = 0.0, False, p.st - SWING_COST
+            if p.swing < 0 and p.st >= p.swing_cost and not p.block:
+                p.swing, p.hit_done, p.st = 0.0, False, p.st - p.swing_cost
         elif t == "block":
             p.block = bool(m.get("on")) and p.swing < 0
 
@@ -375,10 +383,10 @@ class DuelRoom:
             p.st = min(100.0, p.st + (6.0 if p.block else 16.0) * dt) if p.swing < 0 else p.st
             if p.swing >= 0:
                 p.swing += dt
-                if not p.hit_done and p.swing >= SWING_HIT_AT:
+                if not p.hit_done and p.swing >= p.hit_at:
                     p.hit_done = True
                     self.strike(p, b if p is a else a)
-                if p.swing >= SWING_END:
+                if p.swing >= p.end_at:
                     p.swing = -1.0
         # never stand inside each other
         d = math.hypot(a.x - b.x, a.z - b.z)
@@ -401,12 +409,12 @@ class DuelRoom:
     def strike(self, p, q):
         dx, dz = q.x - p.x, q.z - p.z
         d = math.hypot(dx, dz)
-        if d > REACH + REACH_SLACK:
+        if d > p.reach + REACH_SLACK:
             return self.events.append(["miss", p.i])
         fx, fz = -math.sin(p.yaw), -math.cos(p.yaw)
         if d > 0.01 and (fx * dx + fz * dz) / d < math.cos(1.1):      # must be roughly facing the target
             return self.events.append(["miss", p.i])
-        dmg = 20.0 * (0.85 + random.random() * 0.3) * p.melee * q.taken
+        dmg = 20.0 * (0.85 + random.random() * 0.3) * p.melee * p.wdmg * q.taken
         qf = (-math.sin(q.yaw), -math.cos(q.yaw))
         facing_back = d > 0.01 and (qf[0] * -dx + qf[1] * -dz) / d > math.cos(1.3)
         if q.block and q.st > 0 and facing_back:
@@ -499,8 +507,8 @@ class CoopRoom:
         if t == "pos":
             DuelRoom.move(self, p, num(m.get("x"), -100, 100), num(m.get("z"), -100, 100), num(m.get("yaw"), -50, 50))
         elif t == "swing":
-            if p.swing < 0 and p.st >= SWING_COST and not p.block:
-                p.swing, p.hit_done, p.st = 0.0, False, p.st - SWING_COST
+            if p.swing < 0 and p.st >= p.swing_cost and not p.block:
+                p.swing, p.hit_done, p.st = 0.0, False, p.st - p.swing_cost
         elif t == "block":
             p.block = bool(m.get("on")) and p.swing < 0
 
@@ -543,10 +551,10 @@ class CoopRoom:
                 p.st = min(100.0, p.st + (6.0 if p.block else 16.0) * dt)
             else:
                 p.swing += dt
-                if not p.hit_done and p.swing >= SWING_HIT_AT:
+                if not p.hit_done and p.swing >= p.hit_at:
                     p.hit_done = True
                     self.strike(p)
-                if p.swing >= SWING_END:
+                if p.swing >= p.end_at:
                     p.swing = -1.0
         # nobody stands inside anybody else
         live = [f for f in self.fighters if not f.down]
@@ -589,7 +597,7 @@ class CoopRoom:
                 continue
             dx, dz = q.x - p.x, q.z - p.z
             d = math.hypot(dx, dz)
-            if d > REACH + REACH_SLACK or (d > 0.01 and (fx * dx + fz * dz) / d < math.cos(1.1)):
+            if d > p.reach + REACH_SLACK or (d > 0.01 and (fx * dx + fz * dz) / d < math.cos(1.1)):
                 continue
             if d < bd:
                 best, bd = q, d
@@ -597,7 +605,7 @@ class CoopRoom:
             return self.events.append(["miss", p.i])
         q = best
         dx, dz = q.x - p.x, q.z - p.z
-        dmg = 20.0 * (0.85 + random.random() * 0.3) * p.melee * q.taken
+        dmg = 20.0 * (0.85 + random.random() * 0.3) * p.melee * p.wdmg * q.taken
         qf = (-math.sin(q.yaw), -math.cos(q.yaw))
         facing = bd > 0.01 and (qf[0] * -dx + qf[1] * -dz) / bd > math.cos(1.3)
         if q.block and q.st > 0 and facing:
@@ -1751,6 +1759,36 @@ def social_msg(conn, text):
     conn.send({"t": "fr_msg", "msg": text})
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# festivals: the diyas (clay lamps) and sky lanterns people put down are seen by everybody in the same city
+
+DIYAS = collections.deque(maxlen=80)     # { x, z, c (city), n (who), at } of the lamps set down in the last half hour
+DIYA_LIFE = 1800.0
+
+
+def on_fest(conn, m):
+    k, t = m.get("k"), now()
+    city = m.get("c") if m.get("c") in WORLD_CITIES else None
+    if not city:
+        return
+    while DIYAS and t - DIYAS[0]["at"] > DIYA_LIFE:
+        DIYAS.popleft()
+    if k == "sync":                                          # a festival has begun for them: here are the lamps already lit
+        return conn.send({"t": "diyas", "c": city, "list": [{"x": d["x"], "z": d["z"], "n": d["n"]} for d in DIYAS if d["c"] == city]})
+    if k not in ("diya", "lantern") or t - conn.fest_t < 1.2:
+        return
+    conn.fest_t = t
+    x, z = round(num(m.get("x"), -20000, 20000), 1), round(num(m.get("z"), -20000, 20000), 1)
+    if k == "diya":
+        DIYAS.append({"x": x, "z": z, "c": city, "n": conn.name, "at": t})
+        msg = {"t": "fest", "k": "diya", "c": city, "x": x, "z": z, "n": conn.name}
+    else:
+        msg = {"t": "fest", "k": "lantern", "c": city, "x": x, "z": z, "y": round(num(m.get("y"), 0, 60), 1), "col": int(num(m.get("col"), 0, 5)), "w": clean_chat(m.get("w"))[:60], "n": conn.name}
+    for c in list(CONNS):
+        if c is not conn and c.hello and not c.closed:
+            c.send(msg)
+
+
 def on_social(conn, m):
     a = m.get("a")
     if not conn.fid:
@@ -1891,6 +1929,8 @@ async def handle_msg(conn, m):
         return on_chat(conn, m)
     if t == "social":
         return on_social(conn, m)
+    if t == "fest":
+        return on_fest(conn, m)
     if t == "admin":
         return on_admin(conn, m)
     if t == "queue":

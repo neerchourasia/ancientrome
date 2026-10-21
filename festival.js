@@ -16,7 +16,7 @@ const Festival = (() => {
     holi: { city: "delhi", name: "Holi", icon: "🎨", from: 17, to: 18, note: "coloured powder, cheaper food, better pay", say: ["Holi hai!", "Bura na mano, Holi hai!", "Happy Holi!", "Come, play with colours!"] },
   };
   const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b] };
-  let clock = 0, lanterns = [], diyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
+  let clock = 0, lanterns = [], diyas = [], rdiyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
   const mats = {};
 
   const dayOfYear = () => ((Math.floor(Time.day) - 1) % 28 + 28) % 28 + 1;
@@ -91,23 +91,45 @@ const Festival = (() => {
   }
 
   // release a sky lantern in front of you (it drifts up and away, with your wish said above it)
-  function release(col, wish) {
+  // `at` is given when somebody else's lantern comes in from the game server: { x, y, z }
+  function release(col, wish, at) {
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), g = lanternMesh(col);
-    g.position.set(player.x + fx * 1.4, player.feet + 1.3, player.z + fz * 1.4); scene.add(g);
+    const lx = at ? at.x : player.x + fx * 1.4, ly = at ? at.y : player.feet + 1.3, lz = at ? at.z : player.z + fz * 1.4;
+    g.position.set(lx, ly, lz); scene.add(g);
+    if (!at) Online.navalSend({ t: "fest", k: "lantern", c: city, x: +lx.toFixed(1), y: +ly.toFixed(1), z: +lz.toFixed(1), col: Math.max(0, LANT_COLORS.indexOf(col)), w: wish || "" });
     lanterns.push({ g, vy: 1.4 + Math.random() * 0.6, ph: Math.random() * 6, t: 0, dx: (Math.random() - 0.3) * 0.6, dz: (Math.random() - 0.5) * 0.6 });
     while (lanterns.length > 36) { const o = lanterns.shift(); scene.remove(o.g); }
-    if (wish) Speech.say({ x: player.x + fx * 1.4, z: player.z + fz * 1.4 }, wish, 4);
-    Sfx.play("coin");
+    if (wish) Speech.say({ x: lx, z: lz }, wish, 4);
+    if (!at) Sfx.play("coin");
   }
   // set a little clay lamp (a diya) down where you stand; it burns until the festival is over
-  function placeDiya() {
+  function makeDiya(x, z) {
     const g = new T.Group(), bowl = new T.Mesh(new T.CylinderGeometry(0.22, 0.14, 0.12, 10), new T.MeshLambertMaterial({ color: 0xb5593a })); bowl.position.y = 0.06; g.add(bowl);
     const flame = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffc860, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false })); flame.scale.set(1.1, 1.1, 1); flame.position.y = 0.25; g.add(flame);
+    g.position.set(x, groundAt(x, z), z); scene.add(g);
+    return g;
+  }
+  function placeDiya() {
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), x = player.x + fx * 1.1, z = player.z + fz * 1.1;
-    g.position.set(x, groundAt(x, z), z); scene.add(g); diyas.push(g);
+    diyas.push(makeDiya(x, z));
     while (diyas.length > 16) scene.remove(diyas.shift());
+    Online.navalSend({ t: "fest", k: "diya", c: city, x: +x.toFixed(1), z: +z.toFixed(1) });   // everybody else in the city sees it too
     Sfx.play("coin");
   }
+
+  // lamps and lanterns put down by other players (from the game server): only while the festival is on in this city
+  function remote(m) {
+    if (!cur || m.c !== city || !(curKey === "diwali" || curKey === "saturnalia")) return;
+    const add = (x, z) => {
+      if (rdiyas.some((d) => Math.abs(d.position.x - x) < 0.05 && Math.abs(d.position.z - z) < 0.05)) return;
+      rdiyas.push(makeDiya(x, z));
+      while (rdiyas.length > 40) scene.remove(rdiyas.shift());
+    };
+    if (m.t === "diyas") { for (const d of m.list || []) add(d.x, d.z); }
+    else if (m.k === "diya") { add(m.x, m.z); toast(`🪔 ${m.n} lit a diya`); }
+    else if (m.k === "lantern") release(LANT_COLORS[m.col] || LANT_COLORS[0], m.w, { x: m.x, y: m.y, z: m.z });
+  }
+  function sync() { if (cur) Online.navalSend({ t: "fest", k: "sync", c: city }); }
 
   // shoot a burst of coloured powder (Holi) or throw flowers (Floralia) in front of you; people it hits are splashed with colour
   function shoot() {
@@ -176,8 +198,8 @@ const Festival = (() => {
     if (key !== curKey) {
       curKey = key; cur = key ? FEASTS[key] : null;
       for (const [k, g] of Object.entries(deco)) g.visible = k === key;
-      for (const l of lanterns.splice(0)) scene.remove(l.g); for (const d of diyas.splice(0)) scene.remove(d); restoreTints();
-      if (key) { build(key).visible = true; toast(`${cur.icon} ${cur.name}! ${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
+      for (const l of lanterns.splice(0)) scene.remove(l.g); for (const d of diyas.splice(0)) scene.remove(d); for (const d of rdiyas.splice(0)) scene.remove(d); restoreTints();
+      if (key) { sync(); build(key).visible = true; toast(`${cur.icon} ${cur.name}! ${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
       badge();
       const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = (curKey === "diwali" || curKey === "saturnalia") ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : "🕯 Light a lantern (L)") : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
     }
@@ -189,7 +211,7 @@ const Festival = (() => {
       l.g.children[2].material.opacity = Math.max(0, Math.min(1, (190 - l.g.position.y) / 60));
       if (l.g.position.y > 200) { scene.remove(l.g); lanterns.splice(i, 1); }
     }
-    for (const d of diyas) d.children[1].scale.setScalar(1.0 + Math.sin(clock * 9 + d.position.x) * 0.12);
+    for (const d of diyas.concat(rdiyas)) d.children[1].scale.setScalar(1.0 + Math.sin(clock * 9 + d.position.x) * 0.12);
     clock += dt;
     // people wish you well
     sayT -= dt;
@@ -226,7 +248,7 @@ const Festival = (() => {
   }
 
   return {
-    init, update, FEASTS, key, release, shoot,
+    init, update, FEASTS, key, release, shoot, remote, sync,
     get active() { return !!cur; },
     get id() { return curKey; },
     get name() { return cur ? cur.name : ""; },

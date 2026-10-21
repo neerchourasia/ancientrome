@@ -102,7 +102,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             c.close()
         self.srv.close()
         server.CONNS.clear()
-        server.BLOCKED.clear(); server.CHAT_LOG.clear()
+        server.BLOCKED.clear(); server.CHAT_LOG.clear(); server.DIYAS.clear()
         for d in (server.RATINGS, server.CLAIMS, server.FID_UID, server.NAMES, server.REQS, server.MAIL, server.RECENT):
             d.clear()
         for q in server.QUEUES.values():
@@ -146,7 +146,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         a = await self.player(name="<script>alert(1)</script>Bob", cls="god-mode", look={"toga": 99, "skin": -3, "sash": "x"})
         self.assertNotIn("premium", a.welcome)
         self.assertEqual(server.clean_name("<b>Mara</b>"), "bMarab")
-        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": [], "pet": None})
+        self.assertEqual(server.clean_look({"toga": 99, "skin": True, "hair": 2}), {"skin": 0, "hair": 2, "toga": 0, "sash": 0, "acc": [], "pet": None, "weapon": None})
         self.assertEqual(server.clean_look({"acc": ["cloak", "cloak", "<script>", 7, "helmet"]})["acc"], ["cloak", "helmet"])
         self.assertEqual(server.clean_look({"toga": 5, "sash": 5})["toga"], 5)   # every colour is free
         self.assertEqual(server.clean_look({"pet": "eagle"})["pet"], "eagle")
@@ -193,6 +193,53 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(end["reason"], "ko")
         self.assertEqual(end["hp"][1], 0.0)
         self.assertGreater(end["hp"][0], 99.0)           # Ann was never hurt
+
+    async def test_weapons_change_reach_damage_and_swing_speed(self):
+        a = await self.player("Ann", look={"weapon": "spear"})
+        b = await self.player("Ben", look={"weapon": "dagger"})
+        self.assertIsNone(server.clean_look({"weapon": "bazooka"})["weapon"])      # only real weapons are accepted
+        a.send({"t": "queue", "mode": "duel"})
+        b.send({"t": "queue", "mode": "duel"})
+        await a.until(lambda m: m["t"] == "match")
+        await b.until(lambda m: m["t"] == "match")
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        pa, pb = room.players
+        self.assertEqual((pa.reach, pb.reach), (4.3, 2.5))
+        pa.x, pa.z, pa.yaw = 0.0, 0.0, 0.0
+        pb.x, pb.z, pb.yaw = 0.0, -4.0, math.pi          # four metres in front of Ann, facing her
+        room.events.clear()
+        room.strike(pa, pb)                              # the spear reaches that far
+        self.assertEqual(room.events[-1][0], "hit")
+        room.events.clear()
+        room.strike(pb, pa)                              # the dagger does not
+        self.assertEqual(room.events[-1][0], "miss")
+        pb.swing = 0.2                                   # a quick dagger swing is reported on the standard timeline
+        self.assertEqual(pb.state()[6], round(0.2 / 0.65, 2))
+        self.assertGreater(server.WEAPONS["axe"][0], 1.4)
+
+    async def test_other_players_see_your_diyas_and_lanterns(self):
+        a, b, c = await self.player("Ann"), await self.player("Ben"), await self.player("Cy")
+        a.send({"t": "fest", "k": "diya", "c": "delhi", "x": 5900.5, "z": -30.2})
+        got = await b.until(lambda m: m["t"] == "fest")
+        self.assertEqual((got["k"], got["c"], got["x"], got["z"], got["n"]), ("diya", "delhi", 5900.5, -30.2, "Ann"))
+        await c.until(lambda m: m["t"] == "fest")
+        a.send({"t": "fest", "k": "diya", "c": "delhi", "x": 1, "z": 1})          # too soon after the last one: ignored
+        with self.assertRaises(asyncio.TimeoutError):
+            await b.until(lambda m: m["t"] == "fest", timeout=0.6)
+        await asyncio.sleep(1.2)
+        a.send({"t": "fest", "k": "lantern", "c": "delhi", "x": 5901, "z": -31, "y": 3, "col": 99, "w": "peace for everyone"})
+        lan = await b.until(lambda m: m["t"] == "fest" and m["k"] == "lantern")
+        self.assertEqual((lan["col"], lan["w"], lan["y"]), (5, "peace for everyone", 3.0))
+        late = await self.player("Late")                                          # someone who arrives later asks for the lamps already lit
+        late.send({"t": "fest", "k": "sync", "c": "delhi"})
+        lamps = await late.until(lambda m: m["t"] == "diyas")
+        self.assertEqual([(d["x"], d["n"]) for d in lamps["list"]], [(5900.5, "Ann")])      # lanterns drift away, only lamps stay
+        late.send({"t": "fest", "k": "sync", "c": "rome"})
+        self.assertEqual((await late.until(lambda m: m["t"] == "diyas"))["list"], [])      # none in the other city
+        a.send({"t": "fest", "k": "diya", "c": "mars", "x": 1, "z": 1})            # not a city: ignored
+        with self.assertRaises(asyncio.TimeoutError):
+            await b.until(lambda m: m["t"] == "fest", timeout=0.6)
 
     async def test_duel_block_cuts_damage_and_range_is_checked(self):
         a, b = await self.start_duel()

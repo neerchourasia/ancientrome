@@ -491,6 +491,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 
 #wx-badge { padding: 2px 10px; border-radius: 999px; background: rgba(40,52,66,.85); color: #dbe7f2; font-size: .75rem; white-space: nowrap; }
 #wx-badge:empty { display: none; }
+.mk-note { margin: 6px 0; font-size: .82rem; color: var(--muted); }
 .rank-badge { display: inline-block; padding: 0 7px; margin-left: 2px; border-radius: 999px; background: rgba(226,185,85,.2); border: 1px solid rgba(226,185,85,.55); color: #ffe8a8; font-size: .78rem; white-space: nowrap; }
 /* the menu button: a fireball (a cream ring of flame round a dark, glowing core) with the menu icon in the middle */
 #btn-menu { order: -2; position: relative; width: 124px; height: 124px; padding: 0 !important; border: 0 !important; border-radius: 50%; background: transparent !important; display: grid; place-items: center; }

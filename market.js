@@ -36,6 +36,11 @@ const Market = (() => {
     armbands: { type: "wear", slot: "arms", name: "Gold armbands", price: 70, note: "Worn by gladiators who have won their freedom." },
     boots: { type: "wear", slot: "feet", name: "Hobnailed boots", price: 50, note: "Legionary boots, built for long marches." },
     shield: { type: "wear", slot: "hand", name: "Round shield", price: 110, note: "Painted red, with a bronze boss." },
+    dagger: { type: "weapon", slot: "weapon", name: "Sica (dagger)", price: 60, note: "A quick little blade for the arena." },
+    spear: { type: "weapon", slot: "weapon", name: "Hasta (spear)", price: 130, note: "Reaches far, but slow to thrust." },
+    trident: { type: "weapon", slot: "weapon", name: "Fuscina (trident)", price: 200, note: "The net-fighter's weapon." },
+    axe: { type: "weapon", slot: "weapon", name: "Securis (battle axe)", price: 220, note: "Heavy and slow, and it hits very hard." },
+    spatha: { type: "weapon", slot: "weapon", name: "Champion's greatsword", price: 320, note: "A long, broad blade made for champions." },
     hound: { type: "pet", slot: "pet", name: "Hound", price: 150, note: "A loyal dog that trots along behind you." },
     eagle: { type: "pet", slot: "pet", name: "Eagle", price: 220, note: "The eagle of Rome, circling above you." },
     cat: { type: "pet", slot: "pet", name: "Cat", price: 90, note: "A sleek tabby that pads along behind you." },
@@ -125,11 +130,12 @@ const Market = (() => {
     healer: { title: "Healer and trainer", types: ["cure", "supply", "perk"] },
     garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
     menagerie: { title: "Your menagerie", types: ["pet"], ownedOnly: true, empty: "You do not own any animals yet. Buy one at the animals and rides stall in the market square, and it will live here. Press Bring along to take one with you." },
+    weapons: { title: "Armourer: weapons for the arena", types: ["weapon"], note: "You fight with the gladius (damage 100%, reach 3.1 m) unless you equip another weapon. Weapons work in the arena against the bots, and in duels and team battles against real people." },
     dresser: { title: "Your dresser", types: ["wear"], ownedOnly: true, empty: "You do not own anything to wear yet. The clothier in the market square sells hats, cloaks, armour and boots. You cannot buy things here." },
   };
   let stall = "food";
   const SECTIONS = [
-    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Weapons for the arena", "weapon"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -167,6 +173,7 @@ const Market = (() => {
     Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic") });
     if (avFig) applyAccessories(avFig, s.worn.filter((id) => ITEMS[id].type === "wear"));
     Pets.set(s.worn.find((id) => ITEMS[id].type === "pet"));
+    if (typeof avFig !== "undefined" && avFig) Weapons.setFigure(avFig, s.worn.find((id) => ITEMS[id].type === "weapon"));
     render();
   }
 
@@ -249,7 +256,8 @@ const Market = (() => {
       $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
     } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : " It is the finest house in Rome.";
 
-    $m("mk-sections").replaceChildren(...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {
+    const intro = def.note ? [Object.assign(document.createElement("p"), { className: "mk-note", textContent: def.note })] : [];
+    $m("mk-sections").replaceChildren(...intro, ...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
       h.textContent = title; ul.className = "mk-items";
       const need = type === "car" ? "modern" : type === "mount" ? "ancient" : null;
@@ -263,13 +271,13 @@ const Market = (() => {
       for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => x.type === type && (type !== "food" || foodHere(x)) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
-        name.textContent = it.name; note.textContent = it.note;
+        name.textContent = it.name; note.textContent = it.type === "weapon" ? `${it.note} ${Weapons.describe(id)}` : it.note;
         txt.append(name, note);
         b.type = "button";
         const owned = s.items.includes(id);
         if (it.type === "supply" || it.type === "food" || !owned) { b.textContent = `Buy · ${markFood(it.price, it)}${it.type === "food" && typeof Festival !== "undefined" && Festival.active ? " (festival price)" : ""}`; b.disabled = Vitals.coins < markFood(it.price, it); b.addEventListener("click", () => buyItem(id)); }
         else if (it.type === "car" || it.type === "mount") { const out = Car.current === id; b.textContent = out ? "Park it away" : "Take it out"; b.classList.toggle("on", out); b.addEventListener("click", () => { if (out) { Car.stow(); render(); } else { closePanels(); Car.deploy(id); } }); }
-        else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : "Take off") : (it.type === "pet" ? "Bring along" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
+        else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : it.type === "weapon" ? "Put away" : "Take off") : (it.type === "pet" ? "Bring along" : it.type === "weapon" ? "Equip" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
         li.append(txt, b);
         ul.append(li);
@@ -299,6 +307,7 @@ const Market = (() => {
     get worn() { return s.worn.filter((id) => ITEMS[id].type === "wear"); }, // what other players can see
     get pets() { return s.items.filter((id) => ITEMS[id] && ITEMS[id].type === "pet"); },
     itemName: (id) => (ITEMS[id] ? ITEMS[id].name : id),
+    get weapon() { return s.worn.find((id) => ITEMS[id] && ITEMS[id].type === "weapon") || null; },
     get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },
     owns: (id) => s.items.includes(id),
     perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),

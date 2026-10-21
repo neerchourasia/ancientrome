@@ -39,6 +39,7 @@ function init() {
   buildGround(scene);
   buildLandmarks(scene);
   Stalls.build(scene, Stalls.SITES.rome.x, Stalls.SITES.rome.z, "rome");
+  Stalls.armoury(scene, ARENA.cx, ARENA.cz + 16.5);   // the armourer at the south edge of the arena
   Jobs.build(scene);
   Robbery.init(scene);
   Festival.init(scene);
@@ -139,6 +140,7 @@ function wireInput(canvas) {
     if (Vitals.resting && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(k)) Vitals.stopRest(); // moving stands you up
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
 
+    if (k === "KeyR" && mode === "walk" && !panelOpen && !inCircusTrack(player.x, player.z) && !inArena(player.x, player.z)) { shove(); return; }   // R: shove the citizen in front of you
     if ((k === "KeyL" || k === "KeyU") && mode === "walk" && !panelOpen && !inArena(player.x, player.z) && Festival.key(k)) return;   // festival activities: L a lantern, U colours
     if (k === "KeyT") cycleTime();
     if (k === "KeyO") toggleSound();
@@ -512,6 +514,30 @@ function arrest() {
   }, 1600);
 }
 
+// R: shove the citizen standing in front of you (within about two steps) so they fall over, whatever your pace. The guards notice, like with any knock-over.
+let shoveCd = 0;
+function shove() {
+  if (shoveCd > 0 || sleepT > 0 || player.stun > 0) return;
+  shoveCd = 0.8;
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  let best = null, bd = 1e9;
+  for (const c of (city === "delhi" ? Delhi.people() : CITIZENS.list)) {
+    if ((c.down || 0) > 0) continue;
+    const dx = c.x - player.x, dz = c.z - player.z, d = Math.hypot(dx, dz);
+    if (d > 2.1 || d < 0.05 || (dx * fx + dz * fz) / d < 0.6 || d >= bd) continue;
+    best = c; bd = d;
+  }
+  Sfx.play("swing");
+  if (!best) { toast("Nobody within reach. Step up to someone and press R to shove them"); return; }
+  best.down = 1.8;
+  noteKnock();
+  Speech.rammed(best, false);
+  const nx = best.x + fx * 1.6, nz = best.z + fz * 1.6;
+  if (canMove(best.x, best.z, nx, nz)) { best.x = nx; best.z = nz; }
+  Sfx.play("oof");
+  toast("You shoved a citizen over");
+}
+
 // Running into a citizen knocks them over.
 function bumpCitizens(pace) {
   if (pace < 2.5) return;
@@ -557,7 +583,7 @@ function updatePlayer(dt) {
   if (len > 0) { tx = (tx / len) * speed; tz = (tz / len) * speed; }
   if (player.stun > 0) { player.stun -= dt; tx = tz = 0; } // dazed after a crash
   if (sleepT > 0) tx = tz = 0; // asleep
-  crashCd = Math.max(0, crashCd - dt);
+  crashCd = Math.max(0, crashCd - dt); shoveCd = Math.max(0, shoveCd - dt);
   scrapeCd = Math.max(0, scrapeCd - dt);
   const a = Math.min(1, dt * 9);
   player.vx += (tx - player.vx) * a;
