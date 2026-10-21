@@ -230,6 +230,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "garage") { Garage.open(); return; }
     if ($("#prompt").dataset.kind === "dresser") { Dresser.open(); return; }
     if ($("#prompt").dataset.kind === "cage") { Cage.open(); return; }
+    if ($("#prompt").dataset.kind === "shove") { shove(); return; }
     if ($("#prompt").dataset.kind === "rob") { Robbery.act(); return; }
     if ($("#prompt").dataset.kind === "harbour") { Harbour.board(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
@@ -267,6 +268,7 @@ function wireInput(canvas) {
   $("#btn-dirs").addEventListener("click", toggleDirections);
   $("#btn-sound").addEventListener("click", toggleSound);
   $("#btn-jobs").addEventListener("click", () => Jobs.openList());
+  $("#btn-shove").addEventListener("click", () => { if (mode === "walk" && !panelOpen) shove(); else toast("Shoving works while you are walking about"); });
   // the menu of buttons: closed until you want it (☰ Menu); a dot on it says a gift or a friend's message is waiting
   {
     const bar = document.querySelector(".top-right .buttons"), mb = $("#btn-menu");
@@ -516,6 +518,19 @@ function arrest() {
 
 // R: shove the citizen standing in front of you (within about two steps) so they fall over, whatever your pace. The guards notice, like with any knock-over.
 let shoveCd = 0;
+// the other player standing in front of you within reach (nearer than `limit`), or { close } for one who is close by but not in front
+function shovablePlayer(limit = 1e9) {
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  let peer = null, pd = limit, close = null;
+  if (typeof Online === "undefined") return { peer, close };
+  for (const p of Online.peerList()) {
+    if (p.x === null || !p.id || (p.down || 0) > 0) continue;
+    const dx = p.x - player.x, dz = p.z - player.z, d = Math.hypot(dx, dz);
+    if (d < 0.05 || d > 4.5) continue;
+    if (d <= 2.8 && (dx * fx + dz * fz) / d >= 0.35 && d < pd) { peer = p; pd = d; } else close = close || p;
+  }
+  return { peer, close };
+}
 function shove() {
   if (shoveCd > 0 || sleepT > 0 || player.stun > 0) return;
   shoveCd = 0.8;
@@ -529,14 +544,10 @@ function shove() {
   }
   Sfx.play("swing");
   let peer = null, pd = bd;                                   // other players count too (the game server checks they really are that close)
-  for (const p of Online.peerList()) {
-    if (p.x === null || !p.id) continue;
-    const dx = p.x - player.x, dz = p.z - player.z, d = Math.hypot(dx, dz);
-    if (d > 2.1 || d < 0.05 || (dx * fx + dz * fz) / d < 0.6 || d >= pd) continue;
-    peer = p; pd = d;
-  }
-  if (peer) { Online.shovePeer(peer.id); noteKnock(); peer.down = 1.4; return; }
-  if (!best) { toast("Nobody within reach. Step up to someone and press R to shove them"); return; }
+  const near = shovablePlayer(pd);
+  if (near.peer) peer = near.peer;
+  if (peer) { Online.shovePeer(peer.id); return; }   // the guards only hear of it when the server says the shove landed (Online: shove_ok)
+  if (!best) { toast(near.close ? `${near.close.name} is close: face them and step a little nearer, then press R` : "Nobody within reach. Step up to someone and press R to shove them"); return; }
   best.down = 1.8;
   noteKnock();
   Speech.rammed(best, false);
@@ -1137,6 +1148,7 @@ function updatePrompt() {
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
+    if (!text && mode === "walk") { const sp = shovablePlayer().peer; if (sp) { text = `R: shove ${sp.name}`; p.dataset.kind = "shove"; } }
     if (!text && Cage.at(player.x, player.z, player.feet)) { text = "F: open the cage (choose which animal comes with you)"; p.dataset.kind = "cage"; }
     if (!text) { const hb = Harbour.at(player.x, player.z, player.feet); if (hb) { text = hb.text; p.dataset.kind = "harbour"; } }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }

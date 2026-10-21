@@ -1800,13 +1800,18 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 def on_shove(conn, m):
     t = now()
     target = next((c for c in CONNS if c.hello and not c.closed and c.id == m.get("to")), None)
-    if not target or target is conn or conn.room or target.room or not conn.city or conn.city != target.city:
+    no = lambda why: conn.send({"t": "shove_no", "msg": why})
+    if not target or target is conn:
         return
-    if t - conn.walk_at > 4 or t - target.walk_at > 4 or t - conn.shove_t < 0.7 or t < target.immune_t:
+    if conn.room or target.room or not conn.city or conn.city != target.city or t - conn.walk_at > 4 or t - target.walk_at > 4:
+        return no("%s is somewhere you cannot reach right now (a game, a vehicle, or another city)." % target.name)
+    if t - conn.shove_t < 0.7:
         return
+    if t < target.immune_t:
+        return no("%s was only just shoved. Give them a moment." % target.name)
     d = math.hypot(target.px - conn.px, target.pz - conn.pz)
     if d > SHOVE_RANGE:
-        return
+        return no("%s is too far away. Step right up to them." % target.name)
     conn.shove_t, target.immune_t = t, t + 1.6
     dx, dz = ((target.px - conn.px) / d, (target.pz - conn.pz) / d) if d > 0.05 else (-math.sin(conn.pyaw), -math.cos(conn.pyaw))
     target.send({"t": "shoved", "by": conn.name, "dx": round(dx, 2), "dz": round(dz, 2)})
