@@ -294,6 +294,45 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((end["coop"], end["won"], end["reason"]), (True, True, "cleared"))
         self.assertEqual(end["rank"]["delta"], 8)                                           # a crew victory counts towards your rank
 
+    async def test_the_admin_list_says_where_people_are(self):
+        server.CFG["supabase_url"] = "https://example.supabase.co"
+
+        async def fake_verify(token):
+            return {"boss": "u-boss"}.get(token)
+
+        async def fake_admin(token):
+            return token == "boss"
+        server.verify_token, server.is_admin = fake_verify, fake_admin
+        boss, ann, menu = await self.player("Boss", token="boss"), await self.player("Ann"), await self.player("Menu")
+        ann.send({"t": "walk", "c": "rome", "x": 432, "z": 31, "yaw": 0, "s": 3})
+        await asyncio.sleep(0.3)
+        boss.send({"t": "admin", "a": "who"})
+        who = {w["name"]: w for w in (await boss.until(lambda m: m["t"] == "adminwho"))["who"]}
+        self.assertEqual((who["Ann"]["where_city"], who["Ann"]["where_place"], who["Ann"]["where_doing"]), ("Rome", "at The Colosseum", "walking about"))
+        self.assertEqual(who["Ann"]["where_xz"], "432, 31")
+        self.assertEqual((who["Menu"]["where_city"], who["Menu"]["where_doing"]), ("-", "in the menus"))
+        ann.send({"t": "walk", "c": "delhi", "x": 6000, "z": 1, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.3)
+        boss.send({"t": "admin", "a": "who"})
+        who = {w["name"]: w for w in (await boss.until(lambda m: m["t"] == "adminwho"))["who"]}
+        self.assertEqual((who["Ann"]["where_city"], who["Ann"]["where_place"]), ("Old Delhi", "at Lahori Gate"))
+        self.assertEqual(who["Ann"]["where_xz"], "0, 1")                                   # Delhi's x counts from its Lahori Gate
+
+    async def test_the_chat_can_sing_a_song(self):
+        server.SING_GAP = 0.15
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "chat", "text": "/songs"})
+        self.assertIn("row", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "Songs" in m["text"]))["text"])
+        a.send({"t": "chat", "text": "/sing nonsense"})
+        self.assertIn("do not know", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "know" in m["text"]))["text"])
+        a.send({"t": "chat", "text": "/sing row"})
+        lines = [(await b.until(lambda m: m["t"] == "chat" and m.get("sing")))["text"] for _ in range(4)]
+        self.assertEqual(lines[0], "\u266a Row, row, row your boat, \u266a")
+        self.assertIn("Life is but a dream", lines[3])
+        await asyncio.sleep(1.2)
+        a.send({"t": "chat", "text": "/sing legion"})                                 # too soon after the last song
+        self.assertIn("rest", (await a.until(lambda m: m["t"] == "chat" and m.get("sys") and "rest" in m["text"]))["text"])
+
     async def test_duel_block_cuts_damage_and_range_is_checked(self):
         a, b = await self.start_duel()
         a.send({"t": "swing"})                           # far away: a miss, no damage
@@ -568,7 +607,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(server.clean_ship(None)["port"]), 3)                  # the default: three a side
         c = server.clean_ship({"type": "canoe", "port": [True] * 7, "star": [True] * 7})
         self.assertEqual((sum(c["port"]), sum(c["star"])), (1, 1))                 # a canoe only has the middle spot on each side
-        self.assertEqual([len(v["ports"]) + len(v["stars"]) for v in server.NAVAL_TYPES.values()], [1, 2, 4, 6, 8, 10, 12, 14])   # every boat holds a different number
+        counts = [len(v["ports"]) + len(v["stars"]) for v in server.NAVAL_TYPES.values()]
+        self.assertEqual(sorted(set(counts)), [1, 2, 4, 6, 8, 10, 12, 14])                      # boats hold from one cannon to fourteen
+        self.assertEqual(len(server.NAVAL_TYPES), 20)                                            # the old eight and twelve motorboats, sailboats and other craft
+        self.assertEqual(server.clean_ship({"type": "yacht"})["type"], "yacht")
 
     async def test_naval_players_bring_their_own_ships(self):
         server.CFG["naval_wait"] = 0.6

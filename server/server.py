@@ -226,6 +226,7 @@ class Conn:
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
+        self.singing, self.sang_at = None, -1e9    # the song they are singing in the chat, and when they last started one
         self.fest_t = 0.0          # when they last put a festival lamp or lantern down
         self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
@@ -772,6 +773,19 @@ NAVAL_TYPES = {
     "galley": {"hp": 100, "scale": 0.9, "max": 6.6, "hw": 1.5, "lenK": 1.0, "ports": (0, 2, 4, 6), "stars": (0, 2, 4, 6)},
     "trireme": {"hp": 130, "scale": 1.0, "max": 5.8, "hw": 1.5, "lenK": 1.0, "ports": (0, 1, 3, 5, 6), "stars": (0, 1, 3, 5, 6)},
     "quinquereme": {"hp": 175, "scale": 1.15, "max": 4.8, "hw": 1.5, "lenK": 1.0, "ports": (0, 1, 2, 4, 5, 6), "stars": (0, 1, 2, 4, 5, 6)},
+    # motorboats, sailboats and other modern craft (the same numbers as shipyard.js)
+    "rowboat": {"hp": 40, "scale": 0.55, "max": 5, "hw": 0.9, "lenK": 0.6, "ports": (3,), "stars": ()},
+    "jon": {"hp": 55, "scale": 0.6, "max": 7.4, "hw": 0.9, "lenK": 0.7, "ports": (3,), "stars": (3,)},
+    "pwc": {"hp": 25, "scale": 0.45, "max": 12, "hw": 0.55, "lenK": 0.45, "ports": (3,), "stars": ()},
+    "bowrider": {"hp": 80, "scale": 0.7, "max": 11, "hw": 1.2, "lenK": 0.85, "ports": (2, 4), "stars": (2, 4)},
+    "console": {"hp": 90, "scale": 0.75, "max": 10, "hw": 1.25, "lenK": 0.9, "ports": (1, 3, 5), "stars": (1, 3, 5)},
+    "pontoon": {"hp": 110, "scale": 0.9, "max": 4.4, "hw": 1.7, "lenK": 0.9, "ports": (1, 2, 4, 5), "stars": (1, 2, 4, 5)},
+    "sloop": {"hp": 85, "scale": 0.8, "max": 7, "hw": 1.1, "lenK": 0.95, "ports": (2, 4), "stars": (2, 4)},
+    "catamaran": {"hp": 100, "scale": 0.85, "max": 9, "hw": 1.9, "lenK": 0.9, "ports": (1, 3, 5), "stars": (1, 3, 5)},
+    "cruiser": {"hp": 120, "scale": 0.95, "max": 8, "hw": 1.4, "lenK": 1.05, "ports": (0, 2, 4, 6), "stars": (0, 2, 4, 6)},
+    "houseboat": {"hp": 150, "scale": 1, "max": 2.8, "hw": 2, "lenK": 1, "ports": (0, 1, 3, 5, 6), "stars": (0, 1, 3, 5, 6)},
+    "trawler": {"hp": 160, "scale": 1.05, "max": 4.6, "hw": 1.5, "lenK": 1.1, "ports": (0, 1, 2, 4, 5), "stars": (0, 1, 2, 4, 5)},
+    "yacht": {"hp": 200, "scale": 1.2, "max": 8.5, "hw": 1.5, "lenK": 1.25, "ports": (0, 1, 2, 4, 5, 6), "stars": (0, 1, 2, 4, 5, 6)},
     "battleship": {"hp": 260, "scale": 1.4, "max": 4.2, "hw": 2.1, "lenK": 1.3, "ports": tuple(range(7)), "stars": tuple(range(7))},
 }
 for _t in NAVAL_TYPES.values():
@@ -1215,6 +1229,98 @@ async def matchmaker():
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# where people are (for the admin's list): the sights and places of each city, from landmarks.js and delhi-data.js: (name, x, z, radius)
+
+PLACES = {
+    "rome": [
+    ('The Carcer (Mamertine Prison)', -112, -30, 28),
+    ('Temple of Hercules Victor', -430, 75, 30),
+    ('Theatre of Pompey', -690, -125, 70),
+    ('The Circus Office', -205, 98, 14),
+    ('The Harbour (Portus)', 50, 82, 40),
+    ('The Via Domus', 250, -40, 30),
+    ('The Hypogeum Jobs', 318, 66, 16),
+    ('The Market', 170, 62, 26),
+    ('a house by the Colosseum road', 255, 50, 9),
+    ('The Roman Forum', 30, 0, 95),
+    ('The Colosseum', 430, 30, 125),
+    ('Colossus of the Sun', 288, -36, 60),
+    ('Arch of Titus', 200, 0, 38),
+    ('Curia Julia', -10, -52, 42),
+    ('The Rostra', -72, -16, 30),
+    ('Temple of Saturn', -105, -52, 40),
+    ('Basilica Julia', -40, 55, 58),
+    ('Temple of Castor and Pollux', 30, 55, 34),
+    ('Temple of Vesta', 78, 52, 26),
+    ('The Golden Milestone', -58, 6, 16),
+    ('The Palatine Hill', 40, 260, 105),
+    ('Temple of Jupiter Optimus Maximus', -235, -50, 70),
+    ('Circus Maximus', -230, 430, 190),
+    ("Trajan's Column", -150, -360, 45),
+    ('Servian Wall', 120, -465, 80),
+    ('The Pantheon', -480, -380, 55),
+    ('the Armourer in the arena', 430, 46.5, 8),
+],
+    "delhi": [
+    ("a player's plot off Chandni Chowk", 5900, -50, 22),
+    ('Lahori Gate', 6000, 0, 40),
+    ('Chhatta Chowk and the Naubat Khana', 6045, 0, 42),
+    ('Diwan-i-Aam', 6158, 0, 46),
+    ('Diwan-i-Khas', 6280, -88, 32),
+    ('Rang Mahal and the Stream of Paradise', 6280, 28, 38),
+    ('Muthamman Burj', 6296, -30, 26),
+    ('Chandni Chowk', 5690, 0, 70),
+    ('Begum ki Serai', 5760, -62, 48),
+    ('Katra Neel', 5580, -24, 30),
+    ('Fatehpuri Masjid', 5340, 0, 60),
+    ('Jama Masjid', 5760, 270, 95),
+    ('India Gate', 5900, 900, 70),
+    ('Kartavya Path', 5720, 900, 60),
+    ('Chandni Chowk Metro Station', 5788, 30, 22),
+    ('The Akhara', 5955, 35, 12),
+    ('The Race Start', 5428, 0, 18),
+    ('The Cannon', 6004, 45, 10),
+    ('The Kite Stall', 5982, -42, 9),
+    ('The Pachisi Pavilion', 6112, -45, 10),
+    ('The Bazaar Stall', 5648, -12, 9),
+    ('The Market', 5950, 60, 26),
+    ('The Chaat Stall', 5785, 13, 8),
+],
+}
+CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle"}
+
+
+def where_is(c):
+    """Where a connected player is, in words an admin can use: the city, the nearest sight, what they are doing, and the coordinates."""
+    if c.room:
+        what = ROOM_WORDS.get(getattr(c.room, "kind", ""), "in a game")
+    elif c.heist:
+        what = "robbing a house" if c.heist["thief"] is c else "chasing a thief"
+    elif c.queue:
+        what = "waiting for " + QUEUE_WORDS.get(c.queue, "a game")
+    elif c.veh:
+        what = "riding: " + str(c.veh)
+    elif c.city:
+        what = "walking about" if now() - c.walk_at < 6 else "standing still (or away)"
+    else:
+        what = "in the menus"
+    place = ""
+    if c.city in PLACES and not c.room:
+        best = None
+        for name, x, z, r in PLACES[c.city]:
+            d = math.hypot(c.px - x, c.pz - z)
+            if d <= r + 30 and (best is None or d - r < best[0]):
+                best = (d - r, name)
+        place = ("at " if best and best[0] <= 0 else "near ") + best[1] if best else "out in the streets"
+    elif c.room:
+        place = "in the arena"
+    x, z = (round(c.px - 6000) if c.city == "delhi" else round(c.px)), round(c.pz)
+    return {"city": CITY_NAMES.get(c.city, "-"), "place": place, "doing": what, "xz": ("%d, %d" % (x, z)) if c.city and not c.room else ""}
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # the open world: players who are just walking around can see each other (same city, within earshot)
 
 WORLD_RANGE = 260.0     # metres: you see people this close
@@ -1505,9 +1611,52 @@ def on_chat(conn, m):
     broadcast_chat(entry)
 
 
+SONGS = {   # traditional songs (long out of copyright) and a few new ones for the game
+    "row": ["Row, row, row your boat,", "Gently down the stream.", "Merrily, merrily, merrily, merrily,", "Life is but a dream."],
+    "twinkle": ["Twinkle, twinkle, little star,", "How I wonder what you are!", "Up above the world so high,", "Like a diamond in the sky."],
+    "grace": ["Amazing grace, how sweet the sound,", "That saved a wretch like me.", "I once was lost, but now am found,", "Was blind, but now I see."],
+    "auldlangsyne": ["Should auld acquaintance be forgot,", "And never brought to mind?", "Should auld acquaintance be forgot,", "And auld lang syne!"],
+    "jingle": ["Dashing through the snow,", "In a one-horse open sleigh,", "O'er the fields we go,", "Laughing all the way!"],
+    "legion": ["Marching, marching to the Forum,", "Shields held high and spirits bright,", "Rome is ours and Rome is mighty,", "Sing it out into the night!"],
+    "gladiator": ["Sand beneath and sun above,", "Swords of steel and hearts of fire,", "The crowd is roaring out our names,", "Rise up, rise up, higher and higher!"],
+    "delhi": ["Chai, chai, garam chai,", "Chandni Chowk in the morning light,", "Jalebi sweet and kites on high,", "Delhi, Delhi, shining bright!"],
+}
+SING_GAP = 2.4          # seconds between the lines of a song
+SING_COOLDOWN = 25.0    # seconds before the same person can start another one
+
+
+async def sing_task(conn, lines):
+    try:
+        for line in lines:
+            if conn.closed:
+                return
+            broadcast_chat({"t": "chat", "id": conn.id, "name": conn.name, "text": "\u266a " + line + " \u266a", "sing": 1, "adm": 1 if conn.admin else 0})
+            await asyncio.sleep(SING_GAP)
+    finally:
+        conn.singing = None
+
+
+def start_song(conn, which):
+    t = now()
+    if conn.singing and not conn.singing.done():
+        return say_to(conn, "You are already singing. Wait for the end of the song.")
+    if t - conn.sang_at < SING_COOLDOWN:
+        return say_to(conn, "Give your voice a rest for a moment, then sing again.")
+    key = which.strip().lower().replace(" ", "")
+    if key and key not in SONGS:
+        return say_to(conn, "I do not know that song. Type /songs to see the ones I know.")
+    key = key or random.choice(list(SONGS))
+    conn.sang_at = t
+    conn.singing = asyncio.ensure_future(sing_task(conn, SONGS[key]))
+
+
 def chat_command(conn, text):
     head, _, rest = text[1:].partition(" ")
     cmd = head.lower()
+    if cmd in ("sing", "song"):
+        return start_song(conn, rest)
+    if cmd == "songs":
+        return say_to(conn, "Songs: " + ", ".join(SONGS) + ". Type /sing and a name (or just /sing for a surprise).")
     if cmd in ("w", "whisper", "msg"):
         target, msg = match_name(rest)
         if not target:
@@ -1520,14 +1669,14 @@ def chat_command(conn, text):
             conn.send(entry)
         return
     if cmd == "help":
-        say_to(conn, "Chat: just type. /w name message whispers to one person.")
+        say_to(conn, "Chat: just type. /w name message whispers to one person. /sing sings a song, /songs lists them.")
         if conn.admin:
             say_to(conn, "Admin: /who, /kick name, /mute name [minutes], /unmute name, /say message")
         return
     if not conn.admin:
         return say_to(conn, "Unknown command. Type /help.")
     if cmd == "who":
-        names = ["%s (%s)" % (c.name, c.city or "menu") for c in CONNS if c.hello and not c.closed]
+        names = ["%s (%s, %s)" % (c.name, where_is(c)["city"], (where_is(c)["place"] + ", " if where_is(c)["place"] else "") + where_is(c)["doing"]) for c in CONNS if c.hello and not c.closed]
         return say_to(conn, "Online (%d): %s" % (len(names), ", ".join(names) or "nobody"))
     if cmd == "say" and rest.strip():
         entry = {"t": "chat", "sys": 1, "text": "Announcement: " + rest.strip()[:CHAT_MAX]}
@@ -1561,8 +1710,8 @@ def on_admin(conn, m):
         return
     a = m.get("a")
     if a == "who":
-        conn.send({"t": "adminwho", "who": [{"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
-                                              "muted": c.muted_until > now(), "admin": c.admin} for c in CONNS if c.hello and not c.closed]})
+        conn.send({"t": "adminwho", "who": [dict({"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
+                                                  "muted": c.muted_until > now(), "admin": c.admin}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed]})
         return
     target = next((c for c in CONNS if c.id == m.get("id") and c.hello), None)
     if not target or target.admin:

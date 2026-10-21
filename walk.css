@@ -551,6 +551,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #chat-log li b.adm { color: #ffb347; }
 #chat-log li.sys { color: #a9c2dc; font-style: italic; }
 #chat-log li.whisper { background: rgba(70,40,90,.7); }
+#chat-log li.sing { background: rgba(110,70,10,.72); color: #ffe8a8; font-style: italic; }
 #chat-form { display: flex; gap: 6px; margin-top: 6px; pointer-events: auto; }
 #chat-form[hidden] { display: none; }
 #chat-input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(226,185,85,.6); background: rgba(20,15,10,.9); color: #f3ead7; font: inherit; }

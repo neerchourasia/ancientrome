@@ -96,6 +96,67 @@ const Naval = (() => {
       part(new THREE.BoxGeometry(hw * 1.5, 0.15, 2.0), band, 0, 2.35, -L / 4);
       part(new THREE.BoxGeometry(0.9, 0.4, 0.9), lambert(0x6a8a9a), -hw * 0.5, 1.2, L / 4);          // a crate of fish
       part(new THREE.BoxGeometry(1.4, 0.05, 1.0), lambert(0x8a7a5a), hw * 0.5, 1.05, L / 5);          // nets
+    } else if (sh === "modern") {          // motorboats, sailboats, pontoons, catamarans, houseboats, yachts and jet skis: built from def.look
+      const lk = def.look || {}, w = hw * 2, white = lambert(0xf2f2ee), glass = lambert(0x6a8aa0), seat = lambert(0x8a6a4a), eng = lambert(0x2a2d32), chrome = lambert(0xb8bcc2);
+      const bowLen = lk.flat ? 0 : Math.max(1.4, L * 0.28);
+      if (lk.tubes) {                                                 // a pontoon: a flat deck on two aluminium tubes
+        for (const sx of [-1, 1]) {
+          const t = part(new THREE.CylinderGeometry(0.42, 0.42, L * 0.95, 12), chrome, sx * hw * 0.72, 0.25, 0); t.rotation.x = Math.PI / 2;
+          const nose = part(new THREE.SphereGeometry(0.42, 10, 8), chrome, sx * hw * 0.72, 0.25, L * 0.475); nose.scale.z = 1.6;
+        }
+        hull = part(new THREE.BoxGeometry(w, 0.25, L * 0.92), wood, 0, 0.8, 0);
+        for (const sx of [-1, 1]) part(new THREE.BoxGeometry(0.08, 0.7, L * 0.9), white, sx * (hw - 0.05), 1.3, 0);   // railings
+        for (const sz of [-1, 1]) part(new THREE.BoxGeometry(1.1, 0.35, 1.0), seat, 0, 1.1, sz * L * 0.12);           // benches
+        for (const [px, pz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) part(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 6), dark, px * (hw - 0.2), 2.0, pz * L * 0.28);
+        part(new THREE.BoxGeometry(w - 0.2, 0.12, L * 0.6), band, 0, 3.05, 0);                                       // the canopy in the boat's colour
+      } else if (lk.twin) {                                          // a catamaran: two slim hulls joined by a deck, with a sail
+        for (const sx of [-1, 1]) {
+          part(new THREE.BoxGeometry(0.9, 0.8, L), wood, sx * (hw - 0.45), 0.3, 0);
+          part(wedge(0.45, L * 0.2, 0.8), wood, sx * (hw - 0.45), -0.1, L / 2);
+        }
+        hull = part(new THREE.BoxGeometry(w - 0.4, 0.15, L * 0.62), white, 0, 0.85, -L * 0.04);                    // the deck between them
+        part(new THREE.BoxGeometry(w - 1.2, 0.5, 1.4), white, 0, 1.2, -L * 0.1);                                      // a little cabin
+      } else if (lk.jet) {                                           // a jet ski: a low body with a seat, handlebars and a rider
+        hull = part(new THREE.BoxGeometry(w, 0.5, L), wood, 0, 0.3, 0);
+        part(wedge(w / 2, L * 0.3, 0.5), wood, 0, 0.05, L / 2);
+        part(new THREE.BoxGeometry(w * 0.8, 0.3, L * 0.4), seat, 0, 0.65, -L * 0.15);
+        part(new THREE.BoxGeometry(w * 1.0, 0.08, 0.1), dark, 0, 1.1, L * 0.1);                                        // handlebars
+        part(new THREE.CylinderGeometry(0.17, 0.2, 0.7, 8), lambert(0xd9791f), 0, 1.15, -L * 0.15);
+        part(new THREE.SphereGeometry(0.16, 8, 6), skin, 0, 1.65, -L * 0.15);
+      } else {                                                       // a single-hulled boat
+        const hh = lk.house ? 0.8 : 1.0;
+        hull = part(new THREE.BoxGeometry(w, hh, L), lk.flat ? wood : lambert(hullC), 0, 0.35, 0);
+        if (bowLen > 0) part(wedge(hw, bowLen, hh), wood, 0, -0.15, L / 2);                                           // the pointed bow (a flat boat has a square one)
+        part(new THREE.BoxGeometry(w + 0.15, 0.18, L - 0.3), lk.flat ? dark : white, 0, 0.85, 0);                    // the deck
+        part(new THREE.BoxGeometry(w + 0.1, 0.1, L * 0.96), band, 0, 0.62, 0);                                        // a stripe in the boat's colour
+        if (lk.cabin) {                                                                                               // a cabin with windows
+          part(new THREE.BoxGeometry(w * 0.78, 1.3, L * 0.34), white, 0, 1.5, -L * 0.1);
+          part(new THREE.BoxGeometry(w * 0.8, 0.12, L * 0.36), band, 0, 2.2, -L * 0.1);
+          for (const sx of [-1, 1]) part(new THREE.BoxGeometry(0.05, 0.5, L * 0.28), glass, sx * w * 0.395, 1.6, -L * 0.1);
+          part(new THREE.BoxGeometry(w * 0.7, 0.5, 0.05), glass, 0, 1.6, L * 0.07);
+          if (lk.fly) { part(new THREE.BoxGeometry(w * 0.55, 0.9, L * 0.2), white, 0, 2.7, -L * 0.14); part(new THREE.BoxGeometry(w * 0.6, 0.1, L * 0.22), band, 0, 3.2, -L * 0.14); part(new THREE.BoxGeometry(w * 0.5, 0.4, 0.05), glass, 0, 2.8, -L * 0.03); }
+          if (lk.derrick) { part(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 6), dark, 0, 2.5, L * 0.22); const b = part(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 6), dark, 0, 3.4, L * 0.32); b.rotation.x = 0.9; }
+        }
+        if (lk.house) {                                                                                               // a houseboat: a boxy home with a roof and a veranda
+          part(new THREE.BoxGeometry(w * 0.8, 1.8, L * 0.6), white, 0, 1.7, -L * 0.04);
+          part(new THREE.BoxGeometry(w * 0.9, 0.2, L * 0.7), band, 0, 2.7, -L * 0.04);
+          for (const sx of [-1, 1]) part(new THREE.BoxGeometry(0.05, 0.6, L * 0.5), glass, sx * w * 0.405, 1.8, -L * 0.04);
+          part(new THREE.BoxGeometry(w * 0.9, 0.9, 0.08), lambert(0x6a4a2a), 0, 1.3, L * 0.34);                     // the porch rail
+        }
+        if (lk.seats) { part(new THREE.BoxGeometry(w * 0.8, 0.4, 1.0), seat, 0, 1.15, L * 0.25); part(new THREE.BoxGeometry(w * 0.8, 0.7, 0.1), seat, 0, 1.5, L * 0.18); part(new THREE.BoxGeometry(w * 0.85, 0.5, 0.06), glass, 0, 1.6, L * 0.06); }   // the open seating up front and a windscreen
+        if (lk.console) {                                                                                             // a steering console in the middle with a T-top
+          part(new THREE.BoxGeometry(0.9, 1.1, 0.8), white, 0, 1.45, -L * 0.05);
+          part(new THREE.BoxGeometry(w * 0.8, 0.1, 1.4), band, 0, 2.95, -L * 0.05);
+          for (const sx of [-1, 1]) part(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), chrome, sx * w * 0.38, 2.2, -L * 0.05);
+        }
+        if (lk.rows) {                                                                                                // a rower and a pair of oars
+          part(new THREE.CylinderGeometry(0.2, 0.25, 0.7, 8), lambert(0x8a3a2a), 0, 1.25, -L * 0.1);
+          part(new THREE.SphereGeometry(0.2, 8, 6), skin, 0, 1.8, -L * 0.1);
+          for (const sx of [-1, 1]) { const o = part(new THREE.CylinderGeometry(0.03, 0.03, 2.0, 6), dark, sx * (hw + 0.5), 1.3, -L * 0.1); o.rotation.z = sx * 0.9; }
+        }
+        if (lk.sail && !lk.rows) part(new THREE.BoxGeometry(w * 0.7, 0.5, L * 0.3), white, 0, 1.2, -L * 0.2);       // a cabin hatch
+        if (lk.outboard) { part(new THREE.BoxGeometry(0.55, 0.9, 0.45), eng, 0, 0.9, -L / 2 - 0.15); if (lk.console) { part(new THREE.BoxGeometry(0.55, 0.9, 0.45), eng, 0.7, 0.9, -L / 2 - 0.15); } }   // the outboard engine at the stern
+      }
     } else { // battleship
       hull = part(new THREE.BoxGeometry(hw * 2, 1.5, L), wood, 0, 0.5, 0);
       part(wedge(hw, 3.6, 1.5), wood, 0, -0.25, L / 2);
@@ -119,7 +180,7 @@ const Naval = (() => {
     }
     const cannons = [];
     const layout = def.ports ? [[1, def.ports, def.paims || []], [-1, def.stars, def.saims || []]] : [[1, [1, 0, 1, 0, 1, 0, 0], []], [-1, [1, 0, 1, 0, 1, 0, 0], []]];
-    const sideX = hw + 0.1, cy = sh === "kayak" ? 0.7 : sh === "canoe" ? 0.85 : sh === "battleship" ? 1.7 : 1.3;
+    const sideX = hw + 0.1, cy = sh === "kayak" ? 0.7 : sh === "canoe" ? 0.85 : sh === "battleship" ? 1.7 : sh === "modern" ? ((def.look && (def.look.jet || def.look.rows)) ? 0.95 : 1.2) : 1.3;
     for (const [side, slots, aims] of layout) slots.forEach((on, i) => {
       if (!on) return;
       const cz = SLOT_Z[i] * K, aim = Number.isInteger(aims[i]) ? aims[i] : 2, th = aim * Math.PI / 4;

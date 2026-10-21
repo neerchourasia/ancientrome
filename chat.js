@@ -14,7 +14,10 @@ const Chat = (() => {
   function add(entry) {
     const li = document.createElement("li");
     if (entry.sys) { li.className = "sys"; li.textContent = entry.text; }
-    else {
+    else if (entry.sing) {                                           // a line of a song: shown in the chat and over the singer's head
+      li.className = "sing"; const who = document.createElement("b"); who.textContent = entry.name; li.append(who, document.createTextNode(" " + entry.text));
+      singBubble(entry);
+    } else {
       const who = document.createElement("b");
       who.textContent = entry.w ? (entry.name === Character.name && entry.to ? `You → ${entry.to}` : `${entry.name} (whisper)`) : entry.name;
       if (entry.adm) { who.className = "adm"; who.textContent = "★ " + who.textContent; }
@@ -27,6 +30,15 @@ const Chat = (() => {
     refresh();
     $c("chat-log").scrollTop = 1e6;
     if (!entry.sys && entry.name !== Character.name && typeof Sfx !== "undefined") Sfx.play("beep");
+  }
+
+  // a singing player's line floats over their head (yours over you, other players' over their figures when they are in view)
+  function singBubble(entry) {
+    try {
+      if (entry.name === Character.name) { Speech.say(player, entry.text, 2.4); return; }
+      const p = Online.peerList().find((q) => q.name === entry.name && q.x !== null);
+      if (p) Speech.say({ x: p.x, z: p.z }, entry.text, 2.4);
+    } catch (e) { /* no bubble */ }
   }
 
   function history(list) {
@@ -76,7 +88,7 @@ const Chat = (() => {
     $c("chat-input").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeChat(); } });
     $c("btn-chat").addEventListener("click", () => (open ? closeChat() : openChat()));
     timer = setInterval(refresh, 1500);
-    add({ sys: 1, text: "Press Enter to chat. /help lists the commands." });
+    add({ sys: 1, text: "Press Enter to chat. /help lists the commands. /sing sings a song." });
     lines[0].at = performance.now();
   }
 
@@ -119,11 +131,11 @@ const Admin = (() => {
     t.replaceChildren();
     $a("ad-online-n").textContent = `${list.length} online now`;
     const head = t.insertRow();
-    for (const h of ["Name", "Where", "Account", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const h of ["Name", "City", "Place", "Doing", "Coordinates", "Account", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const p of list) {
       const r = t.insertRow();
       cell(r, p.name + (p.admin ? " ★" : "") + (p.muted ? " (muted)" : ""));
-      cell(r, p.room ? p.room : p.city || "menu"); cell(r, p.acct ? "yes" : "guest");
+      cell(r, p.where_city || p.city || "menu"); cell(r, p.where_place || ""); cell(r, p.where_doing || p.room || ""); cell(r, p.where_xz || ""); cell(r, p.acct ? "yes" : "guest");
       const act = r.insertCell();
       if (!p.admin) {
         button(act, p.muted ? "Unmute" : "Mute 10 min", () => { Online.navalSend({ t: "admin", a: p.muted ? "unmute" : "mute", id: p.id, min: 10 }); setTimeout(loadOnline, 400); });
