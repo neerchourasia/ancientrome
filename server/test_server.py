@@ -530,6 +530,35 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             room.step(0.05)
         self.assertTrue(b1.dead or b1.hp < 5)
 
+    async def test_naval_practice_ships_charge_and_ram_you(self):
+        server.CFG["bot_wait"] = 0.3
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "naval", "bot": True})
+        await a.until(lambda m: m["t"] == "match", timeout=4)
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.start_at = 0
+        me, b1, b2 = room.ships
+        rams = []
+        real_hurt = room.hurt
+
+        def spy(s, dmg, x, y, z, by=None):
+            if dmg == server.NAVAL_RAM_DMG and by is not None and by.bot and s is me:
+                rams.append(by.i)
+            return real_hurt(s, dmg, x, y, z, by)
+        room.hurt = spy
+        self.place(me, 0, 0, 0.0)
+        self.place(b1, 18, 0, -math.pi / 2)       # a practice ship off to the side
+        self.place(b2, -18, 0, math.pi / 2)
+        b1.ai, b1.ai_t = "ram", 9.0
+        b2.ai, b2.ai_t = "ram", 9.0
+        for _ in range(500):                      # 25 seconds with a captain who does nothing
+            me.hp = max(me.hp, 60)                # stay afloat so the whole charge can be seen
+            me.v = 0.0
+            room.step(0.05)
+        self.assertTrue(rams, "a practice ship should ram you bow first")
+        self.assertLessEqual(len(rams), 14)       # and not over and over: a ram, then they back away
+
     async def test_naval_leaving_sinks_your_ship_and_the_others_play_on_or_win(self):
         ws, ms, room = await self.start_naval(3)
         ws[0].w.close()

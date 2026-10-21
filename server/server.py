@@ -821,6 +821,7 @@ class Ship:
         self.cannons = {1: [(NAVAL_SLOT_Z[i] * self.lenK, d["pa"][i]) for i in range(NAVAL_SLOTS) if d["port"][i]], -1: [(NAVAL_SLOT_Z[i] * self.lenK, d["sa"][i]) for i in range(NAVAL_SLOTS) if d["star"][i]]}   # (position along the ship, aim)
         self.cd = {1: 0.3, -1: 0.3}
         self.ram = 0.0
+        self.ai, self.ai_t = "kite", random.random() * 3.0   # what a practice ship is doing: ram (bow first at you), back (away after a ram), or kite (circle and fire broadsides)
         self.dead_at = None                               # when it sank (for the final order)
         self.last_t = None
         self.queue = []                                   # cannons waiting to go off: [delay, side]
@@ -973,15 +974,29 @@ class NavalRoom:
         dx, dz = t.x - b.x, t.z - b.z
         dist = math.hypot(dx, dz) or 1.0
         bearing = math.atan2(dx, dz)
-        if dist > 12:
-            want = bearing
+        # practice ships do not only circle and shoot: they also charge and ram you bow first, then back away for a moment
+        b.ai_t -= dt
+        if b.ai == "ram" and b.ram > 0:
+            b.ai, b.ai_t = "back", 2.5
+        elif b.ai_t <= 0:
+            if b.ai == "ram":
+                b.ai, b.ai_t = "kite", 3.0 + random.random() * 3.0
+            elif random.random() < 0.7:
+                b.ai, b.ai_t = "ram", 6.0 + random.random() * 3.0
+            else:
+                b.ai, b.ai_t = "kite", 3.0 + random.random() * 3.0
+        if b.ai == "ram":
+            want, thr = bearing, 1.0
+        elif b.ai == "back" and dist < 14:
+            want, thr = bearing + math.pi, 0.9
+        elif dist > 12:
+            want, thr = bearing, 1.0
         elif dist < 6:
-            want = bearing + math.pi
+            want, thr = bearing + math.pi, 0.8
         else:
             a1, a2 = bearing + math.pi / 2, bearing - math.pi / 2
-            want = a1 if abs(ang_diff(b.yaw, a1)) < abs(ang_diff(b.yaw, a2)) else a2
+            want, thr = (a1 if abs(ang_diff(b.yaw, a1)) < abs(ang_diff(b.yaw, a2)) else a2), 0.45
         turn = max(-1.0, min(1.0, ang_diff(b.yaw, want) * 2))
-        thr = 1.0 if dist > 12 else 0.8 if dist < 6 else 0.45
         self.move(b, dt, thr, turn)
         if dist < 16:
             fx, fz = ship_fwd(b)
