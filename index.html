@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=247">
+  <link rel="stylesheet" href="walk.css?v=249">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=247"></script>
+  <script src="boot.js?v=249"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -38,7 +38,7 @@
     <div class="top-right">
       <canvas id="minimap" width="200" height="200" title="Click to open the full map"></canvas>
       <div class="buttons collapsed">
-        <button id="btn-menu" type="button" aria-expanded="false" aria-label="Menu" title="Menu"><svg class="spark" viewBox="-335 -335 670 670" aria-hidden="true" focusable="false"><defs><path id="spk" d="M0 -1 Q0.22 -0.22 1 0 Q0.22 0.22 0 1 Q-0.22 0.22 -1 0 Q-0.22 -0.22 0 -1Z"/></defs><g fill="#ffd666"><use href="#spk" transform="translate(0 -248) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(250 0) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(-250 0) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(0 248) rotate(0) scale(62)" opacity="1"/><use href="#spk" transform="translate(-175 -175) rotate(0) scale(46)" opacity="1"/><use href="#spk" transform="translate(175 -175) rotate(0) scale(46)" opacity="1"/><use href="#spk" transform="translate(-175 175) rotate(0) scale(46)" opacity="0.55"/><use href="#spk" transform="translate(175 175) rotate(0) scale(46)" opacity="0.55"/><use href="#spk" transform="translate(-62 -148) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(63 -148) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(-153 -63) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(153 -63) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(-153 67) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(153 67) rotate(0) scale(26)" opacity="1"/><use href="#spk" transform="translate(-70 157) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(65 157) rotate(0) scale(27)" opacity="1"/><use href="#spk" transform="translate(-110 -288) rotate(-14) scale(30)" opacity="0.85"/><use href="#spk" transform="translate(122 -288) rotate(14) scale(30)" opacity="0.8"/><use href="#spk" transform="translate(-298 -118) rotate(-14) scale(30)" opacity="0.4"/><use href="#spk" transform="translate(300 -118) rotate(14) scale(30)" opacity="0.4"/><use href="#spk" transform="translate(-305 112) rotate(-14) scale(30)" opacity="0.95"/><use href="#spk" transform="translate(300 117) rotate(14) scale(30)" opacity="0.9"/><use href="#spk" transform="translate(-130 277) rotate(-14) scale(30)" opacity="0.9"/><use href="#spk" transform="translate(110 277) rotate(14) scale(30)" opacity="0.6"/></g></svg><span class="mi">☰</span></button>
+        <button id="btn-menu" type="button" aria-expanded="false" aria-label="Menu" title="Menu"><svg class="spark" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><defs><radialGradient id="fbOuter" cx="50%" cy="50%" r="50%"><stop offset=".34" stop-color="#fffbe4"/><stop offset=".7" stop-color="#ffeeb0"/><stop offset=".87" stop-color="#f6b640"/><stop offset=".96" stop-color="#d27422"/><stop offset="1" stop-color="#8a3510"/></radialGradient><radialGradient id="fbCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb04a"/><stop offset=".25" stop-color="#d9741f"/><stop offset=".62" stop-color="#6b250a"/><stop offset="1" stop-color="#220a03"/></radialGradient><filter id="fbRough" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="3" seed="7" result="n"><animate attributeName="baseFrequency" values=".045;.056;.045" dur="3.5s" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="fbSoft"><feGaussianBlur stdDeviation=".6"/></filter></defs><g filter="url(#fbRough)"><circle cx="50" cy="50" r="45" fill="url(#fbOuter)"/><circle cx="50" cy="50" r="19" fill="url(#fbCore)"/></g><g stroke="#f0953a" stroke-width=".7" opacity=".55" filter="url(#fbSoft)"><line x1="56.0" y1="50.0" x2="69.0" y2="50.0"/><line x1="55.5" y1="52.4" x2="67.4" y2="57.7"/><line x1="54.6" y1="53.9" x2="64.6" y2="62.2"/><line x1="52.6" y1="55.4" x2="58.3" y2="67.1"/><line x1="51.0" y1="55.9" x2="53.3" y2="68.7"/><line x1="48.5" y1="55.8" x2="45.4" y2="68.4"/><line x1="47.0" y1="55.2" x2="40.5" y2="66.5"/><line x1="45.1" y1="53.5" x2="34.6" y2="61.2"/><line x1="44.4" y1="52.1" x2="32.1" y2="56.5"/><line x1="44.0" y1="49.6" x2="31.0" y2="48.7"/><line x1="44.4" y1="47.9" x2="32.1" y2="43.5"/><line x1="45.7" y1="45.8" x2="36.3" y2="36.8"/><line x1="47.0" y1="44.8" x2="40.5" y2="33.5"/><line x1="49.4" y1="44.0" x2="48.0" y2="31.1"/><line x1="51.0" y1="44.1" x2="53.3" y2="31.3"/><line x1="53.4" y1="45.0" x2="60.6" y2="34.3"/><line x1="54.6" y1="46.1" x2="64.6" y2="37.8"/><line x1="55.8" y1="48.3" x2="68.3" y2="44.8"/></g></svg><span class="mi">☰</span></button>
         <button id="btn-map" type="button">Map <kbd>M</kbd></button>
         <button id="btn-dirs" type="button">Directions <kbd>G</kbd></button>
         <button id="btn-places" type="button">Places <kbd>P</kbd></button>
@@ -499,51 +499,51 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=247"></script>
-  <script src="delhi-data.js?v=247"></script>
-  <script src="config.js?v=247"></script>
-  <script src="character.js?v=247"></script>
-  <script src="physics.js?v=247"></script>
-  <script src="vitals.js?v=247"></script>
-  <script src="narrator.js?v=247"></script>
-  <script src="audio.js?v=247"></script>
-  <script src="music.js?v=247"></script>
-  <script src="world.js?v=247"></script>
-  <script src="city.js?v=247"></script>
-  <script src="weather.js?v=247"></script>
-  <script src="modern.js?v=247"></script>
-  <script src="delhi.js?v=247"></script>
-  <script src="delhi-games.js?v=247"></script>
-  <script src="home.js?v=247"></script>
-  <script src="spectators.js?v=247"></script>
-  <script src="fight.js?v=247"></script>
-  <script src="nav.js?v=247"></script>
-  <script src="show.js?v=247"></script>
-  <script src="shipyard.js?v=247"></script>
-  <script src="naval.js?v=247"></script>
-  <script src="theatre.js?v=247"></script>
-  <script src="watch.js?v=247"></script>
-  <script src="race.js?v=247"></script>
-  <script src="account.js?v=247"></script>
-  <script src="online.js?v=247"></script>
-  <script src="chat.js?v=247"></script>
-  <script src="social.js?v=247"></script>
-  <script src="gifts.js?v=247"></script>
-  <script src="tax.js?v=247"></script>
-  <script src="pets.js?v=247"></script>
-  <script src="cage.js?v=247"></script>
-  <script src="car.js?v=247"></script>
-  <script src="market.js?v=247"></script>
-  <script src="garage.js?v=247"></script>
-  <script src="dresser.js?v=247"></script>
-  <script src="festival.js?v=247"></script>
-  <script src="harbour.js?v=247"></script>
-  <script src="disease.js?v=247"></script>
-  <script src="jail.js?v=247"></script>
-  <script src="guards.js?v=247"></script>
-  <script src="stalls.js?v=247"></script>
-  <script src="robbery.js?v=247"></script>
-  <script src="jobs.js?v=247"></script>
-  <script src="game.js?v=247"></script>
+  <script src="landmarks.js?v=249"></script>
+  <script src="delhi-data.js?v=249"></script>
+  <script src="config.js?v=249"></script>
+  <script src="character.js?v=249"></script>
+  <script src="physics.js?v=249"></script>
+  <script src="vitals.js?v=249"></script>
+  <script src="narrator.js?v=249"></script>
+  <script src="audio.js?v=249"></script>
+  <script src="music.js?v=249"></script>
+  <script src="world.js?v=249"></script>
+  <script src="city.js?v=249"></script>
+  <script src="weather.js?v=249"></script>
+  <script src="modern.js?v=249"></script>
+  <script src="delhi.js?v=249"></script>
+  <script src="delhi-games.js?v=249"></script>
+  <script src="home.js?v=249"></script>
+  <script src="spectators.js?v=249"></script>
+  <script src="fight.js?v=249"></script>
+  <script src="nav.js?v=249"></script>
+  <script src="show.js?v=249"></script>
+  <script src="shipyard.js?v=249"></script>
+  <script src="naval.js?v=249"></script>
+  <script src="theatre.js?v=249"></script>
+  <script src="watch.js?v=249"></script>
+  <script src="race.js?v=249"></script>
+  <script src="account.js?v=249"></script>
+  <script src="online.js?v=249"></script>
+  <script src="chat.js?v=249"></script>
+  <script src="social.js?v=249"></script>
+  <script src="gifts.js?v=249"></script>
+  <script src="tax.js?v=249"></script>
+  <script src="pets.js?v=249"></script>
+  <script src="cage.js?v=249"></script>
+  <script src="car.js?v=249"></script>
+  <script src="market.js?v=249"></script>
+  <script src="garage.js?v=249"></script>
+  <script src="dresser.js?v=249"></script>
+  <script src="festival.js?v=249"></script>
+  <script src="harbour.js?v=249"></script>
+  <script src="disease.js?v=249"></script>
+  <script src="jail.js?v=249"></script>
+  <script src="guards.js?v=249"></script>
+  <script src="stalls.js?v=249"></script>
+  <script src="robbery.js?v=249"></script>
+  <script src="jobs.js?v=249"></script>
+  <script src="game.js?v=249"></script>
 </body>
 </html>
