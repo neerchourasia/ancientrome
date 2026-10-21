@@ -487,14 +487,14 @@ const Naval = (() => {
       if (p.i !== m.you) s.model.g.add(nameTag(p.name));
       ships[p.i] = s;
     }
-    online = { you: m.you, ships, balls: new Map(), sendT: 0, n: m.players.length, humans: m.players.filter((p) => !p.bot).length, over: false, notice: false };
+    online = { you: m.you, coop: !!m.coop, ships, balls: new Map(), sendT: 0, n: m.players.length, humans: m.players.filter((p) => !p.bot).length, over: false, notice: false };
     me = ships[m.you];
     foes = m.players.filter((p) => p.i !== m.you).map((p) => ships[p.i]);
     camYaw = me.yaw;
     el("naval-hud").classList.add("show");
     Crowd.setCheer(true);
     closePanels();
-    msg("Naumachia! The arena floods... every ship for itself!", 3600);
+    msg(m.coop ? "Naumachia! The arena floods... sail together and sink all the practice ships!" : "Naumachia! The arena floods... every ship for itself!", 3600);
     Sfx.play("horn");
   }
 
@@ -621,6 +621,15 @@ const Naval = (() => {
   function onlineEnd(m) {
     if (!active || !online) return;
     online.over = true;
+    if (m.coop) {                                                  // a crew battle with a friend: the whole crew wins or loses together
+      const prize = m.won ? 70 : 0; Vitals.coins += prize;
+      const why = { cleared: "Every practice ship is sunk. Well sailed, crew!", sunk: "Your whole crew was sunk.", time: "Time ran out.", empty: "Your crewmate left." }[m.reason] || "";
+      stop(!!m.won, m.won ? "Victory for the crew!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${typeof Online !== "undefined" ? Online.ladderText(m.rank) : ""}`, [
+        { label: "Sail again", fn: () => { closePanels(); Online.openLobby(); } },
+        { label: "Leave the arena", fn: closePanels },
+      ]);
+      return;
+    }
     const rank = m.order.findIndex((o) => o.i === online.you) + 1, ords = ["", "1st", "2nd", "3rd", "4th", "5th"];
     const alone = online.humans < 2, prize = rank === 1 ? (alone ? 40 : 80) : rank === 2 && online.n > 2 && !alone ? 30 : 0;
     Vitals.coins += prize;

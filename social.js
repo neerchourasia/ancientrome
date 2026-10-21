@@ -8,6 +8,7 @@ const Social = (() => {
   const $s = (id) => document.getElementById(id);
   const friends = new Map();          // fid -> { fid, name, online, unread }
   const requests = new Map();         // fid -> name
+  const invites = new Map();          // fid -> name of a friend who asked you to sail with them
   const convos = new Map();           // fid -> [{ mine, text, at }]
   let rank = { r: 1000, w: 0, l: 0, d: 0 }, myFid = "", sel = "", notice = "", online = [], top = null;
   const KEY = () => `rome-social-${Account.userId || "guest"}`;
@@ -38,7 +39,7 @@ const Social = (() => {
   }
 
   const send = (obj) => Online.navalSend({ t: "social", ...obj });
-  const unreadTotal = () => [...friends.values()].reduce((n, f) => n + (f.unread || 0), 0) + requests.size;
+  const unreadTotal = () => [...friends.values()].reduce((n, f) => n + (f.unread || 0), 0) + requests.size + invites.size;
 
   // ------------------------------------------------------------------ messages from the server
 
@@ -55,6 +56,7 @@ const Social = (() => {
         if (requests.size) toast(`👥 ${requests.size} friend request${requests.size === 1 ? "" : "s"} waiting: open Friends`);
         persist(); break;
       }
+      case "fr_invite": invites.set(m.fid, m.name); toast(`⚓ ${m.name} invites you to sail together! Open Friends`); if (typeof Sfx !== "undefined") Sfx.play("horn"); setTimeout(() => { invites.delete(m.fid); render(); }, 90000); break;
       case "fr_in": requests.set(m.fid, m.name); toast(`👥 ${m.name} wants to be your friend`); if (typeof Sfx !== "undefined") Sfx.play("beep"); break;
       case "fr_added": friends.set(m.fid, { fid: m.fid, name: m.name, online: !!m.online, unread: 0 }); requests.delete(m.fid); toast(`👥 ${m.name} is now your friend`); persist(); break;
       case "fr_removed": { const f = friends.get(m.fid); friends.delete(m.fid); convos.delete(m.fid); if (sel === m.fid) sel = ""; if (f) say(`${f.name} is no longer on your friends list.`); persist(); break; }
@@ -103,13 +105,16 @@ const Social = (() => {
     $s("fr-login").hidden = !login; $s("fr-main").hidden = login;
     $s("fr-status").textContent = notice || (Online.connected ? "" : "Connecting to the game server...");
     $s("fr-rank").textContent = login ? "" : `Your rank: ${rankText()}`;
+    const iv = $s("fr-invlist"); iv.replaceChildren();
+    $s("fr-invs").hidden = !invites.size;
+    for (const [fid, name] of invites) li(iv, span(`⚓ ${name} wants to sail with you`), btn("Sail!", () => sailWith(fid, true)), btn("No thanks", () => { invites.delete(fid); render(); }));
     const rq = $s("fr-reqlist"); rq.replaceChildren();
     $s("fr-reqs").hidden = !requests.size;
     for (const [fid, name] of requests) li(rq, span(name), btn("Accept", () => send({ a: "ans", fid, ok: true })), btn("Decline", () => { requests.delete(fid); send({ a: "ans", fid, ok: false }); render(); }));
     const fl = $s("fr-list"); fl.replaceChildren();
     const list = [...friends.values()].sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
     if (!list.length) li(fl, span("No friends yet. Add someone below.", "dim"));
-    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), btn("Remove", () => { if (confirm(`Remove ${f.name} from your friends?`)) send({ a: "del", fid: f.fid }); }));
+    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), ...(f.online ? [btn("⚓ Sail", () => sailWith(f.fid, false))] : []), btn("Remove", () => { if (confirm(`Remove ${f.name} from your friends?`)) send({ a: "del", fid: f.fid }); }));
     const chat = $s("fr-chat"), cur = friends.get(sel);
     chat.hidden = !cur;
     if (cur) {
@@ -122,6 +127,15 @@ const Social = (() => {
     const ol = $s("fr-online"); ol.replaceChildren();
     for (const p of online) li(ol, span(p.name), p.friend ? span("friend", "dim") : p.sent ? span("asked", "dim") : btn("Add friend", () => { send({ a: "req", fid: p.fid }); p.sent = true; render(); }));
     if (!online.length) li(ol, span("Nobody else with an account is online right now.", "dim"));
+  }
+
+  // sail together: invite a friend (or accept their invitation); the naval crew battle is fought in Rome, against the practice ships
+  function sailWith(fid, accepting) {
+    if (typeof city !== "undefined" && city !== "rome") { toast("The naval battle is held in Rome. Press B to travel back first."); return; }
+    if (mode !== "walk") { toast("Finish what you are doing first"); return; }
+    if (accepting) invites.delete(fid);
+    send({ a: accepting ? "accept" : "invite", fid, ship: Shipyard.onlineDesign() });
+    render();
   }
 
   function select(fid) {

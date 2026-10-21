@@ -829,6 +829,7 @@ class Ship:
         d = self.design or clean_ship(None)
         self.cannons = {1: [(NAVAL_SLOT_Z[i] * self.lenK, d["pa"][i]) for i in range(NAVAL_SLOTS) if d["port"][i]], -1: [(NAVAL_SLOT_Z[i] * self.lenK, d["sa"][i]) for i in range(NAVAL_SLOTS) if d["star"][i]]}   # (position along the ship, aim)
         self.cd = {1: 0.3, -1: 0.3}
+        self.team = None
         self.ram = 0.0
         self.ai, self.ai_t = "kite", random.random() * 3.0   # what a practice ship is doing: ram (bow first at you), back (away after a ram), or kite (circle and fire broadsides)
         self.dead_at = None                               # when it sank (for the final order)
@@ -862,12 +863,15 @@ class NavalRoom:
     kind = "naval"
     TICK = 0.05
 
-    def __init__(self, conns, bots=0):
+    def __init__(self, conns, bots=0, coop=False):
         self.id = os.urandom(3).hex()
+        self.coop = coop                                  # a crew battle: the players sail together against the practice ships
         n = len(conns) + bots
         self.ships = [Ship(c, i, n) for i, c in enumerate(conns)]
         for _ in range(bots):
             self.ships.append(Ship(None, len(self.ships), n, bot=True))
+        for s in self.ships:
+            s.team = 1 if s.bot else 0
         self.balls, self.next_ball, self.events = [], 1, []
         self.start_at = now() + NAVAL_COUNTDOWN
         self.over = False
@@ -877,7 +881,7 @@ class NavalRoom:
                 s.conn.room, s.conn.me, s.conn.queue = self, s, None
         for s in self.ships:
             if s.conn:
-                s.conn.send({"t": "match", "mode": "naval", "room": self.id, "you": s.i, "countdown": NAVAL_COUNTDOWN,
+                s.conn.send({"t": "match", "mode": "naval", "room": self.id, "you": s.i, "countdown": NAVAL_COUNTDOWN, "coop": self.coop,
                              "rx": NAVAL_RX, "rz": NAVAL_RZ,
                              "players": [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look, "bot": q.bot, "ship": q.design,
                                           "x": round(q.x, 2), "z": round(q.z, 2), "yaw": round(q.yaw, 3)} for q in self.ships]})
@@ -1049,7 +1053,7 @@ class NavalRoom:
             b["z"] += b["vz"] * dt
             done = False
             for s in self.ships:
-                if s is b["by"] or s.dead or (s.bot and b["by"].bot):   # practice ships do not shoot each other
+                if s is b["by"] or s.dead or (s.bot and b["by"].bot) or (self.coop and s.team == b["by"].team):   # practice ships do not shoot each other, and neither do crewmates
                     continue
                 dx, dz = b["x"] - s.x, b["z"] - s.z
                 sn, cs = math.sin(s.yaw), math.cos(s.yaw)
@@ -1072,7 +1076,14 @@ class NavalRoom:
                 s.conn.send(payload)
         alive = [s for s in self.ships if not s.dead]
         humans = [s for s in self.ships if s.conn and not s.dead]
-        if live and len(alive) <= 1:
+        if self.coop:
+            if live and not any(s.bot for s in alive):
+                self.finish("cleared")
+            elif live and not humans:
+                self.finish("sunk")
+            elif t - self.start_at > NAVAL_TIME * 1.5:
+                self.finish("time")
+        elif live and len(alive) <= 1:
             self.finish("last")
         elif live and not humans:
             self.finish("last")
@@ -1106,7 +1117,7 @@ class NavalRoom:
                 _, _, dx, dz, _ = hit
                 for rammer, target, sgn in ((a, b, 1), (b, a, -1)):
                     fx, fz = ship_fwd(rammer)
-                    if rammer.v > 3.5 and rammer.ram <= 0 and sgn * (dx * fx + dz * fz) > 0 and not (rammer.bot and target.bot):
+                    if rammer.v > 3.5 and rammer.ram <= 0 and sgn * (dx * fx + dz * fz) > 0 and not (rammer.bot and target.bot) and not (self.coop and rammer.team == target.team):
                         rammer.ram = 1.2
                         rammer.v *= 0.4
                         self.events.append(["r", rammer.i, target.i])
@@ -1120,7 +1131,11 @@ class NavalRoom:
         order = sorted(self.ships, key=lambda s: (0, -s.hp) if not s.dead else (1, -s.dead_at))
         msg = {"t": "end", "mode": "naval", "reason": reason,
                "order": [{"i": s.i, "name": s.name, "hp": round(s.hp), "bot": s.bot} for s in order]}
-        ranks = rate_placements([(s.who, k) for k, s in enumerate(order) if s.who])
+        if self.coop:
+            msg["coop"], msg["won"] = True, reason == "cleared"
+            ranks = rate_team([s.who for s in self.ships if s.who], msg["won"]) if reason != "empty" else {}
+        else:
+            ranks = rate_placements([(s.who, k) for k, s in enumerate(order) if s.who])
         for s in self.ships:
             if s.conn:
                 s.conn.send(dict(msg, rank=ranks[id(s.who)]) if id(s.who) in ranks else msg)
@@ -1582,6 +1597,8 @@ REQS = {}         # friend id -> {friend id of the one asking: their name}
 MAIL = {}         # friend id -> messages sent to them while they were away
 RECENT = collections.defaultdict(list)    # (account id, account id) -> times they played a ranked match against each other
 MAIL_MAX, REQ_MAX, FRIENDS_MAX = 30, 20, 60
+INVITES = {}      # (friend id of the one inviting, friend id of the one invited) -> when
+INVITE_LIFE = 90.0
 
 
 def fid_of(uid):
@@ -1884,6 +1901,34 @@ def on_social(conn, m):
         return conn.send({"t": "fr_removed", "fid": fid})
     if a == "dm":
         return on_dm(conn, m)
+    if a == "invite":
+        fid = clean_fid(m.get("fid"))
+        if not fid or not mutual(conn.fid, fid):
+            return social_msg(conn, "You can only invite your friends.")
+        others = [c for c in conns_of(fid) if not c.room]
+        if conn.room or not others:
+            return social_msg(conn, "Your friend is not free to sail right now (offline, or busy in a game)." if not conn.room else "Finish your game first.")
+        conn.ship = clean_ship(m.get("ship"))
+        leave_queue(conn)
+        INVITES[(conn.fid, fid)] = now()
+        for c in others:
+            c.send({"t": "fr_invite", "fid": conn.fid, "name": conn.name, "game": "naval"})
+        return social_msg(conn, "Invitation sent. You sail as soon as they accept.")
+    if a == "accept":
+        fid = clean_fid(m.get("fid"))
+        t = now()
+        if not fid or t - INVITES.get((fid, conn.fid), -1e9) > INVITE_LIFE or not mutual(conn.fid, fid):
+            return social_msg(conn, "That invitation has run out.")
+        hosts = [c for c in conns_of(fid) if not c.room]
+        if conn.room or not hosts:
+            return social_msg(conn, "Your friend is not free to sail any more.")
+        INVITES.pop((fid, conn.fid), None)
+        conn.ship = clean_ship(m.get("ship"))
+        host = hosts[0]
+        leave_queue(conn)
+        leave_queue(host)
+        NavalRoom([host, conn], bots=3, coop=True)
+        return
 
 
 def accept_friend(conn, fid):

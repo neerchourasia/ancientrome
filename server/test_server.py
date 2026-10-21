@@ -102,7 +102,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             c.close()
         self.srv.close()
         server.CONNS.clear()
-        server.BLOCKED.clear(); server.CHAT_LOG.clear(); server.DIYAS.clear()
+        server.BLOCKED.clear(); server.CHAT_LOG.clear(); server.DIYAS.clear(); server.INVITES.clear()
         for d in (server.RATINGS, server.CLAIMS, server.FID_UID, server.NAMES, server.REQS, server.MAIL, server.RECENT):
             d.clear()
         for q in server.QUEUES.values():
@@ -261,6 +261,38 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         a.send({"t": "shove", "to": cb.id})                                         # Ben cannot be shoved again straight away
         with self.assertRaises(asyncio.TimeoutError):
             await b.until(lambda m: m["t"] == "shoved", timeout=0.6)
+
+    async def test_friends_can_sail_together_against_practice_ships(self):
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        ann.send({"t": "social", "a": "req", "name": "Bob"})
+        asked = await bob.until(lambda m: m["t"] == "fr_in")
+        bob.send({"t": "social", "a": "ans", "fid": asked["fid"], "ok": True})
+        added = await ann.until(lambda m: m["t"] == "fr_added")
+        ann.send({"t": "social", "a": "invite", "fid": server.fid_of("u-cy")})            # Cy is not a friend
+        self.assertIn("only invite your friends", (await ann.until(lambda m: m["t"] == "fr_msg" and "invite" in m["msg"]))["msg"])
+        ann.send({"t": "social", "a": "invite", "fid": added["fid"]})
+        inv = await bob.until(lambda m: m["t"] == "fr_invite")
+        self.assertEqual((inv["name"], inv["game"]), ("Ann", "naval"))
+        bob.send({"t": "social", "a": "accept", "fid": inv["fid"]})
+        ma = await ann.until(lambda m: m["t"] == "match")
+        mb = await bob.until(lambda m: m["t"] == "match")
+        self.assertTrue(ma["coop"] and mb["coop"])
+        self.assertEqual([p["bot"] for p in ma["players"]], [False, False, True, True, True])      # two friends and three practice ships
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.start_at = 0
+        a, b, *bots = room.ships
+        room.balls.append({"id": 1, "x": b.x, "y": server.NAVAL_LEVEL + 0.5, "z": b.z, "vx": 0, "vy": 0, "vz": 0, "by": a})
+        room.step(0.05)
+        self.assertEqual(b.hp, 100)                                                         # crewmates cannot hurt each other
+        for s in bots:
+            room.sink(s)
+        room.step(0.05)
+        self.assertTrue(room.over)
+        end = await ann.until(lambda m: m["t"] == "end")
+        self.assertEqual((end["coop"], end["won"], end["reason"]), (True, True, "cleared"))
+        self.assertEqual(end["rank"]["delta"], 8)                                           # a crew victory counts towards your rank
 
     async def test_duel_block_cuts_damage_and_range_is_checked(self):
         a, b = await self.start_duel()
