@@ -319,7 +319,12 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 #account-close, #on-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
 #account [hidden], #online [hidden] { display: none !important; }
 #account label { display: block; margin: 8px 0; font-weight: 600; }
-#account input[type=email], #account input[type=password] { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--ink); background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; }
+#account input[type=email], #account input[type=password], #account .pw-wrap input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--ink); background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; }
+#account .pw-wrap { position: relative; display: block; }
+#account .pw-wrap input { padding-right: 42px; }
+#account .pw-eye { position: absolute; right: 4px; top: 4px; bottom: 0; width: 36px; height: 36px; margin: auto 0; padding: 0; font-size: 1.15rem; line-height: 1; color: var(--ink); background: transparent; border: 0; border-radius: 8px; cursor: pointer; opacity: .8; }
+#account .pw-eye:hover, #account .pw-eye:focus-visible { opacity: 1; background: rgba(255,255,255,.12); }
+#account .pw-eye.on { opacity: 1; color: var(--gold); }
 #account input:focus { outline: 2px solid var(--gold); }
 .ac-check { display: flex !important; align-items: flex-start; gap: 8px; font-weight: 400 !important; font-size: .85rem; color: var(--muted); }
 .ac-check a { color: var(--gold); }

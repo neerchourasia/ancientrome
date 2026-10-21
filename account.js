@@ -241,6 +241,7 @@ const Account = (() => {
     if (mode !== "walk" || (panelOpen && !creatorOpen) || (creatorOpen && !Character.exists)) { toast("Close what is open and stop the game first"); return; }
     if (creatorOpen) closeCreator();
     openPanel("#account");
+    for (const eye of document.querySelectorAll("#account .pw-eye")) { const box = eye.parentElement.querySelector("input"); if (box.type !== "password") eye.click(); }   // a password box always starts hidden
     renderAccount();
   }
 
@@ -250,6 +251,17 @@ const Account = (() => {
     $a("account").addEventListener("click", (e) => { if (e.target.id === "account") closePanels(); });
     $a("ac-login").addEventListener("click", () => submit("in"));
     $a("ac-signup").addEventListener("click", () => submit("up"));
+    // the eye: show what you typed in a password box, or hide it again
+    for (const eye of document.querySelectorAll("#account .pw-eye")) {
+      const box = eye.parentElement.querySelector("input");
+      eye.addEventListener("click", () => {
+        const show = box.type === "password";
+        box.type = show ? "text" : "password";
+        eye.textContent = show ? "🙈" : "👁"; eye.classList.toggle("on", show);
+        eye.setAttribute("aria-label", show ? "Hide password" : "Show password"); eye.title = show ? "Hide password" : "Show password";
+        box.focus();
+      });
+    }
     $a("ac-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit("in"); });
     $a("ac-save").addEventListener("click", () => saveNow(false));
     $a("ac-forgot").addEventListener("click", forgot);
