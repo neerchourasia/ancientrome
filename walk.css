@@ -441,6 +441,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .jb-metal.hit { transform: scale(1.04); }
 #heist-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; gap: 2px; max-width: min(520px, 92vw); padding: 8px 16px; background: rgba(120,24,24,.88); border: 1px solid rgba(255,200,120,.6); border-radius: 10px; color: #fff; text-align: center; pointer-events: none; }
 #heist-hud.show { display: flex; }
+#heist-arrow { display: inline-block; font-size: 1.8rem; line-height: 1; color: #ffd36b; transform-origin: 50% 50%; text-shadow: 0 0 6px rgba(0,0,0,.6); }
 #heist-hud strong { font: 700 1rem Georgia, serif; color: #ffd36b; }
 #heist-hud span { font-size: .8rem; }
 

@@ -125,8 +125,9 @@ const Robbery = (() => {
     el.classList.add("show");
     const left = Math.max(0, Math.round((heist.until - performance.now()) / 1000));
     if (heist.role === "thief") el.innerHTML = `<strong>🏃 Run! ${heist.npc ? "The city guards are" : esc(heist.other) + " is"} after you</strong><span>${heist.d != null ? `${heist.d} m behind you${heist.x !== undefined && heist.d > 0 ? `, to the ${dirWord(heist.x - player.x, heist.z - player.z)}: run ${dirWord(player.x - heist.x, player.z - heist.z)}` : ""}. ` : ""}There is no place to reach: just get away. You are clear in ${left} s, or at 230 m. Cars, carts and elephants are faster than running. If they catch you, you lose ${LOOT} denarii.</span>`;
-    else el.innerHTML = `<strong>⚠ ${esc(heist.other)} is robbing your house!</strong><span>${heist.d != null ? `${heist.d} m away, to the ${dirWord(heist.x - player.x, heist.z - player.z)}. ` : ""}Catch them within ${left} s to win back ${LOOT} denarii.</span>`;
+    else el.innerHTML = `<strong>⚠ ${esc(heist.other)} is robbing your house!</strong><span id="heist-arrow" aria-hidden="true">➤</span><span>${heist.d != null ? `${heist.d} m away, to the ${dirWord(heist.x - player.x, heist.z - player.z)}. ` : ""}Chase them! Get within ${CATCH} m of them within ${left} s to win back ${LOOT} denarii. Follow the red light and the arrow, and use a vehicle if you have one.</span>`;
   }
+  const CATCH = 4;
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   function begin(m) {
@@ -142,11 +143,13 @@ const Robbery = (() => {
       Narrator.say(`${m.other} is robbing your house. Catch them.`, { interrupt: true });
       Chat.add({ sys: 1, text: `⚠ ${m.other} is robbing your house on the Via Domus!` });
       Sfx.play("horn");
+      openGetaway(true);          // you can give chase on foot or in one of your own vehicles
     }
     hud();
   }
 
-  function openGetaway() {
+  function openGetaway(chase) {
+    $r("getaway").querySelector("h2").textContent = chase ? "🏃 Give chase!" : "🏃 Getaway!";
     const ul = $r("gw-list"); ul.replaceChildren();
     const owned = Object.keys(Market.ITEMS).filter((id) => { const it = Market.ITEMS[id], M = Car.MODELS[id]; return (it.type === "car" || it.type === "mount") && M && Market.owns(id) && (M.era || "modern") === era; });
     const add = (label, note, fn) => {
@@ -156,8 +159,8 @@ const Robbery = (() => {
       li.append(sp, b); ul.append(li);
     };
     for (const id of owned) { const M = Car.MODELS[id]; add(M.name, `Top speed ${Math.round(M.max * 3.6)} km/h`, () => { Car.deploy(id); setTimeout(() => Car.enter(), 60); }); }
-    add("Run on foot", "Hold Shift to sprint", () => toast("You run for it! Hold Shift to sprint."));
-    if (!owned.length) $r("gw-note").textContent = "You do not own a vehicle that works here, so you run. (Buy one at the animals and rides stall in the market square.)"; else $r("gw-note").textContent = "Pick your getaway. The clock is running.";
+    add("Run on foot", "Hold Shift to sprint", () => toast(chase ? "After them! Hold Shift to sprint, and follow the red light." : "You run for it! Hold Shift to sprint."));
+    $r("gw-note").textContent = !owned.length ? "You do not own a vehicle that works here, so you run. (Buy one at the animals and rides stall in the market square.)" : chase ? "Pick how you chase them. The clock is running." : "Pick your getaway. The clock is running.";
     openPanel("#getaway");
   }
 
@@ -259,8 +262,31 @@ const Robbery = (() => {
     else if (!heist.reported) { heist.reported = true; Online.navalSend({ t: "heist_caught" }); }
   }
 
+  // the owner chasing a thief sees a tall red light over them and an arrow in the HUD pointing the way
+  let beacon = null;
+  function chaseMarks(dt) {
+    const chasing = heist && heist.role === "owner" && heist.x !== undefined;
+    if (!beacon && scene) {
+      beacon = new THREE.Group();
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 90, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }));
+      col.position.y = 45; beacon.add(col);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), new THREE.MeshBasicMaterial({ color: 0xff5a3a })); ball.position.y = 7; beacon.add(ball);
+      beacon.visible = false; scene.add(beacon);
+    }
+    if (beacon) {
+      beacon.visible = !!chasing;
+      if (chasing) { const k = Math.min(1, dt * 4); beacon.position.x += (heist.x - beacon.position.x) * k; beacon.position.z += (heist.z - beacon.position.z) * k; beacon.position.y = groundAt(heist.x, heist.z); beacon.children[1].scale.setScalar(1 + Math.sin(performance.now() / 160) * 0.15); }
+    }
+    const arrow = chasing && $r("heist-arrow");
+    if (arrow) {
+      const dx = heist.x - player.x, dz = heist.z - player.z, fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
+      arrow.style.transform = `rotate(${Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz) - Math.PI / 2}rad)`;
+    }
+  }
+
   function update(dt) {
     panelT -= dt;
+    chaseMarks(dt);
     if (heist && panelT <= 0) { panelT = 0.5; hud(); }
     if (heist && heist.npc) npcUpdate(dt);
     else if (heist && heist.role === "thief" && guards.some((gd) => gd.g.visible)) {      // a real robbery: the guards chase too, and can catch you
@@ -280,6 +306,7 @@ const Robbery = (() => {
     setHouses, at, act, begin, pos, end, update, guardsCaught,
     get active() { return !!heist; },
     get role() { return heist ? heist.role : null; },
+    get chaseBoost() { return heist && heist.role === "owner" ? 1.2 : 1; },        // the owner runs a little faster than usual while chasing
     PLOTS,
   };
 })();

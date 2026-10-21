@@ -423,7 +423,7 @@ let crashCd = 0, scrapeCd = 0;
 // Number keys 1-9 pick how fast you walk (4 is a normal walking pace, 9 is a sprint).
 const WALK_SPEEDS = [1.5, 2.5, 4, 5.5, 7, 8.5, 10, 11.5, 13];
 let walkLevel = 4;
-const walkSpeed = () => WALK_SPEEDS[walkLevel - 1] * Disease.speedMul;   // illness slows you
+const walkSpeed = () => WALK_SPEEDS[walkLevel - 1] * Disease.speedMul * Robbery.chaseBoost;   // illness slows you
 function setWalkLevel(n) {
   walkLevel = n;
   toast(`Walking speed ${n}/9${n === 1 ? " (a slow stroll)" : n === 4 ? " (normal)" : n === 9 ? " (sprint)" : ""}`);
@@ -594,7 +594,7 @@ function updatePlayer(dt) {
   if (keys.has("KeyE")) turn -= 1;
   player.yaw += turn * 1.9 * dt;
 
-  const speed = mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul, walkSpeed()) : walkSpeed(); // in a duel everyone is the same speed (Shift blocks)
+  const speed = mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul * Robbery.chaseBoost, walkSpeed()) : walkSpeed(); // in a duel everyone is the same speed (Shift blocks)
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   const rx = -fz, rz = fx;
   let tx = fx * fwd + rx * side, tz = fz * fwd + rz * side;
