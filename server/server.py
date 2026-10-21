@@ -217,7 +217,7 @@ class Conn:
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.seen = set()          # the other walkers this connection has been told about
         self.ship = None           # the ship design they chose for the naval battle
-        self.htier = 0             # the tier of their house (0 to 3), shown to others on their plot
+        self.htier = 0             # the tier of their house (0 to 5), shown to others on their plot
         self.plot = None           # which house plot in Rome is theirs
         self.heist = None          # a robbery they are in (as the thief or the owner)
         self.rob_cd = 0.0          # when they may rob again
@@ -1238,7 +1238,7 @@ def on_walk(conn, m):
     conn.park = [pk[0], round(num(pk[1], -20000, 20000), 1), round(num(pk[2], -20000, 20000), 1), round(num(pk[3], -50, 50), 2)] if isinstance(pk, list) and len(pk) == 4 and pk[0] in VEHICLES else None
     conn.walk_at = now()
     h = m.get("h")
-    conn.htier = int(h) if isinstance(h, (int, float)) and 0 <= h <= 3 else conn.htier
+    conn.htier = int(h) if isinstance(h, (int, float)) and 0 <= h <= 5 else conn.htier
 
 
 def world_once():

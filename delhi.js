@@ -463,10 +463,10 @@ const Delhi = (() => {
 
   // ---------- your house: a plot off Chandni Chowk that grows as you buy (Market) ----------
 
-  const houses = [0, 1, 2, 3].map(() => ({ g: new T.Group(), blockers: [] }));
+  const houses = [0, 1, 2, 3, 4, 5].map(() => ({ g: new T.Group(), blockers: [] }));
   let houseTier = 0;
   // the bedroom of each size of house, where Z puts you to sleep: centre and half-sizes
-  const ROOMS = [{ x: -100, z: -34, hw: 4, hd: 3.6 }, { x: -100, z: -44, hw: 7, hd: 5 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }];
+  const ROOMS = [{ x: -100, z: -34, hw: 4, hd: 3.6 }, { x: -100, z: -44, hw: 7, hd: 5 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }, { x: -82, z: -72, hw: 5.6, hd: 5.6 }];
   const PLOT = { x0: -118, x1: -66, z0: -90, z1: -18 };
 
   function hb(t, cx, y0, cz, w, h, d, m, solid = true) { // a box in house `t`
@@ -535,28 +535,49 @@ const Delhi = (() => {
     hlawn(1, -100, -26, 36, 14); hfountain(1, -100, -24, 2.2);
     for (const [cx, cz] of [[-112, -28], [-88, -28], [-112, -70], [-88, -70], [-100, -75]]) htree(1, cx, cz, 1.1);
     // 2: the grand haveli; 3: the same, with a tower, a pavilion in a pool and a gate
-    grandHouse(2);
-    grandHouse(3);
+    for (const t of [2, 3, 4, 5]) grandHouse(t);
     // a dresser in every house: against the east wall of the small house and the bigger one, and the north wall of the bedroom in the haveli and mahal
     const dm2 = { wood: D.wood, top: lambert(0x8a6a3a), drawer: lambert(0x5a3e22), mirror: new T.MeshBasicMaterial({ color: 0xb8d0dc }), frame: D.gold };
-    [[0, -96.6, -36.4, "w"], [1, -93.4, -48.4, "w"], [2, -85, -76.6, "s"], [3, -85, -76.6, "s"]].forEach(([t, dx, dz, f]) => {
+    [[0, -96.6, -36.4, "w"], [1, -93.4, -48.4, "w"], [2, -85, -76.6, "s"], [3, -85, -76.6, "s"], [4, -85, -76.6, "s"], [5, -85, -76.6, "s"]].forEach(([t, dx, dz, f]) => {
       for (const p of Dresser.parts(dx, dz, f)) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, dm2[p.mat], p.solid);
       Dresser.register("delhi", X(dx), dz, f, () => houseTier === t);
     });
     // a garage for every upgrade (not the small house), by the east wall of the plot, open to the west
     const gm = { wall: D.cream, roof: D.redDark, dark: lambert(0x6a625a), door: D.wood };
-    for (let t = 1; t <= 3; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);
+    for (let t = 1; t <= 5; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);
     Garage.register("delhi", scene, X(-72), -28, "w", () => houseTier);
-    hc(3, -72, 0, -85, 5.5, 24, D.cream, true, 8);
-    hc(3, -72, 24, -85, 6.4, 0.6, D.marble, false, 8);
-    hdome(3, -72, 24.6, -85, 4, 5, D.gold, 0.8);
-    hc(3, -92, 0, -62, 8.5, 0.6, D.marble, false); hc(3, -92, 0.55, -62, 7.8, 0.08, D.water, false);
-    for (const [dx, dz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) hb(3, -92 + dx, 0.6, -62 + dz, 0.5, 4, 0.5, D.marble, false);
-    hb(3, -92, 4.6, -62, 6, 0.4, 6, D.marble, false);
-    hdome(3, -92, 5, -62, 2.4, 3, D.gold, 0.4);
-    for (const sx of [-1, 1]) hb(3, -100 + sx * 4.2, 0, -19, 1.2, 8, 1.2, D.marble, false);
+    for (const t of [3, 4, 5]) {      // the mahal's tower, pavilion in a pool and gate (the two palaces keep them)
+      hc(t, -72, 0, -85, 5.5, 24, D.cream, true, 8);
+      hc(t, -72, 24, -85, 6.4, 0.6, D.marble, false, 8);
+      hdome(t, -72, 24.6, -85, 4, 5, D.gold, 0.8);
+      hc(t, -92, 0, -62, 8.5, 0.6, D.marble, false); hc(t, -92, 0.55, -62, 7.8, 0.08, D.water, false);
+      for (const [dx, dz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) hb(t, -92 + dx, 0.6, -62 + dz, 0.5, 4, 0.5, D.marble, false);
+      hb(t, -92, 4.6, -62, 6, 0.4, 6, D.marble, false);
+      hdome(t, -92, 5, -62, 2.4, 3, D.gold, 0.4);
+      for (const sx of [-1, 1]) hb(t, -100 + sx * 4.2, 0, -19, 1.2, 8, 1.2, D.marble, false);
+    }
+    // 4: a Shahi palace: a pillared Diwan-i-Aam of red sandstone in the front courtyard, with a throne alcove and chhatris (you walk between the pillars)
+    for (const t of [4, 5]) {
+      hb(t, -92, 0, -35.5, 34, 0.15, 12, D.stone, false);                                       // the hall's floor
+      for (let k = 0; k < 9; k++) for (const dz of [-40.5, -30.5]) hc(t, -108 + k * 4, 0, dz, 0.5, 6, D.red, true);   // the pillars
+      hb(t, -92, 6, -35.5, 36, 0.6, 13, D.red, false);                                          // the roof
+      hb(t, -92, 0.15, -41.5, 8, 1.2, 3, D.marble, false); hb(t, -92, 1.35, -41.5, 6, 0.2, 2, D.gold, false);    // the throne alcove
+      for (const dx of [-16, -4, 8, 16]) chhatri(houses[t].g, X(-92 + dx), 6.6, -35.5 + (dx < 0 ? -4 : 4), 0.9, D.marble);
+    }
+    // 5: an imperial Qila: four minarets at the corners of the plot and golden domes on the hall
+    {
+      const t = 5;
+      for (const [cx, cz] of [[-115, -21], [-69, -21], [-115, -87], [-69, -87]]) {
+        for (let i = 0; i < 5; i++) hc(t, cx, i * 4, cz, 1.6 - i * 0.12, 4, i % 2 ? D.marble : D.red, i === 0, 8);
+        hc(t, cx, 20, cz, 1.9, 0.5, D.marble, false, 8);
+        chhatri(houses[t].g, X(cx), 20.5, cz, 1.0, D.marble);
+        hdome(t, cx, 22.6, cz, 1.0, 1.4, D.gold, 0.2);
+      }
+      for (const dx of [-16, 0, 16]) hdome(t, -92 + dx, 6.6, -35.5, 3.2, 3.6, D.gold, 0.5);
+      hb(t, -100, 0.1, -17.5, 7, 0.15, 3, D.gold, false);                                       // a golden threshold at the gate
+    }
     // the menagerie: a cage in the bedroom of every house, against a wall clear of the bed and the dresser
-    [[-99.4, -36.2, 1], [-100, -48.2, 1], [-79.6, -67.7, 1], [-79.6, -67.7, 1]].forEach(([cx, cz, f], t) => Cage.build(houses[t].g, X(cx), cz, f, houses[t].blockers));
+    [[-99.4, -36.2, 1], [-100, -48.2, 1], [-79.6, -67.7, 1], [-79.6, -67.7, 1], [-79.6, -67.7, 1], [-79.6, -67.7, 1]].forEach(([cx, cz, f], t) => Cage.build(houses[t].g, X(cx), cz, f, houses[t].blockers));
     for (const h of houses) scene.add(h.g);
     setTier(pendingTier);
   }

@@ -52,7 +52,7 @@ const Robbery = (() => {
     box(g, 0, 0, 5.05, 2.6, 3.0, 0.2, dark, false);
     for (const sx of [-4.5, 4.5]) box(g, sx, 1.6, 5.05, 1.5, 1.4, 0.2, dark, false);
     // tier groups: garden, wings, tower: each shown according to the owner's house
-    const tiers = [new T.Group(), new T.Group(), new T.Group()];
+    const tiers = [new T.Group(), new T.Group(), new T.Group(), new T.Group(), new T.Group()];
     for (const t of tiers) { t.visible = false; g.add(t); }
     box(tiers[0], 0, 0.02, 9, 22, 0.1, 8, green, false);                                 // garden in front
     for (const sx of [-10.5, 10.5]) box(tiers[0], sx, 0, 9, 1, 1.2, 8, lam(0x3f6b34), true);
@@ -60,6 +60,12 @@ const Robbery = (() => {
     for (const sx of [-11, 11]) { box(tiers[1], sx, 0, 0, 8, 3.6, 9, stone, true); box(tiers[1], sx, 3.6, 0, 9, 0.5, 10, roof, false); } // wings
     box(tiers[2], 0, 5, 0, 6, 5, 5, stone, true);                                        // a tower with a gilded top
     const top = new T.Mesh(PYRG, lam(0xd9b44a)); top.scale.set(4.6, 3, 4.6); top.position.set(0, 12.5, 0); top.rotation.y = Math.PI / 4; tiers[2].add(top);
+    for (const sx of [-11, 11]) {                                                        // tier 4, a palace: a tower on each wing
+      box(tiers[3], sx, 4.1, 0, 3.4, 5.2, 3.4, stone, true);
+      const cap = new T.Mesh(PYRG, roof); cap.scale.set(3.8, 2.6, 3.8); cap.position.set(sx, 10.4 + 1.3, 0); cap.rotation.y = Math.PI / 4; tiers[3].add(cap);
+    }
+    for (const sx of [-11, 11]) { const cap = new T.Mesh(PYRG, lam(0xd9b44a)); cap.scale.set(4.2, 3.2, 4.2); cap.position.set(sx, 10.4 + 1.6, 0); cap.rotation.y = Math.PI / 4; tiers[4].add(cap); }   // tier 5: they turn to gold
+    for (const sx of [-5, 5]) { box(tiers[4], sx, 0, 14, 1.2, 4.5, 1.2, lam(0xe9e1cf), true); box(tiers[4], sx, 4.5, 14, 1.5, 0.6, 1.5, lam(0xd9b44a), false); }   // a gilded gate at the street
     // the sign with the owner's name hangs over the door
     const label = sign(g, "", 3.9, 5.2 * f, f > 0 ? 0 : Math.PI);
     const h = { g, tiers, blockers, label, id: null, tier: -1, name: "" };

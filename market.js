@@ -12,6 +12,8 @@ const Market = (() => {
     { name: "House with a garden", price: 150, rest: 1.5, rent: 0, perk: "A walled garden with a fountain, hedges and cypress trees. Resting at home heals 1.5 times faster." },
     { name: "Grand domus", price: 400, rest: 2, rent: 15, perk: "Two wings, a colonnade and a statue. Resting heals twice as fast, and your tenants pay you 15 denarii each morning." },
     { name: "Villa with a tower", price: 1000, rest: 3, rent: 40, perk: "A tower, a pool behind the house and a gilded pavilion. Resting heals 3 times faster, and rent is 40 denarii each morning." },
+    { name: "Patrician palace", price: 2500, rest: 4, rent: 90, perk: "A great hall behind the villa, with a columned portico, four corner towers and a dome. Resting heals 4 times faster, and rent is 90 denarii each morning." },
+    { name: "Imperial palace", price: 6000, rest: 5, rent: 200, perk: "Golden roofs and domes, a triumphal gate at the road and statues along the path. Resting heals 5 times faster, and rent is 200 denarii each morning." },
   ];
 
   // Your home in Old Delhi: a small house on a plot off Chandni Chowk that you build up the same way.
@@ -20,6 +22,8 @@ const Market = (() => {
     { name: "House with a garden", price: 150, rest: 1.5, rent: 0, perk: "A bigger house with a veranda, a garden with trees and a fountain. Resting at home heals 1.5 times faster." },
     { name: "Grand haveli", price: 400, rest: 2, rent: 15, perk: "A haveli built round a courtyard, with a fountain and carved ranges. Resting heals twice as fast, and your tenants pay you 15 denarii each morning." },
     { name: "Mahal with a tower", price: 1000, rest: 3, rent: 40, perk: "A tower with a golden dome, a marble pavilion in a pool and a gate. Resting heals 3 times faster, and rent is 40 denarii each morning." },
+    { name: "Shahi palace", price: 2500, rest: 4, rent: 90, perk: "A red sandstone Diwan-i-Aam behind the mahal: a long pillared hall with a throne alcove and corner chhatris. Resting heals 4 times faster, and rent is 90 denarii each morning." },
+    { name: "Imperial Qila", price: 6000, rest: 5, rent: 200, perk: "Four minarets, golden domes and a grand marble pavilion. Resting heals 5 times faster, and rent is 200 denarii each morning." },
   ];
   const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : HOUSES);
   const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : s.house);

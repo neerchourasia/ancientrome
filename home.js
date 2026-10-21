@@ -156,7 +156,7 @@ const Home = (() => {
   }
 
   // ---- house upgrades, bought in the Market: each tier is built hidden (its collision switched off) and appears when you own it
-  const ext = [null, { meshes: [], blockers: [] }, { meshes: [], blockers: [] }, { meshes: [], blockers: [] }];
+  const ext = [null, ...Array.from({ length: 5 }, () => ({ meshes: [], blockers: [] }))];
   let tier = 0;
   const GROUNDS = [232, 278, 28, 58]; // x0, x1, z0, z1: resting here heals faster (the villa's back garden counts too)
 
@@ -213,12 +213,42 @@ const Home = (() => {
     piece(3, BOX, M.water, 255, 0.1, 66, 19.6, 0.1, 9.6);
     for (const [cx, cz] of [[268, 70], [273, 70], [268, 75], [273, 75]]) piece(3, CYL, M.marble, cx, 2, cz, 0.4, 4, 0.4, true, true);
     piece(3, PYR, gold, 270.5, 4.9, 72.5, 5.2, 1.8, 5.2).rotation.y = Math.PI / 4;
+
+    // tier 4: a patrician palace behind the pool: a great hall with a columned portico, four corner towers and a dome
+    const SPH = new T.SphereGeometry(1, 18, 12);
+    piece(4, BOX, stone, 255, 4.5, 96, 36, 9, 14, true);                          // the great hall
+    piece(4, BOX, M.roof, 255, 9.5, 96, 38, 1, 16);
+    piece(4, BOX, M.marble2, 255, 0.35, 85.6, 26, 0.7, 2.4);                      // steps up to the portico
+    piece(4, BOX, M.marble2, 255, 0.9, 86.9, 26, 0.5, 1.6);
+    piece(4, BOX, M.dark, 255, 2.4, 88.95, 4.2, 4.6, 0.2);                         // the great door
+    for (let i = 0; i < 8; i++) piece(4, CYL, M.marble, 244 + i * 3.14, 4.6, 87.8, 0.5, 8.4, 0.5, true, true);   // the portico columns
+    piece(4, BOX, M.marble2, 255, 9.2, 87.8, 26, 1.0, 2.4);
+    piece(4, BOX, M.marble2, 255, 10.2, 87.8, 12, 1.2, 2.2);                      // a pediment over the middle
+    piece(4, CYL, stone, 255, 11.7, 96, 4.4, 3.6, 4.4);                           // the drum and the dome
+    piece(4, SPH, gold, 255, 13.5, 96, 4.4, 3.6, 4.4);
+    for (const [cx, cz] of [[238, 90], [272, 90], [238, 102], [272, 102]]) {      // corner towers
+      piece(4, CYL, stone, cx, 7, cz, 2.3, 14, 2.3, true, true);
+      piece(4, CONE, M.roof, cx, 16, cz, 2.9, 4, 2.9);
+    }
+
+    // tier 5: an imperial palace: golden roofs, a triumphal gate at the road and statues along the path
+    piece(5, BOX, gold, 255, 10.1, 96, 38.4, 0.5, 16.4);                          // a gilded roof
+    for (const [cx, cz] of [[238, 90], [272, 90], [238, 102], [272, 102]]) piece(5, SPH, gold, cx, 15.8, cz, 3.1, 3.1, 3.1);
+    piece(5, CYL, gold, 255, 19.6, 96, 0.5, 5, 0.5);                              // a spire over the dome
+    for (const px of [247, 263]) piece(5, BOX, M.marble, px, 5, 22.5, 3.2, 10, 3.2, true);   // the triumphal gate
+    piece(5, BOX, M.marble2, 255, 10.4, 22.5, 19, 2, 3.2);
+    piece(5, BOX, gold, 255, 11.7, 22.5, 19.4, 0.6, 3.5);
+    for (const [sx, sz] of [[251, 33], [259, 33], [251, 41], [259, 41]]) {         // statues on plinths along the path
+      piece(5, BOX, M.marble2, sx, 0.8, sz, 1.4, 1.6, 1.4, true);
+      piece(5, CYL, M.bronze, sx, 2.7, sz, 0.38, 2.2, 0.38);
+      piece(5, SPH, M.bronze, sx, 4.0, sz, 0.3, 0.3, 0.3);
+    }
   }
 
   // 0 = the small house you start with; 1, 2, 3 = the upgrades
   function setTier(n) {
-    tier = Math.max(0, Math.min(3, n | 0));
-    for (let t = 1; t <= 3; t++) {
+    tier = Math.max(0, Math.min(5, n | 0));
+    for (let t = 1; t <= 5; t++) {
       const on = t <= tier;
       for (const m of ext[t].meshes) m.visible = on;
       for (const b of ext[t].blockers) b.off = !on;
@@ -227,8 +257,8 @@ const Home = (() => {
 
   // How much faster you recover when resting at home (see Market.REST for the numbers)
   function restBoost(x, z) {
-    const inGrounds = x > GROUNDS[0] && x < GROUNDS[1] && z > GROUNDS[2] && z < (tier >= 3 ? 78 : GROUNDS[3]);
-    return inGrounds || inside(x, z) ? [1, 1.5, 2, 3][tier] : 1;
+    const inGrounds = x > GROUNDS[0] && x < GROUNDS[1] && z > GROUNDS[2] && z < (tier >= 4 ? 112 : tier >= 3 ? 78 : GROUNDS[3]);
+    return inGrounds || inside(x, z) ? [1, 1.5, 2, 3, 4, 5][tier] : 1;
   }
 
   // Brighten the windows and the room after dark.
