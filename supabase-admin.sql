@@ -10,6 +10,8 @@ create table if not exists public.admins (
   email text primary key
 );
 alter table public.admins enable row level security;          -- no policies: the game's public key cannot read or change it
+-- (explicit grant, since Supabase stopped granting API access to new tables automatically on 30 October 2026: only the service role)
+grant select, insert, update, delete on public.admins to service_role;
 
 insert into public.admins (email) values (lower('YOUR_EMAIL@example.com')) on conflict do nothing;
 

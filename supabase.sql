@@ -11,6 +11,12 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- Supabase no longer grants API access to new tables automatically (from 30 October 2026), so say who may reach this one.
+-- Players (logged in) can read, add and change rows, and the row-level-security rules below limit them to their own row. The public
+-- (anon) key gets nothing. The server-side service role is given full access.
+grant select, insert, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.profiles to service_role;
+
 drop policy if exists "read own profile"   on public.profiles;
 drop policy if exists "insert own profile" on public.profiles;
 drop policy if exists "update own profile" on public.profiles;
