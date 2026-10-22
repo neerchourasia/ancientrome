@@ -496,6 +496,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #creature-card.show { display: block; }
 #creature-card b { display: block; margin-bottom: 3px; color: #bff3ff; font-size: .78rem; }
 #creature-card ul { list-style: none; margin: 0; padding: 0; }
+#creature-card small { display: block; margin-top: 4px; color: #ffe08a; font-size: .68rem; }
 #creature-card li { color: rgba(220,240,245,.55); }
 #creature-card li.seen { color: #ffe08a; }
 #creature-card.done { border-color: #ffd36b; box-shadow: 0 0 10px rgba(255,211,107,.5); }

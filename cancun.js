@@ -382,6 +382,7 @@ const Cancun = (() => {
     { id: "grouper", name: "Nassau grouper", col: 0xb08a5a, len: 1.3, hh: 0.4, reef: true },
     { id: "tetra", name: "cenote tetra", col: 0x9ad0e8, len: 0.3, hh: 0.1, pond: true },
   ];
+  const ALL_BONUS = 300;                                         // denarii for seeing every creature, on top of the 20 for each one
   const SNORKEL_KEY = "rome-snorkel", HIRE = { x: 860, z: 130 }, HIRE_PRICE = 15;
   let snorkeling = false, haveGear = false, seen = new Set(), fish = [], fishBody = null, fishTail = null, overlay = null, hud = null;
   try { const v = JSON.parse(localStorage.getItem(SNORKEL_KEY) || "[]"); if (Array.isArray(v)) seen = new Set(v.filter((id) => SPECIES.some((s) => s.id === id))); } catch (e) { /* ignore */ }
@@ -476,7 +477,7 @@ const Cancun = (() => {
         const left = SPECIES.length - seen.size;
         Vitals.coins += 20; Sfx.play("coin");
         toast(`🐠 You spot ${/^[aeiou]/.test(f.sp.name) ? "an" : "a"} ${f.sp.name}! (+20 denarii) ${seen.size} of ${SPECIES.length} seen${left ? "" : ". You have seen them all!"}`);
-        if (!left) { Vitals.coins += 150; toast("🤿 You have seen every creature: +150 denarii. Master snorkeller!"); }
+        if (!left) { Vitals.coins += ALL_BONUS; Sfx.play("cheer"); toast(`🤿 You have seen every creature: +${ALL_BONUS} denarii! Master snorkeller!`); }
         return;
       }
     }
@@ -491,6 +492,7 @@ const Cancun = (() => {
     const ul = document.createElement("ul");
     for (const s of SPECIES) { const li = document.createElement("li"); li.className = seen.has(s.id) ? "seen" : ""; li.textContent = seen.has(s.id) ? `✓ ${s.name}` : `• ???${s.pond ? " (cenote)" : ""}`; ul.append(li); }
     card.append(ul);
+    const note = document.createElement("small"); note.textContent = seen.size === SPECIES.length ? `All found! ${ALL_BONUS} denarii paid` : `20 denarii each, and ${ALL_BONUS} more for all ${SPECIES.length}`; card.append(note);
     card.classList.toggle("done", seen.size === SPECIES.length);
   }
   const showCard = (v) => { if (!card) renderCard(); card.classList.toggle("show", !!v); };
