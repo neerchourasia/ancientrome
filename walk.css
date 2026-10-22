@@ -499,6 +499,13 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #creature-card li { color: rgba(220,240,245,.55); }
 #creature-card li.seen { color: #ffe08a; }
 #creature-card.done { border-color: #ffd36b; box-shadow: 0 0 10px rgba(255,211,107,.5); }
+#travel .tv-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+#travel .tv-list button { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; }
+#travel .tv-list button.here { opacity: .55; border-color: var(--gold); }
+#travel .tv-list button.here strong::after { content: "  (you are here)"; font-weight: 400; color: var(--muted); }
+#travel .tv-icon { font-size: 1.8rem; line-height: 1; }
+#travel .tv-list strong { display: block; color: var(--gold); }
+#travel .tv-list small { display: block; color: var(--muted); font-size: .76rem; margin-top: 2px; }
 #underwater { position: fixed; inset: 0; z-index: 2; display: none; pointer-events: none; background: radial-gradient(ellipse at 50% 38%, rgba(60,190,215,.12), rgba(10,90,130,.52) 78%), linear-gradient(rgba(20,120,160,.2), rgba(8,60,100,.38)); animation: uwsway 5s ease-in-out infinite; }
 #underwater.show { display: block; }
 @keyframes uwsway { 50% { background-position: 0 6px, 0 0; filter: hue-rotate(6deg); } }

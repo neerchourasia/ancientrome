@@ -149,7 +149,7 @@ function wireInput(canvas) {
     if (k === "KeyZ") toggleRest();
     if (k === "KeyK") toggleEra();
     if (k === "Enter" && (mode === "walk" || mode === "drive" || mode === "watch") && !panelOpen && !creatorOpen) { e.preventDefault(); Chat.open(); return; }
-    if (k === "KeyB") travel(NEXT_CITY[city]);
+    if (k === "KeyB") openTravel();
     if (k === "KeyN" && city === "delhi" && mode === "walk" && !panelOpen && canStart()) DGames.open();
     if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();
     if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
@@ -265,7 +265,8 @@ function wireInput(canvas) {
   });
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
-  $("#btn-city").addEventListener("click", () => travel(NEXT_CITY[city]));
+  $("#btn-city").addEventListener("click", openTravel);
+  for (const b of document.querySelectorAll("#travel .tv-list button")) b.addEventListener("click", () => { closePanels(); travel(b.dataset.city); });
   $("#btn-map").addEventListener("click", toggleBigMap);
   $("#btn-places").addEventListener("click", togglePlaces);
   $("#btn-dirs").addEventListener("click", toggleDirections);
@@ -1058,7 +1059,8 @@ function applyEra() {
   $("#era-badge").textContent = modern ? newName : oldName;
   $("#era-badge").classList.toggle("ancient", !modern);
   $("#btn-era").innerHTML = modern ? `${oldName} <kbd>K</kbd>` : `${newName} <kbd>K</kbd>`;
-  $("#btn-city").innerHTML = `✈ Travel to ${{ rome: "Rome", delhi: "Delhi", cancun: "Cancún" }[NEXT_CITY[city]]} <kbd>B</kbd>`;
+  $("#btn-city").innerHTML = "✈ Travel <kbd>B</kbd>";
+  for (const b of document.querySelectorAll("#travel .tv-list button")) { b.disabled = b.dataset.city === city; b.classList.toggle("here", b.dataset.city === city); }
   $("#hud .top-left h1").innerHTML = city === "rome" ? (modern ? "Time Machine <small>Modern Rome · today</small>" : "Time Machine <small>Ancient Rome · c. 128 AD</small>") : city === "cancun" ? (modern ? "Time Machine <small>Cancún · today</small>" : "Time Machine <small>Chichén Itzá · c. 1000 AD</small>") : (modern ? "Time Machine <small>Modern Delhi · today</small>" : "Time Machine <small>Mughal Delhi · c. 1650</small>");
   $("#btn-dgames").hidden = city !== "delhi";
   $("#map-title").textContent = city === "rome" ? "Map of Rome" : city === "cancun" ? "Map of Cancún and Chichén Itzá" : "Map of Old Delhi";
@@ -1085,6 +1087,15 @@ function toggleEra() {
 // Travel between Rome and Old Delhi: the screen fades, you arrive in the other city.
 let travelBusy = false;
 const mapCache = {};
+// The Travel button (or B): a list of the cities, and you choose where to go.
+function openTravel() {
+  if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
+  if ($("#travel").classList.contains("show")) { closePanels(); return; }
+  if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
+  for (const b of document.querySelectorAll("#travel .tv-list button")) { b.disabled = b.dataset.city === city; b.classList.toggle("here", b.dataset.city === city); }
+  openPanel("#travel");
+}
+
 function travel(to) {
   if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
