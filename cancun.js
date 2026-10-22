@@ -472,7 +472,7 @@ const Cancun = (() => {
       if (seen.has(f.sp.id)) continue;
       const px = f.cx + Math.cos(f.a) * f.r, pz = f.cz + Math.sin(f.a) * f.r;
       if (Math.hypot(px - player.x, pz - player.z) < 7 && Math.abs(f.y - (player.feet - 2)) < 8) {
-        seen.add(f.sp.id); saveSeen();
+        seen.add(f.sp.id); saveSeen(); renderCard();
         const left = SPECIES.length - seen.size;
         Vitals.coins += 20; Sfx.play("coin");
         toast(`🐠 You spot ${/^[aeiou]/.test(f.sp.name) ? "an" : "a"} ${f.sp.name}! (+20 denarii) ${seen.size} of ${SPECIES.length} seen${left ? "" : ". You have seen them all!"}`);
@@ -482,6 +482,18 @@ const Cancun = (() => {
     }
   }
 
+  // the list of creatures, always on the screen in Cancún: the ones you have seen by name, the rest as ???
+  let card = null;
+  function renderCard() {
+    if (!card) { card = document.createElement("div"); card.id = "creature-card"; card.setAttribute("aria-label", "Sea creatures you have seen"); document.body.append(card); }
+    card.replaceChildren();
+    const h = document.createElement("b"); h.textContent = `🐠 Creatures ${seen.size}/${SPECIES.length}`; card.append(h);
+    const ul = document.createElement("ul");
+    for (const s of SPECIES) { const li = document.createElement("li"); li.className = seen.has(s.id) ? "seen" : ""; li.textContent = seen.has(s.id) ? `✓ ${s.name}` : `• ???${s.pond ? " (cenote)" : ""}`; ul.append(li); }
+    card.append(ul);
+    card.classList.toggle("done", seen.size === SPECIES.length);
+  }
+  const showCard = (v) => { if (!card) renderCard(); card.classList.toggle("show", !!v); };
   function setSnorkel(on) {
     snorkeling = !!on;
     if (!overlay) {
@@ -555,7 +567,7 @@ const Cancun = (() => {
       body.instanceColor.needsUpdate = hat.instanceColor.needsUpdate = true;
     }
   }
-  const show = (v) => { if (root) root.visible = v; if (!v) { haveGear = false; if (snorkeling) setSnorkel(false); } };
+  const show = (v) => { if (root) root.visible = v; showCard(v && built); if (!v) { haveGear = false; if (snorkeling) setSnorkel(false); } };
   const homeInside = (x, z) => Math.abs(x - X(HOME.x)) < HOME.hw - 0.3 && Math.abs(z - HOME.z) < HOME.hd - 0.3;
   const homeSpot = () => ({ x: X(HOME.x), z: HOME.z + 1.4 });
   function update(dt, px, pz) {
@@ -573,7 +585,7 @@ const Cancun = (() => {
     build, show, setEra, update, homeInside, homeSpot, setEquinox, SPAWN, BOUNDS: BOUNDS_C, MAP: MAP_C,
     fishAt: () => fish.map((f) => [f.sp.id, f.cx + Math.cos(f.a) * f.r, f.y, f.cz + Math.sin(f.a) * f.r]),
     inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
-    snorkelSnapshot: () => [...seen], snorkelRestore: (a) => { if (Array.isArray(a)) for (const id of a) if (SPECIES.some((s) => s.id === id)) seen.add(id); saveSeen(); },
+    snorkelSnapshot: () => [...seen], snorkelRestore: (a) => { if (Array.isArray(a)) for (const id of a) if (SPECIES.some((s) => s.id === id)) seen.add(id); saveSeen(); if (card) renderCard(); },
     get built() { return built; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body, X,
     inHome: (x, z) => Math.abs(x - X(HOME.x)) < 14 && Math.abs(z - HOME.z) < 14,
   };
