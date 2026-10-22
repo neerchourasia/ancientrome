@@ -504,7 +504,8 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #btn-menu .spark { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 0 7px rgba(255,140,40,.65)); transition: transform .35s ease, filter .35s ease; }
 #btn-menu:hover .spark, #btn-menu:focus-visible .spark { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(255,170,60,.95)); }
 #btn-menu .mi { position: relative; font-size: 1.35rem; line-height: 1; color: #fff3cf; text-shadow: 0 0 6px #5a1d05, 0 1px 3px rgba(0,0,0,.9); }
-#btn-menu.alert::after { content: ""; position: absolute; top: 20px; right: 20px; width: 13px; height: 13px; border-radius: 50%; background: #ff2e2e; border: 2px solid #fff; box-shadow: 0 0 8px rgba(255,46,46,.9); }
+#btn-menu.alert .spark { filter: hue-rotate(185deg) saturate(1.5) brightness(1) drop-shadow(0 0 10px rgba(70,150,255,.95)); animation: fireAlert 1.1s ease-in-out infinite; }   /* something is waiting: the fireball burns blue */
+@keyframes fireAlert { 50% { filter: hue-rotate(190deg) saturate(1.9) brightness(1.12) drop-shadow(0 0 18px rgba(90,170,255,1)); transform: scale(1.06); } }
 .buttons.collapsed button:not(#btn-menu) { display: none !important; }
 #btn-gift.ready { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); animation: giftpulse 1.6s ease-in-out infinite; }
 @keyframes giftpulse { 50% { box-shadow: 0 0 14px rgba(255,211,107,1); } }
