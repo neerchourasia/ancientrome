@@ -682,7 +682,7 @@ const VIEWS = [
 ];
 let viewIndex = 0, camZoom = 1; // camZoom: the mouse wheel moves the camera closer or further away
 try { const i = VIEWS.findIndex((v) => v.id === localStorage.getItem("rome-view")); if (i >= 0) viewIndex = i; } catch (e) { /* storage unavailable */ }
-const viewId = () => VIEWS[viewIndex].id;
+const viewId = () => (typeof Cancun !== "undefined" && city === "cancun" && Cancun.snorkeling ? "first" : VIEWS[viewIndex].id);   // snorkelling is always seen through your own mask; your usual camera comes back when you surface
 
 // A person: you, and the other players online.
 function createFigure() {

@@ -376,6 +376,10 @@ const Cancun = (() => {
     { id: "barracuda", name: "barracuda", col: 0xb8c4cc, len: 2.0, hh: 0.16, reef: true },
     { id: "turtle", name: "green sea turtle", col: 0x4a7a3a, len: 1.4, hh: 0.2, wide: 1.1, reef: true },
     { id: "ray", name: "spotted eagle ray", col: 0x3a4a5a, len: 1.6, hh: 0.1, wide: 2.4, reef: true },
+    { id: "sergeant", name: "sergeant major", col: 0xe8d24a, len: 0.45, hh: 0.28, reef: true },
+    { id: "lionfish", name: "lionfish", col: 0xb5452a, len: 0.6, hh: 0.3, wide: 0.9, reef: true },
+    { id: "idol", name: "moorish idol", col: 0xf2e8a0, len: 0.55, hh: 0.45, reef: true },
+    { id: "grouper", name: "Nassau grouper", col: 0xb08a5a, len: 1.3, hh: 0.4, reef: true },
     { id: "tetra", name: "cenote tetra", col: 0x9ad0e8, len: 0.3, hh: 0.1, pond: true },
   ];
   const SNORKEL_KEY = "rome-snorkel", HIRE = { x: 860, z: 130 }, HIRE_PRICE = 15;
@@ -406,11 +410,11 @@ const Cancun = (() => {
     const anchor = new T.Mesh(new T.TorusGeometry(0.6, 0.1, 6, 12), C.dark); anchor.position.set(3.5, 0.6, 2); anchor.rotation.x = 1.2; wreck.add(anchor); root.add(wreck);
     // the fish: bodies and tails, each in a school that swims slowly in circles over the reef (and a few tetras in the cenote)
     const reefSp = SPECIES.filter((s) => s.reef), pondSp = SPECIES.filter((s) => s.pond);
-    const total = 118;
+    const REEF_FISH = 330, total = REEF_FISH + 22;                                                  // lots of fish: schools of every kind over each patch of reef
     fishBody = new T.InstancedMesh(new T.SphereGeometry(0.5, 8, 6), new T.MeshLambertMaterial({ color: 0xffffff }), total);
     fishTail = new T.InstancedMesh(new T.ConeGeometry(0.28, 0.5, 4), new T.MeshLambertMaterial({ color: 0xffffff }), total);
     for (let i = 0; i < total; i++) {
-      const inPd = i >= 100, sp = inPd ? pondSp[0] : reefSp[i % reefSp.length], c = inPd ? [POND.x, POND.z, 6] : clusters[i % clusters.length].concat([14 + rnd() * 16]);
+      const inPd = i >= REEF_FISH, sp = inPd ? pondSp[0] : reefSp[i % reefSp.length], c = inPd ? [POND.x, POND.z, 6] : clusters[i % clusters.length].concat([14 + rnd() * 16]);
       const cx = inPd ? POND.x : c[0], cz = inPd ? POND.z : c[1];
       fish.push({ sp, cx: X(cx), cz, r: inPd ? 2 + rnd() * 7 : 4 + rnd() * c[2], a: rnd() * 6.28, w: (0.25 + rnd() * 0.45) * (rnd() < 0.5 ? 1 : -1) * (sp.len > 1 ? 0.5 : 1), y: inPd ? -1.5 - rnd() * 6 : -5 + rnd() * 3.6, ph: rnd() * 6 });
       fishBody.setColorAt(i, new T.Color(sp.col)); fishTail.setColorAt(i, new T.Color(sp.col).multiplyScalar(0.8));
