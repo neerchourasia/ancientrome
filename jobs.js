@@ -25,12 +25,16 @@ const Jobs = (() => {
     props: { name: "Scenery crew", base: 35, icon: "🏛", text: "Hoist the painted scenery up to the arena. Press Space when the marker is inside the green. Ten hoists to a shift." },
   };
   // the jobs on the job board at the market square (in both cities); `names` are the local names
-  const BOARD = ["baker", "scribe", "groom", "courier", "water", "haggler", "smith", "watch"];
+  const BOARD = ["baker", "scribe", "groom", "courier", "drive", "fly", "water", "haggler", "smith", "watch"];
   Object.assign(JOBS, {
     baker: { name: "Baker", names: { rome: "Baker", delhi: "Halwai (sweet maker)" }, base: 28, icon: "🍞", board: true, text: "Keep the oven at the right heat. Hold Space (or the button) to feed the fire and let go to let it cool. Keep the heat in the green." },
     scribe: { name: "Scribe", names: { rome: "Scribe", delhi: "Munshi (clerk)" }, base: 32, icon: "✍", board: true, text: "Copy the letters as they appear: press the same key as fast as you can. Each letter you miss costs you." },
     groom: { name: "Stable hand", names: { rome: "Stable hand", delhi: "Mahout's helper" }, base: 36, icon: "🐴", board: true, text: "Remember the order the animals are fed in, then repeat it with keys 1 to 4. Each round adds one more." },
     courier: { name: "Messenger", names: { rome: "Messenger", delhi: "Harkara (runner)" }, base: 55, icon: "📜", board: true, run: true, text: "Carry a message across the city to a landmark before time runs out. The sooner you arrive, the more you are paid." },
+  });
+  Object.assign(JOBS, {   // jobs for the modern cities: deliveries that you do in a vehicle you own
+    drive: { name: "Delivery driver", base: 85, icon: "📦", board: true, run: true, mode: "drive", only: "modern", text: "Take a parcel across the city by road before time runs out. You must arrive in a car, bike, bus or any other road vehicle you own (buy one at the animals and rides stall)." },
+    fly: { name: "Air freight pilot", base: 180, icon: "✈", board: true, run: true, mode: "fly", only: "modern", text: "Fly a cargo across the city before time runs out, and arrive in an aircraft you own (a plane, helicopter, balloon...). Faster aircraft make it easy; a balloon makes it hard." },
   });
   Object.assign(JOBS, {   // jobs only Ancient Rome has
     water: { name: "Water carrier", names: { rome: "Water carrier (aquarius)" }, base: 30, icon: "🪣", board: true, only: "rome-ancient", text: "Carry two full buckets from the fountain without spilling. They sway: hold A or D (or the buttons) to lean against the swing and keep the bar in the middle." },
@@ -46,7 +50,7 @@ const Jobs = (() => {
     gates: { name: "Starting-gate keeper", mech: "props", place: "circus", only: "rome-ancient", base: 40, icon: "🚩", text: "Drop the starting rope when the chariots are lined up. Press Space when the marker is inside the green. Ten races to a shift." },
     wheel: { name: "Wheelwright", mech: "smith", place: "circus", only: "rome-ancient", base: 44, icon: "🛞", text: "Fit the iron rims to the chariot wheels while they glow orange: press Space when the iron is the right colour. Twelve wheels to a shift." },
   });
-  const jobHere = (job) => !job.only || (typeof city !== "undefined" && typeof era !== "undefined" && job.only === `${city}-${era}`);
+  const jobHere = (job) => !job.only || (typeof city !== "undefined" && typeof era !== "undefined" && (job.only === `${city}-${era}` || job.only === era));
   const jobName = (kind) => { const j = JOBS[kind]; return (j.names && j.names[typeof city !== "undefined" ? city : "rome"]) || j.name; };
   const BEASTS = [["🦁", "Lion"], ["🐻", "Bear"], ["🐆", "Leopard"], ["🐗", "Boar"]];
 
@@ -453,7 +457,7 @@ const Jobs = (() => {
     { title: "Hypogeum, under the Colosseum", where: "Ancient Rome: the stair-house by the Colosseum's west gate", city: "rome", era: "ancient", lm: "hypogeum", jobs: ["capstan", "keeper", "props"] },
     { title: "Circus Office, at the Circus Maximus", where: "Ancient Rome: the hut by the starting gates", city: "rome", era: "ancient", lm: "circusjobs", jobs: CIRCUS },
     { title: "Job board in Rome's market", where: "Rome: the market square south of the Forum (some jobs are Ancient Rome only)", city: "rome", era: null, lm: "market", jobs: BOARD },
-    { title: "Job board in Delhi's market", where: "Old Delhi: the market square south of the Lahori Gate", city: "delhi", era: null, lm: "g-market", jobs: ["baker", "scribe", "groom", "courier"] },
+    { title: "Job board in Delhi's market", where: "Old Delhi: the market square south of the Lahori Gate", city: "delhi", era: null, lm: "g-market", jobs: ["baker", "scribe", "groom", "courier", "drive", "fly"] },
   ];
   const nameIn = (kind, c) => { const j = JOBS[kind]; return (j.names && j.names[c]) || j.name; };
 
@@ -498,23 +502,29 @@ const Jobs = (() => {
       const job = JOBS[kind], li = document.createElement("li"), sp = document.createElement("span"), n = document.createElement("strong"), d = document.createElement("small"), b = document.createElement("button");
       n.textContent = `${job.icon} ${jobName(kind)}`; d.textContent = `${job.text} Pays up to ${Math.round(job.base * r.mul * (typeof Festival !== "undefined" ? Festival.payMul : 1))} denarii.`;
       sp.append(n, d); b.type = "button"; b.textContent = Vitals.hp >= MIN_HP ? "Take the job" : "Too tired"; b.disabled = Vitals.hp < MIN_HP;
-      b.addEventListener("click", () => { closePanels(); if (JOBS[kind].run) startCourier(); else open(kind); });
+      b.addEventListener("click", () => { closePanels(); if (JOBS[kind].run) startCourier(kind); else open(kind); });
       li.append(sp, b); ul.append(li);
     }
   }
 
   // The messenger: carry a message to a landmark across the city before the time is up (the game's directions arrow shows the way)
   let courier = null;
-  function startCourier() {
-    if (courier) { toast("You are already carrying a message."); return; }
+  const ownsVehicle = (wantFly) => typeof Car !== "undefined" && typeof Market !== "undefined" && Object.keys(Market.ITEMS).some((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!Car.MODELS[id].fly === wantFly && Market.owns(id));
+  function startCourier(kind = "courier") {
+    if (courier) { toast("You are already carrying something."); return; }
+    const job = JOBS[kind], mode = job.mode || "run";
+    if (mode !== "run" && !ownsVehicle(mode === "fly")) { toast(mode === "fly" ? "You need an aircraft of your own for this job. Buy one at the animals and rides stall." : "You need a car, bike or other road vehicle of your own for this job. Buy one at the animals and rides stall."); return; }
+    const [lo, hi] = mode === "fly" ? [500, 1400] : mode === "drive" ? [250, 800] : [120, 600];
     const list = (typeof LANDMARKS !== "undefined" ? LANDMARKS : []).filter((l) => !l.home && !l.game);
-    const cands = list.map((l) => ({ l, d: Math.hypot(l.x - player.x, l.z - player.z) })).filter((c) => c.d > 120 && c.d < 600);
-    if (!cands.length) { toast("There is nowhere to send a message from here."); return; }
-    const pick = cands[Math.floor(Math.random() * cands.length)], total = Math.round(pick.d / 6.5 + 35);
-    courier = { lm: pick.l, until: performance.now() + total * 1000, total, hudT: 0 };
+    let cands = list.map((l) => ({ l, d: Math.hypot(l.x - player.x, l.z - player.z) })).filter((c) => c.d > lo && c.d < hi);
+    if (!cands.length) cands = list.map((l) => ({ l, d: Math.hypot(l.x - player.x, l.z - player.z) })).filter((c) => c.d > lo * 0.5 && c.d < hi * 1.4);
+    if (!cands.length) { toast("There is nowhere to send it from here."); return; }
+    const pick = cands[Math.floor(Math.random() * cands.length)], total = Math.round(mode === "fly" ? pick.d / 26 + 45 : mode === "drive" ? pick.d / 9 + 30 : pick.d / 6.5 + 35);
+    courier = { lm: pick.l, until: performance.now() + total * 1000, total, hudT: 0, kind, mode, city: typeof city !== "undefined" ? city : "rome" };
     if (typeof startDirections === "function") startDirections(pick.l);
-    toast(`Take this message to ${pick.l.name}: ${Math.round(pick.d)} m, you have ${total} seconds.`);
-    Narrator.say(`Deliver the message to ${pick.l.name} within ${total} seconds.`, { interrupt: true });
+    const what = mode === "fly" ? "this cargo" : mode === "drive" ? "this parcel" : "this message";
+    toast(`Take ${what} to ${pick.l.name}: ${Math.round(pick.d)} m, you have ${total} seconds.${mode === "run" ? "" : mode === "fly" ? " Get in your aircraft and fly there!" : " Get in your vehicle and drive there!"}`);
+    Narrator.say(`Deliver ${what} to ${pick.l.name} within ${total} seconds.`, { interrupt: true });
     courierHud();
   }
   function courierHud() {
@@ -522,21 +532,26 @@ const Jobs = (() => {
     if (!courier) { el.classList.remove("show"); return; }
     const left = Math.max(0, Math.round((courier.until - performance.now()) / 1000)), d = Math.round(Math.hypot(courier.lm.x - player.x, courier.lm.z - player.z));
     const ang = Math.atan2(courier.lm.x - player.x, -(courier.lm.z - player.z)), dir = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8];
-    el.innerHTML = `<strong>📜 Deliver the message to ${courier.lm.name}</strong><span>${d} m to the ${dir}. ${left} s left. Follow the directions arrow, or open Places (P) to see it.</span>`; el.classList.add("show");
+    el.innerHTML = `<strong>${JOBS[courier.kind].icon} Deliver ${courier.mode === "fly" ? "the cargo" : courier.mode === "drive" ? "the parcel" : "the message"} to ${courier.lm.name}</strong><span>${d} m to the ${dir}. ${left} s left. Follow the directions arrow, or open Places (P) to see it.</span>`; el.classList.add("show");
   }
   function courierUpdate(dt) {
     if (!courier) return;
     courier.hudT -= dt; if (courier.hudT <= 0) { courier.hudT = 0.5; courierHud(); }
-    if (typeof city !== "undefined" && courier.lm.x > 3000 !== (city === "delhi")) { courier = null; courierHud(); toast("You left the city: the message is lost."); return; }
+    if (typeof city !== "undefined" && city !== courier.city) { courier = null; courierHud(); toast("You left the city: the delivery is lost."); return; }
     const left = (courier.until - performance.now()) / 1000, d = Math.hypot(courier.lm.x - player.x, courier.lm.z - player.z);
-    if (d < Math.max(14, courier.lm.r * 0.35)) {
-      const r = rank(), pay = Math.round(JOBS.courier.base * r.mul * (0.4 + 0.6 * Math.max(0, left) / courier.total) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
+    const cur = courier.mode !== "run" && typeof Car !== "undefined" && Car.driving ? Car.MODELS[Car.current] : null;
+    const wrongWay = (courier.mode === "drive" && (!cur || cur.fly)) || (courier.mode === "fly" && (!cur || !cur.fly));          // a delivery must arrive in a vehicle (or aircraft)
+    const close = d < (courier.mode === "fly" ? Math.max(45, courier.lm.r * 0.6) : Math.max(14, courier.lm.r * 0.35));
+    if (close && wrongWay) { if ((courier.nag = (courier.nag || 0) - dt) <= 0) { courier.nag = 6; toast(courier.mode === "fly" ? "Arrive in an aircraft!" : "Arrive in a vehicle: you cannot carry this on foot!"); } }
+    else if (close) {
+      const r = rank(), pay = Math.round(JOBS[courier.kind].base * r.mul * (0.4 + 0.6 * Math.max(0, left) / courier.total) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
       Vitals.coins += pay; Vitals.hp -= 5; s.shifts++; s.earned += pay; save(); Sfx.play("coin");
-      toast(`Message delivered to ${courier.lm.name}! You earn ${pay} denarii.`); Narrator.say(`Message delivered. You earn ${pay} denarii.`, { interrupt: true });
+      const done = courier.mode === "fly" ? "Cargo" : courier.mode === "drive" ? "Parcel" : "Message";
+      toast(`${done} delivered to ${courier.lm.name}! You earn ${pay} denarii.`); Narrator.say(`${done} delivered. You earn ${pay} denarii.`, { interrupt: true });
       if (typeof Nav !== "undefined" && Nav.clear) Nav.clear();
       courier = null; courierHud();
     } else if (left <= 0) {
-      toast("Too late: the message is worthless now."); Narrator.say("Too late. The message is worthless now.", { interrupt: true });
+      toast("Too late: the delivery is worthless now."); Narrator.say("Too late. The delivery is worthless now.", { interrupt: true });
       if (typeof Nav !== "undefined" && Nav.clear) Nav.clear();
       courier = null; courierHud();
     }
