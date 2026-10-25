@@ -7,7 +7,7 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="walk.css?v=289">
+  <link rel="stylesheet" href="walk.css?v=292">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -16,7 +16,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=289"></script>
+  <script src="boot.js?v=292"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -156,7 +156,7 @@
 
     <div id="dg-hud"><strong id="dg-title"></strong><span id="dg-info"></span><div class="bar" id="dg-bar-row"><div id="dg-bar"></div></div><p id="dg-keys"></p></div>
 
-    <div id="drive-hud"><span id="drive-kmh">0</span> <small>km/h</small><p><kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out</p></div>
+    <div id="drive-hud"><span id="drive-kmh">0</span> <small>km/h</small><small id="drive-alt"></small><p id="drive-keys"><kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out</p></div>
 
     <div id="race-hud">
       <div class="stats">
@@ -514,56 +514,56 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=289"></script>
-  <script src="cancun-data.js?v=289"></script>
-  <script src="delhi-data.js?v=289"></script>
-  <script src="config.js?v=289"></script>
-  <script src="character.js?v=289"></script>
-  <script src="physics.js?v=289"></script>
-  <script src="vitals.js?v=289"></script>
-  <script src="narrator.js?v=289"></script>
-  <script src="audio.js?v=289"></script>
-  <script src="music.js?v=289"></script>
-  <script src="world.js?v=289"></script>
-  <script src="city.js?v=289"></script>
-  <script src="weather.js?v=289"></script>
-  <script src="modern.js?v=289"></script>
-  <script src="delhi.js?v=289"></script>
-  <script src="cancun.js?v=289"></script>
-  <script src="delhi-games.js?v=289"></script>
-  <script src="doors.js?v=289"></script>
-  <script src="home.js?v=289"></script>
-  <script src="spectators.js?v=289"></script>
-  <script src="fight.js?v=289"></script>
-  <script src="nav.js?v=289"></script>
-  <script src="show.js?v=289"></script>
-  <script src="shipyard.js?v=289"></script>
-  <script src="naval.js?v=289"></script>
-  <script src="theatre.js?v=289"></script>
-  <script src="watch.js?v=289"></script>
-  <script src="race.js?v=289"></script>
-  <script src="account.js?v=289"></script>
-  <script src="online.js?v=289"></script>
-  <script src="chat.js?v=289"></script>
-  <script src="social.js?v=289"></script>
-  <script src="gifts.js?v=289"></script>
-  <script src="tax.js?v=289"></script>
-  <script src="pets.js?v=289"></script>
-  <script src="cage.js?v=289"></script>
-  <script src="car.js?v=289"></script>
-  <script src="market.js?v=289"></script>
-  <script src="garage.js?v=289"></script>
-  <script src="dresser.js?v=289"></script>
-  <script src="festival.js?v=289"></script>
-  <script src="harbour.js?v=289"></script>
-  <script src="disease.js?v=289"></script>
-  <script src="jail.js?v=289"></script>
-  <script src="guards.js?v=289"></script>
-  <script src="police.js?v=289"></script>
-  <script src="weapons.js?v=289"></script>
-  <script src="stalls.js?v=289"></script>
-  <script src="robbery.js?v=289"></script>
-  <script src="jobs.js?v=289"></script>
-  <script src="game.js?v=289"></script>
+  <script src="landmarks.js?v=292"></script>
+  <script src="cancun-data.js?v=292"></script>
+  <script src="delhi-data.js?v=292"></script>
+  <script src="config.js?v=292"></script>
+  <script src="character.js?v=292"></script>
+  <script src="physics.js?v=292"></script>
+  <script src="vitals.js?v=292"></script>
+  <script src="narrator.js?v=292"></script>
+  <script src="audio.js?v=292"></script>
+  <script src="music.js?v=292"></script>
+  <script src="world.js?v=292"></script>
+  <script src="city.js?v=292"></script>
+  <script src="weather.js?v=292"></script>
+  <script src="modern.js?v=292"></script>
+  <script src="delhi.js?v=292"></script>
+  <script src="cancun.js?v=292"></script>
+  <script src="delhi-games.js?v=292"></script>
+  <script src="doors.js?v=292"></script>
+  <script src="home.js?v=292"></script>
+  <script src="spectators.js?v=292"></script>
+  <script src="fight.js?v=292"></script>
+  <script src="nav.js?v=292"></script>
+  <script src="show.js?v=292"></script>
+  <script src="shipyard.js?v=292"></script>
+  <script src="naval.js?v=292"></script>
+  <script src="theatre.js?v=292"></script>
+  <script src="watch.js?v=292"></script>
+  <script src="race.js?v=292"></script>
+  <script src="account.js?v=292"></script>
+  <script src="online.js?v=292"></script>
+  <script src="chat.js?v=292"></script>
+  <script src="social.js?v=292"></script>
+  <script src="gifts.js?v=292"></script>
+  <script src="tax.js?v=292"></script>
+  <script src="pets.js?v=292"></script>
+  <script src="cage.js?v=292"></script>
+  <script src="car.js?v=292"></script>
+  <script src="market.js?v=292"></script>
+  <script src="garage.js?v=292"></script>
+  <script src="dresser.js?v=292"></script>
+  <script src="festival.js?v=292"></script>
+  <script src="harbour.js?v=292"></script>
+  <script src="disease.js?v=292"></script>
+  <script src="jail.js?v=292"></script>
+  <script src="guards.js?v=292"></script>
+  <script src="police.js?v=292"></script>
+  <script src="weapons.js?v=292"></script>
+  <script src="stalls.js?v=292"></script>
+  <script src="robbery.js?v=292"></script>
+  <script src="jobs.js?v=292"></script>
+  <script src="game.js?v=292"></script>
 </body>
 </html>

@@ -17,6 +17,7 @@ const Car = (() => {
     suv: { name: "SUV", max: 28, accel: 11, turn: 1.9, color: 0x3a5a3a, len: 4.8, wid: 2.0 },
     taxi: { name: "Taxi", max: 25, accel: 10, turn: 2.0, color: 0xf2c21b, len: 4.2, wid: 1.8 },
     truck: { name: "Delivery truck", max: 20, accel: 7, turn: 1.5, color: 0xe8e8e8, len: 6.4, wid: 2.2 },
+    plane: { name: "Light plane", max: 62, accel: 7, turn: 1.2, color: 0xf2f2f4, len: 7.2, wid: 2.4, fly: true, verb: "climb in" },   // flies (see flyUpdate); wings are wider than the hull, which is what hits things
     bus: { name: "Bus", max: 17, accel: 5.5, turn: 1.25, color: 0xd9411f, len: 9.0, wid: 2.5 },
     chariot: { name: "Chariot", max: 21, accel: 9, turn: 1.9, color: 0xb3262b, len: 3.6, wid: 1.4, era: "ancient", motor: false, camH: 2.4, verb: "climb on" },
     horse: { name: "Horse", max: 18, accel: 9, turn: 2.2, color: 0x7a4a2a, len: 2.8, wid: 1.0, era: "ancient", motor: false, camH: 2.5, verb: "climb on" },
@@ -120,6 +121,17 @@ const Car = (() => {
       g.add(box(1.5, 0.15, 1.7, lam(0x7a3a2a), 0, 4.25, 0.2));
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.1, 1.5, 0.1, gold, sx * 0.7, 5.0, 0.2 + sz * 0.75));
       g.add(box(1.7, 0.1, 1.9, red, 0, 5.8, 0.2));
+    } else if (id === "plane") {                       // a small propeller plane: a fuselage, high wings, a tail, three wheels and a propeller
+      const white = lam(0xf2f2f4), red = lam(0xc0262b), dk = lam(0x2b2b2b);
+      g.add(box(1.3, 1.2, 5.2, white, 0, 1.3, 0.3), box(1.34, 0.28, 5.24, red, 0, 1.12, 0.3));          // the body and a red stripe
+      g.add(box(1.1, 0.9, 1.2, dk, 0, 1.3, -2.8), box(1.0, 0.7, 1.4, white, 0, 1.55, -0.9));              // the engine and the cockpit
+      g.add(box(1.0, 0.6, 1.1, lam(0x1d3a4a), 0, 1.85, -0.9));                                           // the canopy
+      g.add(box(11, 0.16, 1.8, white, 0, 2.4, -0.7), box(11.04, 0.18, 0.4, red, 0, 2.4, -1.4));           // the wing and its red front edge
+      g.add(box(0.12, 1.3, 1.1, white, 0, 2.2, 3.2), box(3.6, 0.12, 1.0, white, 0, 1.55, 3.2));          // the tail fin and the tailplane
+      for (const sx of [-1, 1]) g.add(box(0.1, 1.3, 0.1, dk, sx * 1.6, 1.8, -0.7));                       // the wing struts
+      g.add(box(0.1, 0.9, 0.1, dk, 0, 0.55, -1.8), box(0.1, 0.8, 0.1, dk, -0.8, 0.55, 0.6), box(0.1, 0.8, 0.1, dk, 0.8, 0.55, 0.6));
+      for (const [x, z, r] of [[0, -1.8, 0.28], [-0.8, 0.6, 0.3], [0.8, 0.6, 0.3]]) { const w = wheel(r, 0.14, x, r, z); g.add(w); wheels.push(w); }
+      const prop = new THREE.Group(); prop.position.set(0, 1.3, -3.45); prop.add(box(0.18, 2.5, 0.08, dk, 0, 0, 0), box(2.5, 0.18, 0.08, dk, 0, 0, 0.01)); g.add(prop); g.userData.prop = prop;
     } else {
       const L = M.len, W = M.wid, low = id === "sportscar";
       g.add(box(W, low ? 0.5 : 0.65, L, body, 0, low ? 0.5 : 0.6, 0));
@@ -152,7 +164,7 @@ const Car = (() => {
     }
     if (!spot) { toast("There is no room to park here. Find an open street."); return; }
     const m = build(id);
-    car = { id, M: MODELS[id], x: spot[0], z: spot[1], yaw: player.yaw, v: 0, ...m, y: groundAt(spot[0], spot[1]) };
+    car = { id, M: MODELS[id], x: spot[0], z: spot[1], yaw: player.yaw, v: 0, ...m, y: groundAt(spot[0], spot[1]), alt: 0, vy: 0, pitch: 0, roll: 0, throttle: 0 };
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
     scene.add(car.g);
     placeCircles(true);
@@ -175,11 +187,19 @@ const Car = (() => {
     camYaw = car.yaw;
     player.vx = player.vz = 0; Vitals.stopRest();
     $("#drive-hud").classList.add("show");
+    $("#drive-alt").textContent = "";
+    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
+    if (car.M.fly) { toast("Plane: W for power, and above about 100 km/h hold Space to take off. Shift dives. Land gently on a long street or a square, and press X to get out."); return; }
     toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
 
   function exit(silent) {
     if (!driving) return;
+    if (car.M.fly && car.alt > 1.5) {                                                                // you cannot step out of a plane in the air (unless you are forced to)
+      if (!silent) { toast("Land first! Slow down and come down gently on a street or a square."); return; }
+      car.alt = 0; car.vy = 0; car.y = groundAt(car.x, car.z); car.g.position.y = car.y;
+    }
+    if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
     driving = false; car.v = 0;
     mode = "walk";
     $("#drive-hud").classList.remove("show");
@@ -228,8 +248,108 @@ const Car = (() => {
     return true;
   }
 
+  // ---------------------------------------------------------------- the plane
+  // W / S: more or less engine power (S also brakes on the ground) · A D: turn (the plane banks) · Space: climb · Shift: dive. On the ground you roll
+  // faster and faster: above about 100 km/h hold Space and you lift off; below about 95 km/h in the air you sink. Land gently (not too fast, not too steeply)
+  // on a street or a square. Fly to the edge of the city and press F to fly on to the next city.
+  const PLANE = { stall: 26, lift: 28, ceiling: 360 };
+  function crashPlane(why) {
+    Vitals.hp = Math.max(0, Vitals.hp - 38); player.shake = 1; $("#flash").style.opacity = 0.6; Sfx.play("crash");
+    toast(`Crash! ${why} (-38 health)`);
+    car.v = 0; car.vy = 0; car.alt = 0; car.throttle = 0; car.roll = car.pitch = 0;
+    if (!clearAt(car.x, car.z, car.yaw)) rescue();
+  }
+  let edgeT = 0, flyHint = false;
+  function flyUpdate(dt, keys) {
+    const M = car.M;
+    const up = keys.has("Space"), dive = keys.has("ShiftLeft") || keys.has("ShiftRight");
+    const thrUp = keys.has("KeyW") || keys.has("ArrowUp"), thrDown = keys.has("KeyS") || keys.has("ArrowDown");
+    const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+    car.throttle = Math.max(0, Math.min(1, (car.throttle || 0) + (thrUp ? 0.55 : 0) * dt - (thrDown ? 0.9 : 0) * dt));
+    const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
+    // speed
+    car.v += (car.throttle * M.max - car.v) * (air ? 0.2 : 0.28) * dt;
+    if (!air && thrDown && car.throttle === 0) car.v -= 16 * dt;                                  // brakes on the ground
+    if (!air && !thrUp && car.throttle === 0) car.v -= 2.2 * dt;
+    car.v = Math.max(0, car.v);
+    // climbing and diving: only fast enough to fly, and below the stalling speed the plane sinks
+    const lift = Math.min(1, Math.max(0, (car.v - PLANE.lift + 4) / 16));
+    let vyT = 0;
+    if (up) vyT = 12 * lift;
+    else if (dive && air) vyT = -14;
+    else if (air) vyT = car.v < PLANE.stall ? -(PLANE.stall - car.v) * 0.8 - 2 : 0;
+    car.vy += (vyT - car.vy) * Math.min(1, dt * 2.6);
+    if (!air && car.vy < 0) car.vy = 0;
+    car.alt += car.vy * dt;
+    car.v = Math.max(0, car.v - car.vy * 0.12 * dt);                                               // climbing costs a little speed, diving gives it back
+    if (car.alt > PLANE.ceiling) { car.alt = PLANE.ceiling; car.vy = Math.min(0, car.vy); }
+    if (car.alt <= 0) {                                                                            // touching down
+      if (air && (car.vy < -9 || car.v > 56)) { crashPlane(car.vy < -9 ? "You came down too steeply." : "You landed too fast."); }
+      else if (air) { Sfx.play("bump"); }
+      car.alt = 0; car.vy = 0;
+    }
+    // turning (the plane banks into the turn)
+    const fast = Math.min(1, car.v / 22);
+    car.yaw += steer * (car.alt > 0.4 ? 0.9 : car.v > 2 ? 0.6 : 0) * fast * dt;
+    car.roll += ((car.alt > 0.4 ? steer * 0.6 : 0) - car.roll) * Math.min(1, dt * 3);
+    car.pitch += (Math.max(-0.5, Math.min(0.5, car.vy / 26)) - car.pitch) * Math.min(1, dt * 3);
+    // moving: on the ground like a car, in the air over whatever is lower than the plane
+    const dx = -Math.sin(car.yaw) * car.v * dt, dz = -Math.cos(car.yaw) * car.v * dt;
+    if (car.alt > 0.4) {
+      const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx;
+      let hit = false;
+      for (const [a, b] of [[M.len / 2 + 0.3, 0], [0, 0], [-M.len / 2, 0], [0, 5.3], [0, -5.3]]) {                        // nose, middle, tail and the two wing tips
+        const x = car.x + dx + fx * a + rx * b, z = car.z + dz + fz * a + rz * b;
+        if (blockedAt(x, z, groundAt(x, z) + car.alt)) hit = true;
+      }
+      if (hit) crashPlane("You flew into a building.");
+      else { car.x += dx; car.z += dz; }
+    } else if (fits(dx, dz)) { car.x += dx; car.z += dz; }
+    else if (Math.abs(dx) > 1e-4 && fits(dx, 0)) { car.x += dx; car.v *= 1 - 1.6 * dt; }
+    else if (Math.abs(dz) > 1e-4 && fits(0, dz)) { car.z += dz; car.v *= 1 - 1.6 * dt; }
+    else if (car.v > 1) { if (bumpCd <= 0) { bumpCd = 0.9; Sfx.play("bump"); if (car.v > 8) { Vitals.hp = Math.max(0, Vitals.hp - car.v * 0.8); player.shake = 0.6; toast("Bump!"); } } car.v *= 0.2; }
+    bumpCd = Math.max(0, bumpCd - dt);
+    // the edge of the city: high up you can fly on to the next one
+    const b = BOUNDS, m = 25;
+    let edge = false;
+    if (car.x < b.minX + m) { car.x = b.minX + m; edge = true; } if (car.x > b.maxX - m) { car.x = b.maxX - m; edge = true; }
+    if (car.z < b.minZ + m) { car.z = b.minZ + m; edge = true; } if (car.z > b.maxZ - m) { car.z = b.maxZ - m; edge = true; }
+    flyOnReady = edge && car.alt > 50;
+    if (flyOnReady && !flyHint) { flyHint = true; toast("✈ You have reached the edge of the city. Press F to fly on to the next city."); }
+    if (!flyOnReady) flyHint = false;
+    // the plane, the camera target and you all move together
+    car.y = ground + car.alt + 0.0;
+    car.g.position.set(car.x, car.y, car.z); car.g.rotation.order = "YXZ"; car.g.rotation.set(car.pitch, car.yaw, car.roll);
+    if (car.g.userData.prop) car.g.userData.prop.rotation.z += (4 + car.throttle * 70) * dt;
+    for (const w of car.wheels) w.rotation.x += (car.v * dt) / 0.3;
+    player.x = car.x; player.z = car.z; player.yaw = car.yaw; player.feet = car.y; player.vx = player.vz = 0;
+    $("#drive-kmh").textContent = Math.round(Math.abs(car.v) * 3.6);
+    $("#drive-alt").textContent = ` · ${Math.round(car.alt)} m up · power ${Math.round(car.throttle * 100)}%`;
+  }
+  let flyOnReady = false;
+  // fly on from the edge of the city to the next one: you arrive high above it, flying
+  function flyOn() {
+    if (!car || !driving || !car.M.fly || !flyOnReady || travelBusy) return false;
+    const to = NEXT_CITY[city];
+    travelBusy = true; $("#sleep").classList.add("on");
+    setTimeout(() => {
+      try {
+        arriveIn(to);
+        mode = "drive";
+        car.x = player.x; car.z = player.z; car.yaw = player.yaw; car.alt = 130; car.vy = 0; car.v = Math.max(car.v, 38); car.throttle = Math.max(car.throttle, 0.6);
+        car.y = groundAt(car.x, car.z) + car.alt; car.g.position.set(car.x, car.y, car.z);
+        player.feet = car.y; flyOnReady = false; flyHint = false;
+        $("#drive-hud").classList.add("show");
+        toast(`You fly on to ${CITY_NAMES[to]}. Land on a long street or a square when you are ready (hold Shift to dive, S to slow down).`);
+      } catch (e) { console.error(e); toast("Could not fly on"); }
+      $("#sleep").classList.remove("on"); travelBusy = false;
+    }, 900);
+    return true;
+  }
+
   function update(dt, keys) {
     if (!car || !driving) return;
+    if (car.M.fly) { flyUpdate(dt, keys); return; }
     const M = car.M;
     bumpCd = Math.max(0, bumpCd - dt); runCd = Math.max(0, runCd - dt);
     const gas = keys.has("KeyW") || keys.has("ArrowUp"), brake = keys.has("KeyS") || keys.has("ArrowDown");
@@ -300,6 +420,16 @@ const Car = (() => {
   // The chase camera sits behind and above the car and swings round after it.
   function camera(cam, dt) {
     if (!car) return;
+    if (car.M.fly) {                                                                                   // behind and above the plane, looking where it is going
+      let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      camYaw += dy * Math.min(1, dt * 2.6);
+      const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), d = 17 + car.v * 0.07, cx = car.x - fx * d, cz = car.z - fz * d;
+      cam.position.set(cx, Math.max(groundAt(cx, cz) + 1.6, car.y + 5.2 - car.pitch * 6), cz);
+      cam.lookAt(car.x + fx * 9, car.y + 1.3 + car.pitch * 5, car.z + fz * 9);
+      if (player.shake > 0) { cam.position.x += (Math.random() - 0.5) * player.shake * 0.4; cam.position.y += (Math.random() - 0.5) * player.shake * 0.3; player.shake = Math.max(0, player.shake - dt * 2.4); }
+      const f = $("#flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
+      return;
+    }
     let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
     camYaw += dy * Math.min(1, dt * 4);
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
@@ -343,7 +473,9 @@ const Car = (() => {
     // what other players should see of your vehicle: the one you are in, or the one you left parked
     share: () => (car ? { veh: driving ? car.id : null, park: driving ? null : [car.id, +car.x.toFixed(1), +car.z.toFixed(1), +car.yaw.toFixed(2)] } : { veh: null, park: null }),
     get speed() { return car && driving ? Math.abs(car.v) : 0; },
-    state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v } : null),                      // where your car is and how fast (the police chase it)
+    state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v, alt: car.alt || 0 } : null),
+    debugSet: (o) => { if (car) Object.assign(car, o); },
+    flyOn, get flyReady() { return flyOnReady; }, get airborne() { return !!car && driving && car.M.fly && car.alt > 1; },                      // where your car is and how fast (the police chase it)
     drag: (f) => { if (car && driving) car.v *= f; },                                                        // a police car alongside slows you down
     get verb() { return car ? car.M.verb || "get in" : "get in"; },
     get current() { return car ? car.id : null; },

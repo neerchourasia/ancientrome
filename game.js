@@ -143,6 +143,7 @@ function wireInput(canvas) {
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
 
     if (k === "KeyR" && mode === "walk" && !panelOpen && !inCircusTrack(player.x, player.z) && !inArena(player.x, player.z)) { shove(); return; }   // R: shove the citizen in front of you
+    if (k === "KeyF" && mode === "drive" && Car.flyOn()) return;   // in a plane at the edge of the city: fly on to the next one
     if ((k === "KeyL" || k === "KeyU") && mode === "walk" && !panelOpen && !inArena(player.x, player.z) && Festival.key(k)) return;   // festival activities: L a lantern, U colours
     if (k === "KeyT") cycleTime();
     if (k === "KeyO") toggleSound();

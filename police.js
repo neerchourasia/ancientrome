@@ -118,7 +118,7 @@ const Police = (() => {
       const on1 = Math.floor((flash + c.flashOff) * 5) % 2 === 0, u = c.g.userData;      // the lights flash red and blue
       u.red.material.emissive.setHex(on1 ? 0xff2020 : 0x220000); u.blue.material.emissive.setHex(on1 ? 0x000a33 : 0x2060ff);
       u.glow.intensity = d < 120 ? 1.4 : 0; u.glow.color.setHex(on1 ? 0xff3030 : 0x3060ff);
-      if (d < 3.6 && st) {                                                                        // a police car alongside or ahead rams you and slows you down
+      if (d < 3.6 && st && st.alt < 6) {                                                                        // a police car alongside or ahead rams you and slows you down
         Car.drag(0.55); player.shake = Math.max(player.shake || 0, 0.5); c.v *= 0.6;
         if (Math.random() < dt * 2) { Sfx.play("crash"); }
       }
@@ -127,7 +127,8 @@ const Police = (() => {
     if (cars.length && nearest < 90 && sirenT <= 0) { sirenT = 4.5; Sfx.play("horn"); }
     // pulled over: one stays right beside you for a while, or two are close while you are slow
     const slow = !st || Math.abs(st.v) < 7;
-    const caughtNow = (nearest < 4.6) || (near >= 2 && slow);
+    const flying = !!st && st.alt > 6;                                                              // nobody can pull over a plane in the air
+    const caughtNow = !flying && ((nearest < 4.6) || (near >= 2 && slow));
     closeT = caughtNow ? closeT + dt : Math.max(0, closeT - dt * 0.8);
     if (closeT > (nearest < 4.6 ? 2.2 : 1.6) && typeof Guards !== "undefined") {
       closeT = 0; for (const c of cars) scene.remove(c.g); cars.length = 0; wasChasing = false;
