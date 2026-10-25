@@ -34,8 +34,19 @@ const AIRCRAFT = (() => {
     const wy = o.wing === "high" ? y0 + r * 0.8 : y0 - r * 0.45, hs = S / 2 - r, chord = o.eng === "fighter" ? L * 0.3 : L * 0.16, wz = o.eng === "fighter" ? L * 0.12 : L * 0.04;
     for (const sx of [-1, 1]) {
       const root = new T.Group(); root.position.set(sx * r * 0.9, wy, wz); root.rotation.y = sx * (o.sweep || 0.35);
-      root.add(box(hs, 0.16, chord, white, sx * hs / 2, 0, 0), box(hs, 0.18, 0.18, acc, sx * hs / 2, 0, -chord / 2));
-      root.add(box(0.12, 0.7 + L * 0.02, chord * 0.5, acc, sx * hs, 0.35 + L * 0.01, 0));       // winglet
+      const tipLen = o.tip === "fold" ? S * 0.075 : 0, main = hs - tipLen;
+      root.add(box(main, 0.16, chord, white, sx * main / 2, 0, 0), box(main, 0.18, 0.18, acc, sx * main / 2, 0, -chord / 2));
+      if (o.tip === "fold") {                                                                     // folding wingtips (777X): a hinged outer section that folds up on the ground and stretches out to fly
+        const tip = new T.Group(); tip.position.set(sx * main, 0, 0.12); tip.add(box(tipLen, 0.14, chord * 0.7, white, sx * tipLen / 2, 0, 0), box(tipLen, 0.16, 0.14, acc, sx * tipLen / 2, 0, -chord * 0.35), box(0.2, 0.2, chord * 0.7, dk, 0, 0, 0));
+        tip.rotation.z = sx * 1.45; root.add(tip); (g.userData.tips = g.userData.tips || []).push({ g: tip, side: sx });
+      } else if (o.tip === "curve") {                                                             // curved wingtips (A350): the wing bends smoothly up into a blade
+        let parent = root, x = sx * main;
+        for (let k = 0; k < 4; k++) {
+          const seg = new T.Group(), len = S * 0.03, ch = chord * (0.62 - k * 0.1); seg.position.set(k === 0 ? x : sx * len, 0, k === 0 ? 0 : 0); seg.rotation.z = sx * 0.4;
+          seg.add(box(len + 0.05, 0.12, ch, white, sx * len / 2, 0, 0.1 * k), box(len + 0.05, 0.14, 0.12, acc, sx * len / 2, 0, -ch / 2 + 0.1 * k));
+          parent.add(seg); parent = seg;
+        }
+      } else root.add(box(0.12, 0.7 + L * 0.02, chord * 0.5, acc, sx * hs, 0.35 + L * 0.01, 0));      // a plain winglet
       g.add(root);
     }
     // engines
@@ -170,10 +181,10 @@ const AIRCRAFT = (() => {
       note: "A giant business jet with lie-flat beds that can fly right round the world. Top speed 497 km/h." }),
     airliner: J({ name: "Airliner", price: 20000, max: 148, turn: 0.75, color: 0xf4f6f8, len: 24, wid: 3.4, span: 26, wing: { lift: 60, stall: 54, ceiling: 380 }, climb: 11, spool: 0.45, eye: [0, 3.0, -8.4], cam: 2.2, camY: 9, lookY: 2.6, o: { col: 0xf4f6f8, stripe: 0x1d4fa0, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.42, win: true, fin: 0x1d4fa0 },
       note: "A twin-engine passenger jet like a Boeing 737. It needs a long, long street to take off. Top speed 533 km/h." }),
-    b777x: J({ name: "Boeing 777X", price: 40000, max: 152, turn: 0.65, color: 0xf4f6f8, len: 32, wid: 4.2, span: 36, wing: { lift: 66, stall: 60, ceiling: 380 }, climb: 10, spool: 0.38, eye: [0, 3.7, -11.4], cam: 2.5, camY: 11, lookY: 3, o: { col: 0xf4f6f8, stripe: 0xc79a2a, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.44, r: 2.1, win: true, fin: 0xc79a2a },
-      note: "The newest and biggest twin-engine airliner, with huge engines and very long wings. It needs the longest run of any passenger plane. Top speed 547 km/h." }),
-    a350: J({ name: "Airbus A350", price: 38000, max: 150, turn: 0.68, color: 0xf4f6f8, len: 30, wid: 4.0, span: 34, wing: { lift: 64, stall: 58, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 3.5, -10.6], cam: 2.4, camY: 10.5, lookY: 3, o: { col: 0xf4f6f8, stripe: 0x00205b, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.95, win: true, fin: 0x00205b },
-      note: "A long-range twin-engine airliner with curved wingtips and a wide cabin. Top speed 540 km/h." }),
+    b777x: J({ name: "Boeing 777X", price: 40000, max: 152, turn: 0.65, color: 0xf4f6f8, len: 32, wid: 4.2, span: 36, wing: { lift: 66, stall: 60, ceiling: 380 }, climb: 10, spool: 0.38, eye: [0, 3.7, -11.4], cam: 2.5, camY: 11, lookY: 3, o: { col: 0xf4f6f8, stripe: 0xc79a2a, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.44, r: 2.1, win: true, fin: 0xc79a2a, tip: "fold" },
+      note: "The newest and biggest twin-engine airliner, with huge engines and very long wings. It needs the longest run of any passenger plane. The wingtips fold up on the ground and stretch out to fly. Top speed 547 km/h." }),
+    a350: J({ name: "Airbus A350", price: 38000, max: 150, turn: 0.68, color: 0xf4f6f8, len: 30, wid: 4.0, span: 34, wing: { lift: 64, stall: 58, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 3.5, -10.6], cam: 2.4, camY: 10.5, lookY: 3, o: { col: 0xf4f6f8, stripe: 0x00205b, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.95, win: true, fin: 0x00205b, tip: "curve" },
+      note: "A long-range twin-engine airliner with wingtips that curve smoothly upwards and a wide cabin. Top speed 540 km/h." }),
     cargo: J({ name: "Cargo freighter", price: 24000, max: 148, turn: 0.65, color: 0xe4e0d4, len: 30, wid: 4.2, span: 32, wing: { lift: 64, stall: 58, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 3.9, -10.6], cam: 2.5, camY: 11, lookY: 3, o: { col: 0xe4e0d4, stripe: 0xd9a21b, wing: "low", eng: "wing", engines: 4, tail: "low", sweep: 0.45, r: 2.0, fin: 0xd9a21b },
       note: "A huge four-engine freight plane (like the Boeing 747 freighter) with a high nose cockpit and no passenger windows. Top speed 533 km/h." }),
     fighter: J({ name: "Fighter jet", price: 30000, max: 210, turn: 1.8, color: 0x7d838c, len: 14, wid: 2.2, span: 9.5, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -3.6], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x7d838c, stripe: 0x4a4f56, wing: "mid", eng: "fighter", tail: "twin", sweep: 0.8, r: 0.8, finH: 2.0 },

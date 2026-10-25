@@ -348,6 +348,11 @@ const Car = (() => {
     if (u.prop) u.prop.rotation.z += (4 + car.throttle * 70) * dt;
     const rev = car.M.hover ? (car.alt > 0.4 || car.vy > 0 || car.throttle > 0 ? 1 : 0.35) : 0.35 + car.throttle;                    // rotors turn faster in the air
     for (const r of u.rotors || []) r.o.rotation[r.axis] += r.s * rev * dt;
+    if (u.tips) {                                                                                 // folding wingtips: folded up while parked, stretched out once you move or fly
+      const want = car.alt <= 0.4 && Math.abs(car.v) < 3 && car.throttle < 0.05 ? 1 : 0;
+      car.fold = (car.fold === undefined ? 1 : car.fold) + (want - (car.fold === undefined ? 1 : car.fold)) * Math.min(1, dt * 1.2);
+      for (const t of u.tips) t.g.rotation.z = t.side * car.fold * 1.45;
+    }
     for (const w of car.wheels) w.rotation.x += (car.v * dt) / 0.3;
     player.x = car.x; player.z = car.z; player.yaw = car.yaw; player.feet = car.y; player.vx = player.vz = 0;
     $("#drive-kmh").textContent = Math.round(Math.abs(car.v) * 3.6);
