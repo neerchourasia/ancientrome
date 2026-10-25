@@ -343,6 +343,8 @@ const Car = (() => {
     // what other players should see of your vehicle: the one you are in, or the one you left parked
     share: () => (car ? { veh: driving ? car.id : null, park: driving ? null : [car.id, +car.x.toFixed(1), +car.z.toFixed(1), +car.yaw.toFixed(2)] } : { veh: null, park: null }),
     get speed() { return car && driving ? Math.abs(car.v) : 0; },
+    state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v } : null),                      // where your car is and how fast (the police chase it)
+    drag: (f) => { if (car && driving) car.v *= f; },                                                        // a police car alongside slows you down
     get verb() { return car ? car.M.verb || "get in" : "get in"; },
     get current() { return car ? car.id : null; },
     get driving() { return driving; },

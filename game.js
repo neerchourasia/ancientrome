@@ -46,6 +46,7 @@ function init() {
   Festival.init(scene);
   Theatre.init(scene);
   Guards.build(scene);
+  Police.init(scene);
   Jail.bind();
   Harbour.build(scene);
   Home.build();
@@ -495,6 +496,7 @@ function crash(impact, dx, dz, tx, tz) {
 // (four gladiators and then a lion, with the sword). Only in Ancient Rome.
 const knockTimes = [];
 function noteKnock() {
+  if (era === "modern" && mode !== "fight") { Guards.crime(18, "knocking people over"); return; }   // today the police (on foot and in cars) come after you
   if (city !== "rome" || era !== "ancient" || mode === "fight") return;
   knockTimes.push(clock);
   Guards.crime(18, "knocking people over");
@@ -1601,7 +1603,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

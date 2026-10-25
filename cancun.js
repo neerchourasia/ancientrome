@@ -383,6 +383,9 @@ const Cancun = (() => {
     { id: "tetra", name: "cenote tetra", col: 0x9ad0e8, len: 0.3, hh: 0.1, pond: true },
   ];
   const ALL_BONUS = 300;                                         // denarii for seeing every creature, on top of the 20 for each one
+  const ROUNDS_KEY = "rome-snorkel-rounds";
+  let rounds = 1;
+  try { rounds = Math.max(1, parseInt(localStorage.getItem(ROUNDS_KEY) || "1", 10) || 1); } catch (e) { /* ignore */ }
   const SNORKEL_KEY = "rome-snorkel", HIRE = { x: 860, z: 130 }, HIRE_PRICE = 15;
   let snorkeling = false, haveGear = false, seen = new Set(), fish = [], fishBody = null, fishTail = null, overlay = null, hud = null;
   try { const v = JSON.parse(localStorage.getItem(SNORKEL_KEY) || "[]"); if (Array.isArray(v)) seen = new Set(v.filter((id) => SPECIES.some((s) => s.id === id))); } catch (e) { /* ignore */ }
@@ -477,7 +480,10 @@ const Cancun = (() => {
         const left = SPECIES.length - seen.size;
         Vitals.coins += 20; Sfx.play("coin");
         toast(`🐠 You spot ${/^[aeiou]/.test(f.sp.name) ? "an" : "a"} ${f.sp.name}! (+20 denarii) ${seen.size} of ${SPECIES.length} seen${left ? "" : ". You have seen them all!"}`);
-        if (!left) { Vitals.coins += ALL_BONUS; Sfx.play("cheer"); toast(`🤿 You have seen every creature: +${ALL_BONUS} denarii! Master snorkeller!`); }
+        if (!left) {
+          Vitals.coins += ALL_BONUS; Sfx.play("cheer"); toast(`🤿 You have seen every creature: +${ALL_BONUS} denarii! Master snorkeller!`);
+          setTimeout(() => { seen.clear(); saveSeen(); rounds++; try { localStorage.setItem(ROUNDS_KEY, String(rounds)); } catch (e) { /* ignore */ } renderCard(); toast("🐠 The creature list is wiped clean: every creature is unseen again. Find them all once more!"); }, 6000);   // a new round
+        }
         return;
       }
     }
@@ -488,7 +494,7 @@ const Cancun = (() => {
   function renderCard() {
     if (!card) { card = document.createElement("div"); card.id = "creature-card"; card.setAttribute("aria-label", "Sea creatures you have seen"); document.body.append(card); }
     card.replaceChildren();
-    const h = document.createElement("b"); h.textContent = `🐠 Creatures ${seen.size}/${SPECIES.length}`; card.append(h);
+    const h = document.createElement("b"); h.textContent = `🐠 Creatures ${seen.size}/${SPECIES.length}${rounds > 1 ? ` · round ${rounds}` : ""}`; card.append(h);
     const ul = document.createElement("ul");
     for (const s of SPECIES) { const li = document.createElement("li"); li.className = seen.has(s.id) ? "seen" : ""; li.textContent = seen.has(s.id) ? `✓ ${s.name}` : `• ???${s.pond ? " (cenote)" : ""}`; ul.append(li); }
     card.append(ul);
@@ -503,6 +509,7 @@ const Cancun = (() => {
       hud = document.createElement("div"); hud.id = "snorkel-hud"; document.body.append(hud);
     }
     overlay.classList.toggle("show", snorkeling); hud.classList.toggle("show", snorkeling);
+    showCard(snorkeling);                                            // the list of creatures is on the screen only while you snorkel
     if (snorkeling) hud.textContent = `🤿 Snorkelling · ${seen.size} of ${SPECIES.length} creatures seen. Swim to the reef out to sea (or around the cenote): fish swim close by. Press Esc or F to come up.`;
   }
   // the one key for water things: hire the gear on the beach, or put your face in the water
@@ -569,7 +576,7 @@ const Cancun = (() => {
       body.instanceColor.needsUpdate = hat.instanceColor.needsUpdate = true;
     }
   }
-  const show = (v) => { if (root) root.visible = v; showCard(v && built); if (!v) { haveGear = false; if (snorkeling) setSnorkel(false); } };
+  const show = (v) => { if (root) root.visible = v; showCard(false); if (!v) { haveGear = false; if (snorkeling) setSnorkel(false); } };
   const homeInside = (x, z) => Math.abs(x - X(HOME.x)) < HOME.hw - 0.3 && Math.abs(z - HOME.z) < HOME.hd - 0.3;
   const homeSpot = () => ({ x: X(HOME.x), z: HOME.z + 1.4 });
   function update(dt, px, pz) {

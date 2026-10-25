@@ -107,7 +107,7 @@ const Guards = (() => {
     Sfx.play("oof");
     setTimeout(() => {
       const c = typeof city !== "undefined" ? city : "rome";
-      if (c === "delhi") placeAt(DELHI_X - 40, 6, -Math.PI / 2); else placeAt(40, -12, Math.PI / 2);   // let out at the guardhouse by the Forum / the Lahori Gate
+      if (c === "delhi") placeAt(DELHI_X - 40, 6, -Math.PI / 2); else if (c === "cancun") placeAt(Cancun.SPAWN.x, Cancun.SPAWN.z, 0); else placeAt(40, -12, Math.PI / 2);   // let out at the guardhouse by the Forum / the Lahori Gate / the plaza at Chichén Itzá
       $g("sleep").classList.remove("on");
       for (const g of guards) g.state = "walk";
       toast("You are let out. Behave yourself!"); render();
@@ -147,6 +147,7 @@ const Guards = (() => {
       }
     }
     // the wanted level falls while nobody is chasing you
+    if (typeof Police !== "undefined" && Police.chasing) anyChasing = true;      // police cars on your tail keep your wanted level up
     if (live) { if (!anyChasing) wanted = Math.max(0, wanted - 5 * dt); else wanted = Math.max(0, wanted - 0.4 * dt); }
     hudT -= dt; if (hudT <= 0) { hudT = 0.5; render(); }
   }
