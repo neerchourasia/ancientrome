@@ -151,25 +151,23 @@ const Car = (() => {
 
   const freeSpot = (x, z) => !blockedAt(x, z, groundAt(x, z)) && canMove(x, z, x + 0.01, z);
 
-  // Take the car out of the garage and park it in front of you
+  // Take the car out of the garage: it appears right where you are standing (facing the way you face), and you are in it at once.
+  // If something is in the way there it is moved to the nearest clear spot; only if there is none at all, you are told there is no room.
   function deploy(id) {
     if (!MODELS[id]) return;
     if (eraOf(MODELS[id]) !== era) { toast(eraOf(MODELS[id]) === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there." : "Carts and elephants only live in the ancient cities. Press K to go there."); return; }
+    if (mode !== "walk") { toast("Get out of what you are in first."); return; }
     stow();
-    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
-    let spot = null;
-    for (const [f, r] of [[4, 2.6], [4, -2.6], [5.5, 0], [3, 3.6], [3, -3.6], [-4, 3], [7, 3], [0, 5]]) {
-      const x = player.x + fx * f + rx * r, z = player.z + fz * f + rz * r;
-      if (freeSpot(x, z) && freeSpot(x + fx * 2, z + fz * 2) && freeSpot(x - fx * 2, z - fz * 2)) { spot = [x, z]; break; }
-    }
-    if (!spot) { toast("There is no room to park here. Find an open street."); return; }
     const m = build(id);
-    car = { id, M: MODELS[id], x: spot[0], z: spot[1], yaw: player.yaw, v: 0, ...m, y: groundAt(spot[0], spot[1]), alt: 0, vy: 0, pitch: 0, roll: 0, throttle: 0 };
+    car = { id, M: MODELS[id], x: player.x, z: player.z, yaw: player.yaw, v: 0, ...m, y: groundAt(player.x, player.z), alt: 0, vy: 0, pitch: 0, roll: 0, throttle: 0 };
+    if (!clearAt(car.x, car.z, car.yaw) && !rescue()) { car = null; toast("There is no room to put it here. Find an open street."); return; }
+    car.y = groundAt(car.x, car.z);
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
     scene.add(car.g);
-    placeCircles(true);
-    toast(`${car.M.name}: walk up to it and press X to ${car.M.verb || "get in"}.`);
+    placeCircles(false);
+    player.x = car.x; player.z = car.z;
     Sfx.play("coin");
+    enter();                                                                                          // and you get in
   }
 
   function stow() {
