@@ -550,7 +550,7 @@ const Cancun = (() => {
   const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1);   // swimming is about as fast as walking, a little faster at the surface
   const avatarDrop = () => (inWater(player.x, player.z) ? -0.95 : 0);
   const camDrop = () => (inWater(player.x, player.z) ? (snorkeling ? -2.4 : -0.95) : 0);
-  let lastDt = 0.016;
+  let lastDt = 0.016, doneT = 0;
 
   // ---------- public ----------
 
@@ -595,6 +595,7 @@ const Cancun = (() => {
     updatePeople(dt);
     if (px > CX + 700 || Math.hypot(px - X(POND.x), pz - POND.z) < 120) placeFish();
     if (snorkeling) { if (!inWater(px, pz)) setSnorkel(false); else spot(); }
+    if (snorkeling && seen.size >= SPECIES.length) { doneT += dt; if (doneT > 4) { doneT = 0; newRound(); } } else doneT = 0;   // a complete list never stays: after a few seconds the next round begins
   }
   const setEquinox = (on) => { if (serpent) serpent.visible = !!on; };
 
@@ -602,7 +603,16 @@ const Cancun = (() => {
     build, show, setEra, update, homeInside, homeSpot, setEquinox, SPAWN, BOUNDS: BOUNDS_C, MAP: MAP_C,
     fishAt: () => fish.map((f) => [f.sp.id, f.cx + Math.cos(f.a) * f.r, f.y, f.cz + Math.sin(f.a) * f.r]),
     inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
-    snorkelSnapshot: () => [...seen], snorkelRestore: (a) => { if (Array.isArray(a)) for (const id of a) if (SPECIES.some((s) => s.id === id)) seen.add(id); saveSeen(); if (card) renderCard(); },
+    snorkelSnapshot: () => ({ seen: [...seen], rounds }),
+    // from your account: the list and the round you are on. A saved game from an earlier round never brings a finished list back.
+    snorkelRestore: (o) => {
+      const ids = Array.isArray(o) ? o : o && Array.isArray(o.seen) ? o.seen : [], r = o && Number.isFinite(o.rounds) ? o.rounds : 1;
+      if (r < rounds) return;
+      if (r > rounds) { rounds = r; seen.clear(); try { localStorage.setItem(ROUNDS_KEY, String(rounds)); } catch (e) { /* ignore */ } }
+      else if (rounds > 1 && ids.length >= SPECIES.length) return;
+      for (const id of ids) if (SPECIES.some((s) => s.id === id)) seen.add(id);
+      saveSeen(); if (card) renderCard();
+    },
     get built() { return built; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body, X,
     inHome: (x, z) => Math.abs(x - X(HOME.x)) < 14 && Math.abs(z - HOME.z) < 14,
   };

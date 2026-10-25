@@ -83,7 +83,7 @@ const Account = (() => {
         ships: Shipyard.snapshot(),
         disease: Disease.snapshot(),
         social: Social.snapshot(),
-        snorkel: typeof Cancun !== "undefined" ? Cancun.snorkelSnapshot() : [],
+        snorkel: typeof Cancun !== "undefined" ? Cancun.snorkelSnapshot() : { seen: [], rounds: 1 },
         daily: Gifts.snapshot(),
         era,
       },
@@ -112,7 +112,7 @@ const Account = (() => {
     if (p.disease && typeof p.disease === "object") Disease.restore(p.disease);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);
-    if (Array.isArray(p.snorkel) && typeof Cancun !== "undefined") Cancun.snorkelRestore(p.snorkel);
+    if (p.snorkel && typeof Cancun !== "undefined") Cancun.snorkelRestore(p.snorkel);
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 
