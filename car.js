@@ -123,6 +123,7 @@ const Car = (() => {
       g.add(box(1.7, 0.1, 1.9, red, 0, 5.8, 0.2));
     } else if (id === "plane") {                       // a small propeller plane: a fuselage, high wings, a tail, three wheels and a propeller
       const white = lam(0xf2f2f4), red = lam(0xc0262b), dk = lam(0x2b2b2b);
+      const n0 = g.children.length;
       g.add(box(1.3, 1.2, 5.2, white, 0, 1.3, 0.3), box(1.34, 0.28, 5.24, red, 0, 1.12, 0.3));          // the body and a red stripe
       g.add(box(1.1, 0.9, 1.2, dk, 0, 1.3, -2.8), box(1.0, 0.7, 1.4, white, 0, 1.55, -0.9));              // the engine and the cockpit
       g.add(box(1.0, 0.6, 1.1, lam(0x1d3a4a), 0, 1.85, -0.9));                                           // the canopy
@@ -132,6 +133,8 @@ const Car = (() => {
       g.add(box(0.1, 0.9, 0.1, dk, 0, 0.55, -1.8), box(0.1, 0.8, 0.1, dk, -0.8, 0.55, 0.6), box(0.1, 0.8, 0.1, dk, 0.8, 0.55, 0.6));
       for (const [x, z, r] of [[0, -1.8, 0.28], [-0.8, 0.6, 0.3], [0.8, 0.6, 0.3]]) { const w = wheel(r, 0.14, x, r, z); g.add(w); wheels.push(w); }
       const prop = new THREE.Group(); prop.position.set(0, 1.3, -3.45); prop.add(box(0.18, 2.5, 0.08, dk, 0, 0, 0), box(2.5, 0.18, 0.08, dk, 0, 0, 0.01)); g.add(prop); g.userData.prop = prop;
+      g.userData.cockpit = planeCockpit(g);
+      g.userData.shell = [g.children[n0], g.children[n0 + 1], g.children[n0 + 3]];                     // the body, its stripe and the cockpit block: hidden from the inside so you can see the panel
     } else {
       const L = M.len, W = M.wid, low = id === "sportscar";
       g.add(box(W, low ? 0.5 : 0.65, L, body, 0, low ? 0.5 : 0.6, 0));
@@ -200,7 +203,7 @@ const Car = (() => {
     }
     if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
     driving = false; car.v = 0;
-    if (car.M.fly) { car.g.visible = true; if (car.g.userData.prop) car.g.userData.prop.visible = true; }
+    if (car.M.fly) { if (car.g.userData.prop) car.g.userData.prop.visible = true; if (car.g.userData.cockpit) car.g.userData.cockpit.visible = false; for (const m of car.g.userData.shell || []) m.visible = true; }
     mode = "walk";
     $("#drive-hud").classList.remove("show");
     const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx;
@@ -260,11 +263,48 @@ const Car = (() => {
     if (!clearAt(car.x, car.z, car.yaw)) rescue();
   }
   let edgeT = 0, flyHint = false;
+  // The inside of the plane, seen only in pilot view: an instrument panel with three dials that really work (speed, height and a compass),
+  // a control wheel that turns when you steer, a throttle lever and the window posts. It sits in front of the pilot's eye at (0, 2.0, -0.95).
+  function planeCockpit(g) {
+    const cp = new THREE.Group(); cp.visible = false; g.add(cp);
+    const dkm = new THREE.MeshLambertMaterial({ color: 0x1c1d21 }), gry = new THREE.MeshLambertMaterial({ color: 0x3b3e45 }), rd = new THREE.MeshBasicMaterial({ color: 0xe23b2e }), wh = new THREE.MeshBasicMaterial({ color: 0xf4f4f4 });
+    const dash = new THREE.Group(); dash.position.set(0, 1.62, -1.8); dash.rotation.x = -0.3; cp.add(dash);
+    dash.add(box(1.04, 0.34, 0.06, dkm, 0, 0, 0), box(1.1, 0.05, 0.3, dkm, 0, 0.19, 0.1));                  // the panel and the glare shield on top
+    const needles = {};
+    const dial = (name, x, label, marks, text) => {
+      const c = document.createElement("canvas"); c.width = c.height = 128;
+      const x2 = c.getContext("2d");
+      x2.fillStyle = "#101114"; x2.fillRect(0, 0, 128, 128);
+      x2.strokeStyle = "#f4f4f4"; x2.fillStyle = "#f4f4f4"; x2.lineWidth = 3; x2.textAlign = "center"; x2.textBaseline = "middle";
+      for (let i = 0; i <= marks; i++) { const a = (-135 + (270 * i) / marks) * Math.PI / 180, ca = Math.sin(a), sa = -Math.cos(a); x2.beginPath(); x2.moveTo(64 + ca * 54, 64 + sa * 54); x2.lineTo(64 + ca * 46, 64 + sa * 46); x2.stroke(); }
+      x2.font = "bold 14px sans-serif"; x2.fillText(label, 64, 92);
+      if (text) { x2.font = "bold 20px sans-serif"; for (const [t, a] of text) { const r = a * Math.PI / 180; x2.fillText(t, 64 + Math.sin(r) * 34, 64 - Math.cos(r) * 34); } }
+      const tex = new THREE.CanvasTexture(c);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.075, 28), new THREE.MeshBasicMaterial({ map: tex }));
+      face.position.set(x, 0, 0.032); dash.add(face);
+      const pivot = new THREE.Group(); pivot.position.set(x, 0, 0.036);
+      const nd = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.06, 0.004), name === "compass" ? rd : wh); nd.position.y = 0.025; pivot.add(nd);
+      dash.add(pivot); needles[name] = pivot;
+    };
+    dial("speed", -0.3, "km/h", 9, null);
+    dial("alt", 0, "ALT", 9, null);
+    dial("compass", 0.3, "", 8, [["N", 0], ["E", 90], ["S", 180], ["W", 270]]);
+    const lever = box(0.03, 0.025, 0.03, rd, 0.44, -0.08, 0.04); dash.add(box(0.03, 0.2, 0.01, gry, 0.44, -0.04, 0.032), lever);   // the throttle lever slides up and down its slot
+    const yoke = new THREE.Group(); yoke.position.set(0, 1.7, -1.4); yoke.rotation.x = -0.3; cp.add(yoke);          // the control wheel
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.014, 6, 20), dkm); yoke.add(ring, box(0.2, 0.025, 0.025, dkm, 0, 0, 0), box(0.03, 0.03, 0.4, gry, 0, -0.02, 0.2));
+    for (const sx of [-1, 1]) {                                                                                      // the window posts
+      const post = box(0.035, 0.7, 0.035, dkm, sx * 0.55, 2.15, -1.55); post.rotation.z = sx * 0.3; post.rotation.x = 0.3; cp.add(post);
+    }
+    cp.userData = { needles, lever, yoke };
+    return cp;
+  }
+
   function flyUpdate(dt, keys) {
     const M = car.M;
     const up = keys.has("Space"), dive = keys.has("ShiftLeft") || keys.has("ShiftRight");
     const thrUp = keys.has("KeyW") || keys.has("ArrowUp"), thrDown = keys.has("KeyS") || keys.has("ArrowDown");
     const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+    car.steerIn = steer; car.pitchIn = up ? 1 : dive ? -1 : 0;
     car.throttle = Math.max(0, Math.min(1, (car.throttle || 0) + (thrUp ? 0.55 : 0) * dt - (thrDown ? 0.9 : 0) * dt));
     const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
     // speed
@@ -420,7 +460,13 @@ const Car = (() => {
   // The chase camera sits behind and above the car and swings round after it.
   let pilot = false;                                                                                 // pilot view: you look out of the cockpit of the plane
   const eye = new THREE.Vector3();
-  const showPilot = () => { if (car && car.M.fly) { car.g.visible = !(pilot && driving); if (car.g.userData.prop) car.g.userData.prop.visible = !(pilot && driving); } };
+  const showPilot = () => {                                                                         // in pilot view the cockpit shows and the propeller (which would fill the window) hides
+    if (!car || !car.M.fly) return;
+    const p = pilot && driving, ud = car.g.userData;
+    if (ud.prop) ud.prop.visible = !p;
+    if (ud.shell) for (const m of ud.shell) m.visible = !p;
+    if (ud.cockpit) ud.cockpit.visible = p;
+  };
   function togglePilot() {
     if (!car || !driving || !car.M.fly) return;
     pilot = !pilot; showPilot();
@@ -434,6 +480,14 @@ const Car = (() => {
       cam.position.copy(car.g.localToWorld(eye.set(0, 2.0, -0.95)));
       cam.quaternion.copy(car.g.quaternion);
       camYaw = car.yaw;
+      const ck = car.g.userData.cockpit;
+      if (ck) {                                                                                        // the dials show how you are flying and the wheel follows your hands
+        const u = ck.userData, d = (f) => 2.356 - Math.max(0, Math.min(1, f)) * 4.712;
+        u.needles.speed.rotation.z = d(Math.abs(car.v) / 70); u.needles.alt.rotation.z = d(car.alt / 400); u.needles.compass.rotation.z = -car.yaw;
+        u.lever.position.y = -0.14 + car.throttle * 0.2;
+        u.yoke.rotation.z += (-(car.steerIn || 0) * 0.7 - u.yoke.rotation.z) * Math.min(1, dt * 8);
+        u.yoke.position.z += (-1.4 + (car.pitchIn || 0) * 0.07 - u.yoke.position.z) * Math.min(1, dt * 6);
+      }
       if (player.shake > 0) { cam.position.x += (Math.random() - 0.5) * player.shake * 0.4; cam.position.y += (Math.random() - 0.5) * player.shake * 0.3; player.shake = Math.max(0, player.shake - dt * 2.4); }
       const f = $("#flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
       return;
