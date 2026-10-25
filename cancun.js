@@ -482,7 +482,7 @@ const Cancun = (() => {
         toast(`🐠 You spot ${/^[aeiou]/.test(f.sp.name) ? "an" : "a"} ${f.sp.name}! (+20 denarii) ${seen.size} of ${SPECIES.length} seen${left ? "" : ". You have seen them all!"}`);
         if (!left) {
           Vitals.coins += ALL_BONUS; Sfx.play("cheer"); toast(`🤿 You have seen every creature: +${ALL_BONUS} denarii! Master snorkeller!`);
-          setTimeout(() => { seen.clear(); saveSeen(); rounds++; try { localStorage.setItem(ROUNDS_KEY, String(rounds)); } catch (e) { /* ignore */ } renderCard(); toast("🐠 The creature list is wiped clean: every creature is unseen again. Find them all once more!"); }, 6000);   // a new round
+          setTimeout(newRound, 6000);                                         // then a new round
         }
         return;
       }
@@ -502,7 +502,15 @@ const Cancun = (() => {
     card.classList.toggle("done", seen.size === SPECIES.length);
   }
   const showCard = (v) => { if (!card) renderCard(); card.classList.toggle("show", !!v); };
+  // every creature found and paid for: the list is wiped clean (all unseen again) so you can find them all once more
+  function newRound() {
+    if (seen.size < SPECIES.length) return;
+    seen.clear(); saveSeen(); rounds++;
+    try { localStorage.setItem(ROUNDS_KEY, String(rounds)); } catch (e) { /* ignore */ }
+    renderCard(); toast("🐠 The creature list is wiped clean: every creature is unseen again. Find them all once more!");
+  }
   function setSnorkel(on) {
+    if (on && seen.size >= SPECIES.length) newRound();                     // a complete list from before (or a saved game): start the next round now
     snorkeling = !!on;
     if (!overlay) {
       overlay = document.createElement("div"); overlay.id = "underwater"; overlay.setAttribute("aria-hidden", "true"); document.body.append(overlay);
