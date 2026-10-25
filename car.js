@@ -181,12 +181,13 @@ const Car = (() => {
   function enter() {
     if (!nearby() || eraOf(car.M) !== era) return;
     driving = true; mode = "drive";
+    showPilot();
     placeCircles(false);
     camYaw = car.yaw;
     player.vx = player.vz = 0; Vitals.stopRest();
     $("#drive-hud").classList.add("show");
     $("#drive-alt").textContent = "";
-    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake / reverse (on the ground) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
+    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake / reverse (on the ground) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>C</kbd> pilot view · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
     if (car.M.fly) { toast("Plane: W for power, and above about 100 km/h hold Space to take off. Shift dives. Land gently on a long street or a square, and press X to get out."); return; }
     toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
@@ -199,6 +200,7 @@ const Car = (() => {
     }
     if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
     driving = false; car.v = 0;
+    if (car.M.fly) { car.g.visible = true; if (car.g.userData.prop) car.g.userData.prop.visible = true; }
     mode = "walk";
     $("#drive-hud").classList.remove("show");
     const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx;
@@ -416,8 +418,26 @@ const Car = (() => {
   }
 
   // The chase camera sits behind and above the car and swings round after it.
+  let pilot = false;                                                                                 // pilot view: you look out of the cockpit of the plane
+  const eye = new THREE.Vector3();
+  const showPilot = () => { if (car && car.M.fly) { car.g.visible = !(pilot && driving); if (car.g.userData.prop) car.g.userData.prop.visible = !(pilot && driving); } };
+  function togglePilot() {
+    if (!car || !driving || !car.M.fly) return;
+    pilot = !pilot; showPilot();
+    toast(pilot ? "Pilot view. Press C to see the plane from outside again." : "Chase view. Press C for the pilot view.");
+  }
+
   function camera(cam, dt) {
     if (!car) return;
+    if (car.M.fly && pilot) {                                                                          // the pilot's seat: the camera rolls and pitches with the plane
+      car.g.updateMatrixWorld(true);
+      cam.position.copy(car.g.localToWorld(eye.set(0, 2.0, -0.95)));
+      cam.quaternion.copy(car.g.quaternion);
+      camYaw = car.yaw;
+      if (player.shake > 0) { cam.position.x += (Math.random() - 0.5) * player.shake * 0.4; cam.position.y += (Math.random() - 0.5) * player.shake * 0.3; player.shake = Math.max(0, player.shake - dt * 2.4); }
+      const f = $("#flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
+      return;
+    }
     if (car.M.fly) {                                                                                   // behind and above the plane, looking where it is going
       let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
       camYaw += dy * Math.min(1, dt * 2.6);
@@ -452,7 +472,7 @@ const Car = (() => {
   }
 
   return {
-    MODELS, model, deploy, stow, enter, exit, toggleEnter, update, camera, nearby, onEra,
+    MODELS, model, deploy, stow, enter, exit, toggleEnter, togglePilot, update, camera, nearby, onEra,
     // Click on your parked car and it goes back to your garage (if you have one)
     clickAt(cx, cy, cam, canvasEl) {
       if (!car || driving || mode !== "walk") return false;

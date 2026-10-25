@@ -163,6 +163,7 @@ function wireInput(canvas) {
       else if (k === "KeyH") toggleControls();
       else if (k === "KeyC" && mode === "walk") cycleView(e.shiftKey ? -1 : 1);
     }
+    if (mode === "drive" && k === "KeyC") Car.togglePilot();
     if (mode === "walk") { const m = /^(?:Digit|Key|Numpad)([1-9])$/.exec(k); if (m) setWalkLevel(Number(m[1])); }
     if (mode === "watch") {
       if (k === "KeyC") Watch.toggleChase();
