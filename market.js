@@ -79,6 +79,7 @@ const Market = (() => {
     horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
+  for (const [id, M] of Object.entries(AIRCRAFT)) ITEMS[id] = { type: "car", name: M.name, price: M.price, note: M.note };   // the aircraft (aircraft.js) are sold at the animals and rides stall
   // Food from the food stall. Each dish belongs to one city and era. `heal` is health at once; eating also leaves you "fed",
   // which speeds up how fast you heal on your own for a few minutes.
   const F = (name, price, heal, note, where) => ({ type: "food", name, price, heal, note, where });

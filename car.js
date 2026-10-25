@@ -17,7 +17,7 @@ const Car = (() => {
     suv: { name: "SUV", max: 28, accel: 11, turn: 1.9, color: 0x3a5a3a, len: 4.8, wid: 2.0 },
     taxi: { name: "Taxi", max: 25, accel: 10, turn: 2.0, color: 0xf2c21b, len: 4.2, wid: 1.8 },
     truck: { name: "Delivery truck", max: 20, accel: 7, turn: 1.5, color: 0xe8e8e8, len: 6.4, wid: 2.2 },
-    plane: { name: "Light plane", max: 62, accel: 7, turn: 1.2, color: 0xf2f2f4, len: 7.2, wid: 2.4, fly: true, verb: "climb in" },   // flies (see flyUpdate); wings are wider than the hull, which is what hits things
+    plane: { name: "Light plane", max: 62, accel: 7, turn: 1.2, color: 0xf2f2f4, len: 7.2, wid: 2.4, fly: true, air: "wing", verb: "climb in" },   // flies (see flyUpdate); wings are wider than the hull, which is what hits things
     bus: { name: "Bus", max: 17, accel: 5.5, turn: 1.25, color: 0xd9411f, len: 9.0, wid: 2.5 },
     chariot: { name: "Chariot", max: 21, accel: 9, turn: 1.9, color: 0xb3262b, len: 3.6, wid: 1.4, era: "ancient", motor: false, camH: 2.4, verb: "climb on" },
     horse: { name: "Horse", max: 18, accel: 9, turn: 2.2, color: 0x7a4a2a, len: 2.8, wid: 1.0, era: "ancient", motor: false, camH: 2.5, verb: "climb on" },
@@ -25,6 +25,7 @@ const Car = (() => {
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
   };
+  Object.assign(MODELS, AIRCRAFT);   // jets, helicopters, balloons ... (aircraft.js)
   const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
 
   let car = null, driving = false, camYaw = 0, bumpCd = 0, runCd = 0, stuckT = 0, phase = 0;
@@ -40,6 +41,12 @@ const Car = (() => {
 
   // Faces -z (like the people), so its yaw works like yours.
   function build(id) {
+    if (MODELS[id].make) {                                                                            // an aircraft from aircraft.js: with a cockpit to sit in (pilot view) unless it is open
+      const r = MODELS[id].make(MODELS[id]), ud = r.g.userData;
+      ud.shell = MODELS[id].open ? [] : r.g.children.slice();
+      if (!MODELS[id].open) ud.cockpit = planeCockpit(r.g, MODELS[id].eye);
+      return { g: r.g, wheels: r.wheels, legs: [] };
+    }
     const M = MODELS[id], g = new THREE.Group(), body = lam(M.color), glass = lam(0x1d2a33), wheels = [], legs = [];
     const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1b0 }), tail = new THREE.MeshBasicMaterial({ color: 0xc01818 });
     if (id === "scooter") {
@@ -162,7 +169,7 @@ const Car = (() => {
     if (mode !== "walk") { toast("Get out of what you are in first."); return; }
     stow();
     const m = build(id);
-    car = { id, M: MODELS[id], x: player.x, z: player.z, yaw: player.yaw, v: 0, ...m, y: groundAt(player.x, player.z), alt: 0, vy: 0, pitch: 0, roll: 0, throttle: 0 };
+    car = { id, M: MODELS[id], x: player.x, z: player.z, yaw: player.yaw, v: 0, ...m, y: groundAt(player.x, player.z), alt: 0, vy: 0, vx: 0, vz: 0, pitch: 0, roll: 0, throttle: 0 };
     if (!clearAt(car.x, car.z, car.yaw) && !rescue()) { car = null; toast("There is no room to put it here. Find an open street."); return; }
     car.y = groundAt(car.x, car.z);
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
@@ -181,6 +188,17 @@ const Car = (() => {
 
   const nearby = () => !!car && !driving && mode === "walk" && Math.hypot(player.x - car.x, player.z - car.z) < 7;
 
+  // the controls shown for each kind of aircraft: [the hint line, the toast when you get in]
+  function airHelp(M) {
+    const tail = " · <kbd>C</kbd> pilot view · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)";
+    if (M.glide) return ["<kbd>W</kbd> tow rope (up to 80 m) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> pull up · <kbd>Shift</kbd> dive" + tail, "Glider: hold W for a tow up to 80 m, then glide. Look for a thermal (rising air) to climb again. Land gently, and press X to get out."];
+    if (M.air === "heli" || M.air === "vtol") return ["<kbd>W</kbd> forward · <kbd>S</kbd> back · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> descend" + tail, `${M.name}: hold Space to lift straight off; W flies forward. Land gently and press X to get out.`];
+    if (M.air === "blimp") return ["<kbd>W</kbd> forward · <kbd>S</kbd> back · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> descend" + tail, "Airship: slow and gentle. Hold Space to rise, W to move, and Shift to come down again."];
+    if (M.air === "balloon") return ["<kbd>Space</kbd> burner (rise) · <kbd>Shift</kbd> let hot air out (sink) · <kbd>A</kbd><kbd>D</kbd> turn the basket · the wind carries you, and it blows a different way at each height" + tail, "Balloon: hold Space to fire the burner and rise. You cannot steer: climb and sink to find a wind that goes where you want."];
+    const lift = Math.round(((M.wing || PLANE).lift * 3.6) / 10) * 10;
+    return ["<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake / reverse (on the ground) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive" + tail, `${M.name}: W for power, and above about ${lift} km/h hold Space to take off. Shift dives. Land gently on a long street or a square, and press X to get out.`];
+  }
+
   function enter() {
     if (!nearby() || eraOf(car.M) !== era) return;
     driving = true; mode = "drive";
@@ -190,8 +208,8 @@ const Car = (() => {
     player.vx = player.vz = 0; Vitals.stopRest();
     $("#drive-hud").classList.add("show");
     $("#drive-alt").textContent = "";
-    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake / reverse (on the ground) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>C</kbd> pilot view · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
-    if (car.M.fly) { toast("Plane: W for power, and above about 100 km/h hold Space to take off. Shift dives. Land gently on a long street or a square, and press X to get out."); return; }
+    if (car.M.fly) { const h = airHelp(car.M); $("#drive-keys").innerHTML = h[0]; toast(h[1]); return; }
+    $("#drive-keys").innerHTML = "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
     toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
 
@@ -201,7 +219,7 @@ const Car = (() => {
       if (!silent) { toast("Land first! Slow down and come down gently on a street or a square."); return; }
       car.alt = 0; car.vy = 0; car.y = groundAt(car.x, car.z); car.g.position.y = car.y;
     }
-    if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
+    if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; car.vx = car.vz = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
     driving = false; car.v = 0;
     if (car.M.fly) { if (car.g.userData.prop) car.g.userData.prop.visible = true; if (car.g.userData.cockpit) car.g.userData.cockpit.visible = false; for (const m of car.g.userData.shell || []) m.visible = true; }
     mode = "walk";
@@ -232,7 +250,8 @@ const Car = (() => {
 
   // A car wedged against something (or spawned in a tight spot) is moved to the nearest clear place
   function rescue() {
-    for (let r = 1; r <= 9; r += 1) {
+    const far = car.M.fly ? 30 : 9;                                                                  // a big aircraft may have to be moved further to find room
+    for (let r = 1; r <= far; r += car.M.fly ? 2 : 1) {
       for (let k = 0; k < 12; k++) {
         const a = (k / 12) * Math.PI * 2, x = car.x + Math.cos(a) * r, z = car.z + Math.sin(a) * r;
         if (clearAt(x, z, car.yaw)) { car.x = x; car.z = z; car.v = 0; return true; }
@@ -265,8 +284,8 @@ const Car = (() => {
   let edgeT = 0, flyHint = false;
   // The inside of the plane, seen only in pilot view: an instrument panel with three dials that really work (speed, height and a compass),
   // a control wheel that turns when you steer, a throttle lever and the window posts. It sits in front of the pilot's eye at (0, 2.0, -0.95).
-  function planeCockpit(g) {
-    const cp = new THREE.Group(); cp.visible = false; g.add(cp);
+  function planeCockpit(g, eye = [0, 2.0, -0.95]) {
+    const cp = new THREE.Group(); cp.visible = false; cp.position.set(eye[0], eye[1] - 2.0, eye[2] + 0.95); g.add(cp);      // (everything in it is placed for an eye at (0, 2, -0.95))
     const dkm = new THREE.MeshLambertMaterial({ color: 0x1c1d21 }), gry = new THREE.MeshLambertMaterial({ color: 0x3b3e45 }), rd = new THREE.MeshBasicMaterial({ color: 0xe23b2e }), wh = new THREE.MeshBasicMaterial({ color: 0xf4f4f4 });
     const dash = new THREE.Group(); dash.position.set(0, 1.62, -1.8); dash.rotation.x = -0.3; cp.add(dash);
     dash.add(box(1.04, 0.34, 0.06, dkm, 0, 0, 0), box(1.1, 0.05, 0.3, dkm, 0, 0.19, 0.1));                  // the panel and the glare shield on top
@@ -299,46 +318,98 @@ const Car = (() => {
     return cp;
   }
 
+  // Rising air for gliders: about half of the 450 m squares of the city have a thermal in them
+  function thermalAt(x, z) {
+    const i = Math.floor(x / 450), j = Math.floor(z / 450), h = Math.abs(Math.sin(i * 127.1 + j * 311.7) * 43758.5453) % 1;
+    if (h < 0.5) return 0;
+    const cx = (i + 0.25 + 0.5 * ((h * 7.7) % 1)) * 450, cz = (j + 0.25 + 0.5 * ((h * 13.3) % 1)) * 450;
+    return Math.max(0, 1 - Math.hypot(x - cx, z - cz) / 90);
+  }
+  // The wind a balloon is in: it blows a different way (and a different speed) at each height, so you steer by going up and down. [x, z] in m/s
+  function windAt(alt) {
+    const a = 0.9 + Math.sin(alt / 80) * 2.3 + Math.sin(alt / 31) * 0.4, s = 3.5 + 2.5 * (0.5 + 0.5 * Math.sin(alt / 55 + 1));
+    return [Math.sin(a) * s, -Math.cos(a) * s];
+  }
+  const POINTS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+
+  // The end of every flying frame: keep to the city (flying on is possible at the edge), put the aircraft and the camera target where they belong, and show the readout
+  function settle(dt, ground, hud) {
+    const b = BOUNDS, m = 25;
+    let edge = false;
+    if (car.x < b.minX + m) { car.x = b.minX + m; edge = true; } if (car.x > b.maxX - m) { car.x = b.maxX - m; edge = true; }
+    if (car.z < b.minZ + m) { car.z = b.minZ + m; edge = true; } if (car.z > b.maxZ - m) { car.z = b.maxZ - m; edge = true; }
+    flyOnReady = edge && car.alt > 50;
+    if (flyOnReady && !flyHint) { flyHint = true; toast("✈ You have reached the edge of the city. Press F to fly on to the next city."); }
+    if (!flyOnReady) flyHint = false;
+    // the aircraft, the camera target and you all move together
+    car.y = ground + car.alt;
+    car.g.position.set(car.x, car.y, car.z); car.g.rotation.order = "YXZ"; car.g.rotation.set(car.pitch, car.yaw, car.roll);
+    const u = car.g.userData;
+    if (u.prop) u.prop.rotation.z += (4 + car.throttle * 70) * dt;
+    const rev = car.M.hover ? (car.alt > 0.4 || car.vy > 0 || car.throttle > 0 ? 1 : 0.35) : 0.35 + car.throttle;                    // rotors turn faster in the air
+    for (const r of u.rotors || []) r.o.rotation[r.axis] += r.s * rev * dt;
+    for (const w of car.wheels) w.rotation.x += (car.v * dt) / 0.3;
+    player.x = car.x; player.z = car.z; player.yaw = car.yaw; player.feet = car.y; player.vx = player.vz = 0;
+    $("#drive-kmh").textContent = Math.round(Math.abs(car.v) * 3.6);
+    $("#drive-alt").textContent = hud;
+  }
+
+  // Does a helicopter, airship or balloon touch a building if it moves by (dx, dz)? Its body (a small ring low down) and its rotors or envelope (a big ring up high) are checked.
+  function crashHit(M, dx, dz) {
+    const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx;
+    for (const [R, h] of [[M.body || 1.6, 0.5], [M.rad, M.radY || 0.5]]) {
+      for (const [a, b] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]]) {
+        const x = car.x + dx + fx * a + rx * b, z = car.z + dz + fz * a + rz * b;
+        if (blockedAt(x, z, groundAt(x, z) + car.alt + h)) return true;
+      }
+    }
+    return false;
+  }
+
   function flyUpdate(dt, keys) {
-    const M = car.M;
+    const M = car.M, W = M.wing || PLANE, glide = !!M.glide, climb = M.climb || 12;
     const up = keys.has("Space"), dive = keys.has("ShiftLeft") || keys.has("ShiftRight");
     const thrUp = keys.has("KeyW") || keys.has("ArrowUp"), thrDown = keys.has("KeyS") || keys.has("ArrowDown");
     const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
     car.steerIn = steer; car.pitchIn = up ? 1 : dive ? -1 : 0;
-    car.throttle = Math.max(0, Math.min(1, (car.throttle || 0) + (thrUp ? 0.55 : 0) * dt - (thrDown ? 0.9 : 0) * dt));
+    if (glide) car.throttle = thrUp && car.alt < 80 ? Math.min(1, (car.throttle || 0) + 1.2 * dt) : Math.max(0, (car.throttle || 0) - 1.5 * dt);   // a glider has no engine: W is the tow rope, which lets go at 80 m
+    else car.throttle = Math.max(0, Math.min(1, (car.throttle || 0) + (thrUp ? 0.55 : 0) * dt - (thrDown ? 0.9 : 0) * dt));
     const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
+    const th = glide && air ? thermalAt(car.x, car.z) : 0;
     // speed
-    car.v += (car.throttle * M.max - car.v) * (air ? 0.2 : 0.28) * dt;
+    car.v += (Math.max(car.throttle * M.max, glide && air ? M.glide : 0) - car.v) * (air ? 0.2 : 0.28) * (M.spool || 1) * dt;
     if (!air && thrDown && car.throttle === 0) car.v -= (car.v > 0.3 ? 16 : 6) * dt;              // on the ground S brakes, and then backs the plane up (slowly)
     else if (!air && !thrUp && car.throttle === 0) car.v -= Math.sign(car.v) * Math.min(Math.abs(car.v), 2.2 * dt);
     car.v = air ? Math.max(0, car.v) : Math.max(-6, car.v);                                          // you can only reverse on the ground
     // climbing and diving: only fast enough to fly, and below the stalling speed the plane sinks
-    const lift = Math.min(1, Math.max(0, (car.v - PLANE.lift + 4) / 16));
+    const lift = Math.min(1, Math.max(0, (car.v - W.lift + 4) / 16));
     let vyT = 0;
-    if (up) vyT = 12 * lift;
-    else if (dive && air) vyT = -14;
-    else if (air) vyT = car.v < PLANE.stall ? -(PLANE.stall - car.v) * 0.8 - 2 : 0;
+    if (up) vyT = climb * lift;
+    else if (glide && thrUp && car.alt < 80) vyT = 11 * lift;                                          // the tow rope pulls a glider up by itself
+    else if (dive && air) vyT = -climb * 1.15;
+    else if (air) vyT = car.v < W.stall ? -(W.stall - car.v) * 0.8 - 2 : glide ? -M.sink - Math.max(0, car.v - M.glide) * 0.05 : 0;
+    if (th && !dive) vyT += th * 6.5;
     car.vy += (vyT - car.vy) * Math.min(1, dt * 2.6);
     if (!air && car.vy < 0) car.vy = 0;
     car.alt += car.vy * dt;
-    if (car.vy) car.v = Math.max(0, car.v - car.vy * 0.12 * dt);                                             // climbing costs a little speed, diving gives it back
-    if (car.alt > PLANE.ceiling) { car.alt = PLANE.ceiling; car.vy = Math.min(0, car.vy); }
+    if (car.vy) car.v = Math.max(0, car.v - (car.vy - th * 6.5) * 0.12 * dt);                       // climbing costs a little speed, diving gives it back
+    if (car.alt > W.ceiling) { car.alt = W.ceiling; car.vy = Math.min(0, car.vy); }
     if (car.alt <= 0) {                                                                            // touching down
-      if (air && (car.vy < -9 || car.v > 56)) { crashPlane(car.vy < -9 ? "You came down too steeply." : "You landed too fast."); }
+      if (air && (car.vy < -9 || car.v > W.stall * 2.15)) { crashPlane(car.vy < -9 ? "You came down too steeply." : "You landed too fast."); }
       else if (air) { Sfx.play("bump"); }
       car.alt = 0; car.vy = 0;
     }
     // turning (the plane banks into the turn)
     const fast = Math.max(-1, Math.min(1, car.v / 22));
-    car.yaw += steer * (car.alt > 0.4 ? 0.9 : Math.abs(car.v) > 2 ? 0.6 : 0) * fast * dt;
+    car.yaw += steer * (car.alt > 0.4 ? 0.9 : Math.abs(car.v) > 2 ? 0.6 : 0) * (M.turn / 1.2) * fast * dt;
     car.roll += ((car.alt > 0.4 ? steer * 0.6 : 0) - car.roll) * Math.min(1, dt * 3);
     car.pitch += (Math.max(-0.5, Math.min(0.5, car.vy / 26)) - car.pitch) * Math.min(1, dt * 3);
     // moving: on the ground like a car, in the air over whatever is lower than the plane
     const dx = -Math.sin(car.yaw) * car.v * dt, dz = -Math.cos(car.yaw) * car.v * dt;
     if (car.alt > 0.4) {
-      const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx;
+      const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw), rx = -fz, rz = fx, tip = M.span ? M.span / 2 - 0.2 : 5.3;
       let hit = false;
-      for (const [a, b] of [[M.len / 2 + 0.3, 0], [0, 0], [-M.len / 2, 0], [0, 5.3], [0, -5.3]]) {                        // nose, middle, tail and the two wing tips
+      for (const [a, b] of [[M.len / 2 + 0.3, 0], [0, 0], [-M.len / 2, 0], [0, tip], [0, -tip]]) {                        // nose, middle, tail and the two wing tips
         const x = car.x + dx + fx * a + rx * b, z = car.z + dz + fz * a + rz * b;
         if (blockedAt(x, z, groundAt(x, z) + car.alt)) hit = true;
       }
@@ -349,22 +420,61 @@ const Car = (() => {
     else if (Math.abs(dz) > 1e-4 && fits(0, dz)) { car.z += dz; car.v *= 1 - 1.6 * dt; }
     else if (car.v > 1) { if (bumpCd <= 0) { bumpCd = 0.9; Sfx.play("bump"); if (car.v > 8) { Vitals.hp = Math.max(0, Vitals.hp - car.v * 0.8); player.shake = 0.6; toast("Bump!"); } } car.v *= 0.2; }
     bumpCd = Math.max(0, bumpCd - dt);
-    // the edge of the city: high up you can fly on to the next one
-    const b = BOUNDS, m = 25;
-    let edge = false;
-    if (car.x < b.minX + m) { car.x = b.minX + m; edge = true; } if (car.x > b.maxX - m) { car.x = b.maxX - m; edge = true; }
-    if (car.z < b.minZ + m) { car.z = b.minZ + m; edge = true; } if (car.z > b.maxZ - m) { car.z = b.maxZ - m; edge = true; }
-    flyOnReady = edge && car.alt > 50;
-    if (flyOnReady && !flyHint) { flyHint = true; toast("✈ You have reached the edge of the city. Press F to fly on to the next city."); }
-    if (!flyOnReady) flyHint = false;
-    // the plane, the camera target and you all move together
-    car.y = ground + car.alt + 0.0;
-    car.g.position.set(car.x, car.y, car.z); car.g.rotation.order = "YXZ"; car.g.rotation.set(car.pitch, car.yaw, car.roll);
-    if (car.g.userData.prop) car.g.userData.prop.rotation.z += (4 + car.throttle * 70) * dt;
-    for (const w of car.wheels) w.rotation.x += (car.v * dt) / 0.3;
-    player.x = car.x; player.z = car.z; player.yaw = car.yaw; player.feet = car.y; player.vx = player.vz = 0;
-    $("#drive-kmh").textContent = Math.round(Math.abs(car.v) * 3.6);
-    $("#drive-alt").textContent = ` · ${Math.round(car.alt)} m up · power ${Math.round(car.throttle * 100)}%`;
+    const hud = glide ? ` · ${Math.round(car.alt)} m up · ${th > 0.05 ? "in a thermal: rising air ↑" : car.throttle > 0 ? "on tow" : "gliding"}` : ` · ${Math.round(car.alt)} m up · power ${Math.round(car.throttle * 100)}%`;
+    settle(dt, ground, hud);
+  }
+
+  // Helicopters, the tiltrotor, the airship and the balloon. They go up and down on their own (Space and Shift), and on the ground they just sit there.
+  // Helicopter and tiltrotor: W and S fly forward and back at once, with no run needed. Tiltrotor: its rotors tilt forward as it speeds up.
+  // Airship: slow and heavy. Balloon: Space is the burner; it is carried by the wind, which blows a different way at each height.
+  function hoverUpdate(dt, keys) {
+    const M = car.M, kind = M.air, balloon = kind === "balloon";
+    const key = (...c) => c.some((k) => keys.has(k));
+    const up = key("Space"), dive = key("ShiftLeft", "ShiftRight"), fwd = key("KeyW", "ArrowUp"), back = key("KeyS", "ArrowDown");
+    const steer = (key("KeyA", "ArrowLeft") ? 1 : 0) - (key("KeyD", "ArrowRight") ? 1 : 0);
+    car.steerIn = steer; car.pitchIn = up ? 1 : dive ? -1 : 0; car.throttle = fwd ? 1 : 0;
+    const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
+    // up and down
+    const vyT = up ? M.climb : dive ? -M.climb * (balloon ? 0.8 : 0.9) : balloon && air ? -0.7 : 0;                // a balloon cools and sinks slowly; the others hover
+    car.vy += (vyT - car.vy) * Math.min(1, dt * (balloon ? 0.9 : 2.4));
+    if (!air && car.vy < 0) car.vy = 0;
+    car.alt += car.vy * dt;
+    if (car.alt > M.ceiling) { car.alt = M.ceiling; car.vy = Math.min(0, car.vy); }
+    if (car.alt <= 0) {                                                                            // touching down
+      if (air && car.vy < -M.hard) crashPlane("You came down too hard.");
+      else if (air) Sfx.play("bump");
+      car.alt = 0; car.vy = 0;
+    }
+    // turning
+    const yawRate = kind === "heli" ? 1 : kind === "vtol" ? 0.35 + 0.65 * Math.min(1, Math.abs(car.v) / 40) : kind === "blimp" ? Math.min(1, 0.25 + Math.abs(car.v) / 6) : 0.5;
+    car.yaw += steer * M.turn * yawRate * (air ? 1 : 0.5) * dt;
+    // going along
+    const fx = -Math.sin(car.yaw), fz = -Math.cos(car.yaw);
+    let dx, dz;
+    if (balloon) {
+      const [wx, wz] = air ? windAt(car.alt) : [0, 0];
+      car.vx += (wx - car.vx) * Math.min(1, dt * 0.4); car.vz += (wz - car.vz) * Math.min(1, dt * 0.4);
+      car.v = Math.hypot(car.vx, car.vz); dx = car.vx * dt; dz = car.vz * dt;
+    } else {
+      const target = ((fwd ? 1 : 0) - (back ? 0.5 : 0)) * M.max * (air ? 1 : 0.25);                   // on the ground you can only creep along
+      car.v += (target - car.v) * Math.min(1, dt * M.respond);
+      dx = fx * car.v * dt; dz = fz * car.v * dt;
+    }
+    if (air) {                                                                                     // you can rise from a tight spot, but not fly sideways into a building
+      if (Math.abs(dx) + Math.abs(dz) > 1e-4 && crashHit(M, dx, dz) && !crashHit(M, 0, 0)) crashPlane(balloon ? "The balloon hit a building." : "You flew into a building.");
+      else { car.x += dx; car.z += dz; }
+    }
+    else if (!balloon) { if (fits(dx, dz)) { car.x += dx; car.z += dz; } else car.v *= 0.3; }
+    // leaning
+    car.roll += ((air && !balloon ? steer * 0.3 * Math.min(1, Math.abs(car.v) / 10 + 0.3) : 0) - car.roll) * Math.min(1, dt * 3);
+    const lean = kind === "heli" ? 0.22 : kind === "vtol" ? 0.1 : 0.05;
+    car.pitch += ((balloon ? 0 : -(car.v / M.max) * lean + (kind === "blimp" ? car.vy / 30 : 0)) - car.pitch) * Math.min(1, dt * 3);
+    const u = car.g.userData;
+    if (u.pods) { car.tilt = (car.tilt || 0) + (Math.min(1, Math.abs(car.v) / (M.max * 0.45)) - (car.tilt || 0)) * Math.min(1, dt * 1.5); for (const p of u.pods) p.rotation.x = -car.tilt * Math.PI / 2; }
+    if (u.flame) { u.flame.visible = up; u.flame.scale.y = 0.8 + Math.random() * 0.5; }
+    let hud = ` · ${Math.round(car.alt)} m up`;
+    if (balloon && air) hud += ` · drifting ${POINTS[(Math.round(Math.atan2(car.vx, -car.vz) / (Math.PI / 4)) + 8) % 8]}`;
+    settle(dt, ground, hud);
   }
   let flyOnReady = false;
   // fly on from the edge of the city to the next one: you arrive high above it, flying
@@ -376,7 +486,8 @@ const Car = (() => {
       try {
         arriveIn(to);
         mode = "drive";
-        car.x = player.x; car.z = player.z; car.yaw = player.yaw; car.alt = 130; car.vy = 0; car.v = Math.max(car.v, 38); car.throttle = Math.max(car.throttle, 0.6);
+        car.x = player.x; car.z = player.z; car.yaw = player.yaw; car.alt = 130; car.vy = 0; car.v = Math.max(car.v, Math.min(38, car.M.max * 0.7)); car.throttle = Math.max(car.throttle, 0.6);
+        car.vx = -Math.sin(car.yaw) * car.v; car.vz = -Math.cos(car.yaw) * car.v;
         car.y = groundAt(car.x, car.z) + car.alt; car.g.position.set(car.x, car.y, car.z);
         player.feet = car.y; flyOnReady = false; flyHint = false;
         $("#drive-hud").classList.add("show");
@@ -389,7 +500,7 @@ const Car = (() => {
 
   function update(dt, keys) {
     if (!car || !driving) return;
-    if (car.M.fly) { flyUpdate(dt, keys); return; }
+    if (car.M.fly) { (car.M.hover ? hoverUpdate : flyUpdate)(dt, keys); return; }
     const M = car.M;
     bumpCd = Math.max(0, bumpCd - dt); runCd = Math.max(0, runCd - dt);
     const gas = keys.has("KeyW") || keys.has("ArrowUp"), brake = keys.has("KeyS") || keys.has("ArrowDown");
@@ -477,7 +588,7 @@ const Car = (() => {
     if (!car) return;
     if (car.M.fly && pilot) {                                                                          // the pilot's seat: the camera rolls and pitches with the plane
       car.g.updateMatrixWorld(true);
-      cam.position.copy(car.g.localToWorld(eye.set(0, 2.0, -0.95)));
+      cam.position.copy(car.g.localToWorld(eye.set(...(car.M.eye || [0, 2.0, -0.95]))));
       cam.quaternion.copy(car.g.quaternion);
       camYaw = car.yaw;
       const ck = car.g.userData.cockpit;
@@ -495,9 +606,9 @@ const Car = (() => {
     if (car.M.fly) {                                                                                   // behind and above the plane, looking where it is going
       let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
       camYaw += dy * Math.min(1, dt * 2.6);
-      const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), d = 17 + car.v * 0.07, cx = car.x - fx * d, cz = car.z - fz * d;
-      cam.position.set(cx, Math.max(groundAt(cx, cz) + 1.6, car.y + 5.2 - car.pitch * 6), cz);
-      cam.lookAt(car.x + fx * 9, car.y + 1.3 + car.pitch * 5, car.z + fz * 9);
+      const k = car.M.cam || 1, fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), d = (17 + Math.abs(car.v) * 0.07) * k, cx = car.x - fx * d, cz = car.z - fz * d;
+      cam.position.set(cx, Math.max(groundAt(cx, cz) + 1.6, car.y + (car.M.camY || 5.2) - car.pitch * 6), cz);
+      cam.lookAt(car.x + fx * 9 * k, car.y + (car.M.lookY || 1.3) + car.pitch * 5, car.z + fz * 9 * k);
       if (player.shake > 0) { cam.position.x += (Math.random() - 0.5) * player.shake * 0.4; cam.position.y += (Math.random() - 0.5) * player.shake * 0.3; player.shake = Math.max(0, player.shake - dt * 2.4); }
       const f = $("#flash"); f.style.opacity = Math.max(0, parseFloat(f.style.opacity || 0) - dt * 1.6);
       return;

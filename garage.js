@@ -43,7 +43,7 @@ const Garage = (() => {
     if (typeof Market === "undefined" || typeof Car === "undefined") return [];
     return Object.keys(Market.ITEMS).filter((id) => {
       const it = Market.ITEMS[id], M = Car.MODELS[id];
-      return (it.type === "car" || it.type === "mount") && M && Market.owns(id) && (M.era || "modern") === era && Car.current !== id;
+      return (it.type === "car" || it.type === "mount") && M && !(M.fly && id !== "plane") && Market.owns(id) && (M.era || "modern") === era && Car.current !== id;
     }).slice(0, 2);
   }
 
