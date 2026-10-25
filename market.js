@@ -310,6 +310,18 @@ const Market = (() => {
         else if (it.slot) { b.textContent = s.worn.includes(id) ? (it.type === "pet" ? "Send home" : it.type === "weapon" ? "Put away" : "Take off") : (it.type === "pet" ? "Bring along" : it.type === "weapon" ? "Equip" : "Wear"); b.classList.toggle("on", s.worn.includes(id)); b.addEventListener("click", () => wear(id)); }
         else { b.textContent = "Owned"; b.disabled = true; b.classList.add("on"); }
         li.append(txt, b);
+        if (owned && (it.type === "car" || it.type === "mount") && it.price > 0) {                              // sell a vehicle back for half of what it cost (press twice to be sure)
+          const sb = document.createElement("button"), refund = Math.round(it.price * 0.5);
+          let armed = 0;
+          sb.type = "button"; sb.textContent = `Sell · ${refund}`;
+          sb.addEventListener("click", () => {
+            if (!armed || performance.now() - armed > 4000) { armed = performance.now(); sb.textContent = `Sure? Sell for ${refund}`; return; }
+            if (Car.current === id) Car.stow();
+            s.items = s.items.filter((x) => x !== id); Vitals.coins += refund; save(); Sfx.play("coin"); applyAll(); render();
+            toast(`You sold your ${it.name.toLowerCase()} for ${refund} denarii.`);
+          });
+          li.append(sb);
+        }
         ul.append(li);
       }
       if (def.ownedOnly && !ul.children.length) { const li = document.createElement("li"), note = document.createElement("small"); note.textContent = def.empty; li.append(note); ul.append(li); }

@@ -457,6 +457,7 @@ const Jobs = (() => {
     { title: "Hypogeum, under the Colosseum", where: "Ancient Rome: the stair-house by the Colosseum's west gate", city: "rome", era: "ancient", lm: "hypogeum", jobs: ["capstan", "keeper", "props"] },
     { title: "Circus Office, at the Circus Maximus", where: "Ancient Rome: the hut by the starting gates", city: "rome", era: "ancient", lm: "circusjobs", jobs: CIRCUS },
     { title: "Job board in Rome's market", where: "Rome: the market square south of the Forum (some jobs are Ancient Rome only)", city: "rome", era: null, lm: "market", jobs: BOARD },
+    { title: "Job board in Cancún's market", where: "Cancún: the market square south of the great plaza", city: "cancun", era: null, lm: "g-market", jobs: ["baker", "scribe", "groom", "courier", "drive", "fly"] },
     { title: "Job board in Delhi's market", where: "Old Delhi: the market square south of the Lahori Gate", city: "delhi", era: null, lm: "g-market", jobs: ["baker", "scribe", "groom", "courier", "drive", "fly"] },
   ];
   const nameIn = (kind, c) => { const j = JOBS[kind]; return (j.names && j.names[c]) || j.name; };

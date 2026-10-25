@@ -99,7 +99,7 @@ const Stalls = (() => {
     for (const sx of [-1, 1]) box(g, cx + sx * 9, 0, cz - 1, 3.2, 0.5, 0.8, lam(0x6a4c2a));
 
     // the job board, at the east end of the square: notices for the baker, scribe, stable hand and messenger
-    if (!cancun) {
+    {
       const bx = cx + 28, bz = cz + 4.5;
       for (const sx of [-1.6, 1.6]) box(g, bx + sx, 0, bz, 0.22, 3.2, 0.22, lam(0x5a4028), true);
       box(g, bx, 1.1, bz, 3.8, 1.9, 0.18, lam(0x7a5a34), false);
