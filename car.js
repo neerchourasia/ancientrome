@@ -186,7 +186,7 @@ const Car = (() => {
     player.vx = player.vz = 0; Vitals.stopRest();
     $("#drive-hud").classList.add("show");
     $("#drive-alt").textContent = "";
-    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
+    $("#drive-keys").innerHTML = car.M.fly ? "<kbd>W</kbd> power up · <kbd>S</kbd> power down / brake / reverse (on the ground) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> dive · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)" : "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
     if (car.M.fly) { toast("Plane: W for power, and above about 100 km/h hold Space to take off. Shift dives. Land gently on a long street or a square, and press X to get out."); return; }
     toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
@@ -267,9 +267,9 @@ const Car = (() => {
     const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
     // speed
     car.v += (car.throttle * M.max - car.v) * (air ? 0.2 : 0.28) * dt;
-    if (!air && thrDown && car.throttle === 0) car.v -= 16 * dt;                                  // brakes on the ground
-    if (!air && !thrUp && car.throttle === 0) car.v -= 2.2 * dt;
-    car.v = Math.max(0, car.v);
+    if (!air && thrDown && car.throttle === 0) car.v -= (car.v > 0.3 ? 16 : 6) * dt;              // on the ground S brakes, and then backs the plane up (slowly)
+    else if (!air && !thrUp && car.throttle === 0) car.v -= Math.sign(car.v) * Math.min(Math.abs(car.v), 2.2 * dt);
+    car.v = air ? Math.max(0, car.v) : Math.max(-6, car.v);                                          // you can only reverse on the ground
     // climbing and diving: only fast enough to fly, and below the stalling speed the plane sinks
     const lift = Math.min(1, Math.max(0, (car.v - PLANE.lift + 4) / 16));
     let vyT = 0;
@@ -279,7 +279,7 @@ const Car = (() => {
     car.vy += (vyT - car.vy) * Math.min(1, dt * 2.6);
     if (!air && car.vy < 0) car.vy = 0;
     car.alt += car.vy * dt;
-    car.v = Math.max(0, car.v - car.vy * 0.12 * dt);                                               // climbing costs a little speed, diving gives it back
+    if (car.vy) car.v = Math.max(0, car.v - car.vy * 0.12 * dt);                                             // climbing costs a little speed, diving gives it back
     if (car.alt > PLANE.ceiling) { car.alt = PLANE.ceiling; car.vy = Math.min(0, car.vy); }
     if (car.alt <= 0) {                                                                            // touching down
       if (air && (car.vy < -9 || car.v > 56)) { crashPlane(car.vy < -9 ? "You came down too steeply." : "You landed too fast."); }
@@ -287,8 +287,8 @@ const Car = (() => {
       car.alt = 0; car.vy = 0;
     }
     // turning (the plane banks into the turn)
-    const fast = Math.min(1, car.v / 22);
-    car.yaw += steer * (car.alt > 0.4 ? 0.9 : car.v > 2 ? 0.6 : 0) * fast * dt;
+    const fast = Math.max(-1, Math.min(1, car.v / 22));
+    car.yaw += steer * (car.alt > 0.4 ? 0.9 : Math.abs(car.v) > 2 ? 0.6 : 0) * fast * dt;
     car.roll += ((car.alt > 0.4 ? steer * 0.6 : 0) - car.roll) * Math.min(1, dt * 3);
     car.pitch += (Math.max(-0.5, Math.min(0.5, car.vy / 26)) - car.pitch) * Math.min(1, dt * 3);
     // moving: on the ground like a car, in the air over whatever is lower than the plane
