@@ -7,7 +7,7 @@ const Vitals = (() => {
   const START_COINS = 300; // what a new game starts with
   const MIN_FIGHT_HP = 35, MIN_RACE_HORSES = 40, RACE_ENTRY = 20;
   const s = { hp: 100, horses: 100, coins: START_COINS, hunger: 100 };
-  const HUNGER_SECONDS = 720, STARVE_HP = 0.5, STARVE_FLOOR = 12; // full to empty in 12 minutes; under 20% you lose health (up to half a point a second at empty) and you stop healing, but hunger alone only weakens you: it never takes you below 12
+  const HUNGER_SECONDS = 720, STARVE_HP = 0.5; // full to empty in 12 minutes; under 20% you lose health (up to half a point a second at empty) and you stop healing, and if you never eat you starve to death
   // Harder to die: every hit that other parts of the game deal to you (crashes, fights, storms, illness) does only 60% of its damage, so no single blow can
   // kill you outright (even one that would have taken all your health leaves you 40% of it). Only a run of hits, one after another, can.
   const DAMAGE_MUL = 0.6;
@@ -54,7 +54,7 @@ const Vitals = (() => {
       // hunger: food is a must. It runs down while you play; at empty you stop healing and starve
       if (ctx.mode === "walk" || ctx.mode === "watch" || ctx.mode === "drive") {
         s.hunger = clamp(s.hunger - (100 / HUNGER_SECONDS) * dt);
-        if (s.hunger < 20 && ctx.mode !== "watch" && s.hp > STARVE_FLOOR) s.hp = clamp(Math.max(STARVE_FLOOR, s.hp - STARVE_HP * (1 - s.hunger / 20) * dt)); // below a fifth you start losing health, faster the emptier you get
+        if (s.hunger < 20 && ctx.mode !== "watch") s.hp = clamp(s.hp - STARVE_HP * (1 - s.hunger / 20) * dt); // below a fifth you start losing health, faster the emptier you get // below a fifth you start losing health, faster the emptier you get
       }
       saveT += dt;
       if (saveT > 2) { saveT = 0; save(); }
