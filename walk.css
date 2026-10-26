@@ -606,3 +606,17 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #v-tax.bad { color: #ff7a6d; font-weight: 700; }
 #v-tax:empty { display: none; }
 #btn-tax.alert { border-color: #e2b955 !important; color: #ffe29a; }
+
+/* the fares banner (taxi fares, passenger flights, the trading depot hint) */
+#fare-hud { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; align-items: center; padding: 8px 16px; background: rgba(20,70,60,.92); border: 1px solid rgba(150,230,200,.6); border-radius: 10px; color: #fff; text-align: center; pointer-events: none; max-width: min(92vw, 560px); }
+#fare-hud.show { display: flex; }
+#fare-hud strong { font: 700 1rem Georgia, serif; color: #c9f5e0; }
+#fare-hud kbd { background: rgba(255,255,255,.2); border-radius: 4px; padding: 0 5px; }
+/* the trading depot panel looks like the market panel */
+#trade { position: fixed; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(20,15,10,.7); }
+#trade.show { display: flex; }
+#trade .box { width: min(520px, 100%); max-height: 92vh; overflow-y: auto; background: rgba(28,22,16,.97); border: 1px solid rgba(226,185,85,.45); border-radius: 12px; padding: 6px 18px 18px; }
+#trade header { display: flex; justify-content: space-between; align-items: center; }
+#trade h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
+#trade-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
+#trade .mk-items { margin-top: 10px; }

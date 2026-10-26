@@ -277,6 +277,7 @@ const Car = (() => {
   const PLANE = { stall: 26, lift: 28, ceiling: 360 };
   function crashPlane(why) {
     Vitals.hp = Math.max(0, Vitals.hp - 38); player.shake = 1; $("#flash").style.opacity = 0.6; Sfx.play("crash");
+    if (typeof Trade !== "undefined") Trade.lose();
     toast(`Crash! ${why} (-38 health)`);
     car.v = 0; car.vy = 0; car.alt = 0; car.throttle = 0; car.roll = car.pitch = 0;
     if (!clearAt(car.x, car.z, car.yaw)) rescue();

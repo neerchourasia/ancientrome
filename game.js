@@ -120,7 +120,7 @@ function leaveMode() {
   else if (mode === "naval") Naval.stop();
   else if (mode === "watch") Watch.stop();
   else if (mode === "online") Online.leave();
-  else if (mode === "drive") Car.exit();
+  else if (mode === "drive") { if (Trade.isOpen) Trade.close(); else Car.exit(); }
   else if (mode === "dgame" || DGames.running) DGames.stop();
   else closePanels();
 }
@@ -164,6 +164,7 @@ function wireInput(canvas) {
       else if (k === "KeyC" && mode === "walk") cycleView(e.shiftKey ? -1 : 1);
     }
     if (mode === "drive" && k === "KeyC") Car.togglePilot();
+    if (mode === "drive" && !Trade.isOpen) { if (k === "KeyP") Fares.accept(); else if (k === "KeyE") Trade.open(); }
     if (mode === "walk") { const m = /^(?:Digit|Key|Numpad)([1-9])$/.exec(k); if (m) setWalkLevel(Number(m[1])); }
     if (mode === "watch") {
       if (k === "KeyC") Watch.toggleChase();
@@ -1605,7 +1606,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul, atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
