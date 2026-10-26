@@ -64,7 +64,7 @@ const Market = (() => {
     chariot: { type: "mount", name: "Chariot", price: 280, note: "A light two-wheeled chariot with a horse in harness. Top speed 76 km/h." },
     scooter: { type: "car", name: "Vespa scooter", price: 250, note: "Quick and nimble. Top speed 54 km/h." },
     citycar: { type: "car", name: "City car", price: 500, note: "A blue runabout. Top speed 86 km/h." },
-    plane: { type: "car", name: "Light plane", price: 3500, note: "A small propeller plane for the modern cities. Build up speed on a long straight street, hold Space above about 100 km/h to take off, and land gently. Fly to the edge of a city and press F to fly on to the next one. Top speed 223 km/h." },
+    plane: { type: "car", air: true, name: "Light plane", price: 3500, note: "A small propeller plane for the modern cities. Build up speed on a long straight street, hold Space above about 100 km/h to take off, and land gently. Fly to the edge of a city and press F to fly on to the next one. Top speed 223 km/h." },
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
     rickshaw: { type: "car", name: "Cycle rickshaw", price: 200, note: "Pedal-powered, in bright colours. Top speed 25 km/h." },
     oxcart: { type: "mount", name: "Bullock cart", price: 150, note: "A wooden cart pulled by an ox. Top speed 18 km/h." },
@@ -79,7 +79,7 @@ const Market = (() => {
     horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
-  for (const [id, M] of Object.entries(AIRCRAFT)) ITEMS[id] = { type: "car", name: M.name, price: M.price, note: M.note };   // the aircraft (aircraft.js) are sold at the animals and rides stall
+  for (const [id, M] of Object.entries(AIRCRAFT)) ITEMS[id] = { type: "car", air: true, name: M.name, price: M.price, note: M.note };   // the aircraft (aircraft.js) are sold at the animals and rides stall
   // Food from the food stall. Each dish belongs to one city and era. `heal` is health at once; eating also leaves you "fed",
   // which speeds up how fast you heal on your own for a few minutes.
   const F = (name, price, heal, note, where) => ({ type: "food", name, price, heal, note, where });
@@ -155,17 +155,17 @@ const Market = (() => {
   const STALLS = {
     food: { title: "Food stall", types: ["food"] },
     clothes: { title: "Clothier", types: ["wear"] },
-    pets: { title: "Animals and rides", types: ["pet", "car", "mount"] },
+    pets: { title: "Animals and rides", types: ["pet", "car", "air", "mount"] },
     builder: { title: "Builder and decorator", types: ["decor"], house: true },
     healer: { title: "Healer and trainer", types: ["cure", "supply", "perk"] },
-    garage: { title: "Your garage", types: ["car", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
+    garage: { title: "Your garage", types: ["car", "air", "mount"], ownedOnly: true, empty: "You do not own any of these yet. Buy one at the animals and rides stall in the market square." },
     menagerie: { title: "Your menagerie", types: ["pet"], ownedOnly: true, empty: "You do not own any animals yet. Buy one at the animals and rides stall in the market square, and it will live here. Press Bring along to take one with you." },
     weapons: { title: "Armourer: weapons for the arena", types: ["weapon"], note: "You fight with the gladius (damage 100%, reach 3.1 m) unless you equip another weapon. Weapons work in the arena against the bots, and in duels and team battles against real people." },
     dresser: { title: "Your dresser", types: ["wear"], ownedOnly: true, empty: "You do not own anything to wear yet. The clothier in the market square sells hats, cloaks, armour and boots. You cannot buy things here." },
   };
   let stall = "food";
   const SECTIONS = [
-    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Weapons for the arena", "weapon"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
+    ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Weapons for the arena", "weapon"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Aircraft: planes, helicopters, balloons and jets (modern cities)", "air"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
@@ -290,7 +290,7 @@ const Market = (() => {
     $m("mk-sections").replaceChildren(...intro, ...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {
       const h = document.createElement("h3"), ul = document.createElement("ul");
       h.textContent = title; ul.className = "mk-items";
-      const need = type === "car" ? "modern" : type === "mount" ? "ancient" : null;
+      const need = type === "car" || type === "air" ? "modern" : type === "mount" ? "ancient" : null;
       if (need && era !== need && def.ownedOnly) return []; // your garage only lists what exists in this era
       if (need && era !== need) { // these only exist in one era
         const li = document.createElement("li"), note = document.createElement("small");
@@ -298,7 +298,7 @@ const Market = (() => {
         li.append(note); ul.append(li);
         return [h, ul];
       }
-      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => x.type === type && (type !== "food" || foodHere(x)) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
+      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => (x.type === "car" && x.air ? "air" : x.type) === type && (type !== "food" || foodHere(x)) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
         name.textContent = it.name; note.textContent = it.type === "weapon" ? `${it.note} ${Weapons.describe(id)}` : it.note;
