@@ -181,10 +181,13 @@ const Account = (() => {
       const rows = await api("/rest/v1/profiles?select=character,progress,updated_at&user_id=eq." + encodeURIComponent(session.id), { token });
       ready = true;
       if (rows && rows[0] && rows[0].character && rows[0].character.name) {
+        const mine = snapshot();                                                       // what this device has: things bought here before logging in are kept
         apply(rows[0]);
+        keepLocal(mine, rows[0]);
         if (rows[0].updated_at) setKnown(rows[0].updated_at);
-        lastSaved = JSON.stringify(snapshot());
+        lastSaved = "";                                                                // the merged game is saved again at once
         toast("Welcome back! Your saved game is loaded");
+        await saveNow(true);
       } else {
         await saveNow(true);
         toast("Account ready: your game is now saved online");
