@@ -410,11 +410,10 @@ const Naval = (() => {
     }
     // Damage to your ship costs you: the crew (you) are hurt in proportion, and a lost battle costs money.
     const hullLost = me ? 100 * (1 - me.hp / me.max) : 0, defeat = !!title && !win;
-    if (!live) Vitals.hp = defeat ? 0 : Math.max(5, Vitals.hp - hullLost * 0.35);
+    if (!live) Vitals.hp = defeat ? Math.max(10, Vitals.hp - 15) : Math.max(5, Vitals.hp - hullLost * 0.35);    // a sunk ship only bruises you: you are fished out of the water
     if (live) { /* no fines or wounds against real people: only the prize (added by the caller) */ }
     else if (defeat) {
-      deathPending = "You went down with your ship.";
-      text += " You did not survive the sinking.";
+      text += ` Your ship sank, but you were fished out of the water, only bruised. Health: ${Math.round(Vitals.hp)}/100.`;
     } else if (win) {
       Vitals.coins += NAVAL_PURSE;
       text += ` Purse earned: ${NAVAL_PURSE} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
