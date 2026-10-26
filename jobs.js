@@ -511,6 +511,17 @@ const Jobs = (() => {
   // The messenger: carry a message to a landmark across the city before the time is up (the game's directions arrow shows the way)
   let courier = null;
   const ownsVehicle = (wantFly) => typeof Car !== "undefined" && typeof Market !== "undefined" && Object.keys(Market.ITEMS).some((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!Car.MODELS[id].fly === wantFly && Market.owns(id));
+  // Take out the fastest suitable vehicle you own (road vehicles for parcels; for cargo an aircraft with an engine, a balloon or glider only if it is all you have) and get in
+  function autoBoard(wantFly) {
+    if (typeof Car === "undefined" || typeof Market === "undefined" || Car.driving) return Car.driving;
+    const own = Object.keys(Market.ITEMS).filter((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!Car.MODELS[id].fly === wantFly && Market.owns(id));
+    const good = own.filter((id) => !wantFly || (Car.MODELS[id].air !== "balloon" && !Car.MODELS[id].glide));
+    const pool = good.length ? good : own;
+    if (!pool.length) return false;
+    pool.sort((a, b) => Car.MODELS[b].max - Car.MODELS[a].max);
+    Car.deploy(pool[0]);
+    return Car.driving;
+  }
   function startCourier(kind = "courier") {
     if (courier) { toast("You are already carrying something."); return; }
     const job = JOBS[kind], mode = job.mode || "run";
@@ -524,7 +535,8 @@ const Jobs = (() => {
     courier = { lm: pick.l, until: performance.now() + total * 1000, total, hudT: 0, kind, mode, city: typeof city !== "undefined" ? city : "rome" };
     if (typeof startDirections === "function") startDirections(pick.l);
     const what = mode === "fly" ? "this cargo" : mode === "drive" ? "this parcel" : "this message";
-    toast(`Take ${what} to ${pick.l.name}: ${Math.round(pick.d)} m, you have ${total} seconds.${mode === "run" ? "" : mode === "fly" ? " Get in your aircraft and fly there!" : " Get in your vehicle and drive there!"}`);
+    const boarded = mode !== "run" && autoBoard(mode === "fly");                                       // the delivery vehicle is brought out and you are already in it
+    toast(`Take ${what} to ${pick.l.name}: ${Math.round(pick.d)} m, you have ${total} seconds.${mode === "run" || boarded ? "" : mode === "fly" ? " Get in your aircraft and fly there!" : " Get in your vehicle and drive there!"}${boarded ? ` You are in your ${Car.MODELS[Car.current].name.toLowerCase()}.` : ""}`);
     Narrator.say(`Deliver ${what} to ${pick.l.name} within ${total} seconds.`, { interrupt: true });
     courierHud();
   }

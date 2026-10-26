@@ -377,6 +377,42 @@ function buildTrajan() {
   for (const [sx, sz] of [[-120, -230], [-180, -230], [-150, -250]]) statue(sx, sz, 1.1);
 }
 
+
+// A wall of brick arches with see-through openings (the arches are cut out of the texture, so you really can look and walk through them).
+// `levels` storeys of arches, `bays` arches along it. Only the piers between the arches block you.
+function arcadeWall(parent, x, y0, z, len, h, levels, bays, rotY, o = {}) {
+  const bw = 64, bh = 128, c = document.createElement("canvas"); c.width = bw; c.height = bh * levels;
+  const g = c.getContext("2d"), r = mulberry32(o.seed || 5);
+  g.fillStyle = o.color || "#b0623f"; g.fillRect(0, 0, c.width, c.height);
+  for (let i = 0; i < 160; i++) { g.fillStyle = r() < 0.5 ? "rgba(80,40,20,.12)" : "rgba(255,230,200,.1)"; g.fillRect(r() * bw, r() * c.height, 3 + r() * 6, 2 + r() * 3); }
+  g.fillStyle = "rgba(255,245,220,.25)"; for (let l = 0; l < levels; l++) g.fillRect(0, l * bh + bh - 6, bw, 6);                      // the string course between the storeys
+  g.globalCompositeOperation = "destination-out"; g.fillStyle = "#000";                                                      // (a fully opaque fill, so the arches are cut out completely)
+  for (let l = 0; l < levels; l++) {
+    const top = l * bh, bottom = top + bh - 6 - (l === levels - 1 && o.ground ? 0 : 0), rad = 17;
+    g.beginPath(); g.moveTo(14, bottom); g.lineTo(14, top + 26 + rad); g.arc(32, top + 26 + rad, rad, Math.PI, 0); g.lineTo(50, bottom); g.closePath(); g.fill();
+  }
+  const tex = new T.CanvasTexture(c); tex.wrapS = T.RepeatWrapping; tex.repeat.set(bays, 1); tex.anisotropy = 4;
+  const mat = new T.MeshLambertMaterial({ map: tex, alphaTest: 0.5, side: T.DoubleSide });
+  const m = shadowed(new T.Mesh(new T.PlaneGeometry(len, h), mat)); m.position.set(x, y0 + h / 2, z); m.rotation.y = rotY; parent.add(m);
+  // the piers: solid, between the arches (the texture's piers are 14 px of every 64 at each side)
+  const along = Math.abs(Math.sin(rotY)) < 0.5 ? 1 : 0;                                                                                    // 1: the wall runs along x
+  const bay = len / bays, pw = bay * (28 / 64);
+  for (let i = 0; i < bays; i++) {
+    const t = -len / 2 + i * bay + bay / 2;
+    for (const sd of [-1, 1]) {
+      const px = x + (along ? t + sd * (bay / 2 - pw / 4) : 0), pz = z + (along ? 0 : t + sd * (bay / 2 - pw / 4)), w = along ? pw / 2 + 0.05 : 1.2, d = along ? 1.2 : pw / 2 + 0.05;
+      addBlockerBox(px - w / 2, px + w / 2, pz - d / 2, pz + d / 2, (o.wy || 0) + y0, (o.wy || 0) + y0 + h, o.era ? { era: o.era } : undefined);
+    }
+  }
+  return m;
+}
+
+// Roman numerals (1 to 3999) for the numbered entrances of the Colosseum
+function romanNumeral(n) {
+  const T2 = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let out = ""; for (const [v, t] of T2) while (n >= v) { out += t; n -= v; } return out;
+}
+
 // ---------- Palatine palace ----------
 
 function buildPalatine() {
@@ -407,6 +443,27 @@ function buildPalatine() {
   P.box(cx + hw, 8.4, cz, 2, 1, 2 * hd + 2, M.marble2);
   P.cyl(cx, 0, cz, 4.2, 0.7, M.travertine, { solid: true });
   P.cyl(cx, 0.6, cz, 3.6, 0.15, M.water);
+
+
+  // The Arches of Severus: a two-storey arcade at the western edge of the hill, looking out over the Circus Maximus
+  arcadeWall(P.group, -50, 0, 260, 60, 17, 2, 10, -Math.PI / 2, { seed: 11, wy: y });
+  P.box(-49, 17, 260, 5, 1.2, 60.5, M.marble2);                                                                               // the cornice and the flat roof
+  // The Domus Severiana: Severus's three-part extension to the palace with its baths, along the south edge of the hill
+  const halls = [[8, 30], [32, 52], [54, 78]];
+  halls.forEach(([a, b], k) => {
+    const mx = (a + b) / 2, w = b - a;
+    P.box(mx, 0, 339.4, w, 11, 1.2, M.brick, { solid: true, map: "#a9603f" });                                                // the back wall
+    P.box(a + 0.6, 0, 325, 1.2, 11, 30, M.brick, { solid: true, map: "#a9603f" });                                           // the side walls
+    if (k === 2) P.box(b - 0.6, 0, 325, 1.2, 11, 30, M.brick, { solid: true, map: "#a9603f" });
+    P.box(mx, 11, 325, w + 0.4, 1.4, 31, M.roof);                                                                             // the roof
+    for (let i = 0; i < 3; i++) P.column(a + 3 + i * ((w - 6) / 2), 311.5, 0.5, 9.5);                                          // a row of columns at the front
+  });
+  const bath = new T.Mesh(new T.PlaneGeometry(16, 18), M.water); bath.rotation.x = -Math.PI / 2; bath.position.set(42, y + 0.32, 326); worldScene.add(bath);        // the pool in the middle hall (the baths)
+  P.box(42, 0, 326, 18, 0.25, 20, M.marble2);
+  // The Aqua Claudia: the last stretch of the aqueduct, a tall arcade that carried the water to the palace, with the channel along the top
+  arcadeWall(P.group, 40, 0, 188, 100, 20, 1, 14, 0, { seed: 17, color: "#b9906a", wy: y });
+  P.box(40, 20, 188, 100.4, 1.4, 3.4, M.travertine);
+  P.box(40, 21.4, 188, 100, 0.4, 1.6, M.water);
 
   // Halls
   for (const hx of [-3, 78]) {
@@ -484,6 +541,19 @@ function buildColosseum() {
     for (const [s, l, h] of north) addWall(s, l, h, 24);
     const stubs = [13, 9, 12, 6, 11, 13, 8, 5, 10, 13, 7, 12], seg = arc / stubs.length;
     stubs.forEach((h, i) => addWall(-Math.PI / 2 + gap + i * seg, seg, h, 6));
+  }
+
+
+  // The numbered entrances: each of the arches in the ground storey has its number cut over it (ticket-holders went to the entrance that matched the number on their ticket)
+  for (const [w0, base] of [[Math.PI / 2 + gap, 0], [-Math.PI / 2 + gap, 36]]) {
+    for (let k = 0; k < 36; k++) {
+      const th = w0 + ((k + 0.5) / 36) * arc, cv = document.createElement("canvas"); cv.width = 128; cv.height = 64; const q = cv.getContext("2d");
+      q.fillStyle = "#c9b98f"; q.fillRect(0, 0, 128, 64); q.strokeStyle = "#6b5a3a"; q.lineWidth = 3; q.strokeRect(2, 2, 124, 60);
+      q.fillStyle = "#3a2a1a"; q.font = "bold 34px serif"; q.textAlign = "center"; q.textBaseline = "middle"; q.fillText(romanNumeral(base + k + 1), 64, 34);
+      const plate = new T.Mesh(new T.PlaneGeometry(3, 1.5), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) }));
+      plate.position.set(sx * (az + 0.15) * Math.sin(th), 12.4, (az + 0.15) * Math.cos(th)); plate.rotation.y = Math.atan2(Math.sin(th) / sx, Math.cos(th));
+      g.add(plate); colosseumMats.ancientWalls.push(plate);
+    }
   }
 
   // Tiered seating (lathe profile, stepped)
@@ -579,6 +649,19 @@ F.box(cx, 0, zB + back + 0.5, w + 2 * back + 1, 11, 1, M.travertine, { solid: tr
   tip.rotation.y = Math.PI / 4;
   F.add(tip);
   for (const dz of [-176, 176]) for (const dx of [-1.6, 0, 1.6]) F.cyl(cx + dx, 0, midZ + dz, 0.9, 5, M.gold);
+
+  // the lap markers on the spina: seven eggs at one end and seven dolphins at the other (one is taken down after every lap)
+  const eggMat = lambert(0xf3ead0), dolMat = lambert(0x5a8aa0);
+  for (const [dz, kind] of [[-70, "egg"], [70, "dolphin"]]) {
+    for (const sx of [-1, 1]) F.box(cx + sx * 4.1, 1.4, midZ + dz, 0.3, 3.6, 0.3, M.marble2);
+    F.box(cx, 4.7, midZ + dz, 8.6, 0.25, 0.4, M.bronze);
+    for (let i = 0; i < 7; i++) {
+      const lx = cx - 3.6 + i * 1.2;
+      if (kind === "egg") { const e = shadowed(new T.Mesh(new T.SphereGeometry(0.5, 12, 8), eggMat)); e.scale.set(0.8, 1.1, 0.8); e.position.set(lx, 5.55, midZ + dz); F.add(e); }
+      else { const d = F.box(lx, 4.95, midZ + dz, 0.35, 0.4, 1.2, dolMat); d.rotation.x = 0.35; F.box(lx, 5.35, midZ + dz + 0.1, 0.08, 0.35, 0.3, dolMat); }
+    }
+  }
+
 }
 
 // ---------- Pantheon ----------
@@ -657,6 +740,13 @@ function buildPantheon() {
   F.box(0, colH + 0.6, (pz0 + pz1) / 2, 35, 1.6, pz1 - pz0 + 2, M.marble2);
   F.gable(0, colH + 2.2, (pz0 + pz1) / 2 + 0.6, 35, 5.2, pz1 - pz0 + 1.2, M.marble);
 
+
+  // the inscription on the front of the temple: "Marcus Agrippa, son of Lucius, consul for the third time, made this"
+  {
+    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 64; const q = cv.getContext("2d");
+    q.fillStyle = "#e4dccb"; q.fillRect(0, 0, 1024, 64); q.fillStyle = "#4a3f30"; q.font = "bold 44px serif"; q.textAlign = "center"; q.textBaseline = "middle"; q.fillText("M·AGRIPPA·L·F·COS·TERTIVM·FECIT", 512, 34);
+    const ins = new T.Mesh(new T.PlaneGeometry(26, 1.3), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); ins.position.set(0, colH + 1.4, pz1 + 1.05); F.add(ins);
+  }
   // Collision
   addBlockerRing({ cx, cz, ax: R + 0.5, az: R + 0.5, u0: Ri / (R + 0.5), u1: 1.0, gap: 3.6, axis: "z", side: -1, y0: 0, y1: drumH });
 }
@@ -727,8 +817,9 @@ function buildColossus() {
 
 // The Temple of Hercules Victor in the Forum Boarium (c. 120 BC): a round temple of white marble, with a ring of twenty
 // Corinthian columns round a round cella and a tiled roof. It still stands today (the oldest surviving marble building in Rome).
+let herculesModernRoof = null;
 function buildHerculesVictor() {
-  const cx = -430, cz = 75, colR = 7.6, colH = 8.2, base = 1.5;
+  const cx = -430, cz = 75, colR = 7.0, colH = 10.66, base = 1.5;   // 14.8 m across the ring of columns, which are 10.66 m tall
   planeAt(cx, cz, 50, 50, pavingTex("#bcb198", "rgba(90,70,40,.3)", 32, 16, 16));
   MAP_SHAPES.push({ k: "e", cx, cz, ax: 11, az: 11, c: "#e2d9c4" });
   // the stepped podium
@@ -738,9 +829,9 @@ function buildHerculesVictor() {
   }
   const F = frame(cx, cz, 0, 0);
   // twenty columns round the cella (one more or fewer stands or falls with the ruin rule: they all stand today)
-  for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2; F.column(Math.cos(a) * colR, Math.sin(a) * colR, 0.46, colH, base); }
+  for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2; F.column(Math.cos(a) * colR, Math.sin(a) * colR, 0.5, colH, base); }
   // the cella: a white marble drum with a dark doorway to the east
-  const cella = shadowed(new T.Mesh(new T.CylinderGeometry(5.1, 5.1, colH + 0.6, 32, 1, true), M.marble2));
+  const cella = shadowed(new T.Mesh(new T.CylinderGeometry(5.0, 5.0, colH + 0.6, 32, 1, true), M.marble2));
   cella.position.set(cx, base + (colH + 0.6) / 2, cz); worldScene.add(cella);
   const cap = shadowed(new T.Mesh(new T.CylinderGeometry(5.1, 5.1, 0.2, 32), M.marble2)); cap.position.set(cx, base + colH + 0.5, cz); worldScene.add(cap);
   const door = new T.Mesh(new T.PlaneGeometry(2.0, 4.4), M.dark); door.position.set(cx + 5.15, base + 2.3, cz); door.rotation.y = Math.PI / 2; worldScene.add(door);
@@ -750,12 +841,65 @@ function buildHerculesVictor() {
   const roof = shadowed(new T.Mesh(new T.ConeGeometry(colR + 1.0, 4.2, 40), M.roof)); roof.position.set(cx, base + colH + 1 + 2.1, cz); worldScene.add(roof);
   RUIN.roofs.push(roof, ring);                                           // the roof and the beam above the columns are gone today
   const finial = shadowed(new T.Mesh(new T.SphereGeometry(0.45, 8, 6), M.bronze)); finial.position.set(cx, base + colH + 1 + 4.4, cz); worldScene.add(finial); RUIN.roofs.push(finial);
+  // today the temple wears a small modern roof over the cella only (the original beam and roof above the columns are gone)
+  herculesModernRoof = shadowed(new T.Mesh(new T.ConeGeometry(5.3, 3.0, 32), M.roof)); herculesModernRoof.position.set(cx, base + colH + 0.6 + 1.5, cz); herculesModernRoof.visible = false; worldScene.add(herculesModernRoof);
 }
 
 // The Theatre of Pompey in the Campus Martius (55 BC): Rome's first stone theatre. A half-round of seats (the cavea) facing a stage
 // building (the scaena), with the Temple of Venus Victrix at the top of the seats, and behind the stage a great garden with
 // colonnades (the Porticus of Pompey), where Julius Caesar was murdered in 44 BC. Only the curve of its streets survives today.
 let pompeyGroup = null;
+
+// ---- things for the Theatre of Pompey: marble statues on pedestals, fountains, signs
+// A statue (about 3.5 m tall with its pedestal). o: s scale, robe colour, mat (marble or bronze), pose 0..3 (arm raised, spear, holding a bowl, hand on hip), y floor height.
+function pompeyStatue(g, x, z, rot, o = {}) {
+  const s = o.s || 1, mat = o.mat || M.marble, robe = o.robe ? lambert(o.robe) : mat, grp = new T.Group();
+  grp.position.set(x, o.y || 0, z); grp.rotation.y = rot; grp.scale.setScalar(s); g.add(grp);
+  const add = (w, h, d, m, px, py, pz, rx = 0, rz = 0) => { const b = shadowed(new T.Mesh(BOX, m)); b.scale.set(w, h, d); b.position.set(px, py, pz); b.rotation.set(rx, 0, rz); grp.add(b); return b; };
+  add(1.3, 1.0, 1.3, M.marble2, 0, 0.5, 0); add(1.45, 0.14, 1.45, M.marble2, 0, 1.05, 0);              // the pedestal
+  add(0.62, 1.05, 0.42, robe, 0, 1.7, 0); add(0.7, 0.8, 0.44, robe, 0, 2.6, 0);                          // the robe and the chest
+  add(0.2, 0.2, 0.2, mat, 0, 3.15, 0).scale.set(0.24, 0.3, 0.26);                                         // the head
+  add(0.12, 0.5, 0.12, mat, 0, 3.4, 0).scale.set(0.34, 0.1, 0.3);                                          // a wreath or crest
+  const pose = o.pose === undefined ? 0 : o.pose;
+  add(0.15, 0.7, 0.15, robe, -0.45, 2.55, 0, 0, 0.12);
+  if (pose === 0) add(0.15, 0.7, 0.15, mat, 0.5, 3.0, 0.1, 0, -0.5);                                       // one arm raised
+  else if (pose === 1) { add(0.15, 0.7, 0.15, mat, 0.47, 2.6, 0.12); add(0.06, 3.0, 0.06, M.bronze, 0.55, 2.6, 0.2); }  // holding a spear
+  else if (pose === 2) { add(0.15, 0.5, 0.15, mat, 0.4, 2.55, 0.25, -0.9); add(0.4, 0.12, 0.4, M.gold, 0.4, 2.8, 0.45); }  // holding out a bowl
+  else add(0.15, 0.6, 0.15, mat, 0.5, 2.5, 0.05, 0, -0.9);                                                // hand on hip
+  addBlockerCircle(x, z, 0.75 * s, o.y || 0, (o.y || 0) + 3.4 * s, { era: "ancient" });
+  return grp;
+}
+
+// A fountain: a round basin, a column with a bowl on top, and jets of water
+function pompeyFountain(g, x, z, r = 2.4) {
+  const water = new T.MeshLambertMaterial({ color: 0xbfe6f5, transparent: true, opacity: 0.7, emissive: 0x16323f });
+  const add = (geo, m, px, py, pz) => { const o = shadowed(new T.Mesh(geo, m)); o.position.set(px, py, pz); g.add(o); return o; };
+  add(new T.CylinderGeometry(r, r + 0.15, 0.8, 24), M.marble2, x, 0.4, z);
+  add(new T.CircleGeometry(r - 0.25, 24), M.water, x, 0.84, z).rotation.x = -Math.PI / 2;
+  add(new T.CylinderGeometry(0.28, 0.4, 2.1, 12), M.marble, x, 1.5, z);
+  add(new T.CylinderGeometry(1.1, 0.45, 0.35, 16), M.marble2, x, 2.6, z);
+  add(new T.CylinderGeometry(0.08, 0.5, 1.6, 8), water, x, 3.55, z);                                      // the great jet
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2, j = add(new T.CylinderGeometry(0.03, 0.18, 1.0, 6), water, x + Math.cos(a) * (r - 0.6), 1.4, z + Math.sin(a) * (r - 0.6)); j.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); }
+  addBlockerCircle(x, z, r, 0, 0.9, { era: "ancient" });
+}
+
+// A painted-on-wood sign standing flat against a wall (or free-standing when `post`), with a line or two of text
+function pompeySign(g, x, y, z, rotY, w, h, lines, size = 26) {
+  const cv = document.createElement("canvas"); cv.width = 512; cv.height = Math.round(512 * h / w); const gg = cv.getContext("2d");
+  gg.fillStyle = "#3a2a1a"; gg.fillRect(0, 0, cv.width, cv.height); gg.strokeStyle = "#f2d98a"; gg.lineWidth = 5; gg.strokeRect(5, 5, cv.width - 10, cv.height - 10);
+  gg.fillStyle = "#f2d98a"; gg.textAlign = "center"; gg.textBaseline = "middle";
+  lines.forEach((t, i) => { gg.font = `bold ${i === 0 ? size + 6 : size}px sans-serif`; gg.fillText(t, cv.width / 2, cv.height * (i + 1) / (lines.length + 1)); });
+  const sg = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide, emissive: 0x201808 }));
+  sg.position.set(x, y, z); sg.rotation.y = rotY; g.add(sg); return sg;
+}
+
+// A plain solid block (a wall, a base) in the theatre group, blocking you in ancient Rome only
+function pompeyBlock(g, x, y0, z, w, h, d, mat, solid = true) {
+  const m = shadowed(new T.Mesh(BOX, mat)); m.scale.set(w, h, d); m.position.set(x, y0 + h / 2, z); g.add(m);
+  if (solid) addBlockerBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y0, y0 + h, { era: "ancient" });
+  return m;
+}
+
 function buildPompey() {
   const cx = -690, cz = -125, R0 = 15, R1 = 45, rows = 13, rise = 0.62, tread = (R1 - R0) / rows;
   const g = new T.Group(); worldScene.add(g); pompeyGroup = g;
@@ -788,6 +932,49 @@ function buildPompey() {
   for (const zz of [pz0 - 0.3, pz1 + 0.3]) { const e = shadowed(new T.Mesh(BOX, M.marble2)); e.scale.set(pw, 0.8, 4.2); e.position.set(cx, 6.4, zz + (zz === pz0 - 0.3 ? -1.5 : 1.5)); g.add(e); }
   const pool = new T.Mesh(new T.PlaneGeometry(24, 6), M.water); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.12, (pz0 + pz1) / 2); g.add(pool);
   for (const [dx, dz] of [[-28, 8], [-14, -8], [14, -8], [28, 8], [-34, -4], [34, -4], [0, 10], [0, -12]]) { const zz = (pz0 + pz1) / 2 + dz; const t = shadowed(new T.Mesh(new T.CylinderGeometry(0.4, 0.5, 5, 8), lambert(0x5a4630))); t.position.set(cx + dx, 2.5, zz); g.add(t); const l = shadowed(new T.Mesh(new T.SphereGeometry(3.2, 9, 7), lambert(0x4f7f3a))); l.position.set(cx + dx, 6.2, zz); g.add(l); }
+
+  // ---- the portico made deeper: an inner row of columns and a roof all round, so you walk in the shade between two rows of columns
+  const colMat = M.marble, colAt = (px, pz) => { const c = shadowed(new T.Mesh(new T.CylinderGeometry(0.45, 0.55, 6, 10), colMat)); c.position.set(px, 3, pz); g.add(c); addBlockerCircle(px, pz, 0.55, 0, 6, { era: "ancient" }); };
+  for (let i = 0; i <= 14; i++) for (const zz of [pz0 - 5.2, pz1 + 5.2]) colAt(cx - pw / 2 + 1.5 + i * ((pw - 3) / 14), zz);
+  for (const xx of [cx - pw / 2 + 5.2, cx + pw / 2 - 5.2]) for (let j = 0; j <= 6; j++) colAt(xx, pz0 - 5.2 - j * ((pz0 - pz1 - 10.4) / 6));
+  for (const zz of [pz0 - 5.05, pz1 + 5.05]) { const e = shadowed(new T.Mesh(BOX, M.marble2)); e.scale.set(pw, 0.8, 2.6); e.position.set(cx, 6.4, zz); g.add(e); }
+  for (const xx of [cx - pw / 2 + 3.5, cx + pw / 2 - 3.5]) { const e = shadowed(new T.Mesh(BOX, M.marble2)); e.scale.set(6.4, 0.8, pz0 - pz1); e.position.set(xx, 6.4, (pz0 + pz1) / 2); g.add(e); }
+  // paths and flower beds in the garden
+  const pathMat = new T.MeshLambertMaterial({ map: pavingTex("#d8cba8", "rgba(110,80,50,.3)", 32, 6, 6) });
+  for (const [px, pz, w, d] of [[cx, (pz0 + pz1) / 2, 6, pz0 - pz1 - 12], [cx, (pz0 + pz1) / 2, pw - 14, 5]]) { const p = new T.Mesh(new T.PlaneGeometry(w, d), pathMat); p.rotation.x = -Math.PI / 2; p.position.set(px, 0.09, pz); g.add(p); }
+  const bloom = [0xd9413a, 0xe8b72a, 0xe07fb0, 0xf4f4f4, 0x8a5ac8];
+  for (let i = 0; i < 16; i++) { const bx = cx + (i % 4 < 2 ? -1 : 1) * (14 + (i % 2) * 12), bz = (pz0 + pz1) / 2 + (i < 8 ? -1 : 1) * (7 + Math.floor((i % 8) / 4) * 5); pompeyBlock(g, bx, 0, bz, 7, 0.45, 2.4, lambert(bloom[i % 5]), false); }
+  // fountains
+  for (const dx of [-36, -18, 18, 36]) pompeyFountain(g, cx + dx, (pz0 + pz1) / 2 - 0, 2.4);
+  pompeyFountain(g, cx, (pz0 + pz1) / 2 + 12, 1.8); pompeyFountain(g, cx, (pz0 + pz1) / 2 - 12, 1.8);
+  // statues: a row along each long portico, and a few at the two short ends
+  for (let i = 0; i < 8; i++) {
+    const x = cx - 36 + i * (72 / 7);
+    pompeyStatue(g, x, pz0 - 7.6, Math.PI, { pose: i % 4, s: 1 });
+    pompeyStatue(g, x + 4.5, pz1 + 7.6, 0, { pose: (i + 2) % 4, mat: i % 3 === 0 ? M.bronze : M.marble });
+  }
+  for (const [xx, ry] of [[cx - pw / 2 + 7.4, Math.PI / 2], [cx + pw / 2 - 7.4, -Math.PI / 2]]) for (let j = 0; j < 3; j++) pompeyStatue(g, xx, (pz0 + pz1) / 2 + (j - 1) * 12, ry, { pose: j + 1, mat: j === 1 ? M.bronze : M.marble });
+  // the fourteen nations that Pompey conquered: one statue each, behind the stage building, each in a different colour
+  const nationRobes = [0xb23a3a, 0x2f5f9a, 0x4a8a4a, 0xc9972e, 0x7a3f8a, 0x3a8a8a, 0xb5632e, 0x5a6a2e, 0x9a3a6a, 0x3a4f8a, 0xa87a3a, 0x6a2e2e, 0x2e7a5a, 0x8a8a3a];
+  for (let i = 0; i < 14; i++) pompeyStatue(g, cx - 39 + i * 6, sz - 6.6, Math.PI, { robe: nationRobes[i], pose: i % 4 });
+  pompeySign(g, cx, 3.4, sz - 5.1, Math.PI, 7, 1.7, ["THE FOURTEEN NATIONS", "statues of the lands Pompey conquered"], 24);
+  // the dedication over the stage building: Pompey's name and his third consulship (55 BC)
+  pompeySign(g, cx, 12.6, sz - 2.4, 0, 44, 2.0, ["CN·POMPEIVS·CN·F·MAGNVS·COS·TERTIVM·FECIT", "Pompey the Great, son of Gnaeus, consul for the third time, built this"], 30);
+  // the cult statue of Venus Victrix in her temple at the top of the seats
+  pompeyStatue(g, cx, cz + R1 + 10, 0, { mat: M.gold, pose: 2, s: 1.5, y: 1.6 });
+  // the Curia of Pompey: the hall beyond the north portico where Julius Caesar was killed on 15 March 44 BC, with a statue of Pompey at the back
+  {
+    const hz = pz1 - 7.5, hw = 17, hd = 12, hh = 9, wt = 0.9;
+    pompeyBlock(g, cx, 0, hz, hw + 2, 0.5, hd + 2, M.marble2, false); addPlatformBox(cx - hw / 2 - 1, cx + hw / 2 + 1, hz - hd / 2 - 1, hz + hd / 2 + 1, 0.5, { era: "ancient" });
+    pompeyBlock(g, cx, 0.5, hz - hd / 2 + wt / 2, hw, hh, wt, M.brick);                                       // the back wall
+    for (const sx of [-1, 1]) pompeyBlock(g, cx + sx * (hw / 2 - wt / 2), 0.5, hz, wt, hh, hd, M.brick);       // the side walls
+    for (const sx of [-1, 1]) pompeyBlock(g, cx + sx * (hw / 2 - 2.2), 0.5, hz + hd / 2 - wt / 2, 4.4, hh, wt, M.brick);   // the front, with a wide door between
+    const lintel = pompeyBlock(g, cx, 0.5 + hh, hz, hw + 1, 1.0, hd + 1, M.marble2, false);
+    const roofG = shadowed(new T.Mesh(new T.ConeGeometry(hw * 0.78, 3.2, 4), M.roof)); roofG.rotation.y = Math.PI / 4; roofG.scale.set(1, 1, hd / hw * 1.05); roofG.position.set(cx, 0.5 + hh + 1.0 + 1.6, hz); g.add(roofG);
+    for (const sx of [-1, 1]) for (let r = 0; r < 3; r++) pompeyBlock(g, cx + sx * (hw / 2 - 2.0), 0.5, hz - 2.5 + r * 2.4, 0.9, 0.5 + r * 0.25, 2.0, M.marble2, false);   // the senators' benches
+    pompeyStatue(g, cx, hz - hd / 2 + 2.6, 0, { mat: M.marble, robe: 0x7a2a8a, s: 1.45, pose: 0, y: 0.5 });
+    pompeySign(g, cx, 7.2, hz + hd / 2 + 1.7, 0, 9, 1.8, ["CVRIA POMPEI", "15 March 44 BC: Caesar was killed here"], 24);
+  }
   // signs at the two open ends of the seats: the way in is between the end of the seats and the stage building
   for (const side of [-1, 1]) {
     const cv = document.createElement("canvas"); cv.width = 320; cv.height = 90; const gg = cv.getContext("2d");
@@ -901,6 +1088,7 @@ function applyWorldEra(modern) {
   if (colosseumMats.seat) colosseumMats.seat.color.setHex(modern ? 0xaea48c : 0xd8c59b);
   if (circusTrackMat) circusTrackMat.color.setHex(modern ? 0x6f8f52 : 0xffffff);
   if (colossusGroup) colossusGroup.visible = !modern;
+  if (herculesModernRoof) herculesModernRoof.visible = modern;
   if (pompeyGroup) pompeyGroup.visible = !modern;   // the Theatre of Pompey is gone: only the curve of its streets remains
   for (const w of colosseumMats.ancientWalls) w.visible = !modern;
   for (const w of colosseumMats.modernWalls) w.visible = modern;
