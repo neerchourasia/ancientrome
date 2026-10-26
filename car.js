@@ -662,7 +662,7 @@ const Car = (() => {
     // what other players should see of your vehicle: the one you are in, or the one you left parked
     share: () => (car ? { veh: driving ? car.id : null, park: driving ? null : [car.id, +car.x.toFixed(1), +car.z.toFixed(1), +car.yaw.toFixed(2)] } : { veh: null, park: null }),
     get speed() { return car && driving ? Math.abs(car.v) : 0; },
-    state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v, alt: car.alt || 0 } : null),
+    state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v, alt: car.alt || 0, roll: car.roll || 0 } : null),
     debugSet: (o) => { if (car) Object.assign(car, o); },
     flyOn, get flyReady() { return flyOnReady; }, get airborne() { return !!car && driving && car.M.fly && car.alt > 1; },                      // where your car is and how fast (the police chase it)
     drag: (f) => { if (car && driving) car.v *= f; },                                                        // a police car alongside slows you down

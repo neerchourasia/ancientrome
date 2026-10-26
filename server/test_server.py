@@ -756,7 +756,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([p[0] for p in wa["p"]], [b.welcome["id"]])
         self.assertEqual(wa["i"][0][1], "Ben")                                           # name, class and look come once
         self.assertEqual(wa["p"][0][1:3], [150.0, 50.0])
-        self.assertEqual(wa["p"][0][5:], [0, 0])                                         # no vehicle yet
+        self.assertEqual(wa["p"][0][5:], [0, 0, 0, 0.0])                                 # no vehicle yet, on the ground, not leaning
         wb = await b.until(lambda m: m["t"] == "world")
         self.assertEqual([p[0] for p in wb["p"]], [a.welcome["id"]])
         server.world_once()
@@ -772,7 +772,14 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.3)
         server.world_once()
         wj = await a.until(lambda m: m["t"] == "world" and m["p"] and m["p"][0][5] == 0)
-        self.assertEqual(wj["p"][0][5:], [0, 0])
+        self.assertEqual(wj["p"][0][5:7], [0, 0])
+        # Ben takes off in a plane: Ann sees how high he is and how he leans, and she can see him from much further away
+        b.send({"t": "walk", "c": "rome", "x": 800, "z": 50, "yaw": 2.0, "s": 80, "v": "plane", "a": 120, "r": 0.4})
+        await asyncio.sleep(0.3)
+        server.world_once()
+        wf = await a.until(lambda m: m["t"] == "world" and m["p"] and m["p"][0][5] == "plane")
+        self.assertEqual(wf["p"][0][4], 80.0)                                          # (a plane is faster than a walker)
+        self.assertEqual(wf["p"][0][7:], [120, 0.4])
         # Ben walks away: Ann is told he is gone
         b.send({"t": "walk", "c": "rome", "x": 5000, "z": 50, "yaw": 0, "s": 0})
         await asyncio.sleep(0.3)

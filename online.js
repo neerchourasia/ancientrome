@@ -148,10 +148,11 @@ const Online = (() => {
       peers.set(id, { id, fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
       toast(`${name || "A player"} is nearby`);
     }
-    for (const [id, x, z, yaw, spd, veh, park] of m.p || []) {
+    for (const [id, x, z, yaw, spd, veh, park, alt, roll] of m.p || []) {
       const p = peers.get(id);
       if (!p) continue;
-      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd; p.veh = veh || null; p.parkAt = park || null;
+      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd; p.veh = veh || null; p.parkAt = park || null; p.talt = alt || 0; p.troll = roll || 0;
+      if (p.alt === undefined) { p.alt = p.talt; p.roll = p.troll; }
       if (p.x === null) { p.x = x; p.z = z; p.yaw = yaw; }
     }
     for (const id of m.g || []) {
@@ -212,8 +213,11 @@ const Online = (() => {
     if (riding) {
       const g = p.vm, seat = SEAT[p.veh];
       g.visible = show;
-      g.position.set(p.x, groundAt(p.x, p.z), p.z);
-      g.rotation.y = p.yaw;
+      p.alt = (p.alt || 0) + ((p.talt || 0) - (p.alt || 0)) * Math.min(1, dt * 6); p.roll = (p.roll || 0) + ((p.troll || 0) - (p.roll || 0)) * Math.min(1, dt * 6);   // an aircraft is drawn up in the air, leaning into its turns
+      g.position.set(p.x, groundAt(p.x, p.z) + p.alt, p.z);
+      g.rotation.order = "YXZ"; g.rotation.set(0, p.yaw, p.roll);
+      for (const r of g.userData.rotors || []) r.o.rotation[r.axis] += r.s * dt;                                      // helicopter and propeller blades turn
+      if (g.userData.prop) g.userData.prop.rotation.z += 40 * dt;
       p.fig.g.visible = show && seat !== undefined;
       if (seat !== undefined) p.fig.g.position.y += seat;
       for (const w of g.userData.wheels || []) w.rotation.x += (p.spd * dt) / 0.34;
@@ -264,7 +268,7 @@ const Online = (() => {
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();
-    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house });
+    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house, a: Math.round(Car.state() ? Car.state().alt : 0), r: +(Car.state() ? Car.state().roll : 0).toFixed(2) });
   }
 
   function bind() {

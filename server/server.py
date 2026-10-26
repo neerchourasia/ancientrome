@@ -215,6 +215,7 @@ class Conn:
         self.me = None             # this connection's player inside its room
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
+        self.palt, self.proll = 0.0, 0.0     # how high above the ground they are (in an aircraft) and how far it leans
         self.seen = set()          # the other walkers this connection has been told about
         self.ship = None           # the ship design they chose for the naval battle
         self.htier = 0             # the tier of their house (0 to 5), shown to others on their plot
@@ -1344,6 +1345,7 @@ def where_is(c):
 # the open world: players who are just walking around can see each other (same city, within earshot)
 
 WORLD_RANGE = 260.0     # metres: you see people this close
+AIR_RANGE = 900.0       # and when either of you is up in an aircraft, this far (you can see a plane from a long way off)
 WORLD_MAX = 30          # and at most this many at once (the nearest)
 WORLD_CITIES = ("rome", "delhi", "cancun")
 
@@ -1357,7 +1359,8 @@ def on_walk(conn, m):
         return
     conn.city = city
     conn.px, conn.pz = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz)
-    conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 60, 0)
+    conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 300, 0)
+    conn.palt, conn.proll = num(m.get("a"), 0, 600, 0), num(m.get("r"), -1.5, 1.5, 0)
     veh = m.get("v")
     conn.veh = veh if veh in VEHICLES else None
     pk = m.get("k")
@@ -1379,13 +1382,13 @@ def world_once():
         for c in group:
             live.add(c)
             near = sorted(((math.hypot(o.px - c.px, o.pz - c.pz), o) for o in group if o is not c), key=lambda p: p[0])
-            near = [o for d, o in near if d <= WORLD_RANGE][:WORLD_MAX]
+            near = [o for d, o in near if d <= (AIR_RANGE if (c.palt > 5 or o.palt > 5) else WORLD_RANGE)][:WORLD_MAX]
             ids = {o.id for o in near}
             new = [o for o in near if o.id not in c.seen]
             gone = [i for i in c.seen if i not in ids]
             c.seen = ids
             if near or gone:
-                c.send({"t": "world", "p": [[o.id, round(o.px, 1), round(o.pz, 1), round(o.pyaw, 2), round(o.pspd, 1), o.veh or 0, o.park or 0] for o in near],
+                c.send({"t": "world", "p": [[o.id, round(o.px, 1), round(o.pz, 1), round(o.pyaw, 2), round(o.pspd, 1), o.veh or 0, o.park or 0, round(o.palt), round(o.proll, 2)] for o in near],
                         "i": [[o.id, o.name, o.cls, o.look] for o in new], "g": gone})
     for c in list(CONNS):          # anyone who stopped walking (in a game, or gone) sees nobody
         if c not in live and c.seen:
