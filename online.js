@@ -65,7 +65,7 @@ const Online = (() => {
       case "kicked": Chat.add({ sys: 1, text: `An admin kicked you for ${m.minutes || 10} minutes.` }); break;
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
-      case "error": waiting = false; setMsg(m.msg || "Something went wrong."); break;
+      case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": onFight(m); break;
       case "world": onWorld(m); break;
@@ -261,6 +261,16 @@ const Online = (() => {
   }
 
   // every 0.2 s while you walk: where you are (the server decides who can see you)
+  // Is this name allowed? The game server checks (and asks an AI as well, when it has one); if it cannot be reached the name is let through here and checked when you connect
+  async function checkName(name) {
+    if (!URL) return { ok: true };
+    const http = URL.replace(/^ws/, "http").replace(/\/play$/, ""), ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
+    try {
+      const r = await fetch(`${http}/name?n=${encodeURIComponent(name)}`, { signal: ctl.signal });
+      return r.ok ? await r.json() : { ok: true };
+    } catch (e) { return { ok: true }; } finally { clearTimeout(timer); }
+  }
+
   function walkTick(dt) {
     walkSendT -= dt;
     if (walkSendT > 0) return;
@@ -516,5 +526,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, checkName, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

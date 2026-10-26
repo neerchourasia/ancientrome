@@ -121,6 +121,31 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ws.welcome = await ws.until(lambda m: m["t"] == "welcome")
         return ws
 
+    # ---------------------------------------------------------------- names
+
+    async def test_unsuitable_names_are_refused(self):
+        for good in ("Marcus", "Julius Caesar", "Scunthorpe", "Cucumber", "Alexander", "Hancock"):
+            self.assertIsNone(server.local_name_check(good), good)
+        for bad in ("F u c k", "sh1t", "N1gger", "Admin", "Hitler", "p0rn", "5551234567"):
+            self.assertIsNotNone(server.local_name_check(bad), bad)
+        ok, why = await server.check_name("Marcus")
+        self.assertTrue(ok)
+        ok, why = await server.check_name("B1tch")
+        self.assertFalse(ok)
+        self.assertTrue(why)
+        # the page asks over HTTP before you can pick a name
+        r, w = await asyncio.open_connection("127.0.0.1", self.port)
+        w.write(b"GET /name?n=Sh1t HTTP/1.1\r\nHost: x\r\n\r\n")
+        body = (await r.read()).decode()
+        self.assertIn('"ok": false', body)
+        # a bad name that gets in anyway is shown to other players as "Player", and its owner is told
+        ws = await WS.connect(self.port)
+        self.clients.append(ws)
+        ws.send({"t": "hello", "name": "Fuckface", "cls": "gladiator", "look": {}})
+        err = await ws.until(lambda m: m["t"] == "error" and m.get("code") == "name")
+        self.assertTrue(err["msg"])
+        await ws.until(lambda m: m["t"] == "welcome")
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):

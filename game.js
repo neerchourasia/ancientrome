@@ -925,9 +925,15 @@ function closeCreator() {
   applyCharacter(); // drops any unsaved preview
 }
 
-function confirmCreator() {
+let namePending = false;
+async function confirmCreator() {
   const name = Character.cleanName(draft.name);
   if (name.length < 2) { toast("Give your character a name (2 to 16 letters)"); $("#cr-name").focus(); return; }
+  if (namePending) return;
+  namePending = true; toast("Checking that the name is suitable...");
+  const verdict = await Online.checkName(name);
+  namePending = false;
+  if (!verdict.ok) { toast(verdict.reason || "That name is not allowed here. Please choose a different, friendly name."); $("#cr-name").focus(); return; }
   Character.set({ name, cls: draft.cls, look: draft.look });
   closeCreator();
   toast(`Welcome, ${Character.name} the ${Character.className}`);

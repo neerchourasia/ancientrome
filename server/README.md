@@ -19,6 +19,7 @@ Open the game, click **🌐 Play online**, tick "practice bot" and press **Duel*
 | `SUPABASE_URL` | `https://xxxx.supabase.co`. Turns on accounts (logging in and saving your game) |
 | `SUPABASE_ANON_KEY` | the public "anon" key (used to check a login) |
 | `ALLOWED_ORIGINS` | your site's address, e.g. `https://ancientrome-gold.vercel.app` (comma separated; `*` = anyone). Without it only pages on localhost can connect |
+| `ANTHROPIC_API_KEY` | optional: a Claude API key (from console.anthropic.com). Player names are then also checked by Claude (model `claude-haiku-5-5`) to make sure they are appropriate. Without it only the built-in word check runs. Keep it secret: set it here on the server, never in `config.js` |
 | `ALLOW_BOTS` | `1` (default) lets a lone player face a practice bot |
 | `PORT` | default 8765 (hosts like Render set this for you) |
 | `RACE_LAPS`, `BOT_WAIT`, `RACE_WAIT`, `COOP_WAIT`, `NAVAL_WAIT`, `MAX_CONNS`, `MAX_PER_IP` | fine tuning |
