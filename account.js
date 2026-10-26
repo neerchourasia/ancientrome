@@ -20,6 +20,12 @@ const Account = (() => {
     if (h.get("type") === "recovery" && h.get("access_token")) { recoveryToken = h.get("access_token"); history.replaceState(null, "", location.pathname + location.search); }
   } catch (e) { /* ignore */ }
   let session = null, lastSaved = "", listeners = [], busy = false;
+  // When this device last saw the saved game on the server (the moment it was saved). If the server's copy is newer, another device (or an older
+  // version of this page) saved after us: we load it first, so a device that has been sitting on old progress never writes over a newer saved game.
+  const SYNC_KEY = "rome-synced-at";
+  let knownAt = "", ready = false;
+  try { knownAt = localStorage.getItem(SYNC_KEY) || ""; } catch (e) { /* storage unavailable */ }
+  const setKnown = (t) => { knownAt = t; try { localStorage.setItem(SYNC_KEY, t); } catch (e) { /* ignore */ } };
 
   try {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
@@ -116,13 +122,48 @@ const Account = (() => {
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 
-  async function saveNow(quiet) {
+  // Load a saved game that was made after the last time this device looked (on another computer, say). Whatever this device has bought or found
+  // since then is kept as well, so nothing is lost: the purchases of both devices end up together. Returns true if the server's copy was loaded.
+  async function pull(quiet) {
     const token = await freshToken();
     if (!token || !session) return false;
-    const snap = snapshot(), json = JSON.stringify(snap);
+    const rows = await api("/rest/v1/profiles?select=character,progress,updated_at&user_id=eq." + encodeURIComponent(session.id), { token });
+    const row = rows && rows[0];
+    if (!row || !row.character || !row.character.name) return false;
+    const at = row.updated_at || "";
+    if (knownAt && Date.parse(at) <= Date.parse(knownAt)) return false;                  // nothing newer than what we already have
+    const mine = snapshot(), dirty = !knownAt || JSON.stringify(mine) !== lastSaved;     // an unsaved change, or a device that never checked before
+    apply(row);
+    if (dirty) keepLocal(mine, row);
+    setKnown(at);
+    lastSaved = dirty ? "" : JSON.stringify(snapshot());                                 // (after a merge, the merged game is saved again at once)
+    if (!quiet) toast("Your saved game was loaded from your account");
+    return true;
+  }
+
+  // Put back what this device had that the saved game lacks: things bought, sights found, the bigger house, and (if this device had played longer) the purse
+  function keepLocal(mine, row) {
+    const mo = mine.progress.owned || {}, so = Market.snapshot();
+    Market.restore({ house: Math.max(so.house, mo.house | 0), dhouse: Math.max(so.dhouse, mo.dhouse | 0), items: [...new Set([...so.items, ...(mo.items || [])])], worn: so.worn.length ? so.worn : (mo.worn || []) });
+    if (Array.isArray(mine.progress.discovered)) {
+      discovered = new Set([...discovered, ...mine.progress.discovered.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game))]);
+      try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
+      updateProgress();
+    }
+    const theirDay = row.progress && row.progress.time ? row.progress.time.day : 0, v = mine.progress.vitals;
+    if (mine.progress.time && mine.progress.time.day > theirDay && v) { if (Number.isFinite(v.coins)) Vitals.coins = v.coins; if (Number.isFinite(v.hp)) Vitals.hp = v.hp; if (Number.isFinite(v.hunger)) Vitals.hunger = v.hunger; }
+  }
+
+  async function saveNow(quiet) {
+    const token = await freshToken();
+    if (!token || !session || !ready) return false;                                       // (not before the saved game has been looked at)
+    let snap = snapshot(), json = JSON.stringify(snap);
     if (json === lastSaved) return true;
+    try { if (await pull(true)) { snap = snapshot(); json = JSON.stringify(snap); } } catch (e) { /* offline: save anyway below */ }
     try {
-      await api("/rest/v1/profiles?on_conflict=user_id", { token, prefer: "resolution=merge-duplicates,return=minimal", body: { user_id: session.id, ...snap, updated_at: new Date().toISOString() }, keepalive: true });
+      const at = new Date().toISOString();
+      await api("/rest/v1/profiles?on_conflict=user_id", { token, prefer: "resolution=merge-duplicates,return=minimal", body: { user_id: session.id, ...snap, updated_at: at }, keepalive: true });
+      setKnown(at);
       lastSaved = json;
       if (!quiet) toast("Game saved to your account");
       return true;
@@ -137,9 +178,11 @@ const Account = (() => {
     const token = await freshToken();
     if (!token) return;
     try {
-      const rows = await api("/rest/v1/profiles?select=character,progress&user_id=eq." + encodeURIComponent(session.id), { token });
+      const rows = await api("/rest/v1/profiles?select=character,progress,updated_at&user_id=eq." + encodeURIComponent(session.id), { token });
+      ready = true;
       if (rows && rows[0] && rows[0].character && rows[0].character.name) {
         apply(rows[0]);
+        if (rows[0].updated_at) setKnown(rows[0].updated_at);
         lastSaved = JSON.stringify(snapshot());
         toast("Welcome back! Your saved game is loaded");
       } else {
@@ -272,7 +315,12 @@ const Account = (() => {
     if (recoveryToken) { const iv = setInterval(() => { if (typeof started !== "undefined" && started && !panelOpen) { clearInterval(iv); open(); toast("Choose your new password"); } }, 800); }
     $a("ac-logout").addEventListener("click", logOut);
     renderAccount();
-    if (session) freshToken().then((t) => { if (t) checkAdmin(); });
+    // a device that is already logged in looks at the saved game first (it may have been played on another computer), and only then starts saving
+    if (session) freshToken().then(async (t) => {
+      try { if (t) await pull(false); } catch (e) { /* offline: the game carries on with what this device has */ }
+      ready = true;
+      if (t) checkAdmin();
+    });
     setInterval(() => { if (session && !document.hidden) saveNow(true); }, 30000);
     document.addEventListener("visibilitychange", () => { if (document.hidden && session) saveNow(true); });
   }
