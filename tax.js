@@ -91,7 +91,7 @@ const Tax = (() => {
   // What you owe: a base sum, more for a better house in either city, and a little for being rich.
   function amount() {
     const o = Market.snapshot();
-    return Math.round(20 + 15 * (o.house + (o.dhouse || 0)) + Math.min(150, Vitals.coins * 0.04) + Math.max(0, daysOverdue()) * 3);
+    return Math.round((20 + 15 * (o.house + (o.dhouse || 0)) + Math.min(150, Vitals.coins * 0.04) + Math.max(0, daysOverdue()) * 3) * Character.mod("tax"));
   }
   const daysLeft = () => nextDue - Time.day;
   const daysOverdue = () => (nextDue === null ? 0 : Time.day - nextDue);

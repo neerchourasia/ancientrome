@@ -64,6 +64,12 @@ CLASS_MODS = {  # only what a duel needs
     "charioteer": {"melee": 0.9, "taken": 1.05},
     "venator": {"melee": 0.9, "taken": 1.0},
     "merchant": {"melee": 0.85, "taken": 1.1},
+    "legionary": {"melee": 1.1, "taken": 0.8},
+    "medicus": {"melee": 0.85, "taken": 1.0},
+    "explorator": {"melee": 0.9, "taken": 1.0},
+    "nauta": {"melee": 0.9, "taken": 1.0},
+    "senator": {"melee": 0.7, "taken": 1.2},
+    "tabellarius": {"melee": 0.9, "taken": 1.0},
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only

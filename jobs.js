@@ -400,7 +400,7 @@ const Jobs = (() => {
 
   // what a shift pays: at least 30% of the full pay for finishing a shift, up to all of it for doing it perfectly (and 10 more for a perfect one)
   const MIN_PAY = 0.3;
-  const payFor = (job, r, score) => Math.round((job.base * r.mul * Math.max(MIN_PAY, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
+  const payFor = (job, r, score) => Math.round((job.base * r.mul * Math.max(MIN_PAY, Math.min(1, score)) + (score >= 0.95 ? 10 : 0)) * (typeof Festival !== "undefined" ? Festival.payMul : 1) * Character.mod("wage"));
   const liveScore = (G) => (G.kind === "capstan" ? Math.min(1, G.inZone / SHIFT / 0.8) : G.kind === "baker" ? Math.min(1, G.inZone / SHIFT / 0.75) : G.kind === "water" ? Math.min(1, Math.max(0, G.score / 0.75)) : G.score);
 
   function finish(done) {
@@ -557,7 +557,7 @@ const Jobs = (() => {
     const close = d < (courier.mode === "fly" ? Math.max(45, courier.lm.r * 0.6) : Math.max(14, courier.lm.r * 0.35));
     if (close && wrongWay) { if ((courier.nag = (courier.nag || 0) - dt) <= 0) { courier.nag = 6; toast(courier.mode === "fly" ? "Arrive in an aircraft!" : "Arrive in a vehicle: you cannot carry this on foot!"); } }
     else if (close) {
-      const r = rank(), pay = Math.round(JOBS[courier.kind].base * r.mul * (0.4 + 0.6 * Math.max(0, left) / courier.total) * (typeof Festival !== "undefined" ? Festival.payMul : 1));
+      const r = rank(), pay = Math.round(JOBS[courier.kind].base * r.mul * (0.4 + 0.6 * Math.max(0, left) / courier.total) * (typeof Festival !== "undefined" ? Festival.payMul : 1) * Character.mod("wage") * Character.mod("delivery"));
       Vitals.coins += pay; Vitals.hp -= 5; s.shifts++; s.earned += pay; save(); Sfx.play("coin");
       const done = courier.mode === "fly" ? "Cargo" : courier.mode === "drive" ? "Parcel" : "Message";
       toast(`${done} delivered to ${courier.lm.name}! You earn ${pay} denarii.`); Narrator.say(`${done} delivered. You earn ${pay} denarii.`, { interrupt: true });

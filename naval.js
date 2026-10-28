@@ -197,7 +197,7 @@ const Naval = (() => {
     const model = makeGalley(def);
     scene.add(model.g);
     const c0 = isPlayer ? 0.3 : 2.5;
-    return { model, def, sc: def.scale, turnK: def.turn || 1, x, z, yaw, v: 0, hp: def.hp, max: def.hp, maxSpeed: def.max, player: isPlayer, cd: { 1: c0, "-1": c0 }, ram: 0, flash: 0, dead: false, sink: 0 };
+    return { model, def, sc: def.scale, turnK: def.turn || 1, x, z, yaw, v: 0, hp: def.hp * (isPlayer ? Character.mod("hull") : 1), max: def.hp * (isPlayer ? Character.mod("hull") : 1), maxSpeed: def.max, player: isPlayer, cd: { 1: c0, "-1": c0 }, ram: 0, flash: 0, dead: false, sink: 0 };
   }
 
   // ---------- effects ----------
@@ -415,8 +415,9 @@ const Naval = (() => {
     else if (defeat) {
       text += ` Your ship sank, but you were fished out of the water, only bruised. Health: ${Math.round(Vitals.hp)}/100.`;
     } else if (win) {
-      Vitals.coins += NAVAL_PURSE;
-      text += ` Purse earned: ${NAVAL_PURSE} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
+      const purse = Math.round(NAVAL_PURSE * Character.mod("navalpurse"));
+      Vitals.coins += purse;
+      text += ` Purse earned: ${purse} denarii. Health: ${Math.round(Vitals.hp)}/100.`;
     }
     active = false; mode = "walk"; phase = "idle";
     clear();

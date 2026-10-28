@@ -36,6 +36,36 @@ const Character = (() => {
       perks: ["+25% denarii from purses and prizes", "Race entry 25% cheaper", "Weaker sword (-15%), takes 10% more damage"],
       mods: { coin: 1.25, fee: 0.75, melee: 0.85, taken: 1.1 },
     },
+    legionary: {
+      name: "Legionary", blurb: "A soldier of Rome, hard to hurt.",
+      perks: ["20% less damage taken", "+10% sword damage", "Chariot a little slower (-5%)"],
+      mods: { taken: 0.8, melee: 1.1, racespeed: 0.95 },
+    },
+    medicus: {
+      name: "Medicus", blurb: "A physician who heals the sick and wounded.",
+      perks: ["You heal 50% faster", "Weaker sword (-15%)"],
+      mods: { regen: 1.5, melee: 0.85 },
+    },
+    explorator: {
+      name: "Explorator", blurb: "A scout who finds new places first.",
+      perks: ["+50% denarii for discovering sights", "Walks and runs 8% faster", "Weaker sword (-10%)"],
+      mods: { explore: 1.5, walk: 1.08, melee: 0.9 },
+    },
+    nauta: {
+      name: "Nauta", blurb: "A sailor, master of ships.",
+      perks: ["+25% ship hull strength in naval battles", "+25% denarii from naval battle purses", "Weaker sword (-10%)"],
+      mods: { hull: 1.25, navalpurse: 1.25, melee: 0.9 },
+    },
+    senator: {
+      name: "Senator", blurb: "Rich, respected and well taxed.",
+      perks: ["30% less tax", "+10% pay from jobs", "Much weaker sword (-30%), takes 20% more damage"],
+      mods: { tax: 0.7, wage: 1.1, melee: 0.7, taken: 1.2 },
+    },
+    tabellarius: {
+      name: "Tabellarius", blurb: "A courier, fast on foot and on the road.",
+      perks: ["Walks and runs 10% faster", "+25% pay for messages, parcels and cargo", "Weaker sword (-10%)"],
+      mods: { walk: 1.1, delivery: 1.25, melee: 0.9 },
+    },
   };
 
   const DEFAULT = { name: "", cls: "gladiator", look: { skin: 1, hair: 1, toga: 0, sash: 0 } };
