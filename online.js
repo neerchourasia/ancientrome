@@ -59,7 +59,7 @@ const Online = (() => {
       case "shove_ok": toast(`You shoved ${m.name}`); noteKnock(); break;
       case "shove_no": toast(m.msg || "You could not shove them"); break;
       case "shove_fx": { const p = peers.get(m.id); if (p) p.down = 1.4; break; }
-      case "fr_invite": case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
+      case "fr_gift": case "fr_gave": case "fr_invite": case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
       case "adminwho": Admin.showOnline(m.who || []); break;
