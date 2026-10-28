@@ -2201,6 +2201,8 @@ def top_list(n=10):
 GIVE_MAX = 5000            # most denarii in one gift
 GIVE_PER_HOUR = 20000     # most a player may give away in an hour
 GIVES = {}                # friend id -> [(when, amount)] of what they gave lately
+PENDING_GIFTS = {}        # recipient friend id -> gifts not yet confirmed by their browser ({id, fid, from, n, t}); sent again until confirmed
+GIFT_SEQ = [0]
 
 
 def mutual(a, b):
@@ -2222,6 +2224,10 @@ def send_social(conn):
                "requests": [{"fid": f, "name": n} for f, n in REQS.get(conn.fid, {}).items()]})
     for e in MAIL.pop(conn.fid, []):
         conn.send(e)
+    t = now()
+    PENDING_GIFTS[conn.fid] = [g for g in PENDING_GIFTS.get(conn.fid, []) if t - g["t"] < 7 * 86400]
+    for g in PENDING_GIFTS[conn.fid]:                  # gifts that were never confirmed (the friend's page was old, or they were away) arrive now
+        conn.send({"t": "fr_gift", "id": g["id"], "fid": g["fid"], "name": g["from"], "n": g["n"]})
 
 
 def presence(conn, online):
@@ -2382,6 +2388,13 @@ def on_social(conn, m):
         return conn.send({"t": "fr_removed", "fid": fid})
     if a == "dm":
         return on_dm(conn, m)
+    if a == "gift_ack":                   # the browser says it has added a gift: it is not sent again
+        try:
+            gid = int(m.get("id"))
+        except (TypeError, ValueError):
+            return
+        PENDING_GIFTS[conn.fid] = [g for g in PENDING_GIFTS.get(conn.fid, []) if g["id"] != gid]
+        return
     if a == "give":                       # give some denarii to a friend who is online
         fid = clean_fid(m.get("fid"))
         try:
@@ -2402,7 +2415,10 @@ def on_social(conn, m):
         if sum(k for x, k in recent) + n > GIVE_PER_HOUR:
             return social_msg(conn, "You have given a lot this hour. Try again a little later.")
         GIVES[conn.fid] = recent + [(t, n)]
-        others[0].send({"t": "fr_gift", "fid": conn.fid, "name": conn.name, "n": n})
+        GIFT_SEQ[0] += 1
+        gift = {"id": GIFT_SEQ[0], "fid": conn.fid, "from": conn.name, "n": n, "t": t}
+        PENDING_GIFTS.setdefault(fid, []).append(gift)
+        others[0].send({"t": "fr_gift", "id": gift["id"], "fid": conn.fid, "name": conn.name, "n": n})
         if n >= 3000:
             flag("large gift of denarii", "%d denarii to a friend" % n, "low", conn=conn, gap=300)
         return conn.send({"t": "fr_gave", "fid": fid, "n": n})

@@ -8,6 +8,7 @@ const Social = (() => {
   const $s = (id) => document.getElementById(id);
   const friends = new Map();          // fid -> { fid, name, online, unread }
   const requests = new Map();         // fid -> name
+  const gotGifts = new Set();         // ids of gifts of denarii already added (so a gift that is sent twice is not counted twice)
   const invites = new Map();          // fid -> name of a friend who asked you to sail with them
   const convos = new Map();           // fid -> [{ mine, text, at }]
   let rank = { r: 1000, w: 0, l: 0, d: 0 }, myFid = "", sel = "", notice = "", online = [], top = null;
@@ -62,7 +63,13 @@ const Social = (() => {
       case "fr_removed": { const f = friends.get(m.fid); friends.delete(m.fid); convos.delete(m.fid); if (sel === m.fid) sel = ""; if (f) say(`${f.name} is no longer on your friends list.`); persist(); break; }
       case "fr_presence": { const f = friends.get(m.fid); if (f) { f.online = !!m.online; f.name = m.name || f.name; if (m.online) Chat.add({ sys: 1, text: `👥 ${f.name} is online` }); } break; }
       case "fr_online": online = m.list || []; break;
-      case "fr_gift": Vitals.coins += m.n; say(`🪙 ${m.name} gave you ${m.n} denarii!`); toast(`🪙 ${m.name} gave you ${m.n} denarii!`); if (typeof Sfx !== "undefined") Sfx.play("coin"); break;
+      case "fr_gift": {
+        if (m.id !== undefined && !gotGifts.has(m.id)) {                                   // a gift is added once, however many times it is sent
+          gotGifts.add(m.id); Vitals.coins += m.n; say(`🪙 ${m.name} gave you ${m.n} denarii!`); toast(`🪙 ${m.name} gave you ${m.n} denarii!`); if (typeof Sfx !== "undefined") Sfx.play("coin");
+        }
+        if (m.id !== undefined) send({ a: "gift_ack", id: m.id });
+        break;
+      }
       case "fr_gave": { const f = friends.get(m.fid); Vitals.coins = Math.max(0, Vitals.coins - m.n); say(`🪙 You gave ${m.n} denarii to ${f ? f.name : "your friend"}.`); toast(`🪙 You gave ${m.n} denarii to ${f ? f.name : "your friend"}.`); if (typeof Sfx !== "undefined") Sfx.play("coin"); break; }
       case "fr_msg": say(m.msg); toast(m.msg); break;
       case "dm": {

@@ -1176,6 +1176,13 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((gift["name"], gift["n"]), ("Ann", 250))
         sent = await ann.until(lambda m: m["t"] == "fr_gave")
         self.assertEqual(sent["n"], 250)
+        # a gift that was never confirmed (an old page, or the friend was away) is sent again, until the browser says it has it
+        bob2 = await self.player("Bob", token="bob")
+        again = await bob2.until(lambda m: m["t"] == "fr_gift")
+        self.assertEqual((again["id"], again["n"]), (gift["id"], 250))
+        bob2.send({"t": "social", "a": "gift_ack", "id": gift["id"]})
+        await asyncio.sleep(0.3)
+        self.assertEqual(server.PENDING_GIFTS.get(added["fid"], []), [])
         # not too much, not too fast, and not to someone who is not a friend
         ann.send({"t": "social", "a": "give", "fid": added["fid"], "n": 999999})
         self.assertIn("between", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
