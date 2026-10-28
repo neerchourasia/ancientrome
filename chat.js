@@ -211,6 +211,7 @@ const Admin = (() => {
       if (!p.admin) {
         button(act, p.muted ? "Unmute" : "Mute 10 min", () => { Online.navalSend({ t: "admin", a: p.muted ? "unmute" : "mute", id: p.id, min: 10 }); setTimeout(loadOnline, 400); });
         button(act, "Kick", () => { if (confirm(`Kick ${p.name} for 10 minutes?`)) { Online.navalSend({ t: "admin", a: "kick", id: p.id }); setTimeout(loadOnline, 600); } });
+        button(act, "Give 🪙", () => { const raw = prompt(`How many denarii do you give to ${p.name}?`, "1000"); const n = Math.floor(Number(raw)); if (raw !== null && n >= 1) Online.navalSend({ t: "admin", a: "give", id: p.id, n }); });
         button(act, "Block", () => { if (confirm(`Block ${p.name} from the game for 30 days and remove them right now?`)) { Online.navalSend({ t: "admin", a: "block", id: p.id }); setTimeout(loadOnline, 600); } });
       }
     }

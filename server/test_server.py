@@ -177,6 +177,9 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "admin", "a": "events"})
         ev = await ann.until(lambda m: m["t"] == "adminevents")
         self.assertTrue(ev["e"])
+        ann.send({"t": "admin", "a": "give", "id": bea.welcome["id"], "n": 777})
+        gift = await bea.until(lambda m: m["t"] == "fr_gift")
+        self.assertEqual((gift["n"], gift["name"]), (777, "Ann (admin)"))                 # an admin can hand a player some denarii
         ann.send({"t": "admin", "a": "block", "vid": vid_b[:8]})
         gone = await bea.until(lambda m: m["t"] == "kicked")
         self.assertTrue(gone["blocked"])                                               # Bea is thrown out at once

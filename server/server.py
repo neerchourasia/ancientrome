@@ -2039,6 +2039,20 @@ def on_admin(conn, m):
     target = next((c for c in CONNS if c.id == m.get("id") and c.hello), None)
     if not target or target.admin:
         return
+    if a == "give":                      # an admin gives a player some denarii (it arrives like a friend's gift, and is sent again until their browser confirms it)
+        try:
+            n = int(m.get("n"))
+        except (TypeError, ValueError):
+            n = 0
+        if n < 1 or n > 1000000:
+            return say_to(conn, "Give between 1 and 1,000,000 denarii.")
+        GIFT_SEQ[0] += 1
+        gift = {"id": GIFT_SEQ[0], "fid": "", "from": conn.name + " (admin)", "n": n, "t": now()}
+        if target.fid:
+            PENDING_GIFTS.setdefault(target.fid, []).append(gift)
+        target.send({"t": "fr_gift", "id": gift["id"], "fid": "", "name": gift["from"], "n": n})
+        flag("admin gave denarii", "%s gave %d denarii to %s" % (conn.name, n, target.name), "low", conn=conn, gap=0)
+        return say_to(conn, "Gave %d denarii to %s." % (n, target.name))
     if a == "block":
         n = block_visitor(vid=target.vid, uid=target.uid, ip=target.ip, by=conn.name)
         if not n:
