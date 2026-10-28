@@ -124,6 +124,21 @@ const Account = (() => {
     if (p.time && Number.isFinite(p.time.hour) && Number.isFinite(p.time.day)) Time.setClock(p.time.hour, p.time.day);
   }
 
+  // How far along a game is: days lived, things bought, sights found, shifts worked. When this device and the saved game disagree, the one that is further along wins,
+  // so a device with little progress (a new one, or one that was left behind) can never wipe out a game that has a lot.
+  const richness = (p) => {
+    p = p || {};
+    const items = p.owned && Array.isArray(p.owned.items) ? p.owned.items.length : 0, found = Array.isArray(p.discovered) ? p.discovered.length : 0;
+    return (p.time && Number.isFinite(p.time.day) ? p.time.day : 0) + items * 3 + found * 3 + (p.jobs && Number.isFinite(p.jobs.shifts) ? p.jobs.shifts : 0);
+  };
+  // This device is further along than the saved game: keep it, take in whatever the saved game has that this device lacks (things bought elsewhere), and save it all
+  function keepMineOverServer(row, at) {
+    const so = row.progress && row.progress.owned ? row.progress.owned : {}, mo = Market.snapshot();
+    Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
+    if (at) setKnown(at);
+    lastSaved = "";
+  }
+
   // Load a saved game that was made after the last time this device looked (on another computer, say). Whatever this device has bought or found
   // since then is kept as well, so nothing is lost: the purchases of both devices end up together. Returns true if the server's copy was loaded.
   async function pull(quiet) {
@@ -135,6 +150,11 @@ const Account = (() => {
     const at = row.updated_at || "";
     if (knownAt && Date.parse(at) <= Date.parse(knownAt)) return false;                  // nothing newer than what we already have
     const mine = snapshot(), dirty = !knownAt || JSON.stringify(mine) !== lastSaved;     // an unsaved change, or a device that never checked before
+    if (dirty && richness(mine.progress) > richness(row.progress)) {
+      keepMineOverServer(row, at);
+      if (!quiet) toast("This game is further along than the saved one, so it was kept and is being saved to your account");
+      return true;
+    }
     apply(row);
     if (dirty) keepLocal(mine, row);
     setKnown(at);
@@ -184,11 +204,16 @@ const Account = (() => {
       ready = true;
       if (rows && rows[0] && rows[0].character && rows[0].character.name) {
         const mine = snapshot();                                                       // what this device has: things bought here before logging in are kept
-        apply(rows[0]);
-        keepLocal(mine, rows[0]);
-        if (rows[0].updated_at) setKnown(rows[0].updated_at);
-        lastSaved = "";                                                                // the merged game is saved again at once
-        toast("Welcome back! Your saved game is loaded");
+        if (richness(mine.progress) > richness(rows[0].progress)) {                    // this device is further along than the saved game: it wins
+          keepMineOverServer(rows[0], rows[0].updated_at);
+          toast("Welcome back! The game on this device is further along than your saved one, so it was kept and saved");
+        } else {
+          apply(rows[0]);
+          keepLocal(mine, rows[0]);
+          if (rows[0].updated_at) setKnown(rows[0].updated_at);
+          lastSaved = "";                                                              // the merged game is saved again at once
+          toast("Welcome back! Your saved game is loaded");
+        }
         await saveNow(true);
       } else {
         await saveNow(true);
