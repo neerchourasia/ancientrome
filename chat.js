@@ -152,12 +152,14 @@ const Admin = (() => {
     t.replaceChildren(); msg.textContent = "Loading...";
     try {
       const rows = await Account.adminUsers();
-      msg.textContent = `${rows.length} account${rows.length === 1 ? "" : "s"} signed up`;
+      const total = rows.reduce((a, u) => a + (Number(u.coins) || 0), 0);
+      msg.textContent = `${rows.length} account${rows.length === 1 ? "" : "s"} signed up${rows.some((u) => u.coins !== undefined) ? ` · ${total.toLocaleString()} denarii in all (as last saved)` : ""}`;
       const head = t.insertRow();
-      for (const h of ["Email", "Character", "Joined", "Last login", "Last saved"]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+      for (const h of ["Email", "Character", "Denarii", "Day", "Items", "Joined", "Last login", "Last saved"]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
       for (const u of rows) {
         const r = t.insertRow();
-        cell(r, u.email); cell(r, u.character_name ? `${u.character_name}${u.class_name ? " (" + u.class_name + ")" : ""}` : "no character yet"); cell(r, when(u.created_at)); cell(r, when(u.last_sign_in_at)); cell(r, when(u.saved_at));
+        cell(r, u.email); cell(r, u.character_name ? `${u.character_name}${u.class_name ? " (" + u.class_name + ")" : ""}` : "no character yet");
+        cell(r, u.coins == null ? "" : Number(u.coins).toLocaleString()); cell(r, u.game_day == null ? "" : u.game_day); cell(r, u.items == null ? "" : u.items); cell(r, when(u.created_at)); cell(r, when(u.last_sign_in_at)); cell(r, when(u.saved_at));
       }
     } catch (e) { msg.textContent = "Could not load the list: " + e.message; }
   }
@@ -202,10 +204,10 @@ const Admin = (() => {
     t.replaceChildren();
     $a("ad-online-n").textContent = `${list.length} online now`;
     const head = t.insertRow();
-    for (const h of ["Name", "City", "Place", "Doing", "Coordinates", "Account", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const h of ["Name", "Denarii", "City", "Place", "Doing", "Coordinates", "Account", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const p of list) {
       const r = t.insertRow();
-      cell(r, p.name + (p.admin ? " ★" : "") + (p.muted ? " (muted)" : ""));
+      cell(r, p.name + (p.admin ? " ★" : "") + (p.muted ? " (muted)" : "")); cell(r, p.coins == null ? "" : Number(p.coins).toLocaleString());
       cell(r, p.where_city || p.city || "menu"); cell(r, p.where_place || ""); cell(r, p.where_doing || p.room || ""); cell(r, p.where_xz || ""); cell(r, p.acct ? "yes" : "guest");
       const act = r.insertCell();
       if (!p.admin) {

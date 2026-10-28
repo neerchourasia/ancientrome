@@ -292,6 +292,7 @@ class Conn:
         self.me = None             # this connection's player inside its room
         self.city, self.px, self.pz, self.pyaw, self.pspd, self.walk_at = None, 0.0, 0.0, 0.0, 0.0, 0.0   # where they walk in the open world
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
+        self.coins = None          # the denarii they say they have (shown to admins)
         self.palt, self.proll = 0.0, 0.0     # how high above the ground they are (in an aircraft) and how far it leans
         self.seen = set()          # the other walkers this connection has been told about
         self.ship = None           # the ship design they chose for the naval battle
@@ -1455,6 +1456,8 @@ def on_walk(conn, m):
     conn.px, conn.pz = nx, nz
     conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 300, 0)
     conn.palt, conn.proll = num(m.get("a"), 0, 600, 0), num(m.get("r"), -1.5, 1.5, 0)
+    if m.get("d") is not None:
+        conn.coins = int(num(m.get("d"), 0, 1e12, 0))
     veh = m.get("v")
     conn.veh = veh if veh in VEHICLES else None
     pk = m.get("k")
@@ -2014,7 +2017,7 @@ def on_admin(conn, m):
     a = m.get("a")
     if a == "who":
         conn.send({"t": "adminwho", "who": [dict({"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
-                                                  "muted": c.muted_until > now(), "admin": c.admin}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed]})
+                                                  "muted": c.muted_until > now(), "admin": c.admin, "coins": c.coins}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed]})
         return
     if a == "visits":
         rows = sorted(VISITS.values(), key=lambda v: v["last"], reverse=True)[:300]

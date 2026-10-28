@@ -20,10 +20,13 @@ returns boolean language sql stable security definer set search_path = public as
   select exists (select 1 from public.admins a where a.email = lower(coalesce(auth.jwt() ->> 'email', '')));
 $$;
 
+drop function if exists public.admin_users();
 create or replace function public.admin_users()
-returns table (email text, created_at timestamptz, last_sign_in_at timestamptz, character_name text, class_name text, saved_at timestamptz)
+returns table (email text, created_at timestamptz, last_sign_in_at timestamptz, character_name text, class_name text, saved_at timestamptz, coins numeric, game_day numeric, items integer)
 language sql stable security definer set search_path = public, auth as $$
-  select u.email::text, u.created_at, u.last_sign_in_at, p.character ->> 'name', p.character ->> 'cls', p.updated_at
+  select u.email::text, u.created_at, u.last_sign_in_at, p.character ->> 'name', p.character ->> 'cls', p.updated_at,
+         (p.progress -> 'vitals' ->> 'coins')::numeric, (p.progress -> 'time' ->> 'day')::numeric,
+         coalesce(jsonb_array_length(p.progress -> 'owned' -> 'items'), 0)
   from auth.users u
   left join public.profiles p on p.user_id = u.id
   where public.is_admin()

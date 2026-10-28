@@ -296,7 +296,7 @@ const Online = (() => {
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();
-    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house, a: Math.round(Car.state() ? Car.state().alt : 0), r: +(Car.state() ? Car.state().roll : 0).toFixed(2) });
+    send({ t: "walk", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house, a: Math.round(Car.state() ? Car.state().alt : 0), d: Math.round(Vitals.coins), r: +(Car.state() ? Car.state().roll : 0).toFixed(2) });
   }
 
   function bind() {
