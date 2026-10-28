@@ -220,10 +220,25 @@ const Admin = (() => {
     if (!Account.admin) { toast("Only an admin account can open this."); return; }
     if (mode !== "walk" || (panelOpen && !creatorOpen) || !canStart()) { toast("Close what is open and stop the game first"); return; }
     openPanel("#admin");
-    loadUsers(); loadOnline();
+    fillItems(); loadUsers(); loadOnline();
   }
 
+  // the owner's way to put back something they lost (admin accounts only: the panel is hidden from everyone else)
+  function fillItems() {
+    const sel = $a("ad-item"); sel.replaceChildren();
+    for (const [id, name, type] of Market.grantable()) { const o = document.createElement("option"); o.value = id; o.textContent = `${name} (${type === "car" ? "vehicle or aircraft" : type})`; sel.append(o); }
+  }
   function bind() {
+    $a("ad-give").addEventListener("click", () => {
+      if (!Account.admin) return;
+      const id = $a("ad-item").value;
+      if (id && Market.grant(id)) { toast(`Restored: ${Market.itemName(id)}`); Account.saveNow(true); fillItems(); } else toast("Nothing to restore.");
+    });
+    $a("ad-givecoins").addEventListener("click", () => {
+      if (!Account.admin) return;
+      const n = Math.max(1, Math.min(100000, Math.floor(Number($a("ad-coins").value) || 0)));
+      Vitals.coins += n; toast(`Added ${n} denarii.`); Account.saveNow(true);
+    });
     $a("btn-admin").addEventListener("click", openPanel_);
     $a("ad-refresh").addEventListener("click", () => { loadUsers(); loadOnline(); });
     Account.onChange(() => { $a("btn-admin").hidden = !Account.admin; });

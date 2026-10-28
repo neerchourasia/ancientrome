@@ -352,6 +352,12 @@ const Market = (() => {
     get weapon() { return s.worn.find((id) => ITEMS[id] && ITEMS[id].type === "weapon") || null; },
     get pet() { return s.worn.find((id) => ITEMS[id].type === "pet") || null; },
     owns: (id) => s.items.includes(id),
+    // for an admin restoring what a player lost (the Admin panel): put something you can own (not food or supplies) back in the garage, dresser or menagerie
+    grant(id) {
+      if (!Object.prototype.hasOwnProperty.call(ITEMS, id) || ITEMS[id].type === "supply" || ITEMS[id].type === "food" || s.items.includes(id)) return false;
+      s.items.push(id); save(); applyAll(); return true;
+    },
+    grantable: () => Object.keys(ITEMS).filter((id) => ITEMS[id].type !== "supply" && ITEMS[id].type !== "food" && !s.items.includes(id)).map((id) => [id, ITEMS[id].name, ITEMS[id].type]),
     perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),
     rent: () => homes()[tier()].rent,
     houseName: () => homes()[tier()].name,
