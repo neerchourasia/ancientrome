@@ -27,6 +27,10 @@ const AIRCRAFT = (() => {
     const white = lam(o.col), acc = lam(o.stripe), dk = lam(0x2b2b2b), steel = lam(0x8a8f96), glass = lam(0x1d3a4a);
     g.add(tube(r, r, L * 0.45, white, 0, y0, -L * 0.075), tube(r * 0.2, r, L * 0.2, white, 0, y0, -L * 0.4), tube(r, r * 0.25, L * 0.35, white, 0, y0, L * 0.325));    // the tube, the nose and the tail cone
     g.add(box(r * 2.04, r * 0.16, L * 0.45, acc, 0, y0 - r * 0.1, -L * 0.075));                       // a coloured band along the sides
+    if (o.deck) {                                                                                   // a double-decker (A380): a second, shorter fuselage on top of the first, with its own row of windows
+      g.add(tube(r * 0.82, r * 0.82, L * 0.5, white, 0, y0 + r * 0.72, -L * 0.1), tube(r * 0.3, r * 0.82, L * 0.1, white, 0, y0 + r * 0.72, -L * 0.4));
+      for (let z = -L * 0.32; z < L * 0.12; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.2, 0.4, glass, sx * (r * 0.82 + 0.01), y0 + r * 1.2, z));
+    }
     if (o.eng === "fighter") g.add(ball(r * 0.7, r * 0.5, L * 0.12, glass, 0, y0 + r * 0.75, -L * 0.2));   // bubble canopy
     else g.add(box(r * 1.5, r * 0.5, L * 0.07, glass, 0, y0 + r * 0.45, -L * 0.32));                // cockpit windows
     if (o.win) for (let z = -L * 0.26; z < L * 0.16; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.26, 0.4, glass, sx * (r + 0.01), y0 + r * 0.2, z));
@@ -181,6 +185,8 @@ const AIRCRAFT = (() => {
       note: "A giant business jet with lie-flat beds that can fly right round the world. Top speed 497 km/h." }),
     airliner: J({ name: "Airliner", price: 20000, max: 148, turn: 0.75, color: 0xf4f6f8, len: 24, wid: 3.4, span: 26, wing: { lift: 60, stall: 54, ceiling: 380 }, climb: 11, spool: 0.45, eye: [0, 3.0, -8.4], cam: 2.2, camY: 9, lookY: 2.6, o: { col: 0xf4f6f8, stripe: 0x1d4fa0, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.42, win: true, fin: 0x1d4fa0 },
       note: "A twin-engine passenger jet like a Boeing 737. It needs a long, long street to take off. Top speed 533 km/h." }),
+    a380: J({ name: "Airbus A380", price: 50000, max: 150, turn: 0.6, color: 0xf4f6f8, len: 36, wid: 4.8, span: 40, wing: { lift: 68, stall: 62, ceiling: 380 }, climb: 9, spool: 0.34, eye: [0, 5.0, -13.2], cam: 2.8, camY: 12, lookY: 3.6, o: { col: 0xf4f6f8, stripe: 0x6b2a8c, wing: "low", eng: "wing", engines: 4, tail: "low", sweep: 0.38, r: 2.4, win: true, fin: 0x6b2a8c, deck: true },
+      note: "The double-decker superjumbo: two full decks of seats, four engines and enormous wings, the biggest passenger plane of all. It needs the longest run there is. Top speed 540 km/h." }),
     b777x: J({ name: "Boeing 777X", price: 40000, max: 152, turn: 0.65, color: 0xf4f6f8, len: 32, wid: 4.2, span: 36, wing: { lift: 66, stall: 60, ceiling: 380 }, climb: 10, spool: 0.38, eye: [0, 3.7, -11.4], cam: 2.5, camY: 11, lookY: 3, o: { col: 0xf4f6f8, stripe: 0xc79a2a, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.44, r: 2.1, win: true, fin: 0xc79a2a, tip: "fold" },
       note: "The newest and biggest twin-engine airliner, with huge engines and very long wings. It needs the longest run of any passenger plane. The wingtips fold up on the ground and stretch out to fly. Top speed 547 km/h." }),
     a350: J({ name: "Airbus A350", price: 38000, max: 150, turn: 0.68, color: 0xf4f6f8, len: 30, wid: 4.0, span: 34, wing: { lift: 64, stall: 58, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 3.5, -10.6], cam: 2.4, camY: 10.5, lookY: 3, o: { col: 0xf4f6f8, stripe: 0x00205b, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.95, win: true, fin: 0x00205b, tip: "curve" },

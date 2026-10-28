@@ -62,6 +62,8 @@ const Social = (() => {
       case "fr_removed": { const f = friends.get(m.fid); friends.delete(m.fid); convos.delete(m.fid); if (sel === m.fid) sel = ""; if (f) say(`${f.name} is no longer on your friends list.`); persist(); break; }
       case "fr_presence": { const f = friends.get(m.fid); if (f) { f.online = !!m.online; f.name = m.name || f.name; if (m.online) Chat.add({ sys: 1, text: `👥 ${f.name} is online` }); } break; }
       case "fr_online": online = m.list || []; break;
+      case "fr_gift": Vitals.coins += m.n; say(`🪙 ${m.name} gave you ${m.n} denarii!`); toast(`🪙 ${m.name} gave you ${m.n} denarii!`); if (typeof Sfx !== "undefined") Sfx.play("coin"); break;
+      case "fr_gave": { const f = friends.get(m.fid); Vitals.coins = Math.max(0, Vitals.coins - m.n); say(`🪙 You gave ${m.n} denarii to ${f ? f.name : "your friend"}.`); toast(`🪙 You gave ${m.n} denarii to ${f ? f.name : "your friend"}.`); if (typeof Sfx !== "undefined") Sfx.play("coin"); break; }
       case "fr_msg": say(m.msg); toast(m.msg); break;
       case "dm": {
         const other = m.from === myFid ? m.to : m.from, f = friends.get(other);
@@ -114,7 +116,7 @@ const Social = (() => {
     const fl = $s("fr-list"); fl.replaceChildren();
     const list = [...friends.values()].sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
     if (!list.length) li(fl, span("No friends yet. Add someone below.", "dim"));
-    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), ...(f.online ? [btn("⚓ Sail", () => sailWith(f.fid, false))] : []), btn("Remove", () => { if (confirm(`Remove ${f.name} from your friends?`)) send({ a: "del", fid: f.fid }); }));
+    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), ...(f.online ? [btn("⚓ Sail", () => sailWith(f.fid, false)), btn("🪙 Give", () => giveTo(f))] : []), btn("Remove", () => { if (confirm(`Remove ${f.name} from your friends?`)) send({ a: "del", fid: f.fid }); }));
     const chat = $s("fr-chat"), cur = friends.get(sel);
     chat.hidden = !cur;
     if (cur) {
@@ -130,6 +132,17 @@ const Social = (() => {
   }
 
   // sail together: invite a friend (or accept their invitation); the naval crew battle is fought in Rome, against the practice ships
+  // give some of your denarii to a friend who is online (they arrive at once)
+  function giveTo(f) {
+    if (Vitals.coins < 1) { toast("You have no denarii to give."); return; }
+    const raw = prompt(`How many denarii do you give to ${f.name}? (1 to 5000; you have ${Vitals.coins})`, String(Math.min(100, Vitals.coins)));
+    if (raw === null) return;
+    const n = Math.floor(Number(raw));
+    if (!Number.isFinite(n) || n < 1) { toast("Type a whole number of denarii."); return; }
+    if (n > Vitals.coins) { toast("You do not have that many denarii."); return; }
+    send({ a: "give", fid: f.fid, n });
+  }
+
   function sailWith(fid, accepting) {
     if (typeof city !== "undefined" && city !== "rome") { toast("The naval battle is held in Rome. Press B to travel back first."); return; }
     if (mode !== "walk") { toast("Finish what you are doing first"); return; }

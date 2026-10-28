@@ -1163,6 +1163,29 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "social", "a": "dm", "to": added_a["fid"], "text": "still there?"})
         self.assertIn("not friends", (await ann.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
 
+    async def test_friends_can_give_each_other_denarii(self):
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        ann.send({"t": "social", "a": "req", "name": "bob"})
+        asked = await bob.until(lambda m: m["t"] == "fr_in")
+        bob.send({"t": "social", "a": "ans", "fid": asked["fid"], "ok": True})
+        added = await ann.until(lambda m: m["t"] == "fr_added")
+        await bob.until(lambda m: m["t"] == "fr_added")
+        ann.send({"t": "social", "a": "give", "fid": added["fid"], "n": 250})
+        gift = await bob.until(lambda m: m["t"] == "fr_gift")
+        self.assertEqual((gift["name"], gift["n"]), ("Ann", 250))
+        sent = await ann.until(lambda m: m["t"] == "fr_gave")
+        self.assertEqual(sent["n"], 250)
+        # not too much, not too fast, and not to someone who is not a friend
+        ann.send({"t": "social", "a": "give", "fid": added["fid"], "n": 999999})
+        self.assertIn("between", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "give", "fid": added["fid"], "n": 5})
+        self.assertIn("Slow down", (await ann.until(lambda m: m["t"] == "fr_msg" and "Slow" in m["msg"]))["msg"])
+        cy.send({"t": "social", "a": "req", "name": "ann"})
+        stranger = await ann.until(lambda m: m["t"] == "fr_in")
+        ann.send({"t": "social", "a": "give", "fid": stranger["fid"], "n": 10})
+        self.assertIn("only give", (await ann.until(lambda m: m["t"] == "fr_msg" and "only give" in m["msg"]))["msg"])
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

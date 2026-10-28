@@ -17,7 +17,7 @@ const Trade = (() => {
   ];
   // crates each vehicle can carry
   const CAP = { bicycle: 1, scooter: 2, motorcycle: 3, rickshaw: 3, sportscar: 2, citycar: 6, taxi: 6, suv: 12, truck: 40, bus: 30, plane: 12, gyro: 3, glider: 0, balloon: 8, helicopter: 14, tiltrotor: 24,
-    blimp: 60, vlj: 8, lightjet: 12, midjet: 16, supermid: 20, heavyjet: 30, airliner: 90, b777x: 200, a350: 180, cargo: 400, transport: 300, fighter: 2, bomber: 150 };
+    blimp: 60, vlj: 8, lightjet: 12, midjet: 16, supermid: 20, heavyjet: 30, airliner: 90, b777x: 200, a350: 180, a380: 250, cargo: 400, transport: 300, fighter: 2, bomber: 150 };
   const ZONE = 250, SPREAD = 0.04, IMPACT = 0.006;
   let hold = {}, impact = { day: -1, map: {} }, el = null, openNow = false;
   try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") hold = v.hold && typeof v.hold === "object" ? v.hold : {}; } catch (e) { /* storage unavailable */ }

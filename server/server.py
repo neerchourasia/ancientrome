@@ -74,7 +74,7 @@ CLASS_MODS = {  # only what a duel needs
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 PETS = ("hound", "eagle", "cat", "monkey", "peacock", "owl", "parrot", "cub")
-VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot", "plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "cargo", "fighter", "bomber", "transport")   # what a walker can be seen riding or leaving parked
+VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot", "plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport")   # what a walker can be seen riding or leaving parked
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
@@ -1656,7 +1656,7 @@ EVENTS = collections.deque(maxlen=1000)   # suspicious things that happened, new
 FLAG_GAP = {}                     # (kind, who) -> when it was last logged, so one troublemaker does not flood the list
 USER_EMAIL = {}                   # account id -> email, remembered from the login check so admins can see who is who
 VISIT_HITS = {}
-AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "cargo", "fighter", "bomber", "transport"}
+AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport"}
 
 
 def stamp():
@@ -2198,6 +2198,11 @@ def top_list(n=10):
     return [{"name": x["name"], "r": x["r"], "w": x["w"], "l": x["l"]} for x in rows]
 
 
+GIVE_MAX = 5000            # most denarii in one gift
+GIVE_PER_HOUR = 20000     # most a player may give away in an hour
+GIVES = {}                # friend id -> [(when, amount)] of what they gave lately
+
+
 def mutual(a, b):
     return bool(a and b and b in CLAIMS.get(a, ()) and a in CLAIMS.get(b, ()))
 
@@ -2377,6 +2382,30 @@ def on_social(conn, m):
         return conn.send({"t": "fr_removed", "fid": fid})
     if a == "dm":
         return on_dm(conn, m)
+    if a == "give":                       # give some denarii to a friend who is online
+        fid = clean_fid(m.get("fid"))
+        try:
+            n = int(m.get("n"))
+        except (TypeError, ValueError):
+            n = 0
+        if not fid or not mutual(conn.fid, fid):
+            return social_msg(conn, "You can only give denarii to your friends.")
+        if n < 1 or n > GIVE_MAX:
+            return social_msg(conn, "You can give between 1 and %d denarii at a time." % GIVE_MAX)
+        others = conns_of(fid)
+        if not others:
+            return social_msg(conn, "Your friend is not online right now.")
+        t = now()
+        recent = [(x, k) for x, k in GIVES.get(conn.fid, []) if t - x < 3600]
+        if recent and t - recent[-1][0] < 3:
+            return social_msg(conn, "Slow down a little.")
+        if sum(k for x, k in recent) + n > GIVE_PER_HOUR:
+            return social_msg(conn, "You have given a lot this hour. Try again a little later.")
+        GIVES[conn.fid] = recent + [(t, n)]
+        others[0].send({"t": "fr_gift", "fid": conn.fid, "name": conn.name, "n": n})
+        if n >= 3000:
+            flag("large gift of denarii", "%d denarii to a friend" % n, "low", conn=conn, gap=300)
+        return conn.send({"t": "fr_gave", "fid": fid, "n": n})
     if a == "invite":
         fid = clean_fid(m.get("fid"))
         if not fid or not mutual(conn.fid, fid):
