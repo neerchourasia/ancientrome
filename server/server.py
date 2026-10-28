@@ -309,6 +309,7 @@ class Conn:
         self.singing, self.sang_at = None, -1e9    # the song they are singing in the chat, and when they last started one
         self.pic_t = -1e9          # when they last sent a picture in the chat
         self.fest_t = 0.0          # when they last put a festival lamp or lantern down
+        self.throw_t = 0.0         # when they last threw flowers or powder
         self.social_t, self.social_n = now(), 8.0   # how many friend requests / lookups they may do right now
         self.muted_until = 0.0
         self.ctok, self.ctok_t = 3.0, now()   # chat: how many messages they may send right now
@@ -2280,6 +2281,24 @@ def on_fest(conn, m):
         DIYAS.popleft()
     if k == "sync":                                          # a festival has begun for them: here are the lamps already lit
         return conn.send({"t": "diyas", "c": city, "list": [{"x": d["x"], "z": d["z"], "n": d["n"]} for d in DIYAS if d["c"] == city]})
+    if k == "throw":                                         # flowers (Floralia) or coloured powder (Holi): players in front of the thrower are hit, those nearby see it
+        f = m.get("f")
+        if f not in ("floralia", "holi") or t - conn.throw_t < 0.3:
+            return
+        conn.throw_t = t
+        x, z, yaw = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz), num(m.get("yaw"), -50, 50, 0)
+        fx, fz = -math.sin(yaw), -math.cos(yaw)
+        for c in list(CONNS):
+            if c is conn or not c.hello or c.closed or c.room or c.city != city:
+                continue
+            dx, dz = c.px - x, c.pz - z
+            d = math.hypot(dx, dz)
+            if d > 120:
+                continue
+            if 0.5 <= d <= 14 and (dx * fx + dz * fz) / d >= 0.86:
+                c.send({"t": "fest", "k": "hit", "n": conn.name, "f": f})
+            c.send({"t": "fest", "k": "burst", "c": city, "x": round(x, 1), "z": round(z, 1), "yaw": round(yaw, 2), "f": f})
+        return
     if k not in ("diya", "lantern") or t - conn.fest_t < 1.2:
         return
     conn.fest_t = t

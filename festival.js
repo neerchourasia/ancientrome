@@ -125,6 +125,13 @@ const Festival = (() => {
 
   // lamps and lanterns put down by other players (from the game server): only while the festival is on in this city
   function remote(m) {
+    if (m.k === "burst" && scene && m.c === city && (m.f === "floralia" || m.f === "holi")) { spray(m.x, typeof groundAt === "function" ? groundAt(m.x, m.z) : 0, m.z, m.yaw, m.f); return; }      // another player threw flowers or powder nearby
+    if (m.k === "hit" && scene) {                                                                                            // ... and it hit you
+      const flowers = m.f === "floralia", pal = COLORS[m.f] || COLORS.holi;
+      burst(player.x, 1.2, player.z, pal, 14, 4, 1.4, 1.6, false, 3);
+      toast(`${flowers ? "🌸" : "🎨"} ${m.n} threw ${flowers ? "flowers" : "colour"} at you!`); Chat.add({ sys: 1, text: `${flowers ? "🌸" : "🎨"} ${m.n} threw ${flowers ? "flowers" : "colour"} at you!` }); Sfx.play("splash");
+      return;
+    }
     if (!cur || m.c !== city || !(curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos")) return;
     const add = (x, z) => {
       if (rdiyas.some((d) => Math.abs(d.position.x - x) < 0.05 && Math.abs(d.position.z - z) < 0.05)) return;
@@ -138,15 +145,21 @@ const Festival = (() => {
   function sync() { if (cur) Online.navalSend({ t: "fest", k: "sync", c: city }); }
 
   // shoot a burst of coloured powder (Holi) or throw flowers (Floralia) in front of you; people it hits are splashed with colour
-  function shoot() {
-    if (shotCd > 0) return; shotCd = 0.35;
-    const pal = COLORS[curKey] || COLORS.holi, fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), flowers = curKey === "floralia";
+  // the burst of flowers or powder itself, from (x, z) facing `yaw` (yours, or another player's that the server tells you about)
+  function spray(x, feet, z, yaw, key) {
+    const pal = COLORS[key] || COLORS.holi, fx = -Math.sin(yaw), fz = -Math.cos(yaw), flowers = key === "floralia";
     for (let i = 0; i < 28; i++) {
       const sp = 11 + Math.random() * 6, a = (Math.random() - 0.5) * 0.45, c = Math.cos(a), s = Math.sin(a), dx = fx * c - fz * s, dz = fx * s + fz * c;
       const sprite_ = sprite(pal[Math.floor(Math.random() * pal.length)], 0.7 + Math.random() * 0.9, false);
-      sprite_.position.set(player.x + fx * 0.9, player.feet + 1.5, player.z + fz * 0.9);
+      sprite_.position.set(x + fx * 0.9, feet + 1.5, z + fz * 0.9);
       parts.push({ s: sprite_, vx: dx * sp, vy: 1.5 + Math.random() * 2, vz: dz * sp, life: 1.1, max: 1.1, g: flowers ? 3 : 4.5, op: 0.85 });
     }
+    return { pal, fx, fz, flowers };
+  }
+  function shoot() {
+    if (shotCd > 0) return; shotCd = 0.35;
+    const { pal, fx, fz, flowers } = spray(player.x, player.feet, player.z, player.yaw, curKey);
+    Online.navalSend({ t: "fest", k: "throw", c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), f: curKey });   // other players in front of you are hit too, and everyone nearby sees it
     // anyone in front of you within about 14 m is splashed
     const list = typeof city !== "undefined" && city === "delhi" ? (Delhi.built ? Delhi.people() : []) : CITIZENS.list, mesh = city === "delhi" ? Delhi.peopleMesh() : CITIZENS.body;
     list.forEach((p, i) => {

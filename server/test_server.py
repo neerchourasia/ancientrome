@@ -1163,6 +1163,20 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "social", "a": "dm", "to": added_a["fid"], "text": "still there?"})
         self.assertIn("not friends", (await ann.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
 
+    async def test_flowers_thrown_at_a_player_hit_them_and_are_seen_nearby(self):
+        ann, bob, cy = await self.player("Ann"), await self.player("Bob"), await self.player("Cy")
+        ann.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 0, "s": 0})
+        bob.send({"t": "walk", "c": "rome", "x": 100, "z": 42, "yaw": 0, "s": 0})      # 8 m in front of Ann (she faces -z when yaw is 0)
+        cy.send({"t": "walk", "c": "rome", "x": 160, "z": 50, "yaw": 0, "s": 0})       # 60 m to the side: sees the flowers, is not hit
+        await asyncio.sleep(0.3)
+        ann.send({"t": "fest", "k": "throw", "c": "rome", "x": 100, "z": 50, "yaw": 0, "f": "floralia"})
+        hit = await bob.until(lambda m: m["t"] == "fest" and m["k"] == "hit")
+        self.assertEqual((hit["n"], hit["f"]), ("Ann", "floralia"))
+        seen = await cy.until(lambda m: m["t"] == "fest" and m["k"] == "burst")
+        self.assertEqual(seen["x"], 100.0)
+        with self.assertRaises(asyncio.TimeoutError):                                      # Cy was not in front of her
+            await cy.until(lambda m: m["t"] == "fest" and m["k"] == "hit", timeout=0.5)
+
     async def test_friends_can_give_each_other_denarii(self):
         self.accounts("ann", "bob", "cy")
         ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
