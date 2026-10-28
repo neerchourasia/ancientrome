@@ -162,7 +162,40 @@ const Admin = (() => {
     } catch (e) { msg.textContent = "Could not load the list: " + e.message; }
   }
 
-  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); }
+  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); }
+
+  // everyone who opened the site
+  function showVisits(m) {
+    const t = $a("ad-visits"), list = m.v || [];
+    t.replaceChildren();
+    $a("ad-visits-n").textContent = `${m.total || list.length} visitor${(m.total || list.length) === 1 ? "" : "s"} in the log`;
+    const head = t.insertRow();
+    for (const h of ["Last seen", "First seen", "Opened", "Played", "Name", "Account", "Device", "Address", "Flags", "Id", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const v of list) {
+      const r = t.insertRow();
+      if (v.flags) r.className = v.flags > 2 ? "lv-high" : "lv-medium";
+      cell(r, (v.online ? "● " : "") + when(v.last)); cell(r, when(v.first)); cell(r, v.visits); cell(r, v.plays); cell(r, v.name || ""); cell(r, v.acct || "guest"); cell(r, v.ua); cell(r, v.last_ip_mask); cell(r, v.flags || ""); cell(r, String(v.vid || "").slice(0, 8));
+      const act = r.insertCell();
+      if (v.blocked) { act.textContent = "BLOCKED "; button(act, "Unblock", () => { Online.navalSend({ t: "admin", a: "unblock", vid: v.vid }); setTimeout(loadOnline, 600); }); }
+      else button(act, "Block", () => { if (confirm(`Block ${v.name || "this visitor"} (${String(v.vid).slice(0, 8)}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: v.vid }); setTimeout(loadOnline, 600); } });
+    }
+  }
+
+  // suspicious activity
+  function showEvents(list) {
+    const t = $a("ad-events");
+    t.replaceChildren();
+    $a("ad-events-n").textContent = list.length ? `${list.length} recent` : "nothing suspicious so far";
+    const head = t.insertRow();
+    for (const h of ["When", "What", "Details", "Who", "Address", "Id", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const e of list) {
+      const r = t.insertRow();
+      r.className = e.level === "high" ? "lv-high" : e.level === "medium" ? "lv-medium" : "";
+      cell(r, when(e.t)); cell(r, e.kind); cell(r, e.detail); cell(r, e.who || ""); cell(r, e.ip); cell(r, e.vid || "");
+      const act = r.insertCell();
+      if (e.vid) button(act, "Block", () => { if (confirm(`Block ${e.who || "this visitor"} (${e.vid}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: e.vid }); setTimeout(loadOnline, 600); } });
+    }
+  }
 
   function showOnline(list) {
     const t = $a("ad-online");
@@ -178,6 +211,7 @@ const Admin = (() => {
       if (!p.admin) {
         button(act, p.muted ? "Unmute" : "Mute 10 min", () => { Online.navalSend({ t: "admin", a: p.muted ? "unmute" : "mute", id: p.id, min: 10 }); setTimeout(loadOnline, 400); });
         button(act, "Kick", () => { if (confirm(`Kick ${p.name} for 10 minutes?`)) { Online.navalSend({ t: "admin", a: "kick", id: p.id }); setTimeout(loadOnline, 600); } });
+        button(act, "Block", () => { if (confirm(`Block ${p.name} from the game for 30 days and remove them right now?`)) { Online.navalSend({ t: "admin", a: "block", id: p.id }); setTimeout(loadOnline, 600); } });
       }
     }
   }
@@ -196,5 +230,5 @@ const Admin = (() => {
     $a("btn-admin").hidden = !Account.admin;
   }
 
-  return { bind, showOnline, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
+  return { bind, showOnline, showVisits, showEvents, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
 })();

@@ -146,6 +146,52 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(err["msg"])
         await ws.until(lambda m: m["t"] == "welcome")
 
+    # ---------------------------------------------------------------- the admin's visitor log, suspicious activity and blocking
+
+    async def test_visitors_are_logged_and_an_admin_can_block_someone_on_the_spot(self):
+        vid_a, vid_b = "a" * 32, "b" * 32
+        server.VISITS.clear(); server.EVENTS.clear(); server.BLOCKED.clear(); server.FLAG_GAP.clear()
+        # the page says someone came
+        r, w = await asyncio.open_connection("127.0.0.1", self.port)
+        w.write(("GET /visit?v=%s&n=Ann HTTP/1.1\r\nHost: x\r\nUser-Agent: Mozilla/5.0 (Macintosh) Chrome/120 Safari/537\r\nX-Forwarded-For: 203.0.113.9\r\n\r\n" % vid_a).encode())
+        self.assertIn("204", (await r.read()).decode())
+        self.assertEqual(server.VISITS[vid_a]["name"], "Ann")
+        self.assertIn("Chrome on Mac", server.VISITS[vid_a]["ua"])
+        # two players connect; Bea is not an admin
+        ann = await WS.connect(self.port); self.clients.append(ann)
+        ann.send({"t": "hello", "name": "Ann", "cls": "gladiator", "look": {}, "vid": vid_a})
+        ann.welcome = await ann.until(lambda m: m["t"] == "welcome")
+        bea = await WS.connect(self.port); self.clients.append(bea)
+        bea.send({"t": "hello", "name": "Bea", "cls": "gladiator", "look": {}, "vid": vid_b})
+        bea.welcome = await bea.until(lambda m: m["t"] == "welcome")
+        self.assertEqual(server.VISITS[vid_b]["plays"], 1)
+        # someone who is not an admin tries an admin command: it is logged as serious
+        bea.send({"t": "admin", "a": "visits"})
+        await asyncio.sleep(0.3)
+        self.assertTrue(any(e["kind"] == "tried an admin command" and e["level"] == "high" for e in server.EVENTS))
+        # Ann is made an admin (as the database would); she sees the log and blocks Bea
+        next(c for c in server.CONNS if c.id == ann.welcome["id"]).admin = True
+        ann.send({"t": "admin", "a": "visits"})
+        v = await ann.until(lambda m: m["t"] == "adminvisits")
+        self.assertEqual({x["vid"] for x in v["v"]}, {vid_a, vid_b})
+        ann.send({"t": "admin", "a": "events"})
+        ev = await ann.until(lambda m: m["t"] == "adminevents")
+        self.assertTrue(ev["e"])
+        ann.send({"t": "admin", "a": "block", "vid": vid_b[:8]})
+        gone = await bea.until(lambda m: m["t"] == "kicked")
+        self.assertTrue(gone["blocked"])                                               # Bea is thrown out at once
+        await asyncio.sleep(0.3)
+        self.assertNotIn(bea.welcome["id"], [c.id for c in server.CONNS])
+        # she cannot come back, even under another name
+        bea2 = await WS.connect(self.port); self.clients.append(bea2)
+        bea2.send({"t": "hello", "name": "Cleo", "cls": "gladiator", "look": {}, "vid": vid_b})
+        err = await bea2.until(lambda m: m["t"] == "error" and m.get("code") == "kicked")
+        self.assertTrue(err)
+        # admins cannot be blocked, and unblocking lets her back in
+        ann.send({"t": "admin", "a": "unblock", "vid": vid_b})
+        await asyncio.sleep(0.3)
+        self.assertFalse(server.BLOCKED.get(vid_b))
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):

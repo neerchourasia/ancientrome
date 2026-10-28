@@ -19,6 +19,8 @@ Settings are environment variables (see server/README.md).
 import asyncio
 import base64
 import collections
+import datetime
+import ipaddress
 import hashlib
 import json
 import math
@@ -203,6 +205,8 @@ async def verify_token(token):
     hdr = {"apikey": CFG["anon_key"], "Authorization": "Bearer " + str(token)[:4000]}
     try:
         user = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/auth/v1/user", hdr)
+        if isinstance(user, dict) and user.get("id") and user.get("email"):
+            USER_EMAIL[user["id"]] = str(user["email"])[:120]
         return user.get("id") if isinstance(user, dict) else None
     except Exception:
         return None
@@ -291,6 +295,8 @@ class Conn:
         self.rob_cd = 0.0          # when they may rob again
         self.houses_sig = None
         self.admin = False         # set from the database when they log in with an admin account
+        self.vid, self.ua = None, ""   # the visitor id their browser made up (for the admin's visitor list) and the kind of browser they use
+        self.wlast, self.fast = None, 0   # where they last said they were (x, z, city, time) and how many updates in a row were impossibly fast
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
@@ -1424,8 +1430,22 @@ def on_walk(conn, m):
     city = m.get("c")
     if city not in WORLD_CITIES:
         return
+    nx, nz, tnow = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz), now()
+    if conn.wlast and conn.wlast[2] == city:           # watch for a walker who moves faster than anyone honestly could
+        dt, d = max(0.05, tnow - conn.wlast[3]), math.hypot(nx - conn.wlast[0], nz - conn.wlast[1])
+        veh = m.get("v")
+        lim = 260 if veh in AIR_VEH else 50 if veh in VEHICLES else 20
+        if d >= 150 and dt <= 1.5:
+            flag("jumped across the city", "%d m in %.1f s (the Go there button does this too)" % (d, dt), "low", conn=conn, gap=300)
+        elif d / dt > lim:
+            conn.fast += 1
+            if conn.fast >= 3:
+                flag("moving faster than possible", "%d m/s %s" % (d / dt, "in " + str(veh) if veh else "on foot"), "medium", conn=conn, gap=120)
+        else:
+            conn.fast = 0
+    conn.wlast = (nx, nz, city, tnow)
     conn.city = city
-    conn.px, conn.pz = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz)
+    conn.px, conn.pz = nx, nz
     conn.pyaw, conn.pspd = num(m.get("yaw"), -50, 50, conn.pyaw), num(m.get("s"), 0, 300, 0)
     conn.palt, conn.proll = num(m.get("a"), 0, 600, 0), num(m.get("r"), -1.5, 1.5, 0)
     veh = m.get("v")
@@ -1622,6 +1642,106 @@ def heist_once():
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# the visitors' log and security events, for admins. Kept in memory only (the newest ones), so a restart of the server empties it.
+
+VISITS = {}                       # visitor id -> record: when, how often, from what kind of device, name, account
+VISIT_MAX = 3000
+EVENTS = collections.deque(maxlen=1000)   # suspicious things that happened, newest last
+FLAG_GAP = {}                     # (kind, who) -> when it was last logged, so one troublemaker does not flood the list
+USER_EMAIL = {}                   # account id -> email, remembered from the login check so admins can see who is who
+VISIT_HITS = {}
+AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "cargo", "fighter", "bomber", "transport"}
+
+
+def stamp():
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def mask_ip(ip):
+    """An address with its last part hidden (203.0.113.x): enough to tell networks apart, not enough to pin down a person."""
+    ip = str(ip or "?")
+    if ":" in ip:
+        return ":".join(ip.split(":")[:3]) + ":x"
+    parts = ip.split(".")
+    return ".".join(parts[:3]) + ".x" if len(parts) == 4 else ip[:12]
+
+
+def real_ip(peer, hdr):
+    """The visitor's address: the connection's own, or (behind a host's proxy such as Render's) the last address the proxy wrote in X-Forwarded-For."""
+    try:
+        p = ipaddress.ip_address(peer)
+        if (p.is_private or p.is_loopback) and hdr.get("x-forwarded-for"):
+            last = hdr["x-forwarded-for"].split(",")[-1].strip()
+            ipaddress.ip_address(last)
+            return last
+    except ValueError:
+        pass
+    return peer
+
+
+def ua_summary(ua):
+    ua = str(ua or "")
+    browser = "Edge" if "Edg/" in ua else "Chrome" if ("Chrome/" in ua or "CriOS" in ua) else "Firefox" if "Firefox/" in ua else "Safari" if "Safari/" in ua else "other browser"
+    system = "iPhone/iPad" if ("iPhone" in ua or "iPad" in ua) else "Android" if "Android" in ua else "Mac" if "Macintosh" in ua else "Windows" if "Windows" in ua else "Linux" if "Linux" in ua else "unknown system"
+    return "%s on %s%s" % (browser, system, "" if not re.search(r"bot|crawl|spider|curl|python|wget|headless", ua, re.I) else " (looks automated)")
+
+
+def clean_vid(v):
+    v = str(v or "")
+    return v if re.fullmatch(r"[a-f0-9]{16,32}", v) else None
+
+
+def note_visit(vid, ip, ua, lang=None, name=None, acct=None, email=None, kind="page"):
+    """Record that this visitor came (kind 'page': loaded the site; 'play': connected to the game)."""
+    if not vid:
+        return None
+    t = stamp()
+    v = VISITS.get(vid)
+    if v is None:
+        if len(VISITS) >= VISIT_MAX:
+            VISITS.pop(min(VISITS, key=lambda k: VISITS[k]["last"]))
+        v = VISITS[vid] = {"vid": vid, "first": t, "last": t, "visits": 0, "plays": 0, "name": "", "acct": "", "ua": ua_summary(ua), "lang": str(lang or "")[:12], "ips": [], "flags": 0, "last_ip_mask": ""}
+    v["last"] = t
+    if kind == "play":
+        v["plays"] += 1
+    else:
+        v["visits"] += 1
+    if name:
+        v["name"] = clean_name(name)
+    if email:
+        v["acct"] = email
+    elif acct and not v["acct"]:
+        v["acct"] = "account"
+    m = mask_ip(ip)
+    v["last_ip_mask"] = m
+    if m not in v["ips"]:
+        v["ips"] = (v["ips"] + [m])[-4:]
+    # many different visitors coming from one address within the hour can be one person using many accounts
+    same = [x for x in VISITS.values() if x["last_ip_mask"] == m and x["last"][:13] == t[:13]]
+    if len(same) >= 5:
+        flag("many visitors from one address", "%d different visitors from %s this hour" % (len(same), m), "low", ip=ip, vid=vid, gap=3600)
+    return v
+
+
+def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60):
+    """Log something suspicious. The same kind from the same person is logged at most once every `gap` seconds."""
+    who = ""
+    if conn is not None:
+        ip, vid = ip or conn.ip, vid or getattr(conn, "vid", None)
+        who = conn.name
+    key = (kind, vid or ip)
+    t = now()
+    if t - FLAG_GAP.get(key, -1e9) < gap:
+        return
+    FLAG_GAP[key] = t
+    if len(FLAG_GAP) > 5000:
+        FLAG_GAP.clear()
+    if vid and vid in VISITS:
+        VISITS[vid]["flags"] += 1
+    EVENTS.append({"t": stamp(), "kind": kind, "detail": str(detail)[:160], "level": level, "who": who, "ip": mask_ip(ip), "vid": (vid or "")[:8]})
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # chat, and the admin's tools
 
 CHAT_LOG = collections.deque(maxlen=40)     # the last messages, shown to people who join
@@ -1679,7 +1799,37 @@ def kick(target, minutes=10):
 
 def blocked(conn):
     t = now()
-    return BLOCKED.get(conn.ip, 0) > t or (conn.uid and BLOCKED.get(conn.uid, 0) > t)
+    return BLOCKED.get(conn.ip, 0) > t or (conn.uid and BLOCKED.get(conn.uid, 0) > t) or (conn.vid and BLOCKED.get(conn.vid, 0) > t)
+
+
+BLOCK_DAYS = 30
+
+
+def block_visitor(vid=None, uid=None, ip=None, by="an admin"):
+    """Block a person from the game: their browser (visitor id), their account and their address are refused for 30 days, and every connection they
+    have open is closed on the spot. Admins cannot be blocked. Returns how many open connections were closed."""
+    until = now() + BLOCK_DAYS * 86400
+    mates = [c for c in list(CONNS) if c.hello and not c.closed and ((vid and c.vid == vid) or (uid and c.uid == uid))]
+    if any(c.admin for c in mates):
+        return 0
+    for key in (vid, uid, ip):
+        if key:
+            BLOCKED[key] = until
+    for c in mates:
+        BLOCKED[c.ip] = until
+        c.send({"t": "kicked", "minutes": BLOCK_DAYS * 1440, "blocked": True})
+        c.close()
+    if vid and vid in VISITS:
+        VISITS[vid]["blocked"] = True
+    flag("blocked by an admin", "%s blocked %s" % (by, (vid or uid or ip or "?")[:12]), "high", vid=vid, ip=ip, gap=0)
+    return len(mates)
+
+
+def unblock_visitor(vid):
+    for key in [vid] + [c.ip for c in CONNS if c.vid == vid]:
+        BLOCKED.pop(key, None)
+    if vid in VISITS:
+        VISITS[vid]["blocked"] = False
 
 
 PIC_RE = re.compile(r"^data:image/jpeg;base64,([A-Za-z0-9+/]+={0,2})$")
@@ -1708,8 +1858,11 @@ def on_chat(conn, m):
     conn.ctok = min(3.0, conn.ctok + (t - conn.ctok_t) / 1.5)
     conn.ctok_t = t
     if conn.ctok < 1:
+        flag("chat flooding", "sends messages faster than the chat allows", "low", conn=conn, gap=120)
         return say_to(conn, "Slow down a little.")
     text = clean_chat(m.get("text"))
+    if BAD_WORDS.search(str(m.get("text") or "")):
+        flag("swearing in chat", text[:100], "low", conn=conn, gap=120)
     pic = None
     if m.get("pic"):
         if not conn.uid:
@@ -1856,10 +2009,35 @@ def on_admin(conn, m):
         conn.send({"t": "adminwho", "who": [dict({"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
                                                   "muted": c.muted_until > now(), "admin": c.admin}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed]})
         return
+    if a == "visits":
+        rows = sorted(VISITS.values(), key=lambda v: v["last"], reverse=True)[:300]
+        online_vids = {c.vid for c in CONNS if c.hello and not c.closed and c.vid}
+        conn.send({"t": "adminvisits", "total": len(VISITS), "v": [dict(v, ips=None, online=v["vid"] in online_vids, blocked=BLOCKED.get(v["vid"], 0) > now()) for v in rows]})
+        return
+    if a in ("block", "unblock") and (m.get("vid") or m.get("id") is None):                  # by visitor id (a full id, or the first 8 letters shown in the lists)
+        key = str(m.get("vid") or "")
+        full = [k for k in VISITS if k == key or (len(key) >= 8 and k.startswith(key))]
+        if len(full) != 1:
+            return say_to(conn, "Could not find that visitor.")
+        if a == "block":
+            n = block_visitor(vid=full[0], by=conn.name)
+            say_to(conn, "Blocked%s." % (" and removed from the game" if n else ": they are not connected right now, but cannot come back"))
+        else:
+            unblock_visitor(full[0])
+            say_to(conn, "Unblocked.")
+        return
+    if a == "events":
+        conn.send({"t": "adminevents", "e": list(EVENTS)[-300:][::-1]})
+        return
     target = next((c for c in CONNS if c.id == m.get("id") and c.hello), None)
     if not target or target.admin:
         return
-    if a == "kick":
+    if a == "block":
+        n = block_visitor(vid=target.vid, uid=target.uid, ip=target.ip, by=conn.name)
+        if not n:
+            kick(target, BLOCK_DAYS * 1440)
+        say_to(conn, "%s was blocked and removed from the game." % target.name)
+    elif a == "kick":
         kick(target)
     elif a == "mute":
         try:
@@ -2276,13 +2454,19 @@ async def handle_msg(conn, m):
         conn.hello = True
         conn.uid = await verify_token(m.get("token"))
         conn.name = clean_name(m.get("name"))
+        conn.vid = clean_vid(m.get("vid"))
+        if m.get("token") and not conn.uid and CFG["supabase_url"]:
+            flag("login the database did not accept", "a forged or expired login token was sent", "medium", conn=conn, gap=300)
+        note_visit(conn.vid, conn.ip, conn.ua, None, conn.name if conn.name != "Player" else None, conn.uid, USER_EMAIL.get(conn.uid), "play")
         name_ok, name_why = await check_name(conn.name)
         if not name_ok:                       # an unsuitable name is never shown to other players: they see "Player" until it is changed
+            flag("inappropriate name", conn.name, "low", conn=conn, gap=300)
             conn.name = "Player"
             conn.send({"t": "error", "code": "name", "msg": name_why or NAME_BAD_MSG})
         conn.cls = m.get("cls") if m.get("cls") in CLASS_MODS else "gladiator"
         conn.look = clean_look(m.get("look"))
         if blocked(conn):
+            flag("kicked player tried to come back", "while kicked", "high", conn=conn, gap=120)
             conn.send({"t": "error", "code": "kicked", "msg": "You were kicked for a while. Try again later."})
             return conn.close()
         conn.admin = bool(conn.uid) and await is_admin(m.get("token"))
@@ -2308,6 +2492,8 @@ async def handle_msg(conn, m):
     if t == "shove":
         return on_shove(conn, m)
     if t == "admin":
+        if not conn.admin:
+            flag("tried an admin command", "a non-admin sent an admin command (%s)" % str(m.get("a"))[:20], "high", conn=conn, gap=120)
         return on_admin(conn, m)
     if t == "queue":
         mode = "duel" if m.get("mode") == "ranked" else m.get("mode")      # every duel between real people is ranked now
@@ -2353,7 +2539,7 @@ def origin_ok(origin):
 
 
 async def reply(writer, code, body=b"", ctype="text/plain; charset=utf-8", extra=""):
-    reason = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 413: "Payload Too Large", 503: "Service Unavailable"}.get(code, "")
+    reason = {200: "OK", 204: "No Content", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 413: "Payload Too Large", 503: "Service Unavailable"}.get(code, "")
     head = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n" % (code, reason, ctype, len(body), extra)
     writer.write(head.encode() + body)
     try:
@@ -2377,20 +2563,38 @@ async def handle_http(reader, writer):
     except Exception:
         return writer.close()
 
+    ip = real_ip(ip, hdr)
     query = urllib.parse.parse_qs(path.split("?", 1)[1]) if "?" in path else {}
     path = path.split("?", 1)[0]
+    if path == "/visit":         # the page says "someone came" when it loads (for the admin's visitor list)
+        if not origin_ok(hdr.get("origin")):
+            flag("page ping from an unknown website", str(hdr.get("origin"))[:80], "medium", ip=ip)
+            return await reply(writer, 403, b"origin not allowed")
+        t = now()
+        hits = [x for x in VISIT_HITS.get(ip, []) if t - x < 60]
+        VISIT_HITS[ip] = hits + [t]
+        if len(VISIT_HITS) > 3000:
+            VISIT_HITS.clear()
+        if len(hits) >= 12:
+            flag("loading the site again and again", "more than 12 page loads in a minute", "low", ip=ip)
+            return await reply(writer, 503, b"slow down")
+        note_visit(clean_vid((query.get("v") or [""])[0]), ip, hdr.get("user-agent", ""), hdr.get("accept-language", "")[:12], (query.get("n") or [""])[0] or None)
+        return await reply(writer, 204, b"", "text/plain", "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*"))
     if path == "/name":          # the game asks here whether a name is allowed, before you can choose it
         if not origin_ok(hdr.get("origin")):
             return await reply(writer, 403, b"origin not allowed")
         t = now()
         hits = [x for x in NAME_HITS.get(ip, []) if t - x < 60]
         if len(hits) >= 20:
+            flag("name checker flooded", "more than 20 name checks in a minute", "low", ip=ip)
             return await reply(writer, 503, b"slow down")
         NAME_HITS[ip] = hits + [t]
         if len(NAME_HITS) > 2000:
             NAME_HITS.clear()
         nm = clean_name((query.get("n") or [""])[0])
         ok, why = await check_name(nm)
+        if not ok:
+            flag("inappropriate name tried", nm, "low", ip=ip, gap=30)
         cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
         return await reply(writer, 200, json.dumps({"ok": ok, "reason": why, "name": nm}).encode(), "application/json", cors)
     if path == "/health":
@@ -2398,19 +2602,22 @@ async def handle_http(reader, writer):
 
     if path == "/play" and hdr.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in hdr:
         if not origin_ok(hdr.get("origin")):
+            flag("game connection from an unknown website", str(hdr.get("origin"))[:80], "medium", ip=ip)
             return await reply(writer, 403, b"origin not allowed")
         if len(CONNS) >= CFG["max_conns"] or sum(1 for c in CONNS if c.ip == ip) >= CFG["max_per_ip"]:
+            flag("too many connections from one address", "%d open connections" % sum(1 for c in CONNS if c.ip == ip), "medium", ip=ip)
             return await reply(writer, 503, b"busy")
         accept = base64.b64encode(hashlib.sha1((hdr["sec-websocket-key"] + GUID).encode()).digest()).decode()
         writer.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n" % accept).encode())
         await writer.drain()
-        return await ws_session(reader, writer, ip)
+        return await ws_session(reader, writer, ip, hdr.get("user-agent", ""))
 
     await reply(writer, 404, b"not found")
 
 
-async def ws_session(reader, writer, ip):
+async def ws_session(reader, writer, ip, ua=""):
     conn = Conn(reader, writer, ip)
+    conn.ua = ua
     CONNS.add(conn)
     try:
         while not conn.closed:
@@ -2423,6 +2630,7 @@ async def ws_session(reader, writer, ip):
             if op != 1:
                 continue
             if not conn.allow_message():
+                flag("flooding the server", "sent messages far faster than the game ever does; the connection was dropped", "medium", conn=conn)
                 break
             try:
                 m = json.loads(data)

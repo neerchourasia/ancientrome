@@ -620,3 +620,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #trade h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
 #trade-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
 #trade .mk-items { margin-top: 10px; }
+
+/* the admin's lists: serious and worth-a-look rows */
+.dtable tr.lv-high td { background: rgba(200, 50, 40, .28); }
+.dtable tr.lv-medium td { background: rgba(220, 160, 40, .2); }

@@ -20,8 +20,9 @@ const Online = (() => {
 
   // ------------------------------------------------------------------ connection
 
+  let noConnectUntil = 0;                                   // after a kick or a block the browser stops trying to come back
   function connect() {
-    if (!URL) return;
+    if (!URL || Date.now() < noConnectUntil) return;
     const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join(), Market.pet].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is
@@ -32,7 +33,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon }, rank: Social.rank, friends: Social.helloFriends() });
+      send({ t: "hello", vid: visitorId(), token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon }, rank: Social.rank, friends: Social.helloFriends() });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -62,7 +63,9 @@ const Online = (() => {
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
       case "adminwho": Admin.showOnline(m.who || []); break;
-      case "kicked": Chat.add({ sys: 1, text: `An admin kicked you for ${m.minutes || 10} minutes.` }); break;
+      case "adminvisits": Admin.showVisits(m); break;
+      case "adminevents": Admin.showEvents(m.e || []); break;
+      case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
@@ -261,6 +264,21 @@ const Online = (() => {
   }
 
   // every 0.2 s while you walk: where you are (the server decides who can see you)
+  // A random id this browser makes up once (nothing to do with who you are), so the admins' visitor list can tell visitors apart
+  function visitorId() {
+    try {
+      let v = localStorage.getItem("rome-vid");
+      if (!/^[a-f0-9]{32}$/.test(v || "")) { v = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""); localStorage.setItem("rome-vid", v); }
+      return v;
+    } catch (e) { return undefined; }
+  }
+  // Tell the game server that someone opened the site (once per page load): the admins' visitor list shows when, what kind of device, and the character name if there is one
+  function visit() {
+    if (!URL || !visitorId()) return;
+    const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
+    try { fetch(`${http}/visit?v=${visitorId()}&n=${encodeURIComponent(Character.exists ? Character.name : "")}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
+  }
+
   // Is this name allowed? The game server checks (and asks an AI as well, when it has one); if it cannot be reached the name is let through here and checked when you connect
   async function checkName(name) {
     if (!URL) return { ok: true };
@@ -282,6 +300,7 @@ const Online = (() => {
   }
 
   function bind() {
+    visit();
     setInterval(() => { if (started && Character.exists && !document.hidden && (mode === "walk" || mode === "drive") && !duel && !waiting) connect(); }, 4000); // stay connected, so you see the others
     $o("on-duel").addEventListener("click", () => queue("duel"));
     $o("on-race").addEventListener("click", () => queue("race"));
