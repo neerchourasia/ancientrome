@@ -200,4 +200,28 @@ const LANDMARKS = [
     fact: "Almost two thousand years after it was built it is still the largest unreinforced concrete dome in the world. When it rains, water falls through the oculus and drains through holes in the floor.",
     modern: "The Pantheon has survived remarkably well: it is the best-preserved building of ancient Rome, standing almost exactly as it did, and is now used as a church.",
   },
+  {
+    id: "m-colosseo", game: true, only: "modern", name: "Metro: Colosseo", sub: "Linea B · press F at the blue METRO sign",
+    x: 400, z: 110, r: 8, stand: [400, 113],
+    text: "The station for the Colosseum, at the east end of the line. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "Linea B is a line of the underground in modern Rome. It really runs past the Colosseum, but here it is a little shorter and runs under the old city from east to west.",
+  },
+  {
+    id: "m-foro", game: true, only: "modern", name: "Metro: Foro", sub: "Linea B · press F at the blue METRO sign",
+    x: 20, z: -40, r: 8, stand: [20, -37],
+    text: "The station for the Roman Forum. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "Linea B is a line of the underground in modern Rome. It really runs past the Colosseum, but here it is a little shorter and runs under the old city from east to west.",
+  },
+  {
+    id: "m-campidoglio", game: true, only: "modern", name: "Metro: Campidoglio", sub: "Linea B · press F at the blue METRO sign",
+    x: -240, z: 9, r: 8, stand: [-240, 12],
+    text: "The station for the Capitoline Hill. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "Linea B is a line of the underground in modern Rome. It really runs past the Colosseum, but here it is a little shorter and runs under the old city from east to west.",
+  },
+  {
+    id: "m-ercole", game: true, only: "modern", name: "Metro: Ercole Vincitore", sub: "Linea B · press F at the blue METRO sign",
+    x: -430, z: 20, r: 8, stand: [-430, 23],
+    text: "The station at the Temple of Hercules Victor, at the west end of the line. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "Linea B is a line of the underground in modern Rome. It really runs past the Colosseum, but here it is a little shorter and runs under the old city from east to west.",
+  },
 ];

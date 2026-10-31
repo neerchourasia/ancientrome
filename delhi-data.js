@@ -110,6 +110,19 @@ const DELHI_LANDMARKS = [
     fact: "The station is underground, with a single island platform between the tracks.",
   }),
 
+  dl({
+    id: "d-m-cp", game: true, only: "modern", name: "Metro: Connaught Place", sub: "Yellow Line · press F at the blue METRO sign",
+    x: -200, z: 480, r: 8, stand: [-200, 483],
+    text: "The station for Connaught Place, the middle of the line. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "The Yellow Line of the Delhi Metro really runs from Old Delhi through Connaught Place to Central Secretariat.",
+  }),
+  dl({
+    id: "d-m-cs", game: true, only: "modern", name: "Metro: Central Secretariat", sub: "Yellow Line · press F at the blue METRO sign",
+    x: -230, z: 900, r: 8, stand: [-230, 903],
+    text: "The station at the south end of the line, near New Delhi's ceremonial avenue. Walk up to the tall blue METRO sign and press F to go down to the platform. There you can drive the train yourself (F), ride it as a passenger for 10 denarii (R) or go back up (U).",
+    fact: "The Yellow Line of the Delhi Metro really runs from Old Delhi through Connaught Place to Central Secretariat.",
+  }),
+
   // the places for the games (press F there to play; they are on the map and in Directions, but are not sights to discover)
   dl({
     id: "g-akhara", game: true, name: "The Akhara", sub: "Kushti wrestling pit",
