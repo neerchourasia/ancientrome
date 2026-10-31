@@ -147,20 +147,38 @@ const Admin = (() => {
     parent.append(b);
   }
 
+  // the list of accounts has Kick and Block on each row; the game server says which accounts are blocked right now
+  let usersRows = [], blockedUids = new Set(), blockedEmails = new Set();
+  function renderUsers() {
+    const t = $a("ad-users"), rows = usersRows, me = (Account.email || "").toLowerCase();
+    t.replaceChildren();
+    const head = t.insertRow();
+    for (const h of ["Email", "Character", "Denarii", "Day", "Items", "Joined", "Last login", "Last saved", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const u of rows) {
+      const r = t.insertRow(), email = (u.email || "").toLowerCase(), blocked = (u.user_id && blockedUids.has(u.user_id)) || blockedEmails.has(email);
+      if (blocked) r.className = "lv-high";
+      cell(r, u.email); cell(r, u.character_name ? `${u.character_name}${u.class_name ? " (" + u.class_name + ")" : ""}` : "no character yet");
+      cell(r, u.coins == null ? "" : Number(u.coins).toLocaleString()); cell(r, u.game_day == null ? "" : u.game_day); cell(r, u.items == null ? "" : u.items); cell(r, when(u.created_at)); cell(r, when(u.last_sign_in_at)); cell(r, when(u.saved_at));
+      const act = r.insertCell();
+      if (email === me) { act.textContent = "you"; continue; }
+      const ask = (m) => Online.navalSend({ t: "admin", a: m, email: u.email, uid: u.user_id });
+      if (blocked) { act.textContent = "BLOCKED "; button(act, "Unblock", () => { ask("unblockacct"); setTimeout(loadOnline, 600); }); }
+      else {
+        button(act, "Kick", () => { if (confirm(`Kick ${u.email} out of the game for 10 minutes?`)) ask("kickacct"); });
+        button(act, "Block", () => { if (confirm(`Block ${u.email} from the game for 30 days and remove them now?`)) { ask("blockacct"); setTimeout(loadOnline, 600); } });
+      }
+    }
+  }
+
   async function loadUsers() {
     const t = $a("ad-users"), msg = $a("ad-msg");
     t.replaceChildren(); msg.textContent = "Loading...";
     try {
       const rows = await Account.adminUsers();
+      usersRows = rows;
       const total = rows.reduce((a, u) => a + (Number(u.coins) || 0), 0);
       msg.textContent = `${rows.length} account${rows.length === 1 ? "" : "s"} signed up${rows.some((u) => u.coins !== undefined) ? ` · ${total.toLocaleString()} denarii in all (as last saved)` : ""}`;
-      const head = t.insertRow();
-      for (const h of ["Email", "Character", "Denarii", "Day", "Items", "Joined", "Last login", "Last saved"]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
-      for (const u of rows) {
-        const r = t.insertRow();
-        cell(r, u.email); cell(r, u.character_name ? `${u.character_name}${u.class_name ? " (" + u.class_name + ")" : ""}` : "no character yet");
-        cell(r, u.coins == null ? "" : Number(u.coins).toLocaleString()); cell(r, u.game_day == null ? "" : u.game_day); cell(r, u.items == null ? "" : u.items); cell(r, when(u.created_at)); cell(r, when(u.last_sign_in_at)); cell(r, when(u.saved_at));
-      }
+      renderUsers();
     } catch (e) { msg.textContent = "Could not load the list: " + e.message; }
   }
 
@@ -170,7 +188,62 @@ const Admin = (() => {
     for (const pane of document.querySelectorAll("#admin .ad-pane")) pane.hidden = pane.dataset.pane !== name;
   }
 
-  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); }
+  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); Online.navalSend({ t: "admin", a: "journey" }); }
+
+  // the User journey tab: a list of visitors, and each visit of the one you pick as a timeline
+  const CITY = { rome: "Rome", delhi: "Delhi", cancun: "Cancún" };
+  const MODE = { fight: "Started a gladiator fight", race: "Started a chariot race", naval: "Started a naval battle", online: "Went into online play", dgame: "Played a game in Delhi", watch: "Watched a show" };
+  const up = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
+  function say(kind, d) {
+    switch (kind) {
+      case "arrive": return up(d) || "Opened the game";
+      case "play": return up(d);
+      case "city": return `Went to ${CITY[d] || d}`;
+      case "era": return `Switched to ${d} times`;
+      case "mode": return MODE[d] || `Started ${d}`;
+      case "vehicle": return up(d);
+      case "discover": return `Discovered ${d}`;
+      case "job": return up(d);
+      case "buy": return `Got ${d}`;
+      case "sell": return `Sold ${d}`;
+      case "death": return "Died";
+      case "money": return `Money: ${d}`;
+      case "login": return "Logged in";
+      case "demo": return "Switched to the demo";
+      case "logout": return "Logged out";
+      case "left": return up(d) || "Left";
+      default: return up(d) || kind;
+    }
+  }
+  const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  function showJourney(m) {
+    if (m.list) {
+      const t = $a("ad-jlist");
+      t.replaceChildren();
+      $a("ad-journey-n").textContent = `${m.list.length} visitor${m.list.length === 1 ? "" : "s"} with a journey`;
+      $a("ad-journey-b").textContent = m.list.length || "";
+      const head = t.insertRow();
+      for (const h of ["Name", "Account", "Device", "Visits", "Steps", "Last seen", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+      for (const v of m.list) {
+        const r = t.insertRow();
+        cell(r, v.name || "unknown"); cell(r, v.acct || "guest"); cell(r, v.ua); cell(r, v.sessions); cell(r, v.events); cell(r, when(v.last));
+        button(r.insertCell(), "View", () => Online.navalSend({ t: "admin", a: "journey", vid: v.vid }));
+      }
+      return;
+    }
+    const box = $a("ad-jdetail");
+    box.replaceChildren();
+    const h = document.createElement("h3"); h.textContent = `${m.name || "Unknown visitor"} (${String(m.vid).slice(0, 8)})`; box.append(h);
+    for (const s of m.sessions || []) {
+      const card = document.createElement("div"); card.className = "ad-visit";
+      const top = document.createElement("strong"), mins = Math.max(0, Math.round((Date.parse(s.last) - Date.parse(s.start)) / 60000));
+      top.textContent = `${when(s.start)} · ${mins < 1 ? "under a minute" : mins + " min"} · ${s.ua || "unknown device"} · ${s.events.length} step${s.events.length === 1 ? "" : "s"}`;
+      card.append(top);
+      const ol = document.createElement("ol");
+      for (const [sec, kind, d] of s.events) { const li = document.createElement("li"); const tm = document.createElement("time"); tm.textContent = clock(sec); li.append(tm, " " + say(kind, d)); ol.append(li); }
+      card.append(ol); box.append(card);
+    }
+  }
 
   // everyone who opened the site
   function showVisits(m) {
@@ -208,7 +281,8 @@ const Admin = (() => {
     }
   }
 
-  function showOnline(list) {
+  function showOnline(list, m) {
+    if (m) { blockedUids = new Set(m.blocked_uids || []); blockedEmails = new Set((m.blocked_emails || []).map((e) => String(e).toLowerCase())); if (usersRows.length) renderUsers(); }
     const t = $a("ad-online");
     t.replaceChildren();
     $a("ad-online-n").textContent = `${list.length} online now`;
@@ -261,5 +335,5 @@ const Admin = (() => {
     $a("btn-admin").hidden = !Account.admin;
   }
 
-  return { bind, showOnline, showVisits, showEvents, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
+  return { bind, showOnline, showVisits, showEvents, showJourney, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
 })();

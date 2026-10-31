@@ -635,6 +635,11 @@ body.playing #chat:not(.open) { display: none; }
 .ad-badge.hot { color: #e47a6d; opacity: 1; font-weight: 700; }
 #admin .ad-tab.on .ad-badge.hot { color: #7a1f1f; }
 #admin .ad-pane[hidden] { display: none; }
+#ad-jdetail h3 { margin-top: 16px; color: var(--gold); }
+.ad-visit { margin: 8px 0; padding: 8px 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
+.ad-visit ol { list-style: none; margin: 6px 0 0; padding: 0; font-size: .88rem; }
+.ad-visit li { padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,.08); }
+.ad-visit time { display: inline-block; min-width: 3.2em; color: var(--muted); font-variant-numeric: tabular-nums; }
 #admin h3 { margin: 12px 0 4px; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 #admin code { background: rgba(255,255,255,.1); padding: 0 4px; border-radius: 4px; }
 

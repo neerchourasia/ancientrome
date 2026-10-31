@@ -1656,6 +1656,12 @@ def heist_once():
 
 VISITS = {}                       # visitor id -> record: when, how often, from what kind of device, name, account
 VISIT_MAX = 3000
+# What each visitor did on each visit (the admin's "User journey"): a short list of things like "went to Delhi" or "bought a plane", sent by the page.
+# Kept in memory only. No chat text and nothing typed is ever recorded.
+JOURNEYS = {}                     # visitor id -> {"last": time, "name": character name, "sessions": [{"sid", "start", "last", "ua", "events": [[seconds into the visit, kind, detail], ...]}]}
+JOURNEY_VISITORS, JOURNEY_SESSIONS, JOURNEY_EVENTS = 800, 8, 150
+JOURNEY_KINDS = {"arrive", "play", "city", "era", "mode", "vehicle", "discover", "job", "buy", "sell", "death", "money", "login", "logout", "demo", "left", "other"}
+JOURNEY_HITS = {}
 EVENTS = collections.deque(maxlen=1000)   # suspicious things that happened, newest last
 FLAG_GAP = {}                     # (kind, who) -> when it was last logged, so one troublemaker does not flood the list
 USER_EMAIL = {}                   # account id -> email, remembered from the login check so admins can see who is who
@@ -1731,6 +1737,38 @@ def note_visit(vid, ip, ua, lang=None, name=None, acct=None, email=None, kind="p
     if len(same) >= 5:
         flag("many visitors from one address", "%d different visitors from %s this hour" % (len(same), m), "low", ip=ip, vid=vid, gap=3600)
     return v
+
+
+def note_journey(vid, sid, name, ua, events):
+    """Add a batch of things a visitor did to this visit's list (events: [[seconds into the visit, kind, detail], ...])."""
+    if not re.fullmatch(r"[a-f0-9]{32}", vid or "") or not re.fullmatch(r"[a-f0-9]{8,32}", sid or ""):
+        return 0
+    t = stamp()
+    j = JOURNEYS.get(vid)
+    if j is None:
+        if len(JOURNEYS) >= JOURNEY_VISITORS:
+            JOURNEYS.pop(min(JOURNEYS, key=lambda k: JOURNEYS[k]["last"]))
+        j = JOURNEYS[vid] = {"last": t, "name": "", "sessions": []}
+    j["last"] = t
+    if name:
+        j["name"] = clean_name(name)
+    ses = next((x for x in j["sessions"] if x["sid"] == sid), None)
+    if ses is None:
+        first = max([e[0] for e in events if isinstance(e, list) and e and isinstance(e[0], (int, float))] or [0])
+        start = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=min(86400, max(0, first)))).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ses = {"sid": sid, "start": start, "last": t, "ua": ua_summary(ua), "events": []}
+        j["sessions"].append(ses)
+        del j["sessions"][:-JOURNEY_SESSIONS]
+    ses["last"] = t
+    added = 0
+    for e in events[:20]:
+        if not (isinstance(e, list) and len(e) == 3 and isinstance(e[0], (int, float)) and isinstance(e[1], str) and e[1] in JOURNEY_KINDS and isinstance(e[2], str)):
+            continue
+        if len(ses["events"]) >= JOURNEY_EVENTS:
+            break
+        ses["events"].append([int(min(86400, max(0, e[0]))), e[1], re.sub(r"[^\w \-.,:'()+/&>]", "", e[2])[:60]])
+        added += 1
+    return added
 
 
 def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60):
@@ -2017,12 +2055,29 @@ def on_admin(conn, m):
     a = m.get("a")
     if a == "who":
         conn.send({"t": "adminwho", "who": [dict({"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
-                                                  "muted": c.muted_until > now(), "admin": c.admin, "coins": c.coins}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed]})
+                                                  "muted": c.muted_until > now(), "admin": c.admin, "coins": c.coins}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed],
+                   "blocked_uids": [k for k, until in BLOCKED.items() if until > now() and re.fullmatch(r"[0-9a-fA-F-]{36}", str(k))],
+                   "blocked_emails": [USER_EMAIL[k] for k, until in BLOCKED.items() if until > now() and k in USER_EMAIL]})
         return
     if a == "visits":
         rows = sorted(VISITS.values(), key=lambda v: v["last"], reverse=True)[:300]
         online_vids = {c.vid for c in CONNS if c.hello and not c.closed and c.vid}
         conn.send({"t": "adminvisits", "total": len(VISITS), "v": [dict(v, ips=None, online=v["vid"] in online_vids, blocked=BLOCKED.get(v["vid"], 0) > now()) for v in rows]})
+        return
+    if a == "journey":
+        vid = str(m.get("vid") or "")
+        if vid:
+            key = [k for k in JOURNEYS if k == vid or (len(vid) >= 8 and k.startswith(vid))]
+            if len(key) != 1:
+                return say_to(conn, "No journey recorded for that visitor.")
+            j = JOURNEYS[key[0]]
+            conn.send({"t": "adminjourney", "vid": key[0], "name": j["name"] or (VISITS.get(key[0]) or {}).get("name", ""), "sessions": [dict(x) for x in reversed(j["sessions"])]})
+        else:
+            rows = []
+            for k, j in sorted(JOURNEYS.items(), key=lambda kv: kv[1]["last"], reverse=True)[:300]:
+                v = VISITS.get(k) or {}
+                rows.append({"vid": k, "name": j["name"] or v.get("name", ""), "acct": v.get("acct", ""), "ua": v.get("ua") or (j["sessions"][-1]["ua"] if j["sessions"] else ""), "sessions": len(j["sessions"]), "events": sum(len(x["events"]) for x in j["sessions"]), "last": j["last"]})
+            conn.send({"t": "adminjourney", "list": rows})
         return
     if a in ("block", "unblock") and (m.get("vid") or m.get("id") is None):                  # by visitor id (a full id, or the first 8 letters shown in the lists)
         key = str(m.get("vid") or "")
@@ -2039,6 +2094,33 @@ def on_admin(conn, m):
     if a == "events":
         conn.send({"t": "adminevents", "e": list(EVENTS)[-300:][::-1]})
         return
+    if a in ("kickacct", "blockacct", "unblockacct"):             # from the list of accounts: by account id (from the database) or, failing that, by email
+        email = str(m.get("email") or "").strip().lower()[:120]
+        uid = str(m.get("uid") or "")
+        if not re.fullmatch(r"[0-9a-fA-F-]{36}", uid):
+            uid = ""
+        if not uid and email:
+            uid = next((u for u, e in USER_EMAIL.items() if e.lower() == email), "")
+        mates = [c for c in list(CONNS) if c.hello and not c.closed and c.uid and (c.uid == uid or (email and USER_EMAIL.get(c.uid, "").lower() == email))]
+        uid = uid or (mates[0].uid if mates else "")
+        label = email or "that account"
+        if any(c.admin for c in mates):
+            return say_to(conn, "Admins cannot be kicked or blocked.")
+        if a == "kickacct":
+            if not mates:
+                return say_to(conn, "%s is not in the game right now." % label)
+            for c in mates:
+                kick(c)
+            return say_to(conn, "Kicked %s for 10 minutes." % label)
+        if a == "blockacct":
+            if not uid:
+                return say_to(conn, "I do not know %s's account id yet: they have not been in the game since the server started. Run the updated admin_users() in supabase-admin.sql so the list carries account ids." % label)
+            n = block_visitor(uid=uid, by=conn.name)
+            return say_to(conn, "Blocked %s%s." % (label, " and removed from the game" if n else ": they cannot log in to play for 30 days"))
+        for key in [uid] + [v["vid"] for v in VISITS.values() if email and v.get("acct", "").lower() == email]:
+            if key:
+                unblock_visitor(key) if key in VISITS else BLOCKED.pop(key, None)
+        return say_to(conn, "Unblocked %s." % label)
     target = next((c for c in CONNS if c.id == m.get("id") and c.hello), None)
     if not target or target.admin:
         return
@@ -2666,6 +2748,22 @@ async def handle_http(reader, writer):
             flag("loading the site again and again", "more than 12 page loads in a minute", "low", ip=ip)
             return await reply(writer, 503, b"slow down")
         note_visit(clean_vid((query.get("v") or [""])[0]), ip, hdr.get("user-agent", ""), hdr.get("accept-language", "")[:12], (query.get("n") or [""])[0] or None)
+        return await reply(writer, 204, b"", "text/plain", "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*"))
+    if path == "/journey":       # the page reports what the visitor did (a few at a time) for the admin's User journey
+        if not origin_ok(hdr.get("origin")):
+            return await reply(writer, 403, b"origin not allowed")
+        t = now()
+        hits = [x for x in JOURNEY_HITS.get(ip, []) if t - x < 60]
+        if len(hits) >= 40:
+            return await reply(writer, 503, b"slow down")
+        JOURNEY_HITS[ip] = hits + [t]
+        if len(JOURNEY_HITS) > 3000:
+            JOURNEY_HITS.clear()
+        try:
+            evs = json.loads((query.get("e") or ["[]"])[0][:2500])
+        except Exception:
+            evs = []
+        note_journey(clean_vid((query.get("v") or [""])[0]), (query.get("s") or [""])[0][:32], (query.get("n") or [""])[0] or None, hdr.get("user-agent", ""), evs if isinstance(evs, list) else [])
         return await reply(writer, 204, b"", "text/plain", "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*"))
     if path == "/name":          # the game asks here whether a name is allowed, before you can choose it
         if not origin_ok(hdr.get("origin")):

@@ -63,8 +63,9 @@ const Online = (() => {
       case "fr_gift": case "fr_gave": case "fr_invite": case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
-      case "adminwho": Admin.showOnline(m.who || []); break;
+      case "adminwho": Admin.showOnline(m.who || [], m); break;
       case "adminvisits": Admin.showVisits(m); break;
+      case "adminjourney": Admin.showJourney(m); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
@@ -278,6 +279,13 @@ const Online = (() => {
     if (!URL || !visitorId()) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
     try { fetch(`${http}/visit?v=${visitorId()}&n=${encodeURIComponent(Character.exists ? Character.name : "")}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
+  }
+
+  // Tell the game server a few things the visitor did on this visit (the admins' User journey): short lines like "went to Delhi", no chat and nothing typed
+  function journey(sid, events) {
+    if (!URL || !visitorId() || !events.length) return;
+    const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
+    try { fetch(`${http}/journey?v=${visitorId()}&s=${sid}&n=${encodeURIComponent(Character.exists ? Character.name : "")}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   // Is this name allowed? The game server checks (and asks an AI as well, when it has one); if it cannot be reached the name is let through here and checked when you connect
@@ -546,5 +554,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, checkName, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

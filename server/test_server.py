@@ -10,6 +10,7 @@ import os
 import struct
 import sys
 import time
+import urllib.parse
 import unittest
 import warnings
 
@@ -194,6 +195,69 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "admin", "a": "unblock", "vid": vid_b})
         await asyncio.sleep(0.3)
         self.assertFalse(server.BLOCKED.get(vid_b))
+
+    async def test_user_journey_is_recorded_and_only_admins_can_read_it(self):
+        vid = "c" * 32
+        server.JOURNEYS.clear(); server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear(); server.JOURNEY_HITS.clear()
+        ev = json.dumps([[0, "arrive", "rome modern"], [5, "play", "demo"], [40, "city", "delhi"], [41, "hack", "x"], [90, "buy", "Boeing 737 MAX <script>"], [95, "chat", "no"]])
+        r, w = await asyncio.open_connection("127.0.0.1", self.port)
+        w.write(("GET /journey?v=%s&s=%s&n=Ann&e=%s HTTP/1.1\r\nHost: x\r\nUser-Agent: Mozilla/5.0 (Macintosh) Chrome/120 Safari/537\r\n\r\n" % (vid, "d" * 16, urllib.parse.quote(ev))).encode())
+        self.assertIn("204", (await r.read()).decode())
+        ses = server.JOURNEYS[vid]["sessions"][0]
+        self.assertEqual([e[1] for e in ses["events"]], ["arrive", "play", "city", "buy"])           # unknown kinds are dropped
+        self.assertNotIn("<", ses["events"][3][2])                                                   # and odd characters are stripped
+        # a second batch for the same visit joins the same list; a new visit starts a new one
+        server.note_journey(vid, "d" * 16, None, "", [[120, "left", ""]])
+        server.note_journey(vid, "e" * 16, None, "", [[0, "arrive", "rome modern"]])
+        self.assertEqual([len(x["events"]) for x in server.JOURNEYS[vid]["sessions"]], [5, 1])
+        # garbage is ignored
+        self.assertEqual(server.note_journey("zz", "d" * 16, None, "", [[0, "arrive", ""]]), 0)
+        # the admin reads it; someone who is not an admin only gets their attempt logged
+        ann = await WS.connect(self.port); self.clients.append(ann)
+        ann.send({"t": "hello", "name": "Ann", "cls": "gladiator", "look": {}, "vid": vid})
+        ann.welcome = await ann.until(lambda m: m["t"] == "welcome")
+        ann.send({"t": "admin", "a": "journey"})
+        await asyncio.sleep(0.3)
+        self.assertTrue(any(e["kind"] == "tried an admin command" for e in server.EVENTS))
+        next(c for c in server.CONNS if c.id == ann.welcome["id"]).admin = True
+        ann.send({"t": "admin", "a": "journey"})
+        lst = await ann.until(lambda m: m["t"] == "adminjourney" and "list" in m)
+        self.assertEqual((lst["list"][0]["vid"], lst["list"][0]["sessions"], lst["list"][0]["events"]), (vid, 2, 6))
+        ann.send({"t": "admin", "a": "journey", "vid": vid[:8]})
+        one = await ann.until(lambda m: m["t"] == "adminjourney" and "sessions" in m)
+        self.assertEqual(len(one["sessions"]), 2)
+        self.assertEqual(one["sessions"][0]["sid"], "e" * 16)                                          # newest visit first
+
+    async def test_an_admin_can_kick_and_block_an_account_from_the_users_list(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.BLOCKED.clear(); server.FLAG_GAP.clear(); server.USER_EMAIL.clear()
+        uid_b = "12345678-1234-1234-1234-123456789abc"
+        ann = await WS.connect(self.port); self.clients.append(ann)
+        ann.send({"t": "hello", "name": "Ann", "cls": "gladiator", "look": {}, "vid": "a" * 32})
+        ann.welcome = await ann.until(lambda m: m["t"] == "welcome")
+        bea = await WS.connect(self.port); self.clients.append(bea)
+        bea.send({"t": "hello", "name": "Bea", "cls": "gladiator", "look": {}, "vid": "b" * 32})
+        bea.welcome = await bea.until(lambda m: m["t"] == "welcome")
+        cb = next(c for c in server.CONNS if c.id == bea.welcome["id"])
+        cb.uid = uid_b; server.USER_EMAIL[uid_b] = "bea@example.com"                 # as if she had logged in
+        next(c for c in server.CONNS if c.id == ann.welcome["id"]).admin = True
+        # offline accounts cannot be kicked; online ones can, found by email
+        ann.send({"t": "admin", "a": "kickacct", "email": "nobody@example.com"})
+        self.assertIn("not in the game", (await ann.until(lambda m: m["t"] == "chat" or m["t"] == "say" or "text" in m)).get("text", ""))
+        ann.send({"t": "admin", "a": "kickacct", "email": "BEA@example.com"})
+        gone = await bea.until(lambda m: m["t"] == "kicked")
+        self.assertFalse(gone.get("blocked"))
+        await asyncio.sleep(0.3)
+        self.assertNotIn(cb, server.CONNS)
+        # blocking by account id (from the database) works even when she is not connected, and the list says so
+        ann.send({"t": "admin", "a": "blockacct", "email": "bea@example.com", "uid": uid_b})
+        await asyncio.sleep(0.3)
+        self.assertGreater(server.BLOCKED.get(uid_b, 0), server.now())
+        ann.send({"t": "admin", "a": "who"})
+        who = await ann.until(lambda m: m["t"] == "adminwho")
+        self.assertEqual((who["blocked_uids"], who["blocked_emails"]), ([uid_b], ["bea@example.com"]))
+        ann.send({"t": "admin", "a": "unblockacct", "email": "bea@example.com", "uid": uid_b})
+        await asyncio.sleep(0.3)
+        self.assertFalse(server.BLOCKED.get(uid_b))
 
     # ---------------------------------------------------------------- basics
 

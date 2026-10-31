@@ -22,9 +22,9 @@ $$;
 
 drop function if exists public.admin_users();
 create or replace function public.admin_users()
-returns table (email text, created_at timestamptz, last_sign_in_at timestamptz, character_name text, class_name text, saved_at timestamptz, coins numeric, game_day numeric, items integer)
+returns table (user_id uuid, email text, created_at timestamptz, last_sign_in_at timestamptz, character_name text, class_name text, saved_at timestamptz, coins numeric, game_day numeric, items integer)
 language sql stable security definer set search_path = public, auth as $$
-  select u.email::text, u.created_at, u.last_sign_in_at, p.character ->> 'name', p.character ->> 'cls', p.updated_at,
+  select u.id, u.email::text, u.created_at, u.last_sign_in_at, p.character ->> 'name', p.character ->> 'cls', p.updated_at,
          (p.progress -> 'vitals' ->> 'coins')::numeric, (p.progress -> 'time' ->> 'day')::numeric,
          coalesce(jsonb_array_length(p.progress -> 'owned' -> 'items'), 0)
   from auth.users u
