@@ -14,11 +14,12 @@ const Ride = (() => {
   // the driver nearest to you that you could ride with (they must be in a vehicle that is standing, close by)
   function nearest() {
     if (!started || mode !== "walk" || panelOpen || !Online.connected) return null;
-    let best = null, bd = 7;
+    let best = null, bs = 1;
     for (const p of Online.peerList()) {
       if (!p.veh || p.x === null || (p.spd || 0) > 5 || (p.alt || 0) > 3) continue;
-      const d = Math.hypot(p.x - player.x, p.z - player.z);
-      if (d < bd) { bd = d; best = p; }
+      const M = (typeof Car !== "undefined" && Car.MODELS[p.veh]) || {}, reach = Math.max(7, (M.len || 4) * 0.55 + 4);   // a big plane can be reached from its wing or its wheels, not just from its middle
+      const d = Math.hypot(p.x - player.x, p.z - player.z), score = d / reach;
+      if (score < bs) { bs = score; best = p; }
     }
     return best;
   }

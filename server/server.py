@@ -1479,7 +1479,7 @@ SEATS = {"scooter": 1, "motorcycle": 1, "bicycle": 1, "rickshaw": 2, "oxcart": 2
          "suv": 4, "taxi": 3, "truck": 2, "bus": 8, "chariot": 1, "plane": 1, "glider": 0, "gyro": 0, "helicopter": 3, "tiltrotor": 6, "blimp": 8, "balloon": 3,
          "vlj": 3, "lightjet": 5, "midjet": 7, "supermid": 9, "heavyjet": 12, "airliner": 40, "b777x": 60, "a350": 60, "a380": 80, "cargo": 2, "fighter": 0,
          "bomber": 3, "transport": 20}
-BOARD_RANGE = 14.0          # you must be this close to the vehicle to get in
+BOARD_RANGE = 14.0          # you must be this close to the middle of the vehicle to get in (more for a big one)
 STILL_SPEED, STILL_ALT = 6.0, 3.0     # a vehicle is "standing" when it is slower than this and lower than this
 
 
@@ -1487,6 +1487,12 @@ def seats_for(veh):
     if veh in SEATS:
         return SEATS[veh]
     return 20 if veh in AIR_VEH else 1      # (a new airliner or freighter seats 20; any other new vehicle seats 1)
+
+
+def board_range(veh):
+    if veh in AIR_VEH and seats_for(veh) >= 12:      # an airliner is 24 to 36 m long: you can reach it from its wing or its wheels
+        return 34.0
+    return 18.0 if veh in ("bus", "truck", "blimp", "balloon", "bomber", "cargo") else BOARD_RANGE
 
 
 def leave_ride(conn, why):
@@ -1515,7 +1521,7 @@ def on_board(conn, m):
     d = next((c for c in CONNS if c.id == m.get("id") and c.hello and not c.closed), None)
     if not d or d is conn or not d.veh or d.ride or not conn.city or d.city != conn.city:
         return say_to(conn, "You can only get in a vehicle with a driver in it, next to you.")
-    if math.hypot(d.px - conn.px, d.pz - conn.pz) > BOARD_RANGE:
+    if math.hypot(d.px - conn.px, d.pz - conn.pz) > board_range(d.veh):
         return say_to(conn, "Walk up next to the vehicle first.")
     if d.pspd > STILL_SPEED or d.palt > STILL_ALT:
         return say_to(conn, "Wait until it has stopped.")

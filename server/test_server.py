@@ -316,6 +316,20 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         gone = await pas.until(lambda m: m["t"] == "ride" and not m["on"])
         self.assertIn("driver got out", gone["why"])
 
+    async def test_a_big_aircraft_can_be_boarded_from_its_wing(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
+        self.assertGreater(server.board_range("a380"), server.board_range("citycar"))
+        drv = await WS.connect(self.port); self.clients.append(drv)
+        drv.send({"t": "hello", "name": "Pilot", "cls": "gladiator", "look": {}}); drv.welcome = await drv.until(lambda m: m["t"] == "welcome")
+        pas = await WS.connect(self.port); self.clients.append(pas)
+        pas.send({"t": "hello", "name": "Guest", "cls": "gladiator", "look": {}}); pas.welcome = await pas.until(lambda m: m["t"] == "welcome")
+        drv.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 0, "s": 0, "v": "a380"})
+        pas.send({"t": "walk", "c": "rome", "x": 100, "z": 76, "yaw": 0, "s": 0})                    # 26 m from the middle of an A380: next to its wing
+        await asyncio.sleep(0.3)
+        pas.send({"t": "board", "id": drv.welcome["id"]})
+        ride = await pas.until(lambda m: m["t"] == "ride")
+        self.assertTrue(ride["on"])
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):
