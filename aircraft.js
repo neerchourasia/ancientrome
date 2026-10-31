@@ -299,6 +299,27 @@ const AIRCRAFT = (() => {
       note: "A big transport helicopter with a rotor at each end, which carry heavy loads. Top speed 187 km/h." },
   };
   // the fixed-wing jets are built by `jet` from their `o` options
-  for (const M of Object.values(models)) if (M.o) { const o = M.o; M.make = (m) => jet(m, o); }
+  for (const M of Object.values(models)) if (M.o) { const o = M.o; M.make = (m) => jet(m, m.o || o); }   // m.o, so that a livery (a painted copy of the model) can change the colours
   return models;
 })();
+
+// The paint schemes (liveries) an aircraft can be painted in: a body colour, a stripe colour and a tail colour. The jets use all three; the
+// helicopters, tiltrotor and airship use the body colour. The glider, gyrocopter and balloon are not painted.
+const LIVERIES = [
+  { id: "factory", name: "Factory colours" },
+  { id: "sunrise", name: "Sunrise", col: 0xf7f2e8, stripe: 0xf08a24, fin: 0xf08a24 },
+  { id: "ocean", name: "Ocean", col: 0xf4f6f8, stripe: 0x1aa6c8, fin: 0x1aa6c8 },
+  { id: "emerald", name: "Emerald", col: 0xf4f6f8, stripe: 0x1f9d57, fin: 0x1f9d57 },
+  { id: "royal", name: "Royal purple", col: 0xf4f6f8, stripe: 0x6b2a8c, fin: 0x6b2a8c },
+  { id: "crimson", name: "Crimson", col: 0xb02a2a, stripe: 0xf4f6f8, fin: 0xf4f6f8 },
+  { id: "midnight", name: "Midnight", col: 0x1d2a4a, stripe: 0xf2c230, fin: 0xf2c230 },
+  { id: "gold", name: "Gold", col: 0xf0e2b0, stripe: 0xc79a2a, fin: 0xc79a2a },
+  { id: "chrome", name: "Chrome", col: 0xc9ced4, stripe: 0x2d3036, fin: 0x2d3036 },
+  { id: "desert", name: "Desert", col: 0xc2a878, stripe: 0x8a7550, fin: 0x8a7550 },
+  { id: "forest", name: "Forest", col: 0x55633f, stripe: 0x3a4630, fin: 0x3a4630 },
+  { id: "arctic", name: "Arctic", col: 0xe6eaee, stripe: 0x7a8a99, fin: 0x7a8a99 },
+  { id: "night", name: "Night black", col: 0x2a2d31, stripe: 0x555a60, fin: 0x555a60 },
+];
+const paintable = (M) => !!(M && (M.o || M.air === "heli" || M.air === "vtol" || M.air === "blimp"));
+// a copy of the model's numbers in the livery's colours (the builders read `color` and `o` from it)
+const paintedModel = (M, lv) => (lv && paintable(M) ? { ...M, color: lv.col, o: M.o && { ...M.o, col: lv.col, stripe: lv.stripe, fin: lv.fin } } : M);

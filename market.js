@@ -169,7 +169,7 @@ const Market = (() => {
   ];
   const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
 
-  let s = { house: 0, dhouse: 0, items: [], worn: [] };
+  let s = { house: 0, dhouse: 0, items: [], worn: [], paint: {} };
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw) s = sanitize(raw);
@@ -177,11 +177,15 @@ const Market = (() => {
 
   // Anything odd in saved data (edited, or from an older version) is dropped.
   function sanitize(raw) {
-    const out = { house: 0, dhouse: 0, items: [], worn: [] };
+    const out = { house: 0, dhouse: 0, items: [], worn: [], paint: {} };
     if (raw && Number.isInteger(raw.house) && raw.house >= 0 && raw.house < HOUSES.length) out.house = raw.house;
     if (raw && Number.isInteger(raw.dhouse) && raw.dhouse >= 0 && raw.dhouse < HOUSES_D.length) out.dhouse = raw.dhouse;
     const items = Array.isArray(raw && raw.items) ? raw.items : [], worn = Array.isArray(raw && raw.worn) ? raw.worn : [];
     out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply" && ITEMS[id].type !== "food"))];
+    // the paint scheme of each aircraft you own (an unknown aircraft or paint scheme is dropped)
+    if (raw && raw.paint && typeof raw.paint === "object") for (const [id, lid] of Object.entries(raw.paint)) {
+      if (out.items.includes(id) && typeof AIRCRAFT !== "undefined" && paintable(AIRCRAFT[id]) && LIVERIES.some((l) => l.id === lid && l.col != null)) out.paint[id] = lid;
+    }
     const slots = new Set();
     for (const id of worn) {
       if (typeof id !== "string" || !out.items.includes(id) || !ITEMS[id].slot || slots.has(ITEMS[id].slot)) continue;
@@ -322,6 +326,14 @@ const Market = (() => {
           });
           li.append(sb);
         }
+        if (owned && it.air && typeof AIRCRAFT !== "undefined" && paintable(AIRCRAFT[id])) {                      // choose the aircraft's paint scheme
+          const sel = document.createElement("select");
+          sel.title = "Paint scheme"; sel.setAttribute("aria-label", `Paint scheme for ${it.name}`);
+          for (const l of LIVERIES) { const o = document.createElement("option"); o.value = l.id; o.textContent = "🎨 " + l.name; sel.append(o); }
+          sel.value = s.paint[id] || "factory";
+          sel.addEventListener("change", () => { Market.setLivery(id, sel.value); toast(`${it.name}: ${LIVERIES.find((l) => l.id === sel.value).name}`); });
+          li.append(sel);
+        }
         ul.append(li);
       }
       if (def.ownedOnly && !ul.children.length) { const li = document.createElement("li"), note = document.createElement("small"); note.textContent = def.empty; li.append(note); ul.append(li); }
@@ -362,7 +374,15 @@ const Market = (() => {
     rent: () => homes()[tier()].rent,
     houseName: () => homes()[tier()].name,
     houseRest: () => homes()[tier()].rest,
-    snapshot: () => ({ house: s.house, dhouse: s.dhouse, items: s.items.slice(), worn: s.worn.slice() }),
+    snapshot: () => ({ house: s.house, dhouse: s.dhouse, items: s.items.slice(), worn: s.worn.slice(), paint: { ...s.paint } }),
+    livery: (id) => LIVERIES.find((l) => l.id === s.paint[id]) || null,
+    setLivery(id, lid) {
+      if (!s.items.includes(id) || !paintable(AIRCRAFT[id]) || !LIVERIES.some((l) => l.id === lid)) return;
+      if (lid === "factory") delete s.paint[id]; else s.paint[id] = lid;
+      save();
+      if (Car.current === id) { Car.stow(); Car.deploy(id); }     // the aircraft that is out is put back in its new paint
+      if (typeof Account !== "undefined") Account.saveNow(true);
+    },
     restore(raw) { s = sanitize(raw); save(); applyAll(); },
   };
 })();

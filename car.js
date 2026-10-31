@@ -42,7 +42,7 @@ const Car = (() => {
   // Faces -z (like the people), so its yaw works like yours.
   function build(id) {
     if (MODELS[id].make) {                                                                            // an aircraft from aircraft.js: with a cockpit to sit in (pilot view) unless it is open
-      const r = MODELS[id].make(MODELS[id]), ud = r.g.userData;
+      const M0 = MODELS[id], r = M0.make(paintedModel(M0, typeof Market !== "undefined" ? Market.livery(id) : null)), ud = r.g.userData;
       ud.shell = MODELS[id].open ? [] : r.g.children.slice();
       if (!MODELS[id].open) ud.cockpit = planeCockpit(r.g, MODELS[id].eye);
       return { g: r.g, wheels: r.wheels, legs: [] };

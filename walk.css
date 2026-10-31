@@ -412,6 +412,8 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .mk-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .mk-items li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
 .mk-items li span { display: flex; flex-direction: column; }
+.mk-items li { flex-wrap: wrap; }
+.mk-items select { font: inherit; font-size: .85rem; max-width: 150px; padding: 6px 8px; color: var(--ink); background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; }
 .mk-items small { color: var(--muted); }
 .mk-items button.on { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,.4); }
 
