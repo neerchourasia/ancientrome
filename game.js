@@ -61,6 +61,7 @@ function init() {
   Account.bind();
   Online.bind();
   Journey.bind();
+  Controller.bind();
   Chat.bind();
   Social.bind();
   Gifts.bind();
