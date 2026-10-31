@@ -13,7 +13,7 @@ const Controller = (() => {
   //   7 era (K)      8 travel (B)    9 time (T)      C your character
   //   * help (H)     0 Esc (close)   # sound (O)     D voice (J)
   const KEYPAD = { "1": "KeyM", "2": "KeyG", "3": "KeyP", "A": "KeyF", "4": "KeyZ", "5": "KeyC", "6": "KeyX", "B": "KeyE", "7": "KeyK", "8": "KeyB", "9": "KeyT", "C": "KeyY", "*": "KeyH", "0": "Escape", "#": "KeyO", "D": "KeyJ" };
-  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, lastKey = "";
+  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, lastKey = "", hudEl = null, hudText = "";
   const held = new Set();
 
   // press or release a key exactly like the keyboard (and the touch buttons) do
@@ -30,6 +30,7 @@ const Controller = (() => {
     const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*(?:,\s*([0-9A-D*#]?)\s*)?$/.exec(text);
     if (!m) return;                                         // (the first line after the Arduino restarts can be garbage)
     lastAt = performance.now();
+    show(m[1], m[2], m[3], m[4] || "");
     if (typeof started === "undefined" || !started) { releaseAll(); return; }
     if (panelOpen) releaseStick();                          // (with a panel open the stick does nothing, but the keypad still can, for example to close it)
     else { axis(Number(m[1]), "KeyA", "KeyD"); axis(Number(m[2]), "KeyS", "KeyW"); press("Space", m[3] === "1"); }
@@ -41,12 +42,20 @@ const Controller = (() => {
     }
   }
 
+  // a small readout of what the Arduino is sending, so you can see the stick working even when the game does not move
+  function show(x, y, b, k) {
+    if (!hudEl) return;
+    const note = typeof started === "undefined" || !started ? "  (press Enter Rome / Demo first)" : typeof panelOpen !== "undefined" && panelOpen ? "  (a menu is open: the stick is off, close it with 0)" : "";
+    const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}${note}`;
+    if (t !== hudText) { hudText = t; hudEl.textContent = t; }
+  }
   const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } };
 
   async function open(p) {
     port = p;
     await port.open({ baudRate: BAUD });
     connected = true; coins = hp = null; lastAt = performance.now(); label();
+    if (hudEl) { hudEl.hidden = false; hudEl.textContent = "🎮 waiting for the Arduino..."; hudText = ""; }
     toast("Controller connected: stick to walk and turn, press it to jump.");
     writer = port.writable.getWriter();
     const dec = new TextDecoderStream(), piped = port.readable.pipeTo(dec.writable).catch(() => {});
@@ -69,6 +78,7 @@ const Controller = (() => {
     releaseAll();
     const wasOn = connected;
     connected = false; label();
+    if (hudEl) hudEl.hidden = true;
     try { if (reader) await reader.cancel(); } catch (e) { /* ignore */ }
     try { if (writer) { writer.releaseLock(); } } catch (e) { /* ignore */ }
     try { if (piped) await piped; } catch (e) { /* ignore */ }
@@ -96,7 +106,7 @@ const Controller = (() => {
   }
 
   function bind() {
-    btnEl = document.getElementById("btn-controller");
+    btnEl = document.getElementById("btn-controller"); hudEl = document.getElementById("ctl-hud");
     if (btnEl) btnEl.addEventListener("click", connect);
     setInterval(watch, 250);
     if (!("serial" in navigator)) return;
