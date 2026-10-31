@@ -1,12 +1,19 @@
 "use strict";
-// A hardware controller: an Arduino with a joystick (see arduino/joystick_controller) plugged into the computer by USB. The browser talks to it with the
-// Web Serial API (Chrome or Edge on a computer; Firefox and Safari do not have it). The Arduino sends lines like "-62,100,0" (x, y, button, each -100..100 or 0/1)
-// and this file presses the same keys you would: A and D turn, W and S walk or drive (and fly), Space jumps. It also tells the Arduino when you pick up a coin
-// or get hurt, so a buzzer on it can beep. Depends on game.js (keys, sendKey, toast), vitals.js.
+// A hardware controller: an Arduino with a joystick and a 4x4 keypad (see arduino/joystick_controller) plugged into the computer by USB. The browser talks to it
+// with the Web Serial API (Chrome or Edge on a computer; Firefox and Safari do not have it). The Arduino sends lines like "-62,100,0,5" (the stick's x and y, each
+// -100..100, then the stick button 0/1, then the keypad key being pressed, if any) and this file presses the same keys you would: A and D turn, W and S walk
+// or drive (and fly), Space jumps (press the stick down), and each keypad key presses a game key (the table below). It also tells the Arduino when you pick up a
+// coin or get hurt, so a buzzer on it can beep. Depends on game.js (keys, sendKey, toast), vitals.js.
 
 const Controller = (() => {
   const BAUD = 115200, ON = 35, OFF = 20, QUIET_MS = 1200;
-  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null;
+  // What each keypad key does: the keyboard key it presses. Change this table to change the keypad.
+  //   1 map          2 directions    3 places        A interact (shop, talk, jobs ...)
+  //   4 rest         5 camera view   6 vehicle (X)   B trade (E, in a vehicle)
+  //   7 era (K)      8 travel (B)    9 time (T)      C your character
+  //   * help (H)     0 Esc (close)   # sound (O)     D voice (J)
+  const KEYPAD = { "1": "KeyM", "2": "KeyG", "3": "KeyP", "A": "KeyF", "4": "KeyZ", "5": "KeyC", "6": "KeyX", "B": "KeyE", "7": "KeyK", "8": "KeyB", "9": "KeyT", "C": "KeyY", "*": "KeyH", "0": "Escape", "#": "KeyO", "D": "KeyJ" };
+  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, lastKey = "";
   const held = new Set();
 
   // press or release a key exactly like the keyboard (and the touch buttons) do
@@ -14,18 +21,24 @@ const Controller = (() => {
     if (on === held.has(code)) return;
     if (on) { held.add(code); keys.add(code); sendKey("keydown", code); } else { held.delete(code); keys.delete(code); sendKey("keyup", code); }
   }
-  const releaseAll = () => { for (const c of [...held]) press(c, false); };
+  const releaseAll = () => { for (const c of [...held]) press(c, false); lastKey = ""; };
+  const releaseStick = () => { for (const c of ["KeyA", "KeyD", "KeyW", "KeyS", "Space"]) press(c, false); };
   // a little hysteresis, so a stick near the edge of the dead zone does not flicker
   const axis = (v, neg, pos) => { press(neg, v <= -(held.has(neg) ? OFF : ON)); press(pos, v >= (held.has(pos) ? OFF : ON)); };
 
   function line(text) {
-    const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*$/.exec(text);
+    const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*(?:,\s*([0-9A-D*#]?)\s*)?$/.exec(text);
     if (!m) return;                                         // (the first line after the Arduino restarts can be garbage)
     lastAt = performance.now();
-    if (typeof started === "undefined" || !started || panelOpen) { releaseAll(); return; }
-    axis(Number(m[1]), "KeyA", "KeyD");
-    axis(Number(m[2]), "KeyS", "KeyW");
-    press("Space", m[3] === "1");
+    if (typeof started === "undefined" || !started) { releaseAll(); return; }
+    if (panelOpen) releaseStick();                          // (with a panel open the stick does nothing, but the keypad still can, for example to close it)
+    else { axis(Number(m[1]), "KeyA", "KeyD"); axis(Number(m[2]), "KeyS", "KeyW"); press("Space", m[3] === "1"); }
+    const k = m[4] || "";                                   // the keypad: a key goes down when it is first seen and up when it is let go
+    if (k !== lastKey) {
+      if (lastKey && KEYPAD[lastKey]) press(KEYPAD[lastKey], false);
+      if (k && KEYPAD[k]) press(KEYPAD[k], true);
+      lastKey = k;
+    }
   }
 
   const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } };
