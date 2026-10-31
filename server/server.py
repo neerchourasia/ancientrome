@@ -74,7 +74,7 @@ CLASS_MODS = {  # only what a duel needs
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
 ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
 PETS = ("hound", "eagle", "cat", "monkey", "peacock", "owl", "parrot", "cub")
-VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot", "plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport")   # what a walker can be seen riding or leaving parked
+VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot", "plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport", "b737max", "b787", "b777", "b767f", "bbj", "vc25", "b52", "kc46", "p8", "a220", "a320neo", "a321xlr", "a330neo", "a350f", "a400m", "a330mrtt", "f15ex", "superhornet", "growler", "f47", "typhoon", "mq25", "mq28", "littlebird", "h125", "h145", "h160", "nh90", "apache", "chinook")   # what a walker can be seen riding or leaving parked
 
 ARENA_R = 21.0            # duel arena radius, in metres around its centre
 DUEL_SPEED = 9.0          # fastest honest movement in a duel (m/s); more is clamped
@@ -1660,7 +1660,7 @@ EVENTS = collections.deque(maxlen=1000)   # suspicious things that happened, new
 FLAG_GAP = {}                     # (kind, who) -> when it was last logged, so one troublemaker does not flood the list
 USER_EMAIL = {}                   # account id -> email, remembered from the login check so admins can see who is who
 VISIT_HITS = {}
-AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport"}
+AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport", "b737max", "b787", "b777", "b767f", "bbj", "vc25", "b52", "kc46", "p8", "a220", "a320neo", "a321xlr", "a330neo", "a350f", "a400m", "a330mrtt", "f15ex", "superhornet", "growler", "f47", "typhoon", "mq25", "mq28", "littlebird", "h125", "h145", "h160", "nh90", "apache", "chinook"}
 
 
 def stamp():

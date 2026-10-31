@@ -31,7 +31,9 @@ const AIRCRAFT = (() => {
       g.add(tube(r * 0.82, r * 0.82, L * 0.5, white, 0, y0 + r * 0.72, -L * 0.1), tube(r * 0.3, r * 0.82, L * 0.1, white, 0, y0 + r * 0.72, -L * 0.4));
       for (let z = -L * 0.32; z < L * 0.12; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.2, 0.4, glass, sx * (r * 0.82 + 0.01), y0 + r * 1.2, z));
     }
-    if (o.eng === "fighter") g.add(ball(r * 0.7, r * 0.5, L * 0.12, glass, 0, y0 + r * 0.75, -L * 0.2));   // bubble canopy
+    if (o.hump) g.add(tube(r * 0.7, r * 0.7, L * 0.26, white, 0, y0 + r * 0.78, -L * 0.3), tube(r * 0.25, r * 0.7, L * 0.1, white, 0, y0 + r * 0.78, -L * 0.46));   // a 747-style upper deck hump at the front
+    if (o.uav) { /* a drone: no canopy and no cockpit windows */ }
+    else if (o.eng === "fighter") g.add(ball(r * 0.7, r * 0.5, L * 0.12, glass, 0, y0 + r * 0.75, -L * 0.2));   // bubble canopy
     else g.add(box(r * 1.5, r * 0.5, L * 0.07, glass, 0, y0 + r * 0.45, -L * 0.32));                // cockpit windows
     if (o.win) for (let z = -L * 0.26; z < L * 0.16; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.26, 0.4, glass, sx * (r + 0.01), y0 + r * 0.2, z));
     // wings
@@ -55,10 +57,16 @@ const AIRCRAFT = (() => {
     }
     // engines
     if (o.eng === "wing") {
-      const xs = o.engines === 4 ? [0.3, 0.6] : [0.4];
+      const xs = o.engines === 8 ? [0.18, 0.34, 0.5, 0.66] : o.engines === 4 ? [0.3, 0.6] : [0.4];
       for (const f of xs) for (const sx of [-1, 1]) {
         const x = sx * (r + hs * f);
         g.add(tube(r * 0.46, r * 0.4, L * 0.12, steel, x, wy - r * 0.6, wz - chord * 0.55), tube(r * 0.3, r * 0.3, L * 0.125, dk, x, wy - r * 0.6, wz - chord * 0.55 - 0.02));
+      }
+    } else if (o.eng === "prop") {                                                                  // turboprops (A400M): a nacelle on each wing with a spinning propeller
+      for (const f of o.engines === 2 ? [0.4] : [0.28, 0.58]) for (const sx of [-1, 1]) {
+        const x = sx * (r + hs * f), z = wz - chord * 0.7, py = wy - r * 0.25;
+        g.add(tube(r * 0.3, r * 0.26, L * 0.15, steel, x, py, z + L * 0.02));
+        const prop = new T.Group(); prop.position.set(x, py, z - L * 0.06); for (let i = 0; i < 3; i++) { const b = box(0.14, r * 2.1, 0.05, dk, 0, 0, 0); b.rotation.z = i * Math.PI / 3; prop.add(b); } g.add(prop); spin(g.userData, prop, "z", 70);
       }
     } else if (o.eng === "rear") {
       for (const sx of [-1, 1]) g.add(tube(r * 0.42, r * 0.34, L * 0.14, steel, sx * (r + r * 0.6), y0 + r * 0.45, L * 0.27), box(0.3, 0.5, L * 0.12, white, sx * (r + r * 0.25), y0 + r * 0.3, L * 0.27));
@@ -69,9 +77,12 @@ const AIRCRAFT = (() => {
     // tail
     const fin = o.finH || r * 2.4 + L * 0.03;
     const addFin = (x, tilt) => { const f = box(0.14, fin, L * 0.16, o.fin ? lam(o.fin) : white, x, y0 + r * 0.6 + fin / 2 - 0.1, L * 0.4); f.rotation.x = 0.3; f.rotation.z = tilt; g.add(f); return f; };
-    if (o.tail === "twin") { addFin(r * 0.9, 0.4); addFin(-r * 0.9, -0.4); } else addFin(0, 0);
+    if (o.tail === "none") { /* a flying wing: no tail */ } else if (o.tail === "twin") { addFin(r * 0.9, 0.4); addFin(-r * 0.9, -0.4); } else addFin(0, 0);
     const sy = o.tail === "T" ? y0 + r * 0.6 + fin - 0.2 : y0 + r * 0.1;
-    for (const sx of [-1, 1]) { const st = new T.Group(); st.position.set(sx * 0.2, sy, L * (o.tail === "T" ? 0.46 : 0.42)); st.rotation.y = sx * 0.35; st.add(box(S * 0.17, 0.1, L * 0.08, white, sx * S * 0.085, 0, 0)); g.add(st); }
+    if (o.tail !== "none") for (const sx of [-1, 1]) { const st = new T.Group(); st.position.set(sx * 0.2, sy, L * (o.tail === "T" ? 0.46 : 0.42)); st.rotation.y = sx * 0.35; st.add(box(S * 0.17, 0.1, L * 0.08, white, sx * S * 0.085, 0, 0)); g.add(st); }
+    if (o.boom) { const bm = box(0.3, 0.3, L * 0.22, lam(0x555a60), 0, y0 - r * 0.6, L * 0.44); bm.rotation.x = 0.22; g.add(bm, box(S * 0.09, 0.06, 0.5, lam(0x555a60), 0, y0 - r * 0.6 + 0.4, L * 0.52)); }   // the tanker's refuelling boom
+    if (o.canard) for (const sx of [-1, 1]) g.add(box(S * 0.17, 0.07, L * 0.09, white, sx * (r + S * 0.08), y0 + r * 0.25, -L * 0.26));   // small front wings (Typhoon)
+    if (o.pods) for (const sx of [-1, 1]) g.add(tube(0.2, 0.16, 1.7, dk, sx * (r * 0.9 + hs * Math.cos(o.sweep || 0.35)), wy + 0.12, wz - hs * Math.sin(o.sweep || 0.35)));   // wingtip pods (Growler)
     // landing gear: a nose wheel and the main wheels (double for the big ones)
     const strut = (x, z) => { g.add(box(0.12, y0 - r - gr, 0.12, dk, x, (y0 - r + gr) / 2 + 0.05, z)); };
     const gear = (x, z) => { const w = wheelAt(gr, 0.22, x, gr, z); g.add(w); wheels.push(w); strut(x, z); };
@@ -110,6 +121,33 @@ const AIRCRAFT = (() => {
     const rotor = new T.Group(); rotor.position.set(0, 3.6, -0.1); rotor.add(box(9.6, 0.05, 0.35, dk, 0, 0, 0), box(0.35, 0.05, 9.6, dk, 0, 0, 0)); g.add(rotor); spin(u, rotor, "y", 34);
     const tail = new T.Group(); tail.position.set(0.25, 2.7, 5.2); tail.add(box(0.05, 1.8, 0.14, dk, 0, 0, 0), box(0.05, 0.14, 1.8, dk, 0, 0, 0)); g.add(tail); spin(u, tail, "x", 50);
     for (const sx of [-1, 1]) { g.add(box(0.12, 0.12, 3.4, dk, sx * 1.1, 0.12, -0.2), box(0.1, 1.0, 0.1, dk, sx * 1.0, 0.65, -1.0), box(0.1, 1.0, 0.1, dk, sx * 1.0, 0.65, 0.6)); }
+    return { g, wheels };
+  }
+
+  // ---- a scaled copy of the helicopter (the Little Bird and the Airbus helicopters are the same shape in another size and colour)
+  const scaled = (build, k) => (M) => { const r = build(M); r.g.scale.setScalar(k); return r; };
+
+  // ---- an attack helicopter (Apache): a slim body, a two-seat tandem cockpit, stub wings with weapon pods, a chin gun and a four-blade rotor
+  function gunship(M) {
+    const g = new T.Group(), wheels = [], u = g.userData, body = lam(M.color), dk = lam(0x2b2b2b), glass = lam(0x1d3a4a);
+    g.add(box(1.0, 1.2, 4.2, body, 0, 2.0, -0.3), ball(0.5, 0.45, 1.0, glass, 0, 2.45, -1.7), ball(0.5, 0.45, 0.9, glass, 0, 2.85, -0.3), tube(0.07, 0.07, 1.1, dk, 0, 1.4, -2.5));
+    g.add(box(0.36, 0.4, 4.6, body, 0, 2.3, 3.4), box(0.1, 1.5, 0.9, body, 0, 2.9, 5.5), box(1.8, 0.08, 0.5, body, 0, 2.5, 5.3));
+    for (const sx of [-1, 1]) g.add(box(1.7, 0.1, 0.8, body, sx * 1.4, 1.85, -0.2), tube(0.16, 0.16, 1.5, dk, sx * 2.0, 1.7, -0.2), box(0.1, 0.45, 0.1, dk, sx * 0.9, 0.9, -0.5), wheelAt(0.22, 0.12, sx * 0.9, 0.25, -0.5));
+    g.add(box(0.2, 0.7, 0.2, dk, 0, 2.95, -0.2), wheelAt(0.15, 0.1, 0, 0.2, 5.0), box(0.06, 1.6, 0.06, dk, 0, 1.2, 5.0));
+    const rotor = new T.Group(); rotor.position.set(0, 3.4, -0.2); rotor.add(box(7.6, 0.05, 0.3, dk, 0, 0, 0), box(0.3, 0.05, 7.6, dk, 0, 0, 0)); g.add(rotor); spin(u, rotor, "y", 36);
+    const tail = new T.Group(); tail.position.set(0.2, 2.8, 5.5); tail.add(box(0.05, 1.6, 0.14, dk, 0, 0, 0), box(0.05, 0.14, 1.6, dk, 0, 0, 0)); g.add(tail); spin(u, tail, "x", 50);
+    return { g, wheels };
+  }
+
+  // ---- a tandem-rotor transport helicopter (Chinook): a long boxy body with a rotor on a tall pylon at each end, turning in opposite directions
+  function tandem(M) {
+    const g = new T.Group(), wheels = [], u = g.userData, body = lam(M.color), dk = lam(0x2b2b2b), glass = lam(0x1d3a4a);
+    g.add(box(2.2, 2.1, 9.0, body, 0, 2.0, 0.4), box(2.0, 1.1, 1.6, glass, 0, 2.4, -4.4), box(1.7, 1.2, 1.6, body, 0, 1.9, 5.3));      // the cabin, the cockpit windows and the rear ramp
+    g.add(box(0.5, 1.5, 0.6, body, 0, 3.6, 5.2), box(0.4, 1.2, 0.4, dk, 0, 3.6, -3.0));                                              // the rear pylon and the front mast
+    for (const sx of [-1, 1]) g.add(box(0.5, 0.5, 2.2, dk, sx * 1.15, 1.1, -0.5), wheelAt(0.3, 0.2, sx * 1.3, 0.3, -2.4), wheelAt(0.3, 0.2, sx * 1.3, 0.3, 3.6), box(0.1, 0.9, 0.1, dk, sx * 1.2, 0.7, -2.4));
+    for (const [z, y, s] of [[-3.0, 4.35, 30], [5.2, 4.65, -30]]) {
+      const r = new T.Group(); r.position.set(0, y, z); for (let i = 0; i < 3; i++) { const b = box(0.3, 0.05, 7.4, dk, 0, 0, 0); b.rotation.y = i * Math.PI / 3; r.add(b); } g.add(r); spin(u, r, "y", s);
+    }
     return { g, wheels };
   }
 
@@ -199,6 +237,66 @@ const AIRCRAFT = (() => {
       note: "A big grey four-engine military bomber with long swept wings. (It carries no bombs here: this game has no way to drop them.) Top speed 576 km/h." }),
     transport: J({ name: "Military transport", price: 28000, max: 140, turn: 0.7, color: 0x6f7a5a, len: 28, wid: 4.4, span: 32, wing: { lift: 62, stall: 56, ceiling: 380 }, climb: 10, spool: 0.42, eye: [0, 3.6, -10.0], cam: 2.4, camY: 10, lookY: 3, o: { col: 0x6f7a5a, stripe: 0x4a5340, wing: "high", eng: "wing", engines: 4, tail: "T", sweep: 0.22, r: 2.2, fin: 0x6f7a5a },
       note: "A green military cargo plane (like the C-17 Globemaster) with a high wing and a T-tail. It can carry tanks. Top speed 504 km/h." }),
+    b737max: J({ name: "Boeing 737 MAX", price: 23000, max: 150, turn: 0.75, color: 0xf4f6f8, len: 26, wid: 3.7, span: 28, wing: { lift: 58, stall: 52, ceiling: 380 }, climb: 11, spool: 0.45, eye: [0, 3.8, -9.1], cam: 2.3, camY: 9.8, lookY: 3.0, o: { col: 0xf4f6f8, stripe: 0x1d4fa0, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.75, win: true, fin: 0x1d4fa0 },
+      note: "The single-aisle workhorse of short and medium routes, with large modern engines and split winglets. Top speed 540 km/h." }),
+    b787: J({ name: "Boeing 787 Dreamliner", price: 37000, max: 150, turn: 0.68, color: 0xf4f6f8, len: 29, wid: 4.1, span: 33, wing: { lift: 60, stall: 54, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 4.1, -10.1], cam: 2.6, camY: 10.9, lookY: 3.2, o: { col: 0xf4f6f8, stripe: 0x2f9fd4, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.95, win: true, tip: "curve", fin: 0x2f9fd4 },
+      note: "A long-range twin-engine airliner built from carbon composites, with big windows and raked wingtips. Top speed 540 km/h." }),
+    b777: J({ name: "Boeing 777", price: 36000, max: 152, turn: 0.65, color: 0xf4f6f8, len: 32, wid: 4.4, span: 35, wing: { lift: 62, stall: 56, ceiling: 380 }, climb: 10, spool: 0.38, eye: [0, 4.4, -11.2], cam: 2.9, camY: 12.0, lookY: 3.4, o: { col: 0xf4f6f8, stripe: 0xb02a2a, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.42, r: 2.1, win: true, fin: 0xb02a2a },
+      note: "A big twin-engine long-haul airliner with the largest jet engines on any twin. The 777X is its newer, longer-winged cousin. Top speed 547 km/h." }),
+    b767f: J({ name: "Boeing 767 freighter", price: 27000, max: 148, turn: 0.7, color: 0xe4e0d4, len: 27, wid: 4.0, span: 31, wing: { lift: 59, stall: 53, ceiling: 380 }, climb: 10, spool: 0.42, eye: [0, 4.0, -9.4], cam: 2.4, camY: 10.1, lookY: 3.1, o: { col: 0xe4e0d4, stripe: 0x7a4a1f, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.9, win: false, fin: 0x7a4a1f },
+      note: "A freight version of the twin-engine 767, with no passenger windows. Used for parcels all around the world. Top speed 533 km/h." }),
+    bbj: J({ name: "Boeing Business Jet", price: 26000, max: 150, turn: 0.8, color: 0xf4f6f8, len: 25, wid: 3.6, span: 28, wing: { lift: 58, stall: 52, ceiling: 380 }, climb: 12, spool: 0.5, eye: [0, 3.7, -8.8], cam: 2.2, camY: 9.4, lookY: 2.9, o: { col: 0xf4f6f8, stripe: 0xc79a2a, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.7, win: true, fin: 0xc79a2a },
+      note: "A private VIP jet built on a 737 airframe, with a gold stripe and a fully fitted cabin. Top speed 540 km/h." }),
+    vc25: J({ name: "Air Force One (VC-25)", price: 60000, max: 150, turn: 0.6, color: 0xf4f6f8, len: 36, wid: 4.6, span: 36, wing: { lift: 65, stall: 59, ceiling: 380 }, climb: 9, spool: 0.34, eye: [0, 4.6, -12.6], cam: 3.2, camY: 13.5, lookY: 3.6, o: { col: 0xf4f6f8, stripe: 0x5b8fc9, wing: "low", eng: "wing", engines: 4, tail: "low", sweep: 0.42, r: 2.2, win: true, hump: true, fin: 0x1d4fa0 },
+      note: "A jumbo jet in the blue and white colours of the presidential plane, with four engines and a hump on the nose. Top speed 540 km/h." }),
+    b52: J({ name: "B-52 Stratofortress", price: 55000, max: 150, turn: 0.6, color: 0x9aa1a8, len: 40, wid: 3.6, span: 46, wing: { lift: 68, stall: 62, ceiling: 380 }, climb: 9, spool: 0.35, eye: [0, 3.9, -14.0], cam: 3.6, camY: 15.0, lookY: 3.1, o: { col: 0x9aa1a8, stripe: 0x6b7078, wing: "high", eng: "wing", engines: 8, tail: "low", sweep: 0.5, r: 1.7, win: false },
+      note: "A giant grey bomber with eight engines in pairs under long swept wings. (It carries no bombs here: this game has no way to drop them.) Top speed 540 km/h." }),
+    kc46: J({ name: "KC-46 Pegasus", price: 38000, max: 150, turn: 0.7, color: 0x9aa1a8, len: 28, wid: 4.0, span: 31, wing: { lift: 60, stall: 54, ceiling: 380 }, climb: 10, spool: 0.42, eye: [0, 4.0, -9.8], cam: 2.5, camY: 10.5, lookY: 3.1, o: { col: 0x9aa1a8, stripe: 0x6b7078, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.9, win: false, boom: true },
+      note: "A military tanker built on the 767, with a long refuelling boom under its tail. Top speed 540 km/h." }),
+    p8: J({ name: "P-8 Poseidon", price: 34000, max: 155, turn: 0.85, color: 0x9aa1a8, len: 25, wid: 3.6, span: 28, wing: { lift: 58, stall: 52, ceiling: 380 }, climb: 12, spool: 0.5, eye: [0, 3.7, -8.8], cam: 2.2, camY: 9.4, lookY: 2.9, o: { col: 0x9aa1a8, stripe: 0x555a60, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.7, win: false },
+      note: "A grey sub-hunting patrol plane built on a 737, quick and agile for its size. Top speed 558 km/h." }),
+    a220: J({ name: "Airbus A220", price: 17000, max: 146, turn: 0.85, color: 0xf4f6f8, len: 21, wid: 3.1, span: 23, wing: { lift: 55, stall: 49, ceiling: 380 }, climb: 12, spool: 0.5, eye: [0, 3.2, -7.3], cam: 1.9, camY: 7.9, lookY: 2.6, o: { col: 0xf4f6f8, stripe: 0x00a3a1, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.38, r: 1.45, win: true, fin: 0x00a3a1 },
+      note: "A small, efficient single-aisle airliner built for short routes, with wide cabin and engines on the wings. Top speed 526 km/h." }),
+    a320neo: J({ name: "Airbus A320neo", price: 24000, max: 148, turn: 0.78, color: 0xf4f6f8, len: 25, wid: 3.5, span: 27, wing: { lift: 58, stall: 52, ceiling: 380 }, climb: 11, spool: 0.46, eye: [0, 3.6, -8.8], cam: 2.2, camY: 9.4, lookY: 2.9, o: { col: 0xf4f6f8, stripe: 0x00205b, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.65, win: true, fin: 0x00205b },
+      note: "The world's best-selling single-aisle airliner, with large new-engine-option engines and sharklet wingtips. Top speed 533 km/h." }),
+    a321xlr: J({ name: "Airbus A321XLR", price: 28000, max: 148, turn: 0.74, color: 0xf4f6f8, len: 28, wid: 3.6, span: 28, wing: { lift: 60, stall: 54, ceiling: 380 }, climb: 10, spool: 0.44, eye: [0, 3.7, -9.8], cam: 2.5, camY: 10.5, lookY: 2.9, o: { col: 0xf4f6f8, stripe: 0x6b2a8c, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.7, win: true, fin: 0x6b2a8c },
+      note: "A stretched single-aisle airliner with an extra fuel tank, able to fly as far as much bigger planes. Top speed 533 km/h." }),
+    a330neo: J({ name: "Airbus A330neo", price: 34000, max: 150, turn: 0.68, color: 0xf4f6f8, len: 31, wid: 4.2, span: 36, wing: { lift: 62, stall: 56, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 4.2, -10.8], cam: 2.8, camY: 11.6, lookY: 3.3, o: { col: 0xf4f6f8, stripe: 0x0d6b8c, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.42, r: 2.0, win: true, fin: 0x0d6b8c },
+      note: "A medium to long-haul twin-aisle airliner with new engines and larger, curved-tip wings. Top speed 540 km/h." }),
+    a350f: J({ name: "Airbus A350F freighter", price: 40000, max: 150, turn: 0.68, color: 0xe4e0d4, len: 31, wid: 4.1, span: 34, wing: { lift: 62, stall: 56, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 4.1, -10.8], cam: 2.8, camY: 11.6, lookY: 3.2, o: { col: 0xe4e0d4, stripe: 0x00205b, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.4, r: 1.95, win: false, tip: "curve", fin: 0x00205b },
+      note: "A big freight version of the A350, with curved wingtips and no passenger windows. Top speed 540 km/h." }),
+    a400m: J({ name: "Airbus A400M Atlas", price: 30000, max: 130, turn: 0.72, color: 0x6f7a5a, len: 30, wid: 4.4, span: 34, wing: { lift: 52, stall: 46, ceiling: 380 }, climb: 11, spool: 0.42, eye: [0, 4.3, -10.5], cam: 2.7, camY: 11.2, lookY: 3.4, o: { col: 0x6f7a5a, stripe: 0x4a5340, wing: "high", eng: "prop", engines: 4, tail: "T", sweep: 0.12, r: 2.1, win: false, fin: 0x6f7a5a },
+      note: "A green military transport with four big propellers and a high wing. It can take off from short runs and carry heavy loads. It flies slower than the jets. Top speed 468 km/h." }),
+    a330mrtt: J({ name: "A330 MRTT", price: 38000, max: 150, turn: 0.68, color: 0x9aa1a8, len: 31, wid: 4.2, span: 36, wing: { lift: 62, stall: 56, ceiling: 380 }, climb: 10, spool: 0.4, eye: [0, 4.2, -10.8], cam: 2.8, camY: 11.6, lookY: 3.3, o: { col: 0x9aa1a8, stripe: 0x6b7078, wing: "low", eng: "wing", engines: 2, tail: "low", sweep: 0.42, r: 2.0, win: false, boom: true },
+      note: "A military tanker-transport built on the A330, with a refuelling boom under its tail. Top speed 540 km/h." }),
+    f15ex: J({ name: "F-15EX Eagle II", price: 36000, max: 225, turn: 1.6, color: 0x9aa1a8, len: 19, wid: 2.2, span: 13, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -4.9], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x9aa1a8, stripe: 0x555a60, wing: "mid", eng: "fighter", tail: "twin", sweep: 0.55, r: 0.95, finH: 2.0 },
+      note: "A big twin-engine fighter with huge power and twin tails, quick to climb. Top speed 810 km/h." }),
+    superhornet: J({ name: "F/A-18 Super Hornet", price: 33000, max: 215, turn: 1.75, color: 0x7d838c, len: 18, wid: 2.2, span: 12.5, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -4.6], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x7d838c, stripe: 0x1d4fa0, wing: "mid", eng: "fighter", tail: "twin", sweep: 0.6, r: 0.9, finH: 2.0 },
+      note: "A carrier-based twin-engine fighter with slanted twin tails, tough and agile. Top speed 774 km/h." }),
+    growler: J({ name: "EA-18G Growler", price: 35000, max: 215, turn: 1.7, color: 0x555a60, len: 18, wid: 2.2, span: 12.5, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -4.6], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x555a60, stripe: 0x2d3036, wing: "mid", eng: "fighter", tail: "twin", sweep: 0.6, r: 0.9, finH: 2.0, pods: true },
+      note: "The electronic-warfare version of the Super Hornet, in dark grey with pods on its wingtips. Top speed 774 km/h." }),
+    f47: J({ name: "F-47 stealth fighter", price: 45000, max: 235, turn: 1.7, color: 0x4a4f56, len: 19, wid: 2.2, span: 14, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -4.9], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x4a4f56, stripe: 0x2d3036, wing: "mid", eng: "fighter", tail: "none", sweep: 1.0, r: 0.9, finH: 2.0 },
+      note: "A next-generation stealth fighter: a broad, tailless wing with no fins at all. Very fast. Top speed 846 km/h." }),
+    typhoon: J({ name: "Eurofighter Typhoon", price: 34000, max: 225, turn: 1.85, color: 0x8a8f96, len: 16, wid: 2.2, span: 11, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 26, spool: 1.0, eye: [0, 2.1, -4.1], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x8a8f96, stripe: 0x1d4fa0, wing: "mid", eng: "fighter", tail: "low", sweep: 0.95, r: 0.85, finH: 2.2, canard: true },
+      note: "A twin-engine delta-winged fighter with small canard wings at the front. Very quick to turn and climb. Top speed 810 km/h." }),
+    mq25: J({ name: "MQ-25 Stingray", price: 28000, max: 150, turn: 1.0, color: 0x6a7078, len: 15, wid: 2.2, span: 22, wing: { lift: 40, stall: 34, ceiling: 400 }, climb: 14, spool: 0.8, eye: [0, 2.1, -3.9], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0x6a7078, stripe: 0x2d3036, wing: "high", eng: "fighter", tail: "low", sweep: 0.25, r: 0.85, finH: 2.0, uav: true },
+      note: "An unmanned refuelling drone for aircraft carriers: no cockpit and long straight wings. Top speed 540 km/h." }),
+    mq28: J({ name: "MQ-28 Ghost Bat", price: 25000, max: 200, turn: 1.8, color: 0xa0a5ab, len: 11.7, wid: 2.2, span: 7.3, wing: { lift: 58, stall: 52, ceiling: 400 }, climb: 22, spool: 1.0, eye: [0, 2.1, -3.0], cam: 1.4, camY: 5.5, lookY: 1.6, o: { col: 0xa0a5ab, stripe: 0x555a60, wing: "mid", eng: "fighter", tail: "twin", sweep: 0.7, r: 0.6, finH: 1.1, uav: true },
+      note: "A small stealthy drone that flies alongside crewed jets: no cockpit, with small twin tails. Top speed 720 km/h." }),
+    littlebird: { name: "AH-6 Little Bird", price: 7000, fly: true, air: "heli", hover: true, verb: "climb in", max: 55, accel: 6, turn: 1.7, color: 0x7d838c, len: 4.5, wid: 1.7, span: 7.0, rad: 3.6, radY: 2.4, body: 1.0, ceiling: 320, climb: 9, hard: 8, respond: 0.9, eye: [0, 1.65, -0.84], cam: 0.8, camY: 4.2, lookY: 1.8, make: scaled(heli, 0.7),
+      note: "A tiny, nimble light helicopter that fits in tight spaces. It hovers and darts about quickly. Top speed 198 km/h." },
+    h125: { name: "Airbus H125", price: 5500, fly: true, air: "heli", hover: true, verb: "climb in", max: 56, accel: 6, turn: 1.7, color: 0xf2f2f4, len: 5.5, wid: 2.0, span: 8.5, rad: 4.4, radY: 2.9, body: 1.3, ceiling: 420, climb: 9, hard: 8, respond: 0.9, eye: [0, 2.0, -1.02], cam: 1.0, camY: 5.1, lookY: 2.2, make: scaled(heli, 0.85),
+      note: "A single-engine light helicopter that can fly higher than most. Popular for sightseeing and rescue. Top speed 202 km/h." },
+    h145: { name: "Airbus H145", price: 8000, fly: true, air: "heli", hover: true, verb: "climb in", max: 54, accel: 6, turn: 1.7, color: 0x2455a4, len: 6.5, wid: 2.4, span: 10.0, rad: 5.2, radY: 3.4, body: 1.5, ceiling: 320, climb: 9, hard: 8, respond: 0.9, eye: [0, 2.35, -1.2], cam: 1.2, camY: 6.0, lookY: 2.6, make: scaled(heli, 1.0),
+      note: "A twin-engine helicopter used by air ambulances and police. Steady and powerful. Top speed 194 km/h." },
+    h160: { name: "Airbus H160", price: 12000, fly: true, air: "heli", hover: true, verb: "climb in", max: 62, accel: 6, turn: 1.7, color: 0x2f9fd4, len: 7.5, wid: 2.8, span: 11.5, rad: 6.0, radY: 3.9, body: 1.7, ceiling: 320, climb: 9, hard: 8, respond: 0.9, eye: [0, 2.7, -1.38], cam: 1.4, camY: 6.9, lookY: 3.0, make: scaled(heli, 1.15),
+      note: "A sleek, quiet medium helicopter with curved blades and good speed. Top speed 223 km/h." },
+    nh90: { name: "NH90", price: 18000, fly: true, air: "heli", hover: true, verb: "climb in", max: 60, accel: 6, turn: 1.7, color: 0x6f7a5a, len: 9.1, wid: 3.4, span: 14.0, rad: 7.3, radY: 4.8, body: 2.1, ceiling: 320, climb: 9, hard: 8, respond: 0.9, eye: [0, 3.29, -1.68], cam: 1.7, camY: 8.4, lookY: 3.6, make: scaled(heli, 1.4),
+      note: "A big green military transport helicopter that carries troops and cargo. Top speed 216 km/h." },
+    apache: { name: "AH-64 Apache", price: 26000, fly: true, air: "heli", hover: true, verb: "climb in", max: 58, accel: 6, turn: 1.7, color: 0x555d4a, len: 6.5, wid: 2.4, span: 10.0, rad: 5.2, radY: 3.4, body: 1.5, ceiling: 320, climb: 9, hard: 8, respond: 0.9, eye: [0, 2.35, -1.7], cam: 1.2, camY: 6.0, lookY: 2.6, make: gunship,
+      note: "A dark green attack helicopter with a tandem cockpit, stub wings with pods and a chin gun. (It carries no weapons here.) Top speed 209 km/h." },
+    chinook: { name: "CH-47 Chinook", price: 22000, fly: true, air: "heli", hover: true, verb: "climb in", max: 52, accel: 6, turn: 1.7, color: 0x6f7a5a, len: 6.5, wid: 2.4, span: 10.0, rad: 5.2, radY: 3.4, body: 1.5, ceiling: 300, climb: 9, hard: 8, respond: 0.9, eye: [0, 2.7, -4.0], cam: 1.2, camY: 6.0, lookY: 2.6, make: tandem,
+      note: "A big transport helicopter with a rotor at each end, which carry heavy loads. Top speed 187 km/h." },
   };
   // the fixed-wing jets are built by `jet` from their `o` options
   for (const M of Object.values(models)) if (M.o) { const o = M.o; M.make = (m) => jet(m, o); }

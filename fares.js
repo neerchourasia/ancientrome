@@ -9,7 +9,7 @@
 const Fares = (() => {
   const T = THREE;
   // how many passengers each aircraft takes (0: it carries no passengers)
-  const PAX = { plane: 3, gyro: 1, helicopter: 4, tiltrotor: 8, blimp: 12, balloon: 2, vlj: 4, lightjet: 7, midjet: 9, supermid: 11, heavyjet: 16, airliner: 70, b777x: 120, a350: 110, a380: 200, glider: 0, cargo: 0, fighter: 0, bomber: 0, transport: 0 };
+  const PAX = { plane: 3, gyro: 1, helicopter: 4, tiltrotor: 8, blimp: 12, balloon: 2, vlj: 4, lightjet: 7, midjet: 9, supermid: 11, heavyjet: 16, airliner: 70, b777x: 120, a350: 110, a380: 200, glider: 0, cargo: 0, fighter: 0, bomber: 0, transport: 0, b737max: 75, b787: 115, b777: 125, b767f: 0, bbj: 14, vc25: 40, b52: 0, kc46: 0, p8: 0, a220: 55, a320neo: 72, a321xlr: 85, a330neo: 110, a350f: 0, a400m: 0, a330mrtt: 0, f15ex: 0, superhornet: 0, growler: 0, f47: 0, typhoon: 0, mq25: 0, mq28: 0, littlebird: 2, h125: 4, h145: 8, h160: 10, nh90: 16, apache: 0, chinook: 0 };
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   let fare = null, offer = null, cooldown = 4, still = 0, hudT = 0, hudEl = null, marker = null, scene2 = null;
 
