@@ -259,6 +259,63 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.3)
         self.assertFalse(server.BLOCKED.get(uid_b))
 
+    async def test_passengers_ride_along_cannot_drive_and_are_put_out(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
+        async def player(name):
+            c = await WS.connect(self.port); self.clients.append(c)
+            c.send({"t": "hello", "name": name, "cls": "gladiator", "look": {}})
+            c.welcome = await c.until(lambda m: m["t"] == "welcome")
+            return c
+        drv, pas, bys = await player("Dora"), await player("Pia"), await player("Bo")
+        for c, x, v in ((drv, 100, "citycar"), (pas, 104, None), (bys, 110, None)):
+            c.send({"t": "walk", "c": "rome", "x": x, "z": 50, "yaw": 0.5, "s": 0, **({"v": v} if v else {})})
+        await asyncio.sleep(0.3)
+        # Pia climbs in: she is told, and so is Dora
+        pas.send({"t": "board", "id": drv.welcome["id"]})
+        ride = await pas.until(lambda m: m["t"] == "ride")
+        self.assertEqual((ride["on"], ride["name"], ride["veh"], ride["seat"]), (True, "Dora", "citycar", 0))
+        self.assertIn("Pia got in", (await drv.until(lambda m: m["t"] == "ridenote"))["text"])
+        # the driver moves; the passenger goes with them, sees the driver in the world, and nobody else sees the passenger
+        drv.send({"t": "walk", "c": "rome", "x": 160, "z": 60, "yaw": 1.0, "s": 12, "v": "citycar"})
+        pas.send({"t": "walk", "c": "rome", "x": 999, "z": 999, "yaw": 0, "s": 0})                  # a passenger's own position is ignored
+        await asyncio.sleep(0.6)
+        seen_by_pia = await pas.until(lambda m: m["t"] == "world" and any(o[0] == drv.welcome["id"] for o in m["p"]))   # Pia still sees Dora's car in the world
+        self.assertTrue(seen_by_pia)
+        await bys.until(lambda m: m["t"] == "world" and pas.welcome["id"] in m["g"])                   # Pia disappears from Bo's world (she is inside the car)
+        bo_saw = []
+        end = time.monotonic() + 1.0
+        while time.monotonic() < end:
+            try:
+                m = await bys.recv(0.3)
+            except asyncio.TimeoutError:
+                continue
+            if m and m["t"] == "world":
+                bo_saw += [o[0] for o in m["p"]]
+        self.assertNotIn(pas.welcome["id"], bo_saw)                                                    # and Bo never sees her again
+        cp = next(c for c in server.CONNS if c.id == pas.welcome["id"])
+        self.assertEqual((round(cp.px), round(cp.pz)), (160, 60))
+        # cannot get out while it is moving, and a full vehicle has no room (a city car seats three)
+        pas.send({"t": "unboard"})
+        self.assertIn("stopped", (await pas.until(lambda m: m["t"] == "chat"))["text"])
+        # a second walker far away cannot board
+        bys.send({"t": "board", "id": drv.welcome["id"]})
+        self.assertIn("next to the vehicle", (await bys.until(lambda m: m["t"] == "chat"))["text"])
+        # it stops: Pia gets out beside it
+        drv.send({"t": "walk", "c": "rome", "x": 160, "z": 60, "yaw": 1.0, "s": 0, "v": "citycar"})
+        await asyncio.sleep(0.2)
+        pas.send({"t": "unboard"})
+        out = await pas.until(lambda m: m["t"] == "ride" and not m["on"])
+        self.assertEqual((out["x"], out["z"]), (160.0, 60.0))
+        self.assertIsNone(cp.ride)
+        # she climbs in again; when the driver gets out of the vehicle everyone is put out
+        pas.send({"t": "walk", "c": "rome", "x": 162, "z": 60, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.2)
+        pas.send({"t": "board", "id": drv.welcome["id"]})
+        await pas.until(lambda m: m["t"] == "ride" and m["on"])
+        drv.send({"t": "walk", "c": "rome", "x": 160, "z": 60, "yaw": 1.0, "s": 0})                   # no vehicle any more
+        gone = await pas.until(lambda m: m["t"] == "ride" and not m["on"])
+        self.assertIn("driver got out", gone["why"])
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):

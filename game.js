@@ -122,6 +122,7 @@ function leaveMode() {
   else if (mode === "naval") Naval.stop();
   else if (mode === "watch") Watch.stop();
   else if (mode === "online") Online.leave();
+  else if (mode === "ride") Ride.leave();
   else if (mode === "drive") { if (Trade.isOpen) Trade.close(); else Car.exit(); }
   else if (mode === "dgame" || DGames.running) DGames.stop();
   else closePanels();
@@ -155,7 +156,8 @@ function wireInput(canvas) {
     if (k === "Enter" && (mode === "walk" || mode === "drive" || mode === "watch") && !panelOpen && !creatorOpen) { e.preventDefault(); Chat.open(); return; }
     if (k === "KeyB") openTravel();
     if (k === "KeyN" && city === "delhi" && mode === "walk" && !panelOpen && canStart()) DGames.open();
-    if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) Car.toggleEnter();
+    if (k === "KeyX" && mode === "ride") Ride.leave();
+    else if (k === "KeyX" && (mode === "walk" || mode === "drive") && !panelOpen) { if (!(mode === "walk" && Ride.promptText() && Ride.tryBoard())) Car.toggleEnter(); }
     if (k === "KeyY" && mode === "walk" && !panelOpen && canStart()) openCreator(false);
     if (k === "Space" && mode === "walk" && !panelOpen && sleepT <= 0 && player.airY <= 0.02 && player.stun <= 0) { player.vy = JUMP_SPEED; Sfx.play("jump"); }
     if (k === "KeyG" && (mode === "walk" || mode === "watch")) toggleDirections();
@@ -244,6 +246,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "rob") { Robbery.act(); return; }
     if ($("#prompt").dataset.kind === "harbour") { Harbour.board(); return; }
     if ($("#prompt").dataset.kind === "metro") { Subway.key("KeyF"); return; }
+    if ($("#prompt").dataset.kind === "ride") { Ride.tryBoard(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -1028,7 +1031,7 @@ function closePanels() {
   panelOpen = false;
 }
 function openPanel(id) {
-  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive" || mode === "dgame") return;
+  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive" || mode === "dgame" || mode === "ride") return;
   if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
@@ -1200,6 +1203,7 @@ function updatePrompt() {
     if (!text) { const mt = Subway.promptAt(); if (mt) { text = mt; p.dataset.kind = "metro"; } }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
+    if (!text) { const rt = Ride.promptText(); if (rt) { text = rt; p.dataset.kind = "ride"; } }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";
   }
@@ -1643,6 +1647,7 @@ function tick(dt) {
   else if (mode === "drive") Car.update(dt, Subway.control(dt, keys));
   else if (mode === "dgame") DGames.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
+  else if (mode === "ride") Ride.update(dt);
   else if (started && !panelOpen && deathT === 0) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
     else updatePlayer(dt);
@@ -1654,6 +1659,7 @@ function tick(dt) {
   if (mode === "race") Race.camera(camera, dt);
   else if (mode === "naval") Naval.camera(camera, dt);
   else if (mode === "drive") Car.camera(camera, dt);
+  else if (mode === "ride") Ride.camera(camera);
   else if (mode === "dgame" && DGames.camera(camera, dt)) { /* the game's own camera */ }
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {

@@ -80,6 +80,8 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #intro p { color: var(--muted); }
 #intro a { color: var(--gold); }
 #intro [hidden] { display: none !important; }
+#ride-hud { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 4; padding: 7px 16px; font-weight: 700; font-size: .95rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; white-space: nowrap; }
+#ride-hud[hidden] { display: none; }
 #metro-hud { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 4; padding: 7px 16px; font-weight: 700; font-size: .95rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; white-space: nowrap; }
 #metro-hud[hidden] { display: none; }
 #ctl-hud { position: fixed; left: 12px; bottom: 12px; z-index: 4; padding: 5px 12px; font: 600 .82rem ui-monospace, Menlo, monospace; color: var(--ink); background: rgba(28,22,16,.85); border: 1px solid rgba(226,185,85,.45); border-radius: 8px; white-space: pre; }

@@ -294,6 +294,7 @@ class Conn:
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.coins = None          # the denarii they say they have (shown to admins)
         self.palt, self.proll = 0.0, 0.0     # how high above the ground they are (in an aircraft) and how far it leans
+        self.ride, self.riders = None, []    # the driver whose vehicle they are riding in as a passenger / the passengers in their vehicle
         self.seen = set()          # the other walkers this connection has been told about
         self.ship = None           # the ship design they chose for the naval battle
         self.htier = 0             # the tier of their house (0 to 5), shown to others on their plot
@@ -1433,7 +1434,7 @@ WORLD_CITIES = ("rome", "delhi", "cancun")
 
 def on_walk(conn, m):
     """A player says where they are. Only where they stand is taken from them; who can see them is decided here."""
-    if conn.room or not conn.hello:
+    if conn.room or not conn.hello or conn.ride:      # (a passenger goes where the driver goes)
         return
     city = m.get("c")
     if city not in WORLD_CITIES:
@@ -1465,6 +1466,74 @@ def on_walk(conn, m):
     conn.walk_at = now()
     h = m.get("h")
     conn.htier = int(h) if isinstance(h, (int, float)) and 0 <= h <= 5 else conn.htier
+    if conn.riders and (not conn.veh or any(r.city != conn.city for r in conn.riders)):
+        eject_riders(conn, "The driver got out.")
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# passengers: anyone can climb into another player's vehicle (X when you are next to it). They ride along and look out of the side, but cannot drive.
+# The server seats them (how many depends on the vehicle), moves them with the driver, hides them from everyone else, and puts them out beside the
+# vehicle when they ask to get out (only when it is standing still on the ground), when the driver gets out or leaves, or when it changes city.
+
+SEATS = {"scooter": 1, "motorcycle": 1, "bicycle": 1, "rickshaw": 2, "oxcart": 2, "elephant": 2, "horse": 1, "camel": 2, "donkey": 1, "citycar": 3, "sportscar": 1,
+         "suv": 4, "taxi": 3, "truck": 2, "bus": 8, "chariot": 1, "plane": 1, "glider": 0, "gyro": 0, "helicopter": 3, "tiltrotor": 6, "blimp": 8, "balloon": 3,
+         "vlj": 3, "lightjet": 5, "midjet": 7, "supermid": 9, "heavyjet": 12, "airliner": 40, "b777x": 60, "a350": 60, "a380": 80, "cargo": 2, "fighter": 0,
+         "bomber": 3, "transport": 20}
+BOARD_RANGE = 14.0          # you must be this close to the vehicle to get in
+STILL_SPEED, STILL_ALT = 6.0, 3.0     # a vehicle is "standing" when it is slower than this and lower than this
+
+
+def seats_for(veh):
+    if veh in SEATS:
+        return SEATS[veh]
+    return 20 if veh in AIR_VEH else 1      # (a new airliner or freighter seats 20; any other new vehicle seats 1)
+
+
+def leave_ride(conn, why):
+    """Take a passenger out of the vehicle: they are told where it is, so they get out next to it."""
+    d = conn.ride
+    if not d:
+        return
+    conn.ride = None
+    if conn in d.riders:
+        d.riders.remove(conn)
+    conn.px, conn.pz, conn.pyaw, conn.city, conn.walk_at = d.px, d.pz, d.pyaw, d.city, now()
+    conn.send({"t": "ride", "on": False, "x": round(d.px, 1), "z": round(d.pz, 1), "yaw": round(d.pyaw, 2), "why": why})
+    if not d.closed:
+        d.send({"t": "ridenote", "text": "%s got out." % conn.name})
+
+
+def eject_riders(driver, why):
+    for r in list(driver.riders):
+        leave_ride(r, why)
+
+
+def on_board(conn, m):
+    """Someone asks to ride in another player's vehicle."""
+    if conn.room or not conn.hello or conn.ride or conn.riders or conn.veh:
+        return
+    d = next((c for c in CONNS if c.id == m.get("id") and c.hello and not c.closed), None)
+    if not d or d is conn or not d.veh or d.ride or not conn.city or d.city != conn.city:
+        return say_to(conn, "You can only get in a vehicle with a driver in it, next to you.")
+    if math.hypot(d.px - conn.px, d.pz - conn.pz) > BOARD_RANGE:
+        return say_to(conn, "Walk up next to the vehicle first.")
+    if d.pspd > STILL_SPEED or d.palt > STILL_ALT:
+        return say_to(conn, "Wait until it has stopped.")
+    if len(d.riders) >= seats_for(d.veh):
+        return say_to(conn, "There is no room: it is full.")
+    d.riders.append(conn)
+    conn.ride = d
+    conn.send({"t": "ride", "on": True, "id": d.id, "name": d.name, "veh": d.veh, "seat": len(d.riders) - 1})
+    d.send({"t": "ridenote", "text": "%s got in." % conn.name})
+
+
+def on_unboard(conn):
+    d = conn.ride
+    if not d:
+        return
+    if d.pspd > STILL_SPEED or d.palt > STILL_ALT:
+        return say_to(conn, "Wait until it has stopped.")
+    leave_ride(conn, "")
 
 
 def world_once():
@@ -1472,13 +1541,17 @@ def world_once():
     t = now()
     groups = {}
     for c in list(CONNS):
+        if c.ride and c.ride in CONNS:                                   # a passenger is where the driver is
+            d = c.ride
+            c.city, c.px, c.pz, c.pyaw, c.pspd, c.palt, c.proll = d.city, d.px, d.pz, d.pyaw, d.pspd, d.palt, d.proll
+            c.walk_at = d.walk_at
         if c.hello and not c.closed and not c.room and c.city and t - c.walk_at < 4:
             groups.setdefault(c.city, []).append(c)
     live = set()
     for group in groups.values():
         for c in group:
             live.add(c)
-            near = sorted(((math.hypot(o.px - c.px, o.pz - c.pz), o) for o in group if o is not c), key=lambda p: p[0])
+            near = sorted(((math.hypot(o.px - c.px, o.pz - c.pz), o) for o in group if o is not c and not o.ride), key=lambda p: p[0])   # (passengers are inside the vehicle: nobody else sees them)
             near = [o for d, o in near if d <= (AIR_RANGE if (c.palt > 5 or o.palt > 5) else WORLD_RANGE)][:WORLD_MAX]
             ids = {o.id for o in near}
             new = [o for o in near if o.id not in c.seen]
@@ -2648,6 +2721,10 @@ async def handle_msg(conn, m):
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "walk":
         return on_walk(conn, m)
+    if t == "board":
+        return on_board(conn, m)
+    if t == "unboard":
+        return on_unboard(conn)
     if t == "rob":
         return on_rob(conn, m)
     if t == "heist_caught":
@@ -2685,6 +2762,10 @@ async def handle_msg(conn, m):
 
 def drop(conn):
     social_drop(conn)
+    if conn.riders:
+        eject_riders(conn, "The driver left the game.")
+    if conn.ride:
+        leave_ride(conn, "")
     if conn.heist:
         heist_end(conn.heist, "caught" if conn.heist["thief"] is conn else "escaped")
     leave_queue(conn)

@@ -41,6 +41,7 @@ const Online = (() => {
     sock.onclose = () => {
       if (ws !== sock) return;
       ws = null; welcome = null; waiting = false; clearInterval(pingT); clearPeers();
+      if (typeof Ride !== "undefined") Ride.lost();
       if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
       else if (Naval.isOnline()) Naval.stop();
@@ -66,6 +67,8 @@ const Online = (() => {
       case "adminwho": Admin.showOnline(m.who || [], m); break;
       case "adminvisits": Admin.showVisits(m); break;
       case "adminjourney": Admin.showJourney(m); break;
+      case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
+      case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
@@ -169,7 +172,7 @@ const Online = (() => {
 
   // every frame: glide the other players to where they are, with a walking swing
   function peersUpdate(dt) {
-    const show = mode === "walk" || mode === "drive" || mode === "watch";
+    const show = mode === "walk" || mode === "drive" || mode === "watch" || mode === "ride";
     for (const p of peers.values()) {
       if (p.x === null) continue;
       const k = Math.min(1, dt * 8);
@@ -303,6 +306,7 @@ const Online = (() => {
     if (walkSendT > 0) return;
     walkSendT = 0.2;
     if (typeof Subway !== "undefined" && Subway.underground) return;   // down in the metro nobody can see you
+    if (typeof Ride !== "undefined" && Ride.active) return;            // a passenger has no position of their own: the server puts them where the driver is
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();
