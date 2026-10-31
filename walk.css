@@ -84,6 +84,12 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #metro-hud[hidden] { display: none; }
 #ctl-hud { position: fixed; left: 12px; bottom: 12px; z-index: 4; padding: 5px 12px; font: 600 .82rem ui-monospace, Menlo, monospace; color: var(--ink); background: rgba(28,22,16,.85); border: 1px solid rgba(226,185,85,.45); border-radius: 8px; white-space: pre; }
 #ctl-hud[hidden] { display: none; }
+#stk-pad { position: relative; width: 140px; height: 140px; margin: 8px auto 12px; border: 2px solid rgba(255,255,255,.35); border-radius: 12px; background: rgba(0,0,0,.35); }
+#stk-dead { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1px dashed var(--gold); border-radius: 50%; }
+#stk-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; left: 50%; top: 50%; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px rgba(226,185,85,.8); }
+.stk-row { display: grid; grid-template-columns: 9.5em 1fr 3.5em; align-items: center; gap: 8px; margin: 8px 0; font-weight: 600; }
+.stk-row output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stk-check { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-weight: 600; }
 #demo-bar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 7px 12px; font-size: .82rem; color: var(--ink); background: rgba(28,22,16,.92); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; }
 #demo-bar[hidden] { display: none; }
 #demo-bar button { font: inherit; font-weight: 700; cursor: pointer; color: #2a2118; background: var(--gold); border: 1px solid var(--gold); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }

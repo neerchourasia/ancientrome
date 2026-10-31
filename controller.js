@@ -8,7 +8,15 @@
 // Depends on game.js (keys, sendKey, toast, mode, panelOpen), vitals.js.
 
 const Controller = (() => {
-  const BAUD = 115200, ON = 35, OFF = 20, QUIET_MS = 1200;
+  const BAUD = 115200, QUIET_MS = 1200;
+  // How the stick feels (the 🎮 Stick settings panel changes these and keeps them in this browser): dead: the percentage you must push before anything happens;
+  // curve: 1 is straight, more is gentler at small pushes (walking speed follows the push: ((push - dead) / (100 - dead)) ^ curve); turn: how fast you turn;
+  // analog: walk faster the further you push.
+  const CFG_KEY = "rome-stick", CFG_DEFAULT = { dead: 20, curve: 1, turn: 1, analog: true };
+  let cfg = { ...CFG_DEFAULT };
+  try { const saved = JSON.parse(localStorage.getItem(CFG_KEY) || "null"); if (saved && typeof saved === "object") for (const k of Object.keys(CFG_DEFAULT)) if (typeof saved[k] === typeof CFG_DEFAULT[k]) cfg[k] = saved[k]; } catch (e) { /* storage unavailable */ }
+  const ON = () => cfg.dead + 8, OFF = () => cfg.dead;
+  let sx = 0, sy = 0;                                      // where the stick is now
   // What each keypad key does: the keyboard key it presses. Change this table to change the keypad.
   //   1 map          2 directions    3 places        A interact (shop, talk, jobs ...)
   //   4 rest         5 camera view   6 vehicle (X)   B trade (E, in a vehicle)
@@ -35,7 +43,7 @@ const Controller = (() => {
     ["Faster (a plus or volume up)", "@faster"], ["Slower (a minus or volume down)", "@slower"], ["Interact (F)", "KeyF"], ["Close or back (Esc)", "Escape"], ["Map", "KeyM"],
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`Walking speed ${n} (the key marked ${n})`, "Digit" + n])];
   let learning = -1, learned = {}, learnNote = "", seenRemote = false;
-  let learnEl = null, port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
+  let stickEl = null, learnEl = null, port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
   let lastKey = "", keyHeld = "", lastIr = -1, irHeld = "";
   let seenLandmarks = null, shifts = null, wasDead = false, sentCoins = null, sentHp = null, sentAt = 0;
 
@@ -49,7 +57,10 @@ const Controller = (() => {
   const releaseSource = (src) => { for (const [code, set] of [...held]) if (set.has(src)) press(code, false, src); };
   const releaseAll = () => { for (const src of ["stick", "keypad", "remote"]) releaseSource(src); lastKey = keyHeld = irHeld = ""; lastIr = -1; };
   // a little hysteresis, so a stick near the edge of the dead zone does not flicker
-  const axis = (v, neg, pos) => { press(neg, v <= -(held.has(neg) && held.get(neg).has("stick") ? OFF : ON)); press(pos, v >= (held.has(pos) && held.get(pos).has("stick") ? OFF : ON)); };
+  const axis = (v, neg, pos) => { press(neg, v <= -(held.has(neg) && held.get(neg).has("stick") ? OFF() : ON())); press(pos, v >= (held.has(pos) && held.get(pos).has("stick") ? OFF() : ON())); };
+  // how hard the stick is pushed, 0 to 1, after the dead zone and the curve
+  const mag = (v) => { const a = Math.abs(v); return a <= cfg.dead ? 0 : Math.min(1, Math.pow((a - cfg.dead) / (100 - cfg.dead), cfg.curve)); };
+  const stickHolds = (a, b) => ["stick"].some((src) => (held.get(a) && held.get(a).has(src)) || (held.get(b) && held.get(b).has(src)));
   // on foot (and in the online lobby) A and D slide you sideways and Q and E turn you; in a vehicle, a plane or a fight A and D steer
   const onFoot = () => typeof mode !== "undefined" && (mode === "walk" || mode === "online" || mode === "watch");
 
@@ -68,7 +79,9 @@ const Controller = (() => {
     const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*(?:,\s*([0-9A-D*#]?)\s*(?:,\s*(\d{0,3})\s*)?)?$/.exec(text);
     if (!m) return;                                         // (the first line after the Arduino restarts can be garbage)
     lastAt = performance.now();
+    sx = Number(m[1]); sy = Number(m[2]);
     show(m[1], m[2], m[3], m[4] || "", m[5] || "");
+    dot();
     if (typeof started === "undefined" || !started) { releaseAll(); return; }
     if (panelOpen) releaseSource("stick");                  // (with a panel open the stick does nothing, but the keypad and remote still can, for example to close it)
     else {
@@ -101,7 +114,7 @@ const Controller = (() => {
     const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}  remote ${ir === "" ? "-" : "#" + ir}${note}`;
     if (t !== hudText) { hudText = t; hudEl.textContent = t; }
   }
-  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } if (learnEl) learnEl.hidden = !(connected && seenRemote); };   // (the Learn remote button only appears once a remote has been seen)
+  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } if (learnEl) learnEl.hidden = !(connected && seenRemote); if (stickEl) stickEl.hidden = !connected; };   // (the Learn remote button only appears once a remote has been seen)
 
   async function open(p) {
     port = p;
@@ -201,6 +214,7 @@ const Controller = (() => {
   function bind() {
     btnEl = document.getElementById("btn-controller"); hudEl = document.getElementById("ctl-hud");
     if (btnEl) btnEl.addEventListener("click", connect);
+    bindPanel(); stickEl = document.getElementById("btn-stick");
     learnEl = document.getElementById("btn-learn"); if (learnEl) learnEl.addEventListener("click", learnStart);
     setInterval(watch, 250);
     // a win or a defeat on the results screen plays a tune on the buzzer
@@ -213,5 +227,37 @@ const Controller = (() => {
     navigator.serial.addEventListener("connect", auto);
   }
 
-  return { bind, connect, get connected() { return connected; }, _line: line };
+  // ---------------------------------------------------------------- the settings panel
+  const $c = (id) => document.getElementById(id);
+  function dot() {
+    const d = $c("stk-dot");
+    if (!d || !$c("stick").classList.contains("show")) return;
+    d.style.left = 50 + Math.max(-100, Math.min(100, sx)) / 2 + "%"; d.style.top = 50 - Math.max(-100, Math.min(100, sy)) / 2 + "%";
+  }
+  function panelValues() {
+    $c("stk-dead-in").value = cfg.dead; $c("stk-dead-out").textContent = cfg.dead + "%";
+    $c("stk-curve-in").value = Math.round(cfg.curve * 100); $c("stk-curve-out").textContent = cfg.curve.toFixed(2);
+    $c("stk-turn-in").value = Math.round(cfg.turn * 100); $c("stk-turn-out").textContent = Math.round(cfg.turn * 100) + "%";
+    $c("stk-analog").checked = cfg.analog;
+    $c("stk-dead").style.width = $c("stk-dead").style.height = cfg.dead + "%";
+  }
+  const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ } panelValues(); };
+  function bindPanel() {
+    if (!$c("stick")) return;
+    $c("stk-dead-in").addEventListener("input", (e) => { cfg.dead = Number(e.target.value); saveCfg(); });
+    $c("stk-curve-in").addEventListener("input", (e) => { cfg.curve = Number(e.target.value) / 100; saveCfg(); });
+    $c("stk-turn-in").addEventListener("input", (e) => { cfg.turn = Number(e.target.value) / 100; saveCfg(); });
+    $c("stk-analog").addEventListener("change", (e) => { cfg.analog = e.target.checked; saveCfg(); });
+    $c("stk-reset").addEventListener("click", () => { cfg = { ...CFG_DEFAULT }; saveCfg(); });
+    const b = $c("btn-stick"); if (b) b.addEventListener("click", () => { panelValues(); openPanel("#stick"); });
+    panelValues();
+  }
+
+  return {
+    bind, connect, get connected() { return connected; }, _line: line,
+    // read by game.js and car.js: 1 when the keyboard (or nothing) is moving you, and a smaller number when the stick is pushed only part of the way
+    get walkMul() { return connected && cfg.analog && stickHolds("KeyW", "KeyS") ? Math.max(0.15, mag(sy)) : 1; },
+    get turnMul() { return connected && stickHolds("KeyQ", "KeyE") ? Math.max(0.2, mag(sx)) * cfg.turn : 1; },
+    get steerMul() { return connected && stickHolds("KeyA", "KeyD") ? Math.max(0.2, mag(sx)) * cfg.turn : 1; },
+  };
 })();

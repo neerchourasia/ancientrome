@@ -390,7 +390,7 @@ const Car = (() => {
     const M = car.M, W = M.wing || PLANE, glide = !!M.glide, climb = M.climb || 12;
     const up = keys.has("Space"), dive = keys.has("ShiftLeft") || keys.has("ShiftRight");
     const thrUp = keys.has("KeyW") || keys.has("ArrowUp"), thrDown = keys.has("KeyS") || keys.has("ArrowDown");
-    const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+    const steer = ((keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0)) * Controller.steerMul;
     car.steerIn = steer; car.pitchIn = up ? 1 : dive ? -1 : 0;
     if (glide) car.throttle = thrUp && car.alt < 80 ? Math.min(1, (car.throttle || 0) + 1.2 * dt) : Math.max(0, (car.throttle || 0) - 1.5 * dt);   // a glider has no engine: W is the tow rope, which lets go at 80 m
     else car.throttle = Math.max(0, Math.min(1, (car.throttle || 0) + (thrUp ? 0.55 : 0) * dt - (thrDown ? 0.9 : 0) * dt));
@@ -451,7 +451,7 @@ const Car = (() => {
     const M = car.M, kind = M.air, balloon = kind === "balloon";
     const key = (...c) => c.some((k) => keys.has(k));
     const up = key("Space"), dive = key("ShiftLeft", "ShiftRight"), fwd = key("KeyW", "ArrowUp"), back = key("KeyS", "ArrowDown");
-    const steer = (key("KeyA", "ArrowLeft") ? 1 : 0) - (key("KeyD", "ArrowRight") ? 1 : 0);
+    const steer = ((key("KeyA", "ArrowLeft") ? 1 : 0) - (key("KeyD", "ArrowRight") ? 1 : 0)) * Controller.steerMul;
     car.steerIn = steer; car.pitchIn = up ? 1 : dive ? -1 : 0; car.throttle = fwd ? 1 : 0;
     const ground = groundAt(car.x, car.z), air = car.alt > 0.4;
     // up and down
@@ -524,7 +524,7 @@ const Car = (() => {
     const M = car.M;
     bumpCd = Math.max(0, bumpCd - dt); runCd = Math.max(0, runCd - dt);
     const gas = keys.has("KeyW") || keys.has("ArrowUp"), brake = keys.has("KeyS") || keys.has("ArrowDown");
-    const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+    const steer = ((keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0)) * Controller.steerMul;
     if (!car.autopilot) {                                                                              // (the metro's autopilot sets the speed itself)
       if (gas) car.v += M.accel * (1 - Math.max(0, car.v) / M.max * 0.85) * dt;
       if (brake) car.v -= (car.v > 0.3 ? 26 : 9) * dt;
