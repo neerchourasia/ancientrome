@@ -33,11 +33,17 @@ const Controller = (() => {
     show(m[1], m[2], m[3], m[4] || "");
     if (typeof started === "undefined" || !started) { releaseAll(); return; }
     if (panelOpen) releaseStick();                          // (with a panel open the stick does nothing, but the keypad still can, for example to close it)
-    else { axis(Number(m[1]), "KeyA", "KeyD"); axis(Number(m[2]), "KeyS", "KeyW"); press("Space", m[3] === "1"); }
+    else {
+      // left and right: on foot (and in the online lobby) A and D slide you sideways and Q and E turn you, so the stick turns; in a vehicle, a plane or a fight A and D steer
+      const foot = typeof mode !== "undefined" && (mode === "walk" || mode === "online" || mode === "watch");
+      const [L, R] = foot ? ["KeyQ", "KeyE"] : ["KeyA", "KeyD"];
+      for (const c of foot ? ["KeyA", "KeyD"] : ["KeyQ", "KeyE"]) press(c, false);
+      axis(Number(m[1]), L, R); axis(Number(m[2]), "KeyS", "KeyW"); press("Space", m[3] === "1");
+    }
     const k = m[4] || "";                                   // the keypad: a key goes down when it is first seen and up when it is let go
     if (k !== lastKey) {
       if (lastKey && KEYPAD[lastKey]) press(KEYPAD[lastKey], false);
-      if (k && KEYPAD[k]) press(KEYPAD[k], true);
+      if (k && KEYPAD[k] && !(k === "B" && mode !== "drive")) press(KEYPAD[k], true);   // (B is "trade", which only exists in a vehicle: on foot E would turn you)
       lastKey = k;
     }
   }
