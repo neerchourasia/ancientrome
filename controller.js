@@ -1,9 +1,11 @@
 "use strict";
-// A hardware controller: an Arduino with a joystick and a 4x4 keypad (see arduino/joystick_controller) plugged into the computer by USB. The browser talks to it
-// with the Web Serial API (Chrome or Edge on a computer; Firefox and Safari do not have it). The Arduino sends lines like "-62,100,0,5" (the stick's x and y, each
-// -100..100, then the stick button 0/1, then the keypad key being pressed, if any) and this file presses the same keys you would: A and D turn, W and S walk
-// or drive (and fly), Space jumps (press the stick down), and each keypad key presses a game key (the table below). It also tells the Arduino when you pick up a
-// coin or get hurt, so a buzzer on it can beep. Depends on game.js (keys, sendKey, toast), vitals.js.
+// A hardware controller: an Arduino with a joystick, a 4x4 keypad, an IR remote, a buzzer and a 4-digit display (see arduino/joystick_controller) plugged into the
+// computer by USB. The browser talks to it with the Web Serial API (Chrome or Edge on a computer; Firefox and Safari do not have it).
+// The Arduino sends lines like "-62,100,0,5,9": the stick's x and y (each -100..100), the stick button (0/1), the keypad key being pressed and the number of the
+// remote key being held, the last three possibly empty. This file presses the same keys you would: the stick walks and turns (or steers in a vehicle) and
+// jumps when pressed, the keypad and the remote press game keys (the tables below), and the remote's number keys set your walking speed.
+// It also tells the Arduino what is happening, for the buzzer (C coin, H hurt, L landmark, J job, W win, X defeat) and the display (D denarii, P health).
+// Depends on game.js (keys, sendKey, toast, mode, panelOpen), vitals.js.
 
 const Controller = (() => {
   const BAUD = 115200, ON = 35, OFF = 20, QUIET_MS = 1200;
@@ -13,46 +15,80 @@ const Controller = (() => {
   //   7 era (K)      8 travel (B)    9 time (T)      C your character
   //   * help (H)     0 Esc (close)   # sound (O)     D voice (J)
   const KEYPAD = { "1": "KeyM", "2": "KeyG", "3": "KeyP", "A": "KeyF", "4": "KeyZ", "5": "KeyC", "6": "KeyX", "B": "KeyE", "7": "KeyK", "8": "KeyB", "9": "KeyT", "C": "KeyY", "*": "KeyH", "0": "Escape", "#": "KeyO", "D": "KeyJ" };
-  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, lastKey = "", hudEl = null, hudText = "";
-  const held = new Set();
+  // The IR remote, by the number each key sends (the common 21-key kit remote, and the 17-key one with the same layout). Arrows and the middle row are by position.
+  //   top row:     Esc (close)    faster          interact (F)          1-9: your walking speed (Digit1 .. Digit9)
+  //   second row:  turn left      jump            turn right            0: map     EQ / 100+: directions     ST/REPT / 200+: places
+  //   third row:   back           slower          forward
+  // "@left" and "@right" turn you on foot and steer in a vehicle; "@faster" and "@slower" step your walking speed up or down.
+  const IR = {
+    0x45: "Escape", 0x46: "@faster", 0x47: "KeyF",
+    0x44: "@left", 0x40: "Space", 0x43: "@right",
+    0x07: "KeyS", 0x15: "@slower", 0x09: "KeyW",
+    0x16: "KeyM", 0x19: "KeyG", 0x0D: "KeyP",
+    0x0C: "Digit1", 0x18: "Digit2", 0x5E: "Digit3", 0x08: "Digit4", 0x1C: "Digit5", 0x5A: "Digit6", 0x42: "Digit7", 0x52: "Digit8", 0x4A: "Digit9",
+  };
+  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
+  let lastKey = "", keyHeld = "", lastIr = -1, irHeld = "";
+  let seenLandmarks = null, shifts = null, wasDead = false, sentCoins = null, sentHp = null, sentAt = 0;
 
-  // press or release a key exactly like the keyboard (and the touch buttons) do
-  function press(code, on) {
-    if (on === held.has(code)) return;
-    if (on) { held.add(code); keys.add(code); sendKey("keydown", code); } else { held.delete(code); keys.delete(code); sendKey("keyup", code); }
+  // Keys are held on behalf of a source (the stick, the keypad or the remote): a key stays down while any source holds it.
+  const held = new Map();
+  function press(code, on, src = "stick") {
+    let set = held.get(code);
+    if (on) { if (!set) held.set(code, set = new Set()); if (set.has(src)) return; set.add(src); if (set.size === 1) { keys.add(code); sendKey("keydown", code); } }
+    else { if (!set || !set.delete(src)) return; if (!set.size) { held.delete(code); keys.delete(code); sendKey("keyup", code); } }
   }
-  const releaseAll = () => { for (const c of [...held]) press(c, false); lastKey = ""; };
-  const releaseStick = () => { for (const c of ["KeyA", "KeyD", "KeyW", "KeyS", "Space"]) press(c, false); };
+  const releaseSource = (src) => { for (const [code, set] of [...held]) if (set.has(src)) press(code, false, src); };
+  const releaseAll = () => { for (const src of ["stick", "keypad", "remote"]) releaseSource(src); lastKey = keyHeld = irHeld = ""; lastIr = -1; };
   // a little hysteresis, so a stick near the edge of the dead zone does not flicker
-  const axis = (v, neg, pos) => { press(neg, v <= -(held.has(neg) ? OFF : ON)); press(pos, v >= (held.has(pos) ? OFF : ON)); };
+  const axis = (v, neg, pos) => { press(neg, v <= -(held.has(neg) && held.get(neg).has("stick") ? OFF : ON)); press(pos, v >= (held.has(pos) && held.get(pos).has("stick") ? OFF : ON)); };
+  // on foot (and in the online lobby) A and D slide you sideways and Q and E turn you; in a vehicle, a plane or a fight A and D steer
+  const onFoot = () => typeof mode !== "undefined" && (mode === "walk" || mode === "online" || mode === "watch");
+
+  // what a key of the keypad or remote does when it goes down: the key to hold (or "" for a one-off action)
+  function begin(token) {
+    if (token === "@left") return onFoot() ? "KeyQ" : "KeyA";
+    if (token === "@right") return onFoot() ? "KeyE" : "KeyD";
+    if (token === "@faster" || token === "@slower") {
+      if (typeof mode !== "undefined" && mode === "walk" && typeof setWalkLevel === "function") setWalkLevel(Math.max(1, Math.min(9, walkLevel + (token === "@faster" ? 1 : -1))));
+      return "";
+    }
+    return token;
+  }
 
   function line(text) {
-    const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*(?:,\s*([0-9A-D*#]?)\s*)?$/.exec(text);
+    const m = /^\s*(-?\d{1,3})\s*,\s*(-?\d{1,3})\s*,\s*([01])\s*(?:,\s*([0-9A-D*#]?)\s*(?:,\s*(\d{0,3})\s*)?)?$/.exec(text);
     if (!m) return;                                         // (the first line after the Arduino restarts can be garbage)
     lastAt = performance.now();
-    show(m[1], m[2], m[3], m[4] || "");
+    show(m[1], m[2], m[3], m[4] || "", m[5] || "");
     if (typeof started === "undefined" || !started) { releaseAll(); return; }
-    if (panelOpen) releaseStick();                          // (with a panel open the stick does nothing, but the keypad still can, for example to close it)
+    if (panelOpen) releaseSource("stick");                  // (with a panel open the stick does nothing, but the keypad and remote still can, for example to close it)
     else {
-      // left and right: on foot (and in the online lobby) A and D slide you sideways and Q and E turn you, so the stick turns; in a vehicle, a plane or a fight A and D steer
-      const foot = typeof mode !== "undefined" && (mode === "walk" || mode === "online" || mode === "watch");
-      const [L, R] = foot ? ["KeyQ", "KeyE"] : ["KeyA", "KeyD"];
+      const foot = onFoot(), [L, R] = foot ? ["KeyQ", "KeyE"] : ["KeyA", "KeyD"];
       for (const c of foot ? ["KeyA", "KeyD"] : ["KeyQ", "KeyE"]) press(c, false);
       axis(Number(m[1]), L, R); axis(Number(m[2]), "KeyS", "KeyW"); press("Space", m[3] === "1");
     }
     const k = m[4] || "";                                   // the keypad: a key goes down when it is first seen and up when it is let go
     if (k !== lastKey) {
-      if (lastKey && KEYPAD[lastKey]) press(KEYPAD[lastKey], false);
-      if (k && KEYPAD[k] && !(k === "B" && mode !== "drive")) press(KEYPAD[k], true);   // (B is "trade", which only exists in a vehicle: on foot E would turn you)
+      if (keyHeld) press(keyHeld, false, "keypad");
+      keyHeld = "";
+      if (k && KEYPAD[k] && !(k === "B" && mode !== "drive")) { keyHeld = begin(KEYPAD[k]); if (keyHeld) press(keyHeld, true, "keypad"); }   // (B is "trade", which only exists in a vehicle: on foot E would turn you)
       lastKey = k;
+    }
+    const ir = m[5] === "" || m[5] === undefined ? -1 : Number(m[5]);   // the remote: the same, by the number of the key
+    if (ir !== lastIr) {
+      if (irHeld) press(irHeld, false, "remote");
+      irHeld = "";
+      if (ir >= 0 && IR[ir]) { irHeld = begin(IR[ir]); if (irHeld) press(irHeld, true, "remote"); }
+      lastIr = ir;
     }
   }
 
   // a small readout of what the Arduino is sending, so you can see the stick working even when the game does not move
-  function show(x, y, b, k) {
+  function show(x, y, b, k, ir) {
     if (!hudEl) return;
     const note = typeof started === "undefined" || !started ? "  (press Enter Rome / Demo first)" : typeof panelOpen !== "undefined" && panelOpen ? "  (a menu is open: the stick is off, close it with 0)" : "";
-    const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}${note}`;
+    const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}  remote ${ir === "" ? "-" : "#" + ir}${note}`;
     if (t !== hudText) { hudText = t; hudEl.textContent = t; }
   }
   const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } };
@@ -60,7 +96,7 @@ const Controller = (() => {
   async function open(p) {
     port = p;
     await port.open({ baudRate: BAUD });
-    connected = true; coins = hp = null; lastAt = performance.now(); label();
+    connected = true; coins = hp = null; sentCoins = sentHp = null; lastAt = performance.now(); label();
     if (hudEl) { hudEl.hidden = false; hudEl.textContent = "🎮 waiting for the Arduino..."; hudText = ""; }
     toast("Controller connected: stick to walk and turn, press it to jump.");
     writer = port.writable.getWriter();
@@ -100,8 +136,12 @@ const Controller = (() => {
     catch (e) { if (e && e.name !== "NotFoundError") toast("Could not open the controller: " + (e.message || e)); await close(); }
   }
 
-  // tell the Arduino when you collect a coin or get hurt (a buzzer there can beep)
-  const tell = (c) => { if (writer) writer.write(new TextEncoder().encode(c)).catch(() => {}); };
+  // ---------------------------------------------------------------- telling the Arduino what happens (the buzzer's tunes and the display)
+  const tell = (text) => { if (writer) writer.write(new TextEncoder().encode(text)).catch(() => {}); };
+  const WIN = /victor|\bwon\b|\bwin\b|winner|champion|first place|1st|triumph|well fought|cleared|profitable|delivered|congrat/i;
+  const LOSE = /defeat|\blost\b|\blose\b|killed|\bdead\b|\bdied\b|knocked out|sunk|wreck|losing|failed/i;
+  function resultSound(title) { if (LOSE.test(title)) tell("X"); else if (WIN.test(title)) tell("W"); }
+
   function watch() {
     if (!connected) return;
     if (performance.now() - lastAt > QUIET_MS) releaseAll();                 // nothing arriving (a pulled cable): let go of every key
@@ -109,12 +149,30 @@ const Controller = (() => {
     if (coins !== null && Vitals.coins > coins) tell("C");
     if (hp !== null && Vitals.hp < hp - 0.5) tell("H");
     coins = Vitals.coins; hp = Vitals.hp;
+    // the display: your denarii, and your health (it shows it for a moment when it drops)
+    const c = Math.round(Vitals.coins), h = Math.round(Vitals.hp), t = performance.now();
+    if (c !== sentCoins || h !== sentHp || t - sentAt > 5000) { tell(`D${Math.max(0, c)}\nP${Math.max(0, h)}\n`); sentCoins = c; sentHp = h; sentAt = t; }
+    // landmarks, jobs and dying
+    try {
+      const n = discovered.size;
+      if (seenLandmarks !== null && n > seenLandmarks) tell("L");
+      seenLandmarks = n;
+      const s = Jobs.snapshot().shifts;
+      if (shifts !== null && s > shifts) tell("J");
+      shifts = s;
+      const dead = deathT > 0;
+      if (dead && !wasDead) tell("X");
+      wasDead = dead;
+    } catch (e) { /* the game is still loading */ }
   }
 
   function bind() {
     btnEl = document.getElementById("btn-controller"); hudEl = document.getElementById("ctl-hud");
     if (btnEl) btnEl.addEventListener("click", connect);
     setInterval(watch, 250);
+    // a win or a defeat on the results screen plays a tune on the buzzer
+    const shown = window.showResult;
+    if (typeof shown === "function") window.showResult = function (title, ...rest) { try { resultSound(String(title || "")); } catch (e) { /* ignore */ } return shown.call(this, title, ...rest); };
     if (!("serial" in navigator)) return;
     // a controller that was allowed before connects by itself, when the page opens and whenever it is plugged in
     const auto = async () => { if (connected) return; try { const ps = await navigator.serial.getPorts(); if (ps.length) open(ps[0]).catch(() => close()); } catch (e) { /* ignore */ } };
