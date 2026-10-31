@@ -164,6 +164,12 @@ const Admin = (() => {
     } catch (e) { msg.textContent = "Could not load the list: " + e.message; }
   }
 
+  // the grouped tab bar at the top of the panel (People: Users, Online now, Visitors, Suspicious activity; Tools: Restore items)
+  function showTab(name) {
+    for (const b of document.querySelectorAll("#admin .ad-tab")) b.classList.toggle("on", b.dataset.tab === name);
+    for (const pane of document.querySelectorAll("#admin .ad-pane")) pane.hidden = pane.dataset.pane !== name;
+  }
+
   function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); }
 
   // everyone who opened the site
@@ -171,6 +177,7 @@ const Admin = (() => {
     const t = $a("ad-visits"), list = m.v || [];
     t.replaceChildren();
     $a("ad-visits-n").textContent = `${m.total || list.length} visitor${(m.total || list.length) === 1 ? "" : "s"} in the log`;
+    $a("ad-visits-b").textContent = m.total || list.length;
     const head = t.insertRow();
     for (const h of ["Last seen", "First seen", "Opened", "Played", "Name", "Account", "Device", "Address", "Flags", "Id", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const v of list) {
@@ -188,6 +195,8 @@ const Admin = (() => {
     const t = $a("ad-events");
     t.replaceChildren();
     $a("ad-events-n").textContent = list.length ? `${list.length} recent` : "nothing suspicious so far";
+    $a("ad-events-b").textContent = list.length || "";
+    $a("ad-events-b").classList.toggle("hot", list.some((e) => e.level === "high"));
     const head = t.insertRow();
     for (const h of ["When", "What", "Details", "Who", "Address", "Id", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const e of list) {
@@ -203,6 +212,7 @@ const Admin = (() => {
     const t = $a("ad-online");
     t.replaceChildren();
     $a("ad-online-n").textContent = `${list.length} online now`;
+    $a("ad-online-b").textContent = list.length;
     const head = t.insertRow();
     for (const h of ["Name", "Denarii", "City", "Place", "Doing", "Coordinates", "Account", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
     for (const p of list) {
@@ -223,6 +233,7 @@ const Admin = (() => {
     if (!Account.admin) { toast("Only an admin account can open this."); return; }
     if (mode !== "walk" || (panelOpen && !creatorOpen) || !canStart()) { toast("Close what is open and stop the game first"); return; }
     openPanel("#admin");
+    showTab("users");
     fillItems(); loadUsers(); loadOnline();
   }
 
@@ -243,6 +254,8 @@ const Admin = (() => {
       Vitals.coins += n; toast(`Added ${n} denarii.`); Account.saveNow(true);
     });
     $a("btn-admin").addEventListener("click", openPanel_);
+    for (const b of document.querySelectorAll("#admin .ad-tab")) b.addEventListener("click", () => showTab(b.dataset.tab));
+    document.querySelector("#admin .ad-back").addEventListener("click", closePanels);
     $a("ad-refresh").addEventListener("click", () => { loadUsers(); loadOnline(); });
     Account.onChange(() => { $a("btn-admin").hidden = !Account.admin; });
     $a("btn-admin").hidden = !Account.admin;

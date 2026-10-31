@@ -620,7 +620,16 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #chat-form button { padding: 7px 12px; border-radius: 8px; border: 0; background: var(--gold); color: #2a2118; font-weight: 700; cursor: pointer; }
 body.playing #chat:not(.open) { display: none; }
 #admin .box.wide { width: min(760px, 100%); }
-.ad-scroll { max-height: 34vh; overflow: auto; }
+.ad-scroll { max-height: 62vh; overflow: auto; }
+.ad-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.ad-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 14px; border-left: 1px solid rgba(255,255,255,.12); }
+.ad-glabel { color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+#admin .ad-tab.on { background: var(--gold); border-color: var(--gold); color: #2a2118; font-weight: 700; }
+.ad-badge { font-style: normal; font-size: .75rem; opacity: .8; }
+.ad-badge:not(:empty)::before { content: "· "; }
+.ad-badge.hot { color: #e47a6d; opacity: 1; font-weight: 700; }
+#admin .ad-tab.on .ad-badge.hot { color: #7a1f1f; }
+#admin .ad-pane[hidden] { display: none; }
 #admin h3 { margin: 12px 0 4px; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 #admin code { background: rgba(255,255,255,.1); padding: 0 4px; border-radius: 4px; }
 
