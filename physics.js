@@ -138,8 +138,8 @@ function blockedAt(x, z, feet) {
 
 // Can someone standing at (fx, fz) step to (tx, tz)?
 function canMove(fx, fz, tx, tz) {
-  if (tx < BOUNDS.minX || tx > BOUNDS.maxX || tz < BOUNDS.minZ || tz > BOUNDS.maxZ) return false;
   const feet = groundAt(fx, fz);
+  if ((tx < BOUNDS.minX || tx > BOUNDS.maxX || tz < BOUNDS.minZ || tz > BOUNDS.maxZ) && groundAt(tx, tz) < 100) return false;   // (the metro halls, 300 m up, lie outside the city)
   if (groundAt(tx, tz) - feet > MAX_STEP) return false;
   return !blockedAt(tx, tz, feet);
 }

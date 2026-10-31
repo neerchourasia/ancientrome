@@ -143,9 +143,9 @@ function wireInput(canvas) {
     if (Vitals.resting && /^(Key[WASD]|Arrow(Up|Down|Left|Right))$/.test(k)) Vitals.stopRest(); // moving stands you up
     if (e.repeat) return; // one-shot actions fire once per key press, never on auto-repeat
 
-    if (k === "KeyR" && mode === "walk" && !panelOpen && !inCircusTrack(player.x, player.z) && !inArena(player.x, player.z)) { shove(); return; }   // R: shove the citizen in front of you
+    if (k === "KeyR" && mode === "walk" && !panelOpen && !Subway.underground && !inCircusTrack(player.x, player.z) && !inArena(player.x, player.z)) { shove(); return; }   // R: shove the citizen in front of you
     if (k === "KeyF" && mode === "drive" && Car.flyOn()) return;   // in a plane at the edge of the city: fly on to the next one
-    if ((k === "KeyL" || k === "KeyU") && mode === "walk" && !panelOpen && !inArena(player.x, player.z) && Festival.key(k)) return;   // festival activities: L a lantern, U colours
+    if ((k === "KeyL" || k === "KeyU") && mode === "walk" && !panelOpen && !Subway.underground && !inArena(player.x, player.z) && Festival.key(k)) return;   // festival activities: L a lantern, U colours
     if (k === "KeyT") cycleTime();
     if (k === "KeyO") toggleSound();
     if (k === "KeyJ") toggleVoice();
@@ -173,7 +173,8 @@ function wireInput(canvas) {
       else if (k === "KeyN") Watch.nextAct();
       else { const m = /^(?:Digit|Key|Numpad)([1-5])$/.exec(k); if (m) Watch.setAct(Number(m[1]) - 1); }
     } else if (mode === "walk" && canStart()) {
-      if (k === "KeyF" && city === "cancun" && Cancun.promptText() && Cancun.act()) { /* hired snorkel gear, or put your face in the water */ }
+      if (Subway.key(k)) { /* the metro: F at an entrance or on a platform, R and U on a platform */ }
+      else if (k === "KeyF" && city === "cancun" && Cancun.promptText() && Cancun.act()) { /* hired snorkel gear, or put your face in the water */ }
       else if (k === "KeyF" && Stalls.at(player.x, player.z, player.feet)) Stalls.open();
       else if (k === "KeyF" && Jobs.at(player.x, player.z, player.feet)) Jobs.act();
       else if (k === "KeyF" && Garage.at(player.x, player.z, player.feet)) Garage.open();
@@ -241,6 +242,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "shove") { shove(); return; }
     if ($("#prompt").dataset.kind === "rob") { Robbery.act(); return; }
     if ($("#prompt").dataset.kind === "harbour") { Harbour.board(); return; }
+    if ($("#prompt").dataset.kind === "metro") { Subway.key("KeyF"); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
     else if (inCircusTrack(player.x, player.z)) Race.start();
@@ -1086,6 +1088,7 @@ function applyEra() {
 }
 
 function toggleEra() {
+  if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (mode !== "walk") { toast("Leave the game first to switch eras"); return; }
   era = era === "ancient" ? "modern" : "ancient";
   try { localStorage.setItem("rome-era", era); } catch (e) { /* ignore */ }
@@ -1115,6 +1118,7 @@ function openTravel() {
 }
 
 function travel(to) {
+  if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
   if (to === city || travelBusy) return;
@@ -1192,6 +1196,7 @@ function updatePrompt() {
     if (!text && city === "cancun") { const ct = Cancun.promptText(); if (ct) { text = ct; p.dataset.kind = "cancun"; } }
     if (!text && Cage.at(player.x, player.z, player.feet)) { text = "F: open the cage (choose which animal comes with you)"; p.dataset.kind = "cage"; }
     if (!text) { const hb = Harbour.at(player.x, player.z, player.feet); if (hb) { text = hb.text; p.dataset.kind = "harbour"; } }
+    if (!text) { const mt = Subway.promptAt(); if (mt) { text = mt; p.dataset.kind = "metro"; } }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
@@ -1619,7 +1624,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
@@ -1634,7 +1639,7 @@ function tick(dt) {
   else if (mode === "race") Race.update(dt, keys);
   else if (mode === "naval") Naval.update(dt, keys);
   else if (mode === "online") Online.update(dt, keys);
-  else if (mode === "drive") Car.update(dt, keys);
+  else if (mode === "drive") Car.update(dt, Subway.control(dt, keys));
   else if (mode === "dgame") DGames.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (started && !panelOpen && deathT === 0) {

@@ -80,6 +80,8 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #intro p { color: var(--muted); }
 #intro a { color: var(--gold); }
 #intro [hidden] { display: none !important; }
+#metro-hud { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 4; padding: 7px 16px; font-weight: 700; font-size: .95rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; white-space: nowrap; }
+#metro-hud[hidden] { display: none; }
 #demo-bar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 7px 12px; font-size: .82rem; color: var(--ink); background: rgba(28,22,16,.92); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; }
 #demo-bar[hidden] { display: none; }
 #demo-bar button { font: inherit; font-weight: 700; cursor: pointer; color: #2a2118; background: var(--gold); border: 1px solid var(--gold); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }

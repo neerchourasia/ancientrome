@@ -302,6 +302,7 @@ const Online = (() => {
     walkSendT -= dt;
     if (walkSendT > 0) return;
     walkSendT = 0.2;
+    if (typeof Subway !== "undefined" && Subway.underground) return;   // down in the metro nobody can see you
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();

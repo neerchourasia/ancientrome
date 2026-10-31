@@ -23,6 +23,7 @@ const Car = (() => {
     horse: { name: "Horse", max: 18, accel: 9, turn: 2.2, color: 0x7a4a2a, len: 2.8, wid: 1.0, era: "ancient", motor: false, camH: 2.5, verb: "climb on" },
     camel: { name: "Camel", max: 11, accel: 5, turn: 1.8, color: 0xc9a46a, len: 3.4, wid: 1.2, era: "ancient", motor: false, camH: 3.3, verb: "climb on" },
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
+    metro: { name: "Metro train", max: 23, accel: 3.4, turn: 0, color: 0x1d4fa0, len: 36, wid: 3.0, rail: true, camH: 3.5, camBack: 22, verb: "board" },   // runs on the rails of the metro (subway.js): it cannot steer
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
   };
   Object.assign(MODELS, AIRCRAFT);   // jets, helicopters, balloons ... (aircraft.js)
@@ -49,7 +50,17 @@ const Car = (() => {
     }
     const M = MODELS[id], g = new THREE.Group(), body = lam(M.color), glass = lam(0x1d2a33), wheels = [], legs = [];
     const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1b0 }), tail = new THREE.MeshBasicMaterial({ color: 0xc01818 });
-    if (id === "scooter") {
+    if (id === "metro") {                                                                                  // three carriages, lit the same everywhere (the metro is underground)
+      const bm = (c) => new THREE.MeshBasicMaterial({ color: c }), blue = bm(M.color), white = bm(0xe9edf2), glassM = bm(0x16222c), grey = bm(0x4a4e55), lampM = bm(0xfff3b0);
+      for (const z of [-12, 0, 12]) {
+        g.add(box(3.0, 2.5, 11.4, blue, 0, 1.95, z), box(3.04, 0.35, 11.4, white, 0, 2.45, z), box(2.7, 0.2, 11.0, grey, 0, 3.3, z));
+        for (const sx of [-1, 1]) { for (const dz of [-3.6, 0, 3.6]) g.add(box(0.05, 0.8, 1.8, glassM, sx * 1.52, 2.45, z + dz)); g.add(box(0.05, 2.0, 0.9, white, sx * 1.52, 1.75, z + 5.2)); }
+      }
+      g.add(box(3.0, 2.2, 0.3, grey, 0, 1.95, -17.9), box(2.4, 1.0, 0.1, glassM, 0, 2.5, -18.1), box(0.4, 0.3, 0.1, lampM, -1.0, 1.5, -18.1), box(0.4, 0.3, 0.1, lampM, 1.0, 1.5, -18.1));    // the front and back cabs
+      g.add(box(3.0, 2.2, 0.3, grey, 0, 1.95, 17.9), box(2.4, 1.0, 0.1, glassM, 0, 2.5, 18.1), box(0.4, 0.3, 0.1, lampM, -1.0, 1.5, 18.1), box(0.4, 0.3, 0.1, lampM, 1.0, 1.5, 18.1));
+      g.add(box(2.6, 0.5, 35.4, grey, 0, 0.55, 0));
+      return { g, wheels, legs };
+    } else if (id === "scooter") {
       g.add(box(0.34, 0.4, 1.3, body, 0, 0.55, 0.1), box(0.3, 0.1, 0.55, lam(0x2b2b2b), 0, 0.82, 0.3), box(0.9, 0.06, 0.06, lam(0x2b2b2b), 0, 1.1, -0.55), box(0.06, 0.55, 0.06, lam(0x2b2b2b), 0, 0.82, -0.55));
       g.add(box(0.1, 0.1, 0.06, lamp, 0, 0.95, -0.7));
       for (const z of [-0.65, 0.7]) { const w = wheel(0.3, 0.12, 0, 0.3, z); g.add(w); wheels.push(w); }
@@ -209,12 +220,14 @@ const Car = (() => {
     $("#drive-hud").classList.add("show");
     $("#drive-alt").textContent = "";
     if (car.M.fly) { const h = airHelp(car.M); $("#drive-keys").innerHTML = h[0]; toast(h[1]); return; }
+    if (car.M.rail) { $("#drive-keys").innerHTML = "<kbd>W</kbd> power · <kbd>S</kbd> brake · <kbd>Space</kbd> emergency brake · <kbd>X</kbd> or <kbd>Esc</kbd> get off when the train is standing at a station"; if (!Subway.auto) toast("You drive the metro: W for power, S to brake. Stop inside a station for a reward."); return; }
     $("#drive-keys").innerHTML = "<kbd>W</kbd> gas · <kbd>S</kbd> brake · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>X</kbd> or <kbd>Esc</kbd> get out";
     toast(car.M.motor === false ? "W go · S stop and back up · A D steer · Space halt · Esc to get off" : "W gas · S brake and reverse · A D steer · Space handbrake · Esc to get out");
   }
 
   function exit(silent) {
     if (!driving) return;
+    if (car.M.rail && !silent && !Subway.canLeave({ x: car.x, z: car.z, v: car.v })) { toast("Stop the train inside a station to get off."); return; }
     if (car.M.fly && car.alt > 1.5) {                                                                // you cannot step out of a plane in the air (unless you are forced to)
       if (!silent) { toast("Land first! Slow down and come down gently on a street or a square."); return; }
       car.alt = 0; car.vy = 0; car.y = groundAt(car.x, car.z); car.g.position.y = car.y;
@@ -233,6 +246,7 @@ const Car = (() => {
     player.x = spot[0]; player.z = spot[1]; player.feet = groundAt(spot[0], spot[1]); player.vx = player.vz = 0;
     player.yaw = car.yaw; player.pitch = -0.05;
     placeCircles(true);
+    if (car.M.rail) { Subway.afterExit({ x: car.x, z: car.z }); return; }                           // the metro: up to the street, and the train goes away
     if (!silent) toast(`You got off. Your ${car.M.name.toLowerCase()} stays parked here.`);
   }
 
@@ -511,11 +525,13 @@ const Car = (() => {
     bumpCd = Math.max(0, bumpCd - dt); runCd = Math.max(0, runCd - dt);
     const gas = keys.has("KeyW") || keys.has("ArrowUp"), brake = keys.has("KeyS") || keys.has("ArrowDown");
     const steer = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
-    if (gas) car.v += M.accel * (1 - Math.max(0, car.v) / M.max * 0.85) * dt;
-    if (brake) car.v -= (car.v > 0.3 ? 26 : 9) * dt;
-    if (!gas && !brake) car.v -= Math.sign(car.v) * Math.min(Math.abs(car.v), (1.8 + Math.abs(car.v) * 0.12) * dt); // coasting
-    if (keys.has("Space")) car.v *= Math.max(0, 1 - 3.2 * dt);
-    car.v = Math.max(-7, Math.min(M.max, car.v));
+    if (!car.autopilot) {                                                                              // (the metro's autopilot sets the speed itself)
+      if (gas) car.v += M.accel * (1 - Math.max(0, car.v) / M.max * 0.85) * dt;
+      if (brake) car.v -= (car.v > 0.3 ? 26 : 9) * dt;
+      if (!gas && !brake) car.v -= Math.sign(car.v) * Math.min(Math.abs(car.v), (1.8 + Math.abs(car.v) * 0.12) * dt); // coasting
+      if (keys.has("Space")) car.v *= Math.max(0, 1 - 3.2 * dt);
+      car.v = Math.max(-7, Math.min(M.max, car.v));
+    }
 
     const grip = Math.min(1, Math.abs(car.v) / 4) * (1 - 0.45 * Math.abs(car.v) / M.max);
     car.yaw += steer * M.turn * grip * Math.sign(car.v || 1) * dt;
@@ -528,7 +544,8 @@ const Car = (() => {
     // pressing the pedals but going nowhere for a moment: move the car to the nearest clear spot
     stuckT = hit && (gas || brake) && Math.abs(car.v) < 1.5 ? stuckT + dt : 0;
     if (stuckT > 0.8) { stuckT = 0; if (rescue()) toast("Your car was wedged in, so it was moved to a clear spot."); }
-    if (hit && Math.abs(car.v) > 1) {
+    if (hit && M.rail) car.v = 0;                                                                    // a train that reaches the buffers just stops
+    else if (hit && Math.abs(car.v) > 1) {
       const impact = Math.abs(car.v);
       if (bumpCd <= 0) {
         bumpCd = 0.9;
@@ -622,7 +639,7 @@ const Car = (() => {
     let dy = car.yaw - camYaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
     camYaw += dy * Math.min(1, dt * 4);
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
-    let d = 7.5 + (car.M.camH ? 3 : 0) + Math.abs(car.v) * 0.09;
+    let d = (car.M.camBack || 7.5) + (car.M.camH && !car.M.camBack ? 3 : 0) + Math.abs(car.v) * 0.09;
     for (; d > 2.5; d -= 0.5) if (!blockedAt(car.x - fx * d, car.z - fz * d, car.y + 2.5)) break;
     const up = car.M.camH || 0;
     cam.position.set(car.x - fx * d, car.y + 2.6 + up + Math.abs(car.v) * 0.02, car.z - fz * d);
@@ -643,6 +660,7 @@ const Car = (() => {
   }
 
   return {
+    nudge: (o) => { if (!car) return; if (o.v !== undefined) car.v = o.v; if (o.yaw !== undefined) car.yaw = o.yaw; if (o.autopilot !== undefined) car.autopilot = o.autopilot; },
     MODELS, model, deploy, stow, enter, exit, toggleEnter, togglePilot, update, camera, nearby, onEra,
     // Click on your parked car and it goes back to your garage (if you have one)
     clickAt(cx, cy, cam, canvasEl) {
