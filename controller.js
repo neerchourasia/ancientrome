@@ -27,7 +27,15 @@ const Controller = (() => {
     0x16: "KeyM", 0x19: "KeyG", 0x0D: "KeyP",
     0x0C: "Digit1", 0x18: "Digit2", 0x5E: "Digit3", 0x08: "Digit4", 0x1C: "Digit5", 0x5A: "Digit6", 0x42: "Digit7", 0x52: "Digit8", 0x4A: "Digit9",
   };
-  let port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
+  // Remotes differ, so you can teach the game yours (the 🎮 Learn remote button): what it learns is kept in this browser and replaces the table above.
+  const IR_KEY = "rome-ir-map";
+  let irMap = IR;
+  try { const saved = JSON.parse(localStorage.getItem(IR_KEY) || "null"); if (saved && typeof saved === "object" && Object.keys(saved).length) irMap = saved; } catch (e) { /* storage unavailable */ }
+  const LEARN = [["Forward (the up arrow)", "KeyW"], ["Back (the down arrow)", "KeyS"], ["Turn left (the left arrow)", "@left"], ["Turn right (the right arrow)", "@right"], ["Jump (the middle OK key)", "Space"],
+    ["Faster (a plus or volume up)", "@faster"], ["Slower (a minus or volume down)", "@slower"], ["Interact (F)", "KeyF"], ["Close or back (Esc)", "Escape"], ["Map", "KeyM"],
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`Walking speed ${n} (the key marked ${n})`, "Digit" + n])];
+  let learning = -1, learned = {}, learnNote = "";
+  let learnEl = null, port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
   let lastKey = "", keyHeld = "", lastIr = -1, irHeld = "";
   let seenLandmarks = null, shifts = null, wasDead = false, sentCoins = null, sentHp = null, sentAt = 0;
 
@@ -79,7 +87,8 @@ const Controller = (() => {
     if (ir !== lastIr) {
       if (irHeld) press(irHeld, false, "remote");
       irHeld = "";
-      if (ir >= 0 && IR[ir]) { irHeld = begin(IR[ir]); if (irHeld) press(irHeld, true, "remote"); }
+      if (learning >= 0) { if (ir >= 0) learnPress(ir); }
+      else if (ir >= 0 && irMap[ir]) { irHeld = begin(irMap[ir]); if (irHeld) press(irHeld, true, "remote"); }
       lastIr = ir;
     }
   }
@@ -87,11 +96,11 @@ const Controller = (() => {
   // a small readout of what the Arduino is sending, so you can see the stick working even when the game does not move
   function show(x, y, b, k, ir) {
     if (!hudEl) return;
-    const note = typeof started === "undefined" || !started ? "  (press Enter Rome / Demo first)" : typeof panelOpen !== "undefined" && panelOpen ? "  (a menu is open: the stick is off, close it with 0)" : "";
+    const note = learning >= 0 ? `  LEARNING: press the remote key for  ${LEARN[learning][0]}   (Enter on the keyboard skips, Esc stops)` : typeof started === "undefined" || !started ? "  (press Enter Rome / Demo first)" : typeof panelOpen !== "undefined" && panelOpen ? "  (a menu is open: the stick is off, close it with 0)" : "";
     const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}  remote ${ir === "" ? "-" : "#" + ir}${note}`;
     if (t !== hudText) { hudText = t; hudEl.textContent = t; }
   }
-  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } };
+  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } if (learnEl) learnEl.hidden = !connected; };
 
   async function open(p) {
     port = p;
@@ -142,6 +151,28 @@ const Controller = (() => {
   const LOSE = /defeat|\blost\b|\blose\b|killed|\bdead\b|\bdied\b|knocked out|sunk|wreck|losing|failed/i;
   function resultSound(title) { if (LOSE.test(title)) tell("X"); else if (WIN.test(title)) tell("W"); }
 
+  // ---------------------------------------------------------------- teaching the game your remote
+  function learnStart() {
+    if (!connected) { toast("Connect the controller first (🎮 Controller)."); return; }
+    learning = 0; learned = {};
+    toast("Press the remote key for each thing the game asks (see the box at the bottom left). Enter skips one, Esc stops.");
+  }
+  function learnDone(save) {
+    learning = -1;
+    if (save && Object.keys(learned).length) { irMap = learned; try { localStorage.setItem(IR_KEY, JSON.stringify(learned)); } catch (e) { /* ignore */ } toast(`Remote learned: ${Object.keys(learned).length} keys.`); }
+    else toast("Remote learning stopped.");
+  }
+  function learnPress(code) {
+    if (learned[code]) { toast("That key is already used. Press another one (Enter skips this one)."); return; }
+    learned[code] = LEARN[learning][1];
+    if (++learning >= LEARN.length) learnDone(true);
+  }
+  addEventListener("keydown", (e) => {
+    if (learning < 0) return;
+    if (e.code === "Enter") { e.preventDefault(); if (++learning >= LEARN.length) learnDone(true); }
+    else if (e.code === "Escape") learnDone(true);
+  }, true);
+
   function watch() {
     if (!connected) return;
     if (performance.now() - lastAt > QUIET_MS) releaseAll();                 // nothing arriving (a pulled cable): let go of every key
@@ -169,6 +200,7 @@ const Controller = (() => {
   function bind() {
     btnEl = document.getElementById("btn-controller"); hudEl = document.getElementById("ctl-hud");
     if (btnEl) btnEl.addEventListener("click", connect);
+    learnEl = document.getElementById("btn-learn"); if (learnEl) learnEl.addEventListener("click", learnStart);
     setInterval(watch, 250);
     // a win or a defeat on the results screen plays a tune on the buzzer
     const shown = window.showResult;
