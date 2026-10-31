@@ -27,7 +27,12 @@ const Vitals = (() => {
       s.hp = clamp(Number.isFinite(v) && v < s.hp ? s.hp - (s.hp - v) * DAMAGE_MUL : v);          // damage is cut down; healing and plain setting are as before
     },
     get horses() { return s.horses; }, set horses(v) { s.horses = clamp(v); },
-    get coins() { return s.coins; }, set coins(v) { s.coins = Math.max(0, Math.round(v)); },
+    get coins() { return s.coins; }, set coins(v) {
+      v = Math.max(0, Math.round(v));
+      // the demo cannot earn past its limit (it never takes away what a browser already holds)
+      if (v > s.coins && typeof Account !== "undefined" && Account.demo && v > Account.DEMO_COINS) { v = Math.max(s.coins, Account.DEMO_COINS); Account.demoCapped(); }
+      s.coins = v;
+    },
     get resting() { return resting; },
     get fed() { return fed; },
     get hunger() { return s.hunger; }, set hunger(v) { s.hunger = clamp(v); },

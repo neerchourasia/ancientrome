@@ -270,7 +270,7 @@ function wireInput(canvas) {
   // an account is needed to play (when accounts are switched on): the login screen comes first
   $("#start").addEventListener("click", () => { if (Account.loggedIn || !Account.configured) begin(); else Account.gate(begin); });
   for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
-  for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); Account.startDemo(); begin(); });
+  for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startDemo()) begin(); else Account.gate(begin); });
   $("#demo-login").addEventListener("click", () => Account.open());
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);

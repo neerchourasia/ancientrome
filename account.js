@@ -23,7 +23,10 @@ const Account = (() => {
   // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
   let gateOpen = false, gateDone = null, leaving = false;
   // The demo: play without an account. Nothing is saved to an account and the online parts (other players, chat, friends) stay off until someone logs in.
-  let demo = false;
+  let demo = false, demoOver = false, demoTimer = 0, capNoted = 0;
+  const DEMO_MS = 10 * 60 * 1000, DEMO_COINS = 1000, DEMO_KEY = "rome-demo-end";
+  const GATE_TEXT = "You need an account to play. Log in, or create one in a few seconds: your game is saved to it and follows you to any device.";
+  const DEMO_OVER_TEXT = "Your demo has ended. Log in, or create a free account in a few seconds, to keep playing: your game is saved to it and follows you to any device.";
   // When this device last saw the saved game on the server (the moment it was saved). If the server's copy is newer, another device (or an older
   // version of this page) saved after us: we load it first, so a device that has been sitting on old progress never writes over a newer saved game.
   const SYNC_KEY = "rome-synced-at";
@@ -45,7 +48,7 @@ const Account = (() => {
 
   function storeSession(s) {
     session = s;
-    if (s) demo = false;
+    if (s) { demo = false; demoOver = false; clearInterval(demoTimer); }
     try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
   }
 
@@ -319,6 +322,7 @@ const Account = (() => {
     $a("ac-reset").hidden = !configured || !recoveryToken;
     $a("ac-in").hidden = !configured || !on;
     $a("ac-gate").hidden = !(gateOpen && !on && !recoveryToken);
+    $a("ac-gate").textContent = demoOver ? DEMO_OVER_TEXT : GATE_TEXT;
     const st = $a("start");
     if (st && !$a("intro").classList.contains("hidden")) st.textContent = configured && !on ? "Play free" : "Enter Rome";
     for (const g of document.querySelectorAll("#intro [data-guest]")) g.hidden = on;   // "Log in" links are for people who are not logged in
@@ -340,7 +344,30 @@ const Account = (() => {
     for (const eye of document.querySelectorAll("#account .pw-eye")) { const box = eye.parentElement.querySelector("input"); if (box.type !== "password") eye.click(); }
     renderAccount();
   }
-  function startDemo() { demo = true; renderAccount(); }
+  // The demo lasts 10 minutes in all (counted from the first time it is started in this browser) and cannot earn past 1,000 denarii.
+  // Returns false when this browser has used its demo up: the login screen is then what comes next.
+  function startDemo() {
+    let end = 0;
+    try { end = Number(localStorage.getItem(DEMO_KEY)) || 0; } catch (e) { /* storage unavailable */ }
+    if (!end) { end = Date.now() + DEMO_MS; try { localStorage.setItem(DEMO_KEY, String(end)); } catch (e) { /* ignore */ } }
+    if (Date.now() >= end) { demoOver = true; renderAccount(); return false; }
+    demo = true;
+    const tick = () => {
+      const left = end - Date.now();
+      if (!demo || session) { clearInterval(demoTimer); return; }
+      if (left <= 0) { clearInterval(demoTimer); demoOver = true; gate(null); return; }
+      const m = Math.floor(left / 60000), sec = String(Math.floor(left / 1000) % 60).padStart(2, "0");
+      $a("demo-text").textContent = `Demo: ${m}:${sec} left · up to ${DEMO_COINS.toLocaleString()} denarii · not saved, other players are off`;
+    };
+    clearInterval(demoTimer); demoTimer = setInterval(tick, 1000); tick();
+    renderAccount();
+    return true;
+  }
+  function demoCapped() {
+    if (Date.now() - capNoted < 20000) return;
+    capNoted = Date.now();
+    toast(`Demo limit: ${DEMO_COINS.toLocaleString()} denarii. Log in to keep earning.`);
+  }
   function unlock() {
     if (!gateOpen || !session) return;
     gateOpen = false;
@@ -395,7 +422,7 @@ const Account = (() => {
   }
 
   return {
-    configured, bind, open, saveNow, gate, startDemo,
+    configured, bind, open, saveNow, gate, startDemo, demoCapped, DEMO_COINS,
     get demo() { return demo && !session; },
     get locked() { return gateOpen && configured && !session; },
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
