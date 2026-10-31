@@ -34,7 +34,7 @@ const Controller = (() => {
   const LEARN = [["Forward (the up arrow)", "KeyW"], ["Back (the down arrow)", "KeyS"], ["Turn left (the left arrow)", "@left"], ["Turn right (the right arrow)", "@right"], ["Jump (the middle OK key)", "Space"],
     ["Faster (a plus or volume up)", "@faster"], ["Slower (a minus or volume down)", "@slower"], ["Interact (F)", "KeyF"], ["Close or back (Esc)", "Escape"], ["Map", "KeyM"],
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`Walking speed ${n} (the key marked ${n})`, "Digit" + n])];
-  let learning = -1, learned = {}, learnNote = "";
+  let learning = -1, learned = {}, learnNote = "", seenRemote = false;
   let learnEl = null, port = null, reader = null, writer = null, connected = false, lastAt = 0, coins = null, hp = null, btnEl = null, hudEl = null, hudText = "";
   let lastKey = "", keyHeld = "", lastIr = -1, irHeld = "";
   let seenLandmarks = null, shifts = null, wasDead = false, sentCoins = null, sentHp = null, sentAt = 0;
@@ -84,6 +84,7 @@ const Controller = (() => {
       lastKey = k;
     }
     const ir = m[5] === "" || m[5] === undefined ? -1 : Number(m[5]);   // the remote: the same, by the number of the key
+    if (ir >= 0 && !seenRemote) { seenRemote = true; label(); }
     if (ir !== lastIr) {
       if (irHeld) press(irHeld, false, "remote");
       irHeld = "";
@@ -100,7 +101,7 @@ const Controller = (() => {
     const t = `🎮 x ${String(x).padStart(4)}  y ${String(y).padStart(4)}  stick ${b === "1" ? "DOWN" : "up"}  key ${k || "-"}  remote ${ir === "" ? "-" : "#" + ir}${note}`;
     if (t !== hudText) { hudText = t; hudEl.textContent = t; }
   }
-  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } if (learnEl) learnEl.hidden = !connected; };
+  const label = () => { if (btnEl) { btnEl.textContent = connected ? "🎮 Controller: on" : "🎮 Controller"; btnEl.classList.toggle("on", connected); } if (learnEl) learnEl.hidden = !(connected && seenRemote); };   // (the Learn remote button only appears once a remote has been seen)
 
   async function open(p) {
     port = p;
