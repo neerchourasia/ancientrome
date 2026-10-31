@@ -23,6 +23,7 @@ const Online = (() => {
   let noConnectUntil = 0;                                   // after a kick or a block the browser stops trying to come back
   function connect() {
     if (!URL || Date.now() < noConnectUntil) return;
+    if (typeof Account !== "undefined" && Account.demo) { setMsg("Online play needs an account: log in to play with other people."); return; }   // the demo is offline
     const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join(), Market.pet].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is

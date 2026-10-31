@@ -22,6 +22,8 @@ const Account = (() => {
   let session = null, lastSaved = "", listeners = [], busy = false;
   // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
   let gateOpen = false, gateDone = null, leaving = false;
+  // The demo: play without an account. Nothing is saved to an account and the online parts (other players, chat, friends) stay off until someone logs in.
+  let demo = false;
   // When this device last saw the saved game on the server (the moment it was saved). If the server's copy is newer, another device (or an older
   // version of this page) saved after us: we load it first, so a device that has been sitting on old progress never writes over a newer saved game.
   const SYNC_KEY = "rome-synced-at";
@@ -38,11 +40,12 @@ const Account = (() => {
     for (const f of listeners) { try { f(); } catch (e) { /* ignore */ } }
     renderAccount();
     // logged out while playing (the login ran out and could not be renewed): the account screen comes back over the game
-    try { if (configured && !session && !leaving && typeof started !== "undefined" && started) gate(null); } catch (e) { /* the game is still loading */ }
+    try { if (configured && !session && !leaving && !demo && typeof started !== "undefined" && started) gate(null); } catch (e) { /* the game is still loading */ }
   };
 
   function storeSession(s) {
     session = s;
+    if (s) demo = false;
     try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
   }
 
@@ -322,7 +325,8 @@ const Account = (() => {
     if (on) {
       $a("ac-who").textContent = session.email;
     }
-    $a("btn-account").textContent = on ? `Account: ${session.email.split("@")[0].slice(0, 10)}` : "Log in";
+    $a("btn-account").textContent = on ? `Account: ${session.email.split("@")[0].slice(0, 10)}` : demo ? "Log in to save" : "Log in";
+    $a("demo-bar").hidden = !(demo && !on);
   }
 
   // The login screen that cannot be closed. `done` runs once someone has logged in.
@@ -336,6 +340,7 @@ const Account = (() => {
     for (const eye of document.querySelectorAll("#account .pw-eye")) { const box = eye.parentElement.querySelector("input"); if (box.type !== "password") eye.click(); }
     renderAccount();
   }
+  function startDemo() { demo = true; renderAccount(); }
   function unlock() {
     if (!gateOpen || !session) return;
     gateOpen = false;
@@ -390,7 +395,8 @@ const Account = (() => {
   }
 
   return {
-    configured, bind, open, saveNow, gate,
+    configured, bind, open, saveNow, gate, startDemo,
+    get demo() { return demo && !session; },
     get locked() { return gateOpen && configured && !session; },
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
     get loggedIn() { return !!session; },
