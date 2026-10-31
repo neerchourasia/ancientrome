@@ -20,6 +20,8 @@ const Account = (() => {
     if (h.get("type") === "recovery" && h.get("access_token")) { recoveryToken = h.get("access_token"); history.replaceState(null, "", location.pathname + location.search); }
   } catch (e) { /* ignore */ }
   let session = null, lastSaved = "", listeners = [], busy = false;
+  // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
+  let gateOpen = false, gateDone = null, leaving = false;
   // When this device last saw the saved game on the server (the moment it was saved). If the server's copy is newer, another device (or an older
   // version of this page) saved after us: we load it first, so a device that has been sitting on old progress never writes over a newer saved game.
   const SYNC_KEY = "rome-synced-at";
@@ -32,7 +34,12 @@ const Account = (() => {
     if (s && typeof s.access_token === "string" && typeof s.refresh_token === "string" && typeof s.id === "string" && typeof s.email === "string") session = s;
   } catch (e) { /* storage unavailable */ }
 
-  const changed = () => { for (const f of listeners) { try { f(); } catch (e) { /* ignore */ } } renderAccount(); };
+  const changed = () => {
+    for (const f of listeners) { try { f(); } catch (e) { /* ignore */ } }
+    renderAccount();
+    // logged out while playing (the login ran out and could not be renewed): the account screen comes back over the game
+    try { if (configured && !session && !leaving && typeof started !== "undefined" && started) gate(null); } catch (e) { /* the game is still loading */ }
+  };
 
   function storeSession(s) {
     session = s;
@@ -260,7 +267,7 @@ const Account = (() => {
         storeSession(s); $a("ac-pass").value = "";
       }
       say(""); changed();
-      await sync();
+      try { await sync(); } finally { unlock(); }   // the saved game is loaded first, then the game starts
     } catch (e) {
       say(/invalid login/i.test(e.message) ? "That email and password don't match." : /already/i.test(e.message) ? "That email already has an account. Try logging in." : e.message, true);
     } finally { busy = false; }
@@ -290,10 +297,12 @@ const Account = (() => {
   async function logOut() {
     await saveNow(true);
     const token = session && session.access_token;
+    leaving = true;
     storeSession(null); admin = false; lastSaved = "";
     if (token) { try { await api("/auth/v1/logout", { token, body: {} }); } catch (e) { /* the token is dropped here either way */ } }
     changed();
     toast("Logged out");
+    if (configured) setTimeout(() => location.reload(), 600);   // back to the login screen with a clean game
   }
 
   // ------------------------------------------------------------------ the screen
@@ -306,13 +315,37 @@ const Account = (() => {
     $a("ac-form").hidden = !configured || on || !!recoveryToken;
     $a("ac-reset").hidden = !configured || !recoveryToken;
     $a("ac-in").hidden = !configured || !on;
+    $a("ac-gate").hidden = !(gateOpen && !on && !recoveryToken);
+    const st = $a("start");
+    if (st && !$a("intro").classList.contains("hidden")) st.textContent = configured && !on ? "Log in to enter Rome" : "Enter Rome";
     if (on) {
       $a("ac-who").textContent = session.email;
     }
     $a("btn-account").textContent = on ? `Account: ${session.email.split("@")[0].slice(0, 10)}` : "Log in";
   }
 
+  // The login screen that cannot be closed. `done` runs once someone has logged in.
+  function gate(done) {
+    if (!configured || session) { if (done) done(); return; }
+    closePanels();
+    gateDone = done || null; gateOpen = true;
+    $a("account").classList.add("gate", "show");
+    panelOpen = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    for (const eye of document.querySelectorAll("#account .pw-eye")) { const box = eye.parentElement.querySelector("input"); if (box.type !== "password") eye.click(); }
+    renderAccount();
+  }
+  function unlock() {
+    if (!gateOpen || !session) return;
+    gateOpen = false;
+    $a("account").classList.remove("gate");
+    closePanels();
+    const f = gateDone; gateDone = null;
+    if (f) f();
+  }
+
   function open() {
+    if (gateOpen) return;
     if (mode !== "walk" || (panelOpen && !creatorOpen) || (creatorOpen && !Character.exists)) { toast("Close what is open and stop the game first"); return; }
     if (creatorOpen) closeCreator();
     openPanel("#account");
@@ -356,7 +389,8 @@ const Account = (() => {
   }
 
   return {
-    configured, bind, open, saveNow,
+    configured, bind, open, saveNow, gate,
+    get locked() { return gateOpen && configured && !session; },
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
     get loggedIn() { return !!session; },
     get email() { return session ? session.email : ""; },

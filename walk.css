@@ -318,6 +318,8 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 #account h2, #online h2 { font: 700 1.3rem Georgia, serif; color: var(--gold); }
 #account-close, #on-close { font: inherit; color: var(--ink); cursor: pointer; background: var(--panel); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 5px 11px; }
 #account [hidden], #online [hidden] { display: none !important; }
+#account.gate #account-close { display: none !important; }
+#ac-gate { color: var(--gold); font-weight: 600; }
 #account label { display: block; margin: 8px 0; font-weight: 600; }
 #account input[type=email], #account input[type=password], #account .pw-wrap input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--ink); background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; }
 #account .pw-wrap { position: relative; display: block; }

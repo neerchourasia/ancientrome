@@ -259,14 +259,16 @@ function wireInput(canvas) {
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not available here */ }
   });
 
-  $("#start").addEventListener("click", () => {
+  const begin = () => {
     started = true;
     Sfx.init();
     $("#intro").classList.add("hidden");
     if (!Character.exists) openCreator(true);
     $("#help").classList.add("show");
     setTimeout(() => $("#help").classList.remove("show"), 9000);
-  });
+  };
+  // an account is needed to play (when accounts are switched on): the login screen comes first
+  $("#start").addEventListener("click", () => { if (Account.loggedIn || !Account.configured) begin(); else Account.gate(begin); });
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);
@@ -1006,6 +1008,7 @@ function toast(msg) {
 
 const bigMapOpen = () => $("#bigmap").classList.contains("show");
 function closePanels() {
+  if (Account.locked) return;   // the login screen stays until someone has logged in
   $("#account").classList.remove("show");
   $("#online").classList.remove("show");
   for (const p of document.querySelectorAll(".dpanel.show")) p.classList.remove("show");
