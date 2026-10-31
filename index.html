@@ -7,8 +7,8 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 http://localhost:8765 http://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app https://*.onrender.com https://*.fly.dev https://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=345">
-  <link rel="stylesheet" href="walk.css?v=345">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=346">
+  <link rel="stylesheet" href="walk.css?v=346">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -17,7 +17,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac).</p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=345"></script>
+  <script src="boot.js?v=346"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -515,71 +515,114 @@
   </div>
 
   <div id="intro">
-    <div class="box">
-      <p class="eyebrow">Rome, c. 128 AD · the reign of Hadrian</p>
-      <h1>Time Machine</h1>
-      <p>Explore the city at street level. Climb the seats of the Colosseum, stand beneath the Pantheon's dome and walk the Via Sacra. Discover all 20 landmarks to learn their story, then fight as a gladiator in the arena or race a chariot in the Circus Maximus.</p>
-      <button id="start" type="button">Enter Rome</button>
-      <p class="note">Stylized, not to scale. Best on a desktop browser with a keyboard.</p>
-      <p class="note"><a href="guide/">History guide, timeline &amp; quiz</a></p>
-    </div>
+    <nav class="in-nav">
+      <span class="in-brand"><span class="in-logo" aria-hidden="true"></span>Time Machine</span>
+      <span class="in-links">
+        <a href="guide/">History guide</a>
+        <button type="button" class="in-btn ghost" data-enter data-guest>Log in</button>
+        <button type="button" class="in-btn" data-enter>Play free</button>
+      </span>
+    </nav>
+    <main class="in-main">
+      <section class="in-hero">
+        <p class="eyebrow">Free to play · No real money, ever</p>
+        <h1>Walk through history,<br>one street at a time.</h1>
+        <p class="lead">Time Machine is a free 3D game set in Rome in 128 AD, with Mughal Delhi and modern Cancún to explore too. Climb the Colosseum, race a chariot, take a job and earn denarii, a pretend coin that is never real money.</p>
+        <button id="start" type="button">Enter Rome</button>
+        <p class="alt" data-guest><a href="#" data-enter>or log in to your account &rarr;</a></p>
+      </section>
+
+      <section class="in-two">
+        <div class="in-card">
+          <div class="in-icon">👪</div>
+          <h2>For parents</h2>
+          <ul>
+            <li><b>No real money, ever.</b> Denarii are earned by playing. They cannot be bought, cashed out or turned into real money.</li>
+            <li>Made for ages 13 and up. Everyone confirms their age and reads the <a href="terms.html" target="_blank" rel="noopener">Terms</a> when they create an account.</li>
+            <li>We keep the minimum: an email address and the saved game. See the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a> for the full list.</li>
+            <li>Chat is moderated: swearing is masked, names are checked, and admins can mute, remove or block anyone who misbehaves.</li>
+          </ul>
+        </div>
+        <div class="in-card">
+          <div class="in-icon">🎮</div>
+          <h2>For players</h2>
+          <ul>
+            <li>Walk the city at street level and discover all 20 landmarks, each with a real story to read.</li>
+            <li>Fight as a gladiator, race a chariot in the Circus Maximus, sail a naval battle, or take a job.</li>
+            <li>Earn denarii and spend them on vehicles from carts to jets, houses, outfits and pets.</li>
+            <li>Your game is saved to your account, so it follows you to any device.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="in-do">
+        <h3>What you can do</h3>
+        <div class="in-grid">
+          <div><div class="in-icon sm">🏛</div><h4>Explore and learn</h4><p>Stand beneath the Pantheon's dome, walk the Via Sacra and read the history behind every landmark. Switch between ancient and modern Rome, Delhi and Cancún.</p></div>
+          <div><div class="in-icon sm">⚔️</div><h4>Compete and build</h4><p>Duel in the arena, race chariots, design your own ships, deliver parcels by car or plane and upgrade your house.</p></div>
+          <div><div class="in-icon sm">🤝</div><h4>Play together</h4><p>See other players walking around, add friends, chat, send gifts and team up against bots or race each other online.</p></div>
+        </div>
+      </section>
+
+      <p class="in-foot">Stylized, not to scale. Best on a desktop browser with a keyboard. · <a href="guide/">History guide, timeline &amp; quiz</a> · <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a></p>
+    </main>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=345"></script>
-  <script src="cancun-data.js?v=345"></script>
-  <script src="delhi-data.js?v=345"></script>
-  <script src="config.js?v=345"></script>
-  <script src="character.js?v=345"></script>
-  <script src="physics.js?v=345"></script>
-  <script src="vitals.js?v=345"></script>
-  <script src="narrator.js?v=345"></script>
-  <script src="audio.js?v=345"></script>
-  <script src="music.js?v=345"></script>
-  <script src="world.js?v=345"></script>
-  <script src="city.js?v=345"></script>
-  <script src="weather.js?v=345"></script>
-  <script src="modern.js?v=345"></script>
-  <script src="delhi.js?v=345"></script>
-  <script src="cancun.js?v=345"></script>
-  <script src="delhi-games.js?v=345"></script>
-  <script src="doors.js?v=345"></script>
-  <script src="home.js?v=345"></script>
-  <script src="spectators.js?v=345"></script>
-  <script src="fight.js?v=345"></script>
-  <script src="nav.js?v=345"></script>
-  <script src="show.js?v=345"></script>
-  <script src="shipyard.js?v=345"></script>
-  <script src="naval.js?v=345"></script>
-  <script src="theatre.js?v=345"></script>
-  <script src="watch.js?v=345"></script>
-  <script src="race.js?v=345"></script>
-  <script src="account.js?v=345"></script>
-  <script src="online.js?v=345"></script>
-  <script src="chat.js?v=345"></script>
-  <script src="social.js?v=345"></script>
-  <script src="gifts.js?v=345"></script>
-  <script src="tax.js?v=345"></script>
-  <script src="pets.js?v=345"></script>
-  <script src="cage.js?v=345"></script>
-  <script src="treasure.js?v=345"></script>
-  <script src="fares.js?v=345"></script>
-  <script src="trade.js?v=345"></script>
-  <script src="aircraft.js?v=345"></script>
-  <script src="car.js?v=345"></script>
-  <script src="market.js?v=345"></script>
-  <script src="garage.js?v=345"></script>
-  <script src="dresser.js?v=345"></script>
-  <script src="festival.js?v=345"></script>
-  <script src="harbour.js?v=345"></script>
-  <script src="disease.js?v=345"></script>
-  <script src="jail.js?v=345"></script>
-  <script src="guards.js?v=345"></script>
-  <script src="police.js?v=345"></script>
-  <script src="weapons.js?v=345"></script>
-  <script src="stalls.js?v=345"></script>
-  <script src="robbery.js?v=345"></script>
-  <script src="jobs.js?v=345"></script>
-  <script src="game.js?v=345"></script>
+  <script src="landmarks.js?v=346"></script>
+  <script src="cancun-data.js?v=346"></script>
+  <script src="delhi-data.js?v=346"></script>
+  <script src="config.js?v=346"></script>
+  <script src="character.js?v=346"></script>
+  <script src="physics.js?v=346"></script>
+  <script src="vitals.js?v=346"></script>
+  <script src="narrator.js?v=346"></script>
+  <script src="audio.js?v=346"></script>
+  <script src="music.js?v=346"></script>
+  <script src="world.js?v=346"></script>
+  <script src="city.js?v=346"></script>
+  <script src="weather.js?v=346"></script>
+  <script src="modern.js?v=346"></script>
+  <script src="delhi.js?v=346"></script>
+  <script src="cancun.js?v=346"></script>
+  <script src="delhi-games.js?v=346"></script>
+  <script src="doors.js?v=346"></script>
+  <script src="home.js?v=346"></script>
+  <script src="spectators.js?v=346"></script>
+  <script src="fight.js?v=346"></script>
+  <script src="nav.js?v=346"></script>
+  <script src="show.js?v=346"></script>
+  <script src="shipyard.js?v=346"></script>
+  <script src="naval.js?v=346"></script>
+  <script src="theatre.js?v=346"></script>
+  <script src="watch.js?v=346"></script>
+  <script src="race.js?v=346"></script>
+  <script src="account.js?v=346"></script>
+  <script src="online.js?v=346"></script>
+  <script src="chat.js?v=346"></script>
+  <script src="social.js?v=346"></script>
+  <script src="gifts.js?v=346"></script>
+  <script src="tax.js?v=346"></script>
+  <script src="pets.js?v=346"></script>
+  <script src="cage.js?v=346"></script>
+  <script src="treasure.js?v=346"></script>
+  <script src="fares.js?v=346"></script>
+  <script src="trade.js?v=346"></script>
+  <script src="aircraft.js?v=346"></script>
+  <script src="car.js?v=346"></script>
+  <script src="market.js?v=346"></script>
+  <script src="garage.js?v=346"></script>
+  <script src="dresser.js?v=346"></script>
+  <script src="festival.js?v=346"></script>
+  <script src="harbour.js?v=346"></script>
+  <script src="disease.js?v=346"></script>
+  <script src="jail.js?v=346"></script>
+  <script src="guards.js?v=346"></script>
+  <script src="police.js?v=346"></script>
+  <script src="weapons.js?v=346"></script>
+  <script src="stalls.js?v=346"></script>
+  <script src="robbery.js?v=346"></script>
+  <script src="jobs.js?v=346"></script>
+  <script src="game.js?v=346"></script>
 </body>
 </html>

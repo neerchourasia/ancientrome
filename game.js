@@ -269,6 +269,7 @@ function wireInput(canvas) {
   };
   // an account is needed to play (when accounts are switched on): the login screen comes first
   $("#start").addEventListener("click", () => { if (Account.loggedIn || !Account.configured) begin(); else Account.gate(begin); });
+  for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);

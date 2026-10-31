@@ -317,7 +317,8 @@ const Account = (() => {
     $a("ac-in").hidden = !configured || !on;
     $a("ac-gate").hidden = !(gateOpen && !on && !recoveryToken);
     const st = $a("start");
-    if (st && !$a("intro").classList.contains("hidden")) st.textContent = configured && !on ? "Log in to enter Rome" : "Enter Rome";
+    if (st && !$a("intro").classList.contains("hidden")) st.textContent = configured && !on ? "Play free" : "Enter Rome";
+    for (const g of document.querySelectorAll("#intro [data-guest]")) g.hidden = on;   // "Log in" links are for people who are not logged in
     if (on) {
       $a("ac-who").textContent = session.email;
     }
