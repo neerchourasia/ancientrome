@@ -13,6 +13,7 @@ const Treasure = (() => {
   try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") got = v; } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(got)); } catch (e) { /* ignore */ } };
   const keyNow = () => `${city}-${era}-${Math.floor(Time.day)}`;
+  const dayOf = (k) => k.slice(k.lastIndexOf("-") + 1);
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
   function build(key) {
@@ -42,7 +43,7 @@ const Treasure = (() => {
     if (!added && typeof scene !== "undefined") { scene.add(root); added = true; }
     const key = keyNow();
     if (key !== builtKey) {
-      for (const k of Object.keys(got)) if (k !== key) delete got[k];                                // only today's coins are remembered
+      for (const k of Object.keys(got)) if (dayOf(k) !== dayOf(key)) delete got[k];                  // only today's coins are remembered (in every city and era, so going away and coming back does not bring them back)
       build(key);
       if (told !== key && coins.length && left()) { told = key; toast(`Gold coins glint around the city today: find all ${coins.length} for a bonus!`); }
     }
