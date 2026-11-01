@@ -1579,6 +1579,40 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "chat", "text": "again"})
         self.assertEqual((await bob.until(lambda m: m["t"] == "chat" and m.get("text") == "again"))["title"], "")
 
+    async def test_the_world_is_saved_and_loaded_again(self):
+        saved = {}
+
+        def fake_http(url, headers, body=None, method=None, timeout=8):
+            if method == "POST":
+                for row in body:
+                    saved[row["key"]] = row["data"]
+                return None
+            return [{"key": k, "data": v} for k, v in saved.items()]
+        old = (server._http_json, dict(server.CFG))
+        server._http_json = fake_http
+        server.CFG.update({"supabase_url": "https://example.supabase.co", "service_key": "service"})
+        try:
+            server._world_sig.clear()
+            server.GUILDS.clear(); server.GUILD_OF.clear(); server.LEADERS.clear(); server.EVENT_BEST.clear()
+            server.GUILDS["red"] = {"name": "Red", "tag": "RED", "leader": "aaa", "members": {"aaa": "Ann"}, "treasury": 250, "chat": [], "paid": [0.0, 0]}
+            server.GUILD_OF["aaa"] = "red"
+            server.LEADERS["aaa"] = {"name": "Ann", "coins": 900, "relics": 1, "houses": 0, "t": time.time()}
+            server.EVENT_BEST["rome-car"] = {"aaa": {"name": "Ann", "ms": 90000}}
+            server.PYRAMID.update({"blocks": 42, "done": 2, "who": {"Ann": 9}})
+            self.assertGreaterEqual(await server.world_save(), 4)
+            self.assertEqual(await server.world_save(), 0)                                   # nothing changed: nothing sent
+            server.GUILDS.clear(); server.GUILD_OF.clear(); server.LEADERS.clear(); server.EVENT_BEST.clear(); server.PYRAMID.update({"blocks": 0, "done": 0, "who": {}})
+            self.assertTrue(await server.world_load())                                        # a restart: it all comes back
+            self.assertEqual(server.GUILDS["red"]["treasury"], 250)
+            self.assertEqual(server.GUILD_OF["aaa"], "red")
+            self.assertEqual(server.LEADERS["aaa"]["coins"], 900)
+            self.assertEqual(server.EVENT_BEST["rome-car"]["aaa"]["ms"], 90000)
+            self.assertEqual((server.PYRAMID["blocks"], server.PYRAMID["done"]), (42, 2))
+        finally:
+            server._http_json = old[0]
+            server.CFG.clear(); server.CFG.update(old[1])
+            server._world_sig.clear()
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

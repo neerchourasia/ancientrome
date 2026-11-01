@@ -43,6 +43,7 @@ def load_config():
         "port": int(e("PORT", "8765")),
         "supabase_url": supa,
         "anon_key": e("SUPABASE_ANON_KEY", ""),
+        "service_key": e("SUPABASE_SERVICE_KEY", ""),   # lets the server keep the world (guilds, prices, boards) between restarts: see supabase-world.sql
         "allow_bots": e("ALLOW_BOTS", "1") == "1",
         "bot_wait": float(e("BOT_WAIT", "6")),        # seconds alone in the queue before a practice bot joins
         "race_wait": float(e("RACE_WAIT", "6")),      # seconds to wait for more racers once two are queued
@@ -3377,10 +3378,111 @@ async def ws_session(reader, writer, ip, ua=""):
         drop(conn)
 
 
+
+# ---------------------------------------------------------------------------------------------------------------
+# Keeping the world between restarts. With SUPABASE_URL and SUPABASE_SERVICE_KEY set, the server saves guilds, share prices, the leaderboards, the race times and the pyramid to the
+# world_state table (supabase-world.sql) once a minute (when something changed) and loads them when it starts. Without them it works as before, in memory only.
+
+WORLD_SAVE_EVERY = 60.0
+_world_sig = {}
+
+
+def world_on():
+    return bool(CFG.get("supabase_url") and CFG.get("service_key"))
+
+
+def world_headers(extra=None):
+    key = CFG["service_key"]
+    h = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json"}
+    h.update(extra or {})
+    return h
+
+
+def world_snapshot():
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID}
+
+
+def world_apply(rows):
+    """Takes what was saved ({key: data}) and puts it back, ignoring anything that does not look right."""
+    g = rows.get("guilds")
+    if isinstance(g, dict) and isinstance(g.get("guilds"), dict) and isinstance(g.get("of"), dict):
+        GUILDS.clear()
+        GUILD_OF.clear()
+        for k, v in list(g["guilds"].items())[:500]:
+            if isinstance(v, dict) and isinstance(v.get("members"), dict) and v.get("leader") in v["members"] and isinstance(v.get("chat"), list):
+                v["chat"] = v["chat"][-40:]
+                v["treasury"] = int(num(v.get("treasury"), 0, 1e12, 0))
+                v["paid"] = v["paid"] if isinstance(v.get("paid"), list) and len(v["paid"]) == 2 else [0.0, 0]
+                GUILDS[k] = v
+        for f, k in g["of"].items():
+            if k in GUILDS and f in GUILDS[k]["members"]:
+                GUILD_OF[f] = k
+    st = rows.get("stocks")
+    if isinstance(st, dict) and isinstance(st.get("p"), dict) and isinstance(st.get("hist"), dict) and all(d[0] in st["p"] and d[0] in st["hist"] for d in STOCK_DEFS):
+        STOCKS.update({"t": float(st.get("t") or time.time()), "p": {d[0]: float(st["p"][d[0]]) for d in STOCK_DEFS}, "hist": {d[0]: [float(x) for x in st["hist"][d[0]]][-STOCK_HIST:] for d in STOCK_DEFS},
+                       "news": [n for n in st.get("news", []) if isinstance(n, dict)][-6:]})
+    ld = rows.get("leaders")
+    if isinstance(ld, dict):
+        LEADERS.clear()
+        LEADERS.update({k: v for k, v in list(ld.items())[:5000] if isinstance(v, dict) and "name" in v})
+    ev = rows.get("events")
+    if isinstance(ev, dict):
+        EVENT_BEST.clear()
+        EVENT_BEST.update({k: v for k, v in ev.items() if isinstance(v, dict) and re.fullmatch(r"(rome|delhi|cancun)-(car|air|metro)", k)})
+    py = rows.get("pyramid")
+    if isinstance(py, dict):
+        PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})
+
+
+async def world_load():
+    if not world_on():
+        return False
+    try:
+        rows = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state?select=key,data", world_headers())
+    except Exception as err:
+        print("  world: could not load (%s)" % err)
+        return False
+    world_apply({r["key"]: r["data"] for r in (rows or []) if isinstance(r, dict) and "key" in r})
+    for k, v in world_snapshot().items():                     # (what we just loaded is not "changed")
+        _world_sig[k] = json.dumps(v, sort_keys=True, default=str)
+    print("  world: loaded %d guild(s), %d leaderboard entries" % (len(GUILDS), len(LEADERS)))
+    return True
+
+
+async def world_save():
+    if not world_on():
+        return 0
+    changed = []
+    for k, v in world_snapshot().items():
+        sig = json.dumps(v, sort_keys=True, default=str)
+        if _world_sig.get(k) != sig:
+            changed.append((k, v, sig))
+    if not changed:
+        return 0
+    body = [{"key": k, "data": v, "updated_at": datetime.datetime.utcnow().isoformat() + "Z"} for k, v, sig in changed]
+    try:
+        await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state", world_headers({"Prefer": "resolution=merge-duplicates"}), json.loads(json.dumps(body, default=str)), "POST")
+    except Exception as err:
+        print("  world: could not save (%s)" % err)
+        return 0
+    for k, v, sig in changed:
+        _world_sig[k] = sig
+    return len(changed)
+
+
+async def world_save_loop():
+    while True:
+        await asyncio.sleep(WORLD_SAVE_EVERY)
+        await world_save()
+
+
 async def serve(host="0.0.0.0", port=None):
     srv = await asyncio.start_server(handle_http, host, CFG["port"] if port is None else port, limit=2 ** 16)
     asyncio.ensure_future(matchmaker())
     asyncio.ensure_future(world_loop())
+    if world_on():
+        await world_load()
+        asyncio.ensure_future(world_save_loop())
     return srv
 
 
@@ -3388,7 +3490,7 @@ async def main():
     srv = await serve()
     port = srv.sockets[0].getsockname()[1]
     print("Time Machine game server on port %d" % port)
-    print("  accounts: %s | bots: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["allow_bots"]))
+    print("  accounts: %s | bots: %s | world saving: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["allow_bots"], "on" if world_on() else "off (memory only)"))
     if not CFG["origins"]:
         print("  WARNING: ALLOWED_ORIGINS is not set, so only pages on localhost can connect. Set it to your site's address.")
     async with srv:
