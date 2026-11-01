@@ -752,4 +752,10 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .buttons:not(.collapsed) { max-height: calc(100vh - 250px); overflow-y: auto; padding: 4px; background: rgba(20,15,10,.55); border-radius: 12px; scrollbar-width: thin; }
 .buttons.collapsed .mgroup { display: none !important; }
 .mgroup { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; width: 100%; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.14); }
-.mgroup .mh { width: 100%; text-align: right; font: 700 .68rem/1 system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--gold); opacity: .85; }
+.mgroup > button:not(.mh) { display: none; }
+.mgroup.open > button:not(.mh) { display: inline-block; }
+.mgroup > button[hidden] { display: none !important; }
+.mgroup .mh { display: block; width: 100%; text-align: left; padding: 6px 12px; font: 700 .82rem/1.2 system-ui, sans-serif; letter-spacing: .04em; color: var(--gold); }
+.mgroup .mh::after { content: "▸"; float: right; transition: transform .15s; }
+.mgroup.open .mh::after { transform: rotate(90deg); }
+.mgroup .mh.alert { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); }

@@ -314,7 +314,19 @@ function wireInput(canvas) {
     };
     mb.addEventListener("click", () => show(!open));
     show(open);
-    setInterval(() => mb.classList.toggle("alert", !open && ((typeof Gifts !== "undefined" && Gifts.ready) || (typeof Social !== "undefined" && Social.unread() > 0))), 1500);
+    // the sections: press a heading to open its buttons (one section at a time)
+    const groups = [...bar.querySelectorAll(".mgroup")];
+    for (const g of groups) g.querySelector(".mh").addEventListener("click", () => {
+      const was = g.classList.contains("open");
+      for (const o of groups) { o.classList.remove("open"); o.querySelector(".mh").setAttribute("aria-expanded", "false"); }
+      if (!was) { g.classList.add("open"); g.querySelector(".mh").setAttribute("aria-expanded", "true"); }
+    });
+    for (const g of groups) for (const b of g.querySelectorAll("button:not(.mh)")) b.addEventListener("click", () => { if (window.innerWidth < 700) show(false); });
+    const gift = () => typeof Gifts !== "undefined" && Gifts.ready, msgs = () => typeof Social !== "undefined" && Social.unread() > 0;
+    setInterval(() => {
+      mb.classList.toggle("alert", !open && (gift() || msgs()));
+      for (const g of groups) { const h = g.querySelector(".mh"), id = h.textContent; h.classList.toggle("alert", !g.classList.contains("open") && ((id === "Money and work" && gift()) || (id === "People" && msgs()))); }
+    }, 1500);
   }
   $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); toast(Music.on ? "Music on" : "Music off"); });
   refreshMusicButton();
