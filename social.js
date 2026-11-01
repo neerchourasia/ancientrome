@@ -123,7 +123,7 @@ const Social = (() => {
     const fl = $s("fr-list"); fl.replaceChildren();
     const list = [...friends.values()].sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
     if (!list.length) li(fl, span("No friends yet. Add someone below.", "dim"));
-    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), ...(f.online ? [btn("⚓ Sail", () => sailWith(f.fid, false)), btn("🪙 Give", () => giveTo(f))] : []), btn("Remove", () => { if (confirm(`Remove ${f.name} from your friends?`)) send({ a: "del", fid: f.fid }); }));
+    for (const f of list) li(fl, span(f.online ? "🟢" : "⚪"), span(f.name + (f.unread ? ` (${f.unread} new)` : "")), btn("Chat", () => select(f.fid)), ...(f.online ? [btn("⚓ Sail", () => sailWith(f.fid, false)), btn("🪙 Give", () => giveTo(f))] : []), btn("Remove", () => { Dialog.confirm(`Remove ${f.name} from your friends?`).then((yes) => { if (yes) send({ a: "del", fid: f.fid }); }); }));
     const chat = $s("fr-chat"), cur = friends.get(sel);
     chat.hidden = !cur;
     if (cur) {
@@ -142,12 +142,13 @@ const Social = (() => {
   // give some of your denarii to a friend who is online (they arrive at once)
   function giveTo(f) {
     if (Vitals.coins < 1) { toast("You have no denarii to give."); return; }
-    const raw = prompt(`How many denarii do you give to ${f.name}? (1 to 5000; you have ${Vitals.coins})`, String(Math.min(100, Vitals.coins)));
-    if (raw === null) return;
-    const n = Math.floor(Number(raw));
-    if (!Number.isFinite(n) || n < 1) { toast("Type a whole number of denarii."); return; }
-    if (n > Vitals.coins) { toast("You do not have that many denarii."); return; }
-    send({ a: "give", fid: f.fid, n });
+    Dialog.ask(`How many denarii do you give to ${f.name}? (1 to 5000; you have ${Vitals.coins})`, String(Math.min(100, Vitals.coins))).then((raw) => {
+      if (raw === null) return;
+      const n = Math.floor(Number(raw));
+      if (!Number.isFinite(n) || n < 1) { toast("Type a whole number of denarii."); return; }
+      if (n > Vitals.coins) { toast("You do not have that many denarii."); return; }
+      send({ a: "give", fid: f.fid, n });
+    });
   }
 
   function sailWith(fid, accepting) {

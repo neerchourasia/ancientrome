@@ -169,8 +169,8 @@ const Admin = (() => {
       const ask = (m) => Online.navalSend({ t: "admin", a: m, email: u.email, uid: u.user_id });
       if (blocked) { act.textContent = "BLOCKED "; button(act, "Unblock", () => { ask("unblockacct"); setTimeout(loadOnline, 600); }); }
       else {
-        button(act, "Kick", () => { if (confirm(`Kick ${u.email} out of the game for 10 minutes?`)) ask("kickacct"); });
-        button(act, "Block", () => { if (confirm(`Block ${u.email} from the game for 30 days and remove them now?`)) { ask("blockacct"); setTimeout(loadOnline, 600); } });
+        button(act, "Kick", () => { Dialog.confirm(`Kick ${u.email} out of the game for 10 minutes?`).then((yes) => { if (yes) ask("kickacct"); }); });
+        button(act, "Block", () => { Dialog.confirm(`Block ${u.email} from the game for 30 days and remove them now?`).then((yes) => { if (yes) { ask("blockacct"); setTimeout(loadOnline, 600); } }); });
       }
     }
   }
@@ -264,7 +264,7 @@ const Admin = (() => {
       cell(r, (v.online ? "● " : "") + when(v.last)); cell(r, when(v.first)); cell(r, v.visits); cell(r, v.plays); cell(r, v.name || ""); cell(r, v.acct || "guest"); cell(r, v.ua); cell(r, v.last_ip || v.last_ip_mask); cell(r, v.flags || ""); cell(r, String(v.vid || "").slice(0, 8));
       const act = r.insertCell();
       if (v.blocked) { act.textContent = "BLOCKED "; button(act, "Unblock", () => { Online.navalSend({ t: "admin", a: "unblock", vid: v.vid }); setTimeout(loadOnline, 600); }); }
-      else button(act, "Block", () => { if (confirm(`Block ${v.name || "this visitor"} (${String(v.vid).slice(0, 8)}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: v.vid }); setTimeout(loadOnline, 600); } });
+      else button(act, "Block", () => { Dialog.confirm(`Block ${v.name || "this visitor"} (${String(v.vid).slice(0, 8)}) from the game for 30 days and remove them now?`).then((yes) => { if (yes) { Online.navalSend({ t: "admin", a: "block", vid: v.vid }); setTimeout(loadOnline, 600); } }); });
     }
   }
 
@@ -282,7 +282,7 @@ const Admin = (() => {
       r.className = e.level === "high" ? "lv-high" : e.level === "medium" ? "lv-medium" : "";
       cell(r, when(e.t)); cell(r, e.kind); cell(r, e.detail); cell(r, e.who || ""); cell(r, e.ip_full || e.ip); cell(r, e.vid || "");
       const act = r.insertCell();
-      if (e.vid) button(act, "Block", () => { if (confirm(`Block ${e.who || "this visitor"} (${e.vid}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: e.vid }); setTimeout(loadOnline, 600); } });
+      if (e.vid) button(act, "Block", () => { Dialog.confirm(`Block ${e.who || "this visitor"} (${e.vid}) from the game for 30 days and remove them now?`).then((yes) => { if (yes) { Online.navalSend({ t: "admin", a: "block", vid: e.vid }); setTimeout(loadOnline, 600); } }); });
     }
   }
 
@@ -301,9 +301,9 @@ const Admin = (() => {
       const act = r.insertCell();
       if (!p.admin) {
         button(act, p.muted ? "Unmute" : "Mute 10 min", () => { Online.navalSend({ t: "admin", a: p.muted ? "unmute" : "mute", id: p.id, min: 10 }); setTimeout(loadOnline, 400); });
-        button(act, "Kick", () => { if (confirm(`Kick ${p.name} for 10 minutes?`)) { Online.navalSend({ t: "admin", a: "kick", id: p.id }); setTimeout(loadOnline, 600); } });
-        button(act, "Give 🪙", () => { const raw = prompt(`How many denarii do you give to ${p.name}?`, "1000"); const n = Math.floor(Number(raw)); if (raw !== null && n >= 1) Online.navalSend({ t: "admin", a: "give", id: p.id, n }); });
-        button(act, "Block", () => { if (confirm(`Block ${p.name} from the game for 30 days and remove them right now?`)) { Online.navalSend({ t: "admin", a: "block", id: p.id }); setTimeout(loadOnline, 600); } });
+        button(act, "Kick", () => { Dialog.confirm(`Kick ${p.name} for 10 minutes?`).then((yes) => { if (yes) { Online.navalSend({ t: "admin", a: "kick", id: p.id }); setTimeout(loadOnline, 600); } }); });
+        button(act, "Give 🪙", () => { Dialog.ask(`How many denarii do you give to ${p.name}?`, "1000").then((raw) => { const n = Math.floor(Number(raw)); if (raw !== null && n >= 1) Online.navalSend({ t: "admin", a: "give", id: p.id, n }); }); });
+        button(act, "Block", () => { Dialog.confirm(`Block ${p.name} from the game for 30 days and remove them right now?`).then((yes) => { if (yes) { Online.navalSend({ t: "admin", a: "block", id: p.id }); setTimeout(loadOnline, 600); } }); });
       }
     }
   }
