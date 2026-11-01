@@ -13,8 +13,8 @@ const Treasure = (() => {
   let coins = [], builtKey = "", got = {}, added = false, told = "";
   try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") got = v; } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(got)); } catch (e) { /* ignore */ } };
-  const keyNow = () => `${city}-${era}-${Math.floor(Time.day)}`;
-  const foundKey = () => `found:${city}-${Math.floor(Time.day)}`;      // how many coins you have taken today in this city (in either era)
+  const keyNow = () => `${city}-${era}-${Payroll.epoch()}`;                    // (a new set every 20 real minutes, not every game day: sleeping again and again brings none)
+  const foundKey = () => `found:${city}-${Payroll.epoch()}`;      // how many coins you have taken today in this city (in either era)
   const foundNow = () => got[foundKey()] || 0;
   const dayOf = (k) => k.slice(k.lastIndexOf("-") + 1);
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };

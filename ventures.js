@@ -17,11 +17,11 @@ const Ventures = (() => {
   ];
   const HIRE = [{ cost: 0.6, mult: 1.8 }, { cost: 1.0, mult: 2.8 }];          // hiring more bots: the cost (as a share of the price) and the profit multiplier at that level
   const MUSEUM = [{ cost: 3000, slots: 4 }, { cost: 6000, slots: 8 }, { cost: 12000, slots: 12 }];
-  let s = { biz: {}, museum: 0, paidDay: 1 };
+  let s = { biz: {}, museum: 0, paidDay: 1, paidAt: Date.now() - Payroll.DAY_MS };
   try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && typeof r === "object") s = sanitize(r); } catch (e) { /* storage unavailable */ }
 
   function sanitize(raw) {
-    const out = { biz: {}, museum: Math.max(0, Math.min(3, Math.floor(Number(raw && raw.museum) || 0))), paidDay: Math.max(1, Math.floor(Number(raw && raw.paidDay) || 1)) };
+    const out = { biz: {}, museum: Math.max(0, Math.min(3, Math.floor(Number(raw && raw.museum) || 0))), paidDay: Math.max(1, Math.floor(Number(raw && raw.paidDay) || 1)), paidAt: Number.isFinite(raw && raw.paidAt) ? raw.paidAt : Date.now() - Payroll.DAY_MS };
     const b = raw && typeof raw.biz === "object" && raw.biz ? raw.biz : {};
     for (const x of BIZ) if (b[x.id]) out.biz[x.id] = { level: Math.max(0, Math.min(2, Math.floor(Number(b[x.id].level) || 0))) };
     return out;
@@ -73,10 +73,9 @@ const Ventures = (() => {
     if (typeof started === "undefined" || !started) return;
     tick += dt; if (tick < 1) return; tick = 0;
     if (Time.day > s.paidDay) {
-      let pay = 0; const days = Math.min(MAX_DAYS, Time.day - s.paidDay);
-      for (let d = Time.day - days + 1; d <= Time.day; d++) pay += totalFor(d);
-      s.paidDay = Time.day; save();
-      if (pay > 0) { Vitals.coins += pay; Sfx.play("coin"); toast(`Your businesses${s.museum ? " and museum" : ""} earned ${pay} denarii${days > 1 ? ` over ${days} days` : ""}.`); }
+      const real = Payroll.realDays(s.paidAt), pay = Math.round(totalFor(Time.day) * real);      // (the profit for the real time that has passed, not for skipped game days)
+      s.paidDay = Time.day; s.paidAt = Date.now(); save();
+      if (pay > 0) { Vitals.coins += pay; Sfx.play("coin"); toast(`Your businesses${s.museum ? " and museum" : ""} earned ${pay} denarii${real > 1.5 ? ` over ${Math.round(real)} days` : ""}.`); }
     } else if (Time.day < s.paidDay) { s.paidDay = Time.day; save(); }
   }
 
@@ -86,7 +85,7 @@ const Ventures = (() => {
     bind, update, open,
     snapshot: () => JSON.parse(JSON.stringify(s)),
     restore(raw) { s = sanitize(raw); save(); },
-    merge(raw) { const o = sanitize(raw); for (const [id, v] of Object.entries(o.biz)) s.biz[id] = { level: Math.max(v.level, s.biz[id] ? s.biz[id].level : 0) }; s.museum = Math.max(s.museum, o.museum); save(); },
+    merge(raw) { const o = sanitize(raw); for (const [id, v] of Object.entries(o.biz)) s.biz[id] = { level: Math.max(v.level, s.biz[id] ? s.biz[id].level : 0) }; s.museum = Math.max(s.museum, o.museum); s.paidAt = Math.max(s.paidAt, o.paidAt); save(); },
     get count() { return Object.keys(s.biz).length + (s.museum ? 1 : 0); },
     _profit: (day) => totalFor(day),
   };

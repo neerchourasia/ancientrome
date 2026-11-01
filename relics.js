@@ -32,11 +32,11 @@ const Relics = (() => {
   }
 
   function choose() {
-    const list = peopleHere(), k = `${city}-${Time.day}-${list.length}-${owned().length}`;
+    const list = peopleHere(), k = `${city}-${Payroll.epoch()}-${list.length}-${owned().length}`;
     if (k === key) return;
     key = k; carriers = [];
     if (!list.length) return;
-    const rnd = seeded(`relics-${city}-${Time.day}`), free = RELICS.map((r) => r[0]).filter((id) => !owned().includes(id));
+    const rnd = seeded(`relics-${city}-${Payroll.epoch()}`), free = RELICS.map((r) => r[0]).filter((id) => !owned().includes(id));
     const used = new Set();
     for (let n = 0; n < FEW && free.length; n++) {
       const i = Math.floor(rnd() * list.length); if (used.has(i)) continue; used.add(i);

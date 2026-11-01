@@ -1583,7 +1583,7 @@ function updateDeath(dt) {
     deathT = 0;
     Vitals.hp = 55; Vitals.horses = Vitals.horses + 25; Vitals.hunger = Math.max(Vitals.hunger, 50); // the doctor feeds you a little
     const fee = Math.min(Vitals.coins, 25); Vitals.coins -= fee;
-    const rent = Market.rent(); if (rent) Vitals.coins += rent;
+    const rent = Market.collectRent(); if (rent) Vitals.coins += rent;
     $("#death").classList.remove("on", "lapse");
     toast(`Day ${Time.day}: you are on your feet again. The doctor charged ${fee} denarii${rent ? `, and your tenants paid ${rent}` : ""}`);
     Narrator.say(`Day ${Time.day}. You are on your feet again, but still weak. Be careful out there.`, { interrupt: true });
@@ -1615,7 +1615,7 @@ function wakeUp() {
     Narrator.say(`Day ${Time.day}. You collapsed from tiredness, and were carried home. Next time, sleep in your bed at night.`, { interrupt: true });
   } else {
     Vitals.hp = 100;
-    const rent = Market.rent();
+    const rent = Market.collectRent();
     if (rent) Vitals.coins += rent;
     toast(`Day ${Time.day}: you wake at dawn, fully rested${rent ? `. Your tenants paid you ${rent} denarii` : ""}`);
     Narrator.say(`Day ${Time.day}. You wake at dawn, fully rested.`, { interrupt: true });

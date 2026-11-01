@@ -11,14 +11,14 @@
 const Estate = (() => {
   const T = THREE;
   const KEY = "rome-estate", PER_CITY = 10, SELL_BACK = 0.7, RENT_RATE = 0.04, MAX_DAYS = 14;
-  let state = { owned: {}, paidDay: 1 };                  // owned: house id -> { rented: true or false, level: 0 to 3 }
+  let state = { owned: {}, paidDay: 1, paidAt: Date.now() - Payroll.DAY_MS };                  // owned: house id -> { rented: true or false, level: 0 to 3 }
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw && typeof raw === "object") state = sanitize(raw);
   } catch (e) { /* storage unavailable */ }
 
   function sanitize(raw) {
-    const out = { owned: {}, paidDay: Number.isFinite(raw && raw.paidDay) ? Math.max(1, Math.floor(raw.paidDay)) : 1 };
+    const out = { owned: {}, paidDay: Number.isFinite(raw && raw.paidDay) ? Math.max(1, Math.floor(raw.paidDay)) : 1, paidAt: Number.isFinite(raw && raw.paidAt) ? raw.paidAt : Date.now() - Payroll.DAY_MS };
     const o = raw && typeof raw.owned === "object" && raw.owned ? raw.owned : {};
     for (const [id, v] of Object.entries(o)) if (/^(rome|delhi|cancun)-\d{1,2}$/.test(id) && Number(id.split("-")[1]) < PER_CITY) out.owned[id] = { rented: !!(v && v.rented), level: Math.max(0, Math.min(3, Math.floor(Number(v && v.level) || 0))) };
     return out;
@@ -233,9 +233,9 @@ const Estate = (() => {
     ensure();
     tick += dt; if (tick < 1) return; tick = 0;
     if (Time.day > state.paidDay) {
-      const days = Math.min(MAX_DAYS, Time.day - state.paidDay), pay = rentTotal() * days;
-      state.paidDay = Time.day; save();
-      if (pay > 0) { Vitals.coins += pay; Sfx.play("coin"); toast(`Your tenants paid you ${pay} denarii${days > 1 ? ` for ${days} days` : ""}.`); }
+      const real = Payroll.realDays(state.paidAt), pay = Math.round(rentTotal() * real);         // (the rent for the real time that has passed, not for skipped game days)
+      state.paidDay = Time.day; state.paidAt = Date.now(); save();
+      if (pay > 0) { Vitals.coins += pay; Sfx.play("coin"); toast(`Your tenants paid you ${pay} denarii${real > 1.5 ? ` for ${Math.round(real)} days` : ""}.`); }
     } else if (Time.day < state.paidDay) { state.paidDay = Time.day; save(); }          // (a new game, or an older saved game)
   }
 
@@ -246,11 +246,12 @@ const Estate = (() => {
 
   return {
     bind, update, at, open, promptText,
-    snapshot: () => ({ owned: JSON.parse(JSON.stringify(state.owned)), paidDay: state.paidDay }),
+    snapshot: () => ({ owned: JSON.parse(JSON.stringify(state.owned)), paidDay: state.paidDay, paidAt: state.paidAt }),
     restore(raw) { state = sanitize(raw); save(); for (const c of LINESET) for (const h of catalog(c)) rebuild(h); },
     merge(raw) {                                          // take in houses bought on another device (a saved game that is older than this device's)
       const o = sanitize(raw);
       for (const [id, v] of Object.entries(o.owned)) state.owned[id] = { rented: !!(state.owned[id] && state.owned[id].rented) || v.rented, level: Math.max(v.level, state.owned[id] ? state.owned[id].level || 0 : 0) };
+      state.paidAt = Math.max(state.paidAt, o.paidAt);
       save(); for (const c of LINESET) for (const h of catalog(c)) rebuild(h);
     },
     get count() { return Object.keys(state.owned).length; },

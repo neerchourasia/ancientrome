@@ -29,11 +29,11 @@ const Quests = (() => {
   const ensureMarks = () => { if (!marks.length) { for (let i = 0; i < GIVERS; i++) marks.push(makeMark("!", "#d9a21b")); marks.push(makeMark("?", "#2a6fd0")); } };
 
   function choose() {
-    const list = peopleHere(), k = `${city}-${Time.day}-${list.length}`;
+    const list = peopleHere(), k = `${city}-${Payroll.epoch()}-${list.length}`;
     if (k === key) return;
     key = k; givers = []; doneToday = 0;
     if (!list.length) return;
-    const rnd = seeded(`quests-${city}-${Time.day}`), skip = new Set((typeof Relics !== "undefined" ? Relics._carriers() : []).map((c) => c.p));
+    const rnd = seeded(`quests-${city}-${Payroll.epoch()}`), skip = new Set((typeof Relics !== "undefined" ? Relics._carriers() : []).map((c) => c.p));
     const used = new Set();
     for (let n = 0, tries = 0; n < GIVERS && tries < 60; tries++) {
       const i = Math.floor(rnd() * list.length);

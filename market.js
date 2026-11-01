@@ -439,6 +439,15 @@ const Market = (() => {
     grantable: () => Object.keys(ITEMS).filter((id) => ITEMS[id].type !== "supply" && ITEMS[id].type !== "food" && !s.items.includes(id)).map((id) => [id, ITEMS[id].name, ITEMS[id].type]),
     perk: (key) => s.items.reduce((m, id) => m * ((PERKS[id] && PERKS[id][key]) || 1), 1),
     rent: () => homes()[tier()].rent,
+    // what the tenants of your own house pay when you wake in the morning: the rent for the real time since the last time (so sleeping again and again earns no more)
+    collectRent() {
+      const r = homes()[tier()].rent; let at = NaN;
+      try { at = Number(localStorage.getItem("rome-rent-at")); } catch (e) { /* ignore */ }
+      if (!Number.isFinite(at) || at <= 0) at = Date.now() - Payroll.DAY_MS;               // (the first time: a day's worth)
+      const pay = Math.round(r * Payroll.realDays(at));
+      try { localStorage.setItem("rome-rent-at", String(Date.now())); } catch (e) { /* ignore */ }
+      return pay;
+    },
     houseName: () => homes()[tier()].name,
     houseRest: () => homes()[tier()].rest,
     relics: RELICS,
