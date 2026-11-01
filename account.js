@@ -110,6 +110,7 @@ const Account = (() => {
         ventures: typeof Ventures !== "undefined" ? Ventures.snapshot() : {},
         stocks: typeof Exchange !== "undefined" ? Exchange.snapshot() : {},
         events: typeof Events !== "undefined" ? Events.snapshot() : {},
+        ach: typeof Achievements !== "undefined" ? Achievements.snapshot() : {},
         era,
       },
     };
@@ -140,6 +141,7 @@ const Account = (() => {
     if (p.ventures && typeof p.ventures === "object" && typeof Ventures !== "undefined") Ventures.restore(p.ventures);
     if (p.stocks && typeof p.stocks === "object" && typeof Exchange !== "undefined") Exchange.restore(p.stocks);
     if (p.events && typeof p.events === "object" && typeof Events !== "undefined") Events.restore(p.events);
+    if (p.ach && typeof p.ach === "object" && typeof Achievements !== "undefined") Achievements.restore(p.ach);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.trade && typeof p.trade === "object" && typeof Trade !== "undefined") Trade.restore(p.trade);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);
@@ -163,6 +165,7 @@ const Account = (() => {
     if (typeof Ventures !== "undefined" && row.progress && row.progress.ventures) Ventures.merge(row.progress.ventures);
     if (typeof Exchange !== "undefined" && row.progress && row.progress.stocks) Exchange.merge(row.progress.stocks);
     if (typeof Events !== "undefined" && row.progress && row.progress.events) Events.merge(row.progress.events);
+    if (typeof Achievements !== "undefined" && row.progress && row.progress.ach) Achievements.merge(row.progress.ach);
     if (typeof Estate !== "undefined" && row.progress && row.progress.estate) Estate.merge(row.progress.estate);   // the houses bought on the other device too
     if (at) setKnown(at);
     lastSaved = "";

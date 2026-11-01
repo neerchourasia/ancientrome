@@ -759,3 +759,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .mgroup .mh::after { content: "▸"; float: right; transition: transform .15s; }
 .mgroup.open .mh::after { transform: rotate(90deg); }
 .mgroup .mh.alert { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); }
+.ach-list { list-style: none; margin: 6px 0; padding: 0; max-height: 52vh; overflow-y: auto; }
+.ach-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.ach-list li small { display: block; color: var(--muted); font-size: .78rem; }
+.ach-list li.lock { opacity: .55; }

@@ -1569,6 +1569,16 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         st = await ann.until(lambda m: m["t"] == "pyr")
         self.assertEqual(st["blocks"], 0)
 
+    async def test_titles_show_in_chat_but_only_the_real_ones(self):
+        self.accounts("ann")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob")
+        ann.send({"t": "social", "a": "title", "title": "Champion"}); await asyncio.sleep(0.2)
+        ann.send({"t": "chat", "text": "hello"})
+        self.assertEqual((await bob.until(lambda m: m["t"] == "chat" and m.get("text") == "hello"))["title"], "Champion")
+        ann.send({"t": "social", "a": "title", "title": "King of Everything"}); await asyncio.sleep(0.2)   # not a real title
+        ann.send({"t": "chat", "text": "again"})
+        self.assertEqual((await bob.until(lambda m: m["t"] == "chat" and m.get("text") == "again"))["title"], "")
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

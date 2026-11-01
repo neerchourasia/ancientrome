@@ -63,5 +63,5 @@ const Voyage = (() => {
       b.addEventListener("click", () => sail(c)); host.append(b);
     }
   }
-  return { bind, sail, FARE };
+  return { bind, sail, FARE, get count() { return done.length; } };
 })();

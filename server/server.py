@@ -2034,7 +2034,7 @@ def on_chat(conn, m):
     conn.ctok -= 1
     if text.startswith("/"):
         return chat_command(conn, text)
-    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time()), "tag": guild_tag_of(conn)}   # ts: when it was sent, so everyone can see the time
+    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time()), "tag": guild_tag_of(conn), "title": getattr(conn, "title", "")}   # ts: when it was sent, so everyone can see the time
     ADMIN_CHAT.append({"ts": entry["ts"], "id": conn.id, "name": conn.name, "vid": (conn.vid or "")[:8], "text": text or "(sent a picture)", "adm": entry["adm"]})
     if pic:
         CHAT_LOG.append(dict(entry, text=text or "(sent a picture)"))      # people who join later do not get the picture, only that there was one
@@ -2864,6 +2864,15 @@ def on_pyr(conn, m):
     pyr_broadcast(pyr_view())
 
 
+
+ACH_TITLES = ("Veteran", "Tycoon", "Magnate", "Courier", "Collector", "Curator", "Landlord", "Entrepreneur", "Palace Owner", "Champion", "Explorer", "Diver", "Builder", "Lawman")
+
+
+def on_title(conn, m):
+    t = m.get("title")
+    conn.title = t if t in ACH_TITLES else ""
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -2968,6 +2977,8 @@ def on_social(conn, m):
         return on_trade(conn, a, m)
     if a == "stats":
         return on_stats(conn, m)
+    if a == "title":
+        return on_title(conn, m)
     if a == "ev_time":
         return on_event_time(conn, m)
     if a == "ev_top":

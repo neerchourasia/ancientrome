@@ -427,7 +427,8 @@ const Cancun = (() => {
   const SEA_SHORE = 920, SEA_FAR = 1185;                          // you can wade and swim from the shore out to here (local x)
   const CHESTS_AT = [[1010, -90, 0.9], [1070, 130, 0.4], [1105, -230, 0.7], [985, 255, 0.5], [1150, 40, 1.0]];   // sunken chests: local x, z and how rich they are
   const CHESTS = CHESTS_AT, chests = [], DIVE_KEY = "rome-dive";
-  let diveDay = -1, diveTaken = [];
+  let diveDay = -1, diveTaken = [], chestTotal = 0, laidTotal = 0;
+  try { chestTotal = Math.max(0, Math.floor(Number(localStorage.getItem("rome-chests"))) || 0); laidTotal = Math.max(0, Math.floor(Number(localStorage.getItem("rome-laid"))) || 0); } catch (e) { /* storage unavailable */ }
   const POND = { x: -330, z: 215, r: 13 };
   // the pyramid project: everybody in Cancún builds the same pyramid. Take a stone block from the quarry (F), carry it to the site (slowly) and place it (F). The game server
   // counts the blocks of all the players; when the last one goes on, the pyramid is finished and everybody who laid five or more is paid, and a new one is begun.
@@ -639,7 +640,7 @@ const Cancun = (() => {
     diveTaken.push(c.i); c.g.visible = false;
     try { localStorage.setItem(DIVE_KEY, JSON.stringify({ day: diveDay, taken: diveTaken })); } catch (e) { /* ignore */ }
     const gold = Math.round((90 + c.rich * 260 * (0.75 + 0.25 * Math.abs(Math.sin(diveDay * 12.9898 + c.i * 78.233)))) / 10) * 10;
-    Vitals.coins += gold; Sfx.play("coin");
+    Vitals.coins += gold; Sfx.play("coin"); chestTotal++; try { localStorage.setItem("rome-chests", String(chestTotal)); } catch (e) { /* ignore */ }
     toast(`🏴‍☠️ You dive down and open a sunken chest: +${gold} denarii! (${chests.length - diveTaken.length} more on the sea floor today)`);
   }
   const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1) * (carrying ? 0.75 : 1);   // a heavy block slows you   // swimming is about as fast as walking, a little faster at the surface
@@ -724,7 +725,8 @@ const Cancun = (() => {
     if (!carrying && nearQuarry()) { carrying = true; carryMesh.visible = true; Sfx.play("discover"); toast("You pick up a heavy stone block. Carry it to the pyramid site (you walk slower) and press F there."); return true; }
     if (carrying && nearSite()) {
       carrying = false; carryMesh.visible = false;
-      pyr.blocks++; pyr.mine++; Vitals.coins += PYR_PAY; Sfx.play("coin");
+      pyr.blocks++; pyr.mine++; laidTotal++; try { localStorage.setItem("rome-laid", String(laidTotal)); } catch (e) { /* ignore */ }
+      Vitals.coins += PYR_PAY; Sfx.play("coin");
       const online = typeof Online !== "undefined" && Online.connected;
       if (online) Online.navalSend({ t: "pyr_add" });
       if (pyr.blocks >= PYR_TOTAL && !online) pyrFinished(null);                                              // on your own, the pyramid finishes here
@@ -776,7 +778,7 @@ const Cancun = (() => {
   return {
     build, show, setEra, update, homeInside, homeSpot, setEquinox, SPAWN, BOUNDS: BOUNDS_C, MAP: MAP_C,
     fishAt: () => fish.map((f) => [f.sp.id, f.cx + Math.cos(f.a) * f.r, f.y, f.cz + Math.sin(f.a) * f.r]),
-    setTier: setHouseTier, get tier() { return cTier; }, pyrOn, inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
+    setTier: setHouseTier, get tier() { return cTier; }, get stats() { return { chests: chestTotal, laid: laidTotal, pyramids: pyr.done }; }, pyrOn, inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
     snorkelSnapshot: () => ({ seen: [...seen], rounds }),
     // from your account: the list and the round you are on. A saved game from an earlier round never brings a finished list back.
     snorkelRestore: (o) => {

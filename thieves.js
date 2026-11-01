@@ -7,6 +7,8 @@
 const Thieves = (() => {
   const T = THREE;
   const MIN_COINS = 100, MAX_STEAL = 80, BOUNTY = 20, FLEE_TIME = 30, TOUCH = 1.5, GAP = [150, 300];
+  let caught = 0;
+  try { caught = Math.max(0, Math.floor(Number(localStorage.getItem("rome-thieves-caught"))) || 0); } catch (e) { /* storage unavailable */ }
   let thief = null, wait = 90 + Math.random() * 90, mark = null, hudEl = null;
 
   function makeMark() {
@@ -68,6 +70,7 @@ const Thieves = (() => {
       step(dt, t.x - away * 5, t.z - awayZ * 5, 6.4);
       if (d0 < TOUCH + 0.4) {
         Vitals.coins += t.loot + BOUNTY; Sfx.play("coin"); toast(`You caught the thief! Your ${t.loot} denarii are back, and the city pays a ${BOUNTY} denarii bounty.`);
+        caught++; try { localStorage.setItem("rome-thieves-caught", String(caught)); } catch (e) { /* ignore */ }
         remove(); return;
       }
       if (t.left <= 0 || d0 > 140) { toast("The thief got away with your money."); remove(); return; }
@@ -81,5 +84,5 @@ const Thieves = (() => {
     if (t.state === "flee" && hudEl && !Quests.active) { hudEl.hidden = false; hudEl.textContent = `🥷 Catch the thief! ${Math.max(0, Math.ceil(t.left))} s · ${Math.round(d0)} m away · +${t.loot + BOUNTY}`; }
   }
 
-  return { update, get active() { return thief ? thief.state : null; }, _spawn: spawn, _thief: () => thief };
+  return { update, get caught() { return caught; }, get active() { return thief ? thief.state : null; }, _spawn: spawn, _thief: () => thief };
 })();

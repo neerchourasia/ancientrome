@@ -74,5 +74,5 @@ const Guilds = (() => {
     }));
     $g("gd-leave").addEventListener("click", () => Dialog.confirm("Leave your guild?").then((yes) => { if (yes) send({ a: "g_leave" }); }));
   }
-  return { bind, on, open };
+  return { bind, on, open, get inGuild() { return !!mine; } };
 })();

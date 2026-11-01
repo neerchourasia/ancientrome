@@ -15,7 +15,8 @@ const Quests = (() => {
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const nameOf = (i) => { const l = NAMES[city] || NAMES.rome; return l[i % l.length]; };
 
-  let key = "", givers = [], active = null, doneToday = 0;
+  let key = "", givers = [], active = null, doneToday = 0, total = 0;
+  try { total = Math.max(0, Math.floor(Number(localStorage.getItem("rome-quests-done"))) || 0); } catch (e) { /* storage unavailable */ }
   const marks = [];                                       // reusable markers: yellow ! over the givers, one blue ? over the person to find
   function makeMark(sym, col) {
     const c = document.createElement("canvas"); c.width = c.height = 64;
@@ -111,7 +112,7 @@ const Quests = (() => {
   function deliver() { if (active && active.kind === "letter" && !active.done) complete(); }
   function complete() {
     const q = active; if (!q || q.done) return;
-    q.done = true; Vitals.coins += q.reward; Sfx.play("discover"); doneToday++;
+    q.done = true; Vitals.coins += q.reward; Sfx.play("discover"); doneToday++; total++; try { localStorage.setItem("rome-quests-done", String(total)); } catch (e) { /* ignore */ }
     toast(`Quest done! +${q.reward} denarii.`); finish(true);
   }
   function finish(ok) { active = null; hideHud(); }
@@ -133,5 +134,5 @@ const Quests = (() => {
     const b = $q("btn-quest"); if (b) b.addEventListener("click", giveUp);
   }
 
-  return { bind, update, at, open, promptText, get active() { return active; }, _givers: () => givers };
+  return { bind, update, at, open, promptText, get total() { return total; }, get active() { return active; }, _givers: () => givers };
 })();
