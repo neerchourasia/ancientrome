@@ -2827,6 +2827,43 @@ def on_event_top(conn, m):
     conn.send({"t": "ev_top", "course": course, "list": [[r["name"], r["ms"]] for r in rows]})
 
 
+
+# ---- the pyramid project in Cancun: every player's blocks go into one pyramid. In memory only (a restart starts a new one).
+PYR_NEED = 100
+PYRAMID = {"blocks": 0, "done": 0, "who": {}}
+
+
+def pyr_view():
+    top = sorted(PYRAMID["who"].items(), key=lambda kv: -kv[1])[:5]
+    return {"t": "pyr", "blocks": PYRAMID["blocks"], "done": PYRAMID["done"], "need": PYR_NEED, "top": [[n, c] for n, c in top]}
+
+
+def pyr_broadcast(msg):
+    for c in CONNS:
+        if c.hello and not c.closed:
+            c.send(msg)
+
+
+def on_pyr(conn, m):
+    if m.get("t") == "pyr_get":
+        return conn.send(pyr_view())
+    t = now()
+    last = getattr(conn, "pyr_t", None)
+    if last is not None and t - last < 1.5:                       # a block takes a while to carry
+        return
+    conn.pyr_t = t
+    PYRAMID["blocks"] += 1
+    if conn.name in PYRAMID["who"] or len(PYRAMID["who"]) < 500:
+        PYRAMID["who"][conn.name] = PYRAMID["who"].get(conn.name, 0) + 1
+    if PYRAMID["blocks"] >= PYR_NEED:
+        builders = [n for n, c in PYRAMID["who"].items() if c >= 5]
+        PYRAMID["done"] += 1
+        PYRAMID["blocks"] = 0
+        PYRAMID["who"] = {}
+        pyr_broadcast({"t": "pyr_done", "who": builders, "done": PYRAMID["done"]})
+    pyr_broadcast(pyr_view())
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -3138,6 +3175,8 @@ async def handle_msg(conn, m):
         return on_emote(conn, m)
     if t == "stock":
         return on_stock(conn, m)
+    if t in ("pyr_get", "pyr_add"):
+        return on_pyr(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":

@@ -1552,6 +1552,23 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(top["list"][1], ["Ann", 90000])
         self.assertNotIn("mars-car", server.EVENT_BEST)
 
+    async def test_everyone_builds_the_same_pyramid(self):
+        server.PYRAMID.update({"blocks": 0, "done": 0, "who": {}})
+        ann, bob = await self.player("Ann"), await self.player("Bob")
+        ann.send({"t": "pyr_add"})
+        st = await bob.until(lambda m: m["t"] == "pyr" and m["blocks"] == 1)                       # Bob sees Ann's block
+        self.assertEqual(st["top"], [["Ann", 1]])
+        ann.send({"t": "pyr_add"})                                                                 # too soon: ignored
+        with self.assertRaises(asyncio.TimeoutError):
+            await bob.until(lambda m: m["t"] == "pyr" and m["blocks"] == 2, timeout=0.4)
+        server.PYRAMID["blocks"] = server.PYR_NEED - 1
+        server.PYRAMID["who"] = {"Ann": 7, "Bob": 2}
+        bob.send({"t": "pyr_add"})
+        done = await ann.until(lambda m: m["t"] == "pyr_done")                                      # the last block finishes it
+        self.assertEqual((done["who"], done["done"]), (["Ann"], 1))
+        st = await ann.until(lambda m: m["t"] == "pyr")
+        self.assertEqual(st["blocks"], 0)
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

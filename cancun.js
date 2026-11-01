@@ -370,7 +370,14 @@ const Cancun = (() => {
   const CHESTS_AT = [[1010, -90, 0.9], [1070, 130, 0.4], [1105, -230, 0.7], [985, 255, 0.5], [1150, 40, 1.0]];   // sunken chests: local x, z and how rich they are
   const CHESTS = CHESTS_AT, chests = [], DIVE_KEY = "rome-dive";
   let diveDay = -1, diveTaken = [];
-  const POND = { x: -330, z: 215, r: 13 };                        // Cenote Azul: an open sinkhole with clear water, for swimming
+  const POND = { x: -330, z: 215, r: 13 };
+  // the pyramid project: everybody in Cancún builds the same pyramid. Take a stone block from the quarry (F), carry it to the site (slowly) and place it (F). The game server
+  // counts the blocks of all the players; when the last one goes on, the pyramid is finished and everybody who laid five or more is paid, and a new one is begun.
+  const PYR = { x: -215, z: 70, half: 16, layers: 8, lh: 1.8, base: 1.2, qx: -262, qz: 112 }, PYR_NEED = [24, 20, 16, 13, 10, 8, 6, 3], PYR_TOTAL = PYR_NEED.reduce((a, b) => a + b, 0);
+  const PYR_KEY = "rome-pyramid", PYR_PAY = 4, PYR_BONUS = 150;
+  let pyr = { blocks: 0, done: 0, mine: 0, top: [] }, pyrMeshes = [], pyrShown = -1, carrying = false, carryMesh = null, pyrAsk = 0, pyrMonuments = null, capstone = null;
+  try { const r = JSON.parse(localStorage.getItem(PYR_KEY) || "null"); if (r && typeof r === "object") pyr = { blocks: Math.max(0, Math.min(PYR_TOTAL - 1, Math.floor(r.blocks) || 0)), done: Math.max(0, Math.floor(r.done) || 0), mine: Math.max(0, Math.floor(r.mine) || 0), top: [] }; } catch (e) { /* storage unavailable */ }
+  const pyrSave = () => { try { localStorage.setItem(PYR_KEY, JSON.stringify({ blocks: pyr.blocks, done: pyr.done, mine: pyr.mine })); } catch (e) { /* ignore */ } };                        // Cenote Azul: an open sinkhole with clear water, for swimming
   const SPECIES = [                                               // what you can see snorkelling: name, colour, size (length), where
     { id: "parrot", name: "parrotfish", col: 0x20c9b8, len: 0.9, hh: 0.28, reef: true },
     { id: "angel", name: "queen angelfish", col: 0xf2c21b, len: 0.7, hh: 0.4, reef: true },
@@ -535,6 +542,7 @@ const Cancun = (() => {
   // the one key for water things: hire the gear on the beach, or put your face in the water
   function promptText() {
     if (!built || city !== "cancun") return "";
+    const pp = pyrPrompt(); if (pp) return pp;
     const nearHut = modernNow && Math.hypot(player.x - X(HIRE.x), player.z - HIRE.z) < 6;
     if (nearHut && !haveGear) return `F: rent snorkel gear (${HIRE_PRICE} denarii)`;
     if (snorkeling && inWater(player.x, player.z) && chestNear()) return "F: dive for the sunken treasure chest";
@@ -544,6 +552,7 @@ const Cancun = (() => {
   }
   function act() {
     if (!built || city !== "cancun") return false;
+    if (pyrAct()) return true;
     const nearHut = modernNow && Math.hypot(player.x - X(HIRE.x), player.z - HIRE.z) < 6;
     if (nearHut && !haveGear) {
       if (Vitals.coins < HIRE_PRICE) { toast(`Snorkel gear costs ${HIRE_PRICE} denarii.`); return true; }
@@ -575,7 +584,7 @@ const Cancun = (() => {
     Vitals.coins += gold; Sfx.play("coin");
     toast(`🏴‍☠️ You dive down and open a sunken chest: +${gold} denarii! (${chests.length - diveTaken.length} more on the sea floor today)`);
   }
-  const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1);   // swimming is about as fast as walking, a little faster at the surface
+  const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1) * (carrying ? 0.75 : 1);   // a heavy block slows you   // swimming is about as fast as walking, a little faster at the surface
   const avatarDrop = () => (inWater(player.x, player.z) ? -0.95 : 0);
   const camDrop = () => (inWater(player.x, player.z) ? (snorkeling ? -2.4 : -0.95) : 0);
   let lastDt = 0.016, doneT = 0;
@@ -599,8 +608,80 @@ const Cancun = (() => {
     buildPond();
     buildHire();
     buildPeople();
+    buildPyramid();
     Stalls.build(root, X(0), 150, "cancun");
     setEra(false);
+  }
+
+  function buildPyramid() {
+    const stone = lambert(0xcdbf9a), dark = lambert(0x9a8e6e), x = X(PYR.x), z = PYR.z, total = PYR.layers;
+    mbox(root, x, 0, z, PYR.half * 2 + 3, PYR.base, PYR.half * 2 + 3, dark);                                       // the foundation
+    addBlockerBox(x - PYR.half - 1.5, x + PYR.half + 1.5, z - PYR.half - 1.5, z + PYR.half + 1.5, 0, 14);
+    for (let k = 0; k < total; k++) {
+      const size = PYR.half * 2 - k * (PYR.half * 2 - 3) / total, m = new T.Mesh(BOX, k % 2 ? stone : lambert(0xd9ccaa));
+      m.castShadow = m.receiveShadow = true; m.userData.size = size; m.visible = false; root.add(m); pyrMeshes.push(m);
+    }
+    capstone = new T.Mesh(new T.ConeGeometry(1.8, 2.4, 4), C.gold); capstone.position.set(x, PYR.base + total * PYR.lh + 1.2, z); capstone.rotation.y = Math.PI / 4; capstone.visible = false; root.add(capstone);
+    // the quarry: a heap of blocks and a sign; the site has its own sign and four corner posts
+    for (let i = 0; i < 9; i++) mbox(root, X(PYR.qx) + (i % 3) * 1.7 - 1.7, Math.floor(i / 3) * 0.8 * (i % 2 ? 0.8 : 1), PYR.qz + ((i * 7) % 3) * 1.5 - 1.5, 1.5, 0.8, 1.3, i % 2 ? stone : dark);
+    sign(root, X(PYR.qx), 3.2, PYR.qz + 3.2, 5.4, 1.7, "QUARRY", "press F to take a block", 0);
+    sign(root, x, 3.4, z + PYR.half + 3.2, 8.4, 2.1, "BUILD THE PYRAMID", "everyone in Cancún builds it together", 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(root, x + sx * (PYR.half + 2), 0, z + sz * (PYR.half + 2), 0.4, 3.6, 0.4, C.wood);
+    carryMesh = new T.Mesh(BOX, stone); carryMesh.scale.set(0.6, 0.45, 0.6); carryMesh.visible = false; root.add(carryMesh);
+    pyrMonuments = new T.Group(); root.add(pyrMonuments);
+    pyrRefresh();
+  }
+  // the layers rise as blocks go on; every finished pyramid leaves a little gold monument beside the site
+  function pyrRefresh() {
+    const key = pyr.blocks * 1000 + pyr.done; if (key === pyrShown) return; pyrShown = key;
+    let left = pyr.blocks;
+    pyrMeshes.forEach((m, k) => {
+      const f = Math.max(0, Math.min(1, left / PYR_NEED[k])); left -= PYR_NEED[k];
+      m.visible = f > 0;
+      if (f > 0) { const h = PYR.lh * f; m.scale.set(m.userData.size, h, m.userData.size); m.position.set(X(PYR.x), PYR.base + k * PYR.lh + h / 2, PYR.z); }
+    });
+    capstone.visible = pyr.blocks >= PYR_TOTAL - 1;
+    if (pyrMonuments) {
+      pyrMonuments.clear();
+      for (let i = 0; i < Math.min(pyr.done, 12); i++) {
+        const g = new T.Group(); for (let k = 0; k < 4; k++) { const b = new T.Mesh(BOX, k === 3 ? C.gold : lambert(0xd9ccaa)); const sz = 3 - k * 0.7; b.scale.set(sz, 0.7, sz); b.position.y = 0.35 + k * 0.7; g.add(b); }
+        g.position.set(X(PYR.x - 22 + (i % 6) * 6), 0, PYR.z - 28 - Math.floor(i / 6) * 6); pyrMonuments.add(g);
+      }
+    }
+  }
+  const nearQuarry = () => Math.hypot(player.x - X(PYR.qx), player.z - PYR.qz) < 6;
+  const nearSite = () => Math.max(Math.abs(player.x - X(PYR.x)), Math.abs(player.z - PYR.z)) < PYR.half + 11;
+  function pyrPrompt() {
+    if (!built || city !== "cancun") return "";
+    if (!carrying && nearQuarry()) return `F: take a stone block for the pyramid (${pyr.blocks} of ${PYR_TOTAL} laid)`;
+    if (carrying && nearSite()) return `F: place the block on the pyramid (${pyr.blocks} of ${PYR_TOTAL})`;
+    return "";
+  }
+  function pyrAct() {
+    if (!built || city !== "cancun") return false;
+    if (!carrying && nearQuarry()) { carrying = true; carryMesh.visible = true; Sfx.play("discover"); toast("You pick up a heavy stone block. Carry it to the pyramid site (you walk slower) and press F there."); return true; }
+    if (carrying && nearSite()) {
+      carrying = false; carryMesh.visible = false;
+      pyr.blocks++; pyr.mine++; Vitals.coins += PYR_PAY; Sfx.play("coin");
+      const online = typeof Online !== "undefined" && Online.connected;
+      if (online) Online.navalSend({ t: "pyr_add" });
+      if (pyr.blocks >= PYR_TOTAL && !online) pyrFinished(null);                                              // on your own, the pyramid finishes here
+      else toast(`Block laid: ${Math.min(pyr.blocks, PYR_TOTAL)} of ${PYR_TOTAL} (you have laid ${pyr.mine}) · +${PYR_PAY} denarii`);
+      pyrSave(); pyrRefresh(); return true;
+    }
+    return false;
+  }
+  function pyrFinished(who) {
+    const paid = who ? who.includes(Character.name) : pyr.mine >= 5;
+    pyr.done++; pyr.blocks = 0; const mine = pyr.mine; pyr.mine = 0; pyrSave(); pyrRefresh();
+    Sfx.play("cheer");
+    if (paid && mine >= 5) { Vitals.coins += PYR_BONUS; toast(`🔺 The pyramid is finished! Everyone who laid five blocks or more is paid: +${PYR_BONUS} denarii. A gold monument stands beside the site, and a new pyramid is begun.`); }
+    else toast("🔺 The pyramid is finished! A gold monument stands beside the site, and a new one is begun.");
+  }
+  // news from the game server: the shared count, or the pyramid being finished
+  function pyrOn(m) {
+    if (m.t === "pyr") { pyr.blocks = Math.max(0, Math.min(PYR_TOTAL - 1, Math.floor(m.blocks) || 0)); pyr.done = Math.max(pyr.done, Math.floor(m.done) || 0); pyr.top = Array.isArray(m.top) ? m.top : []; pyrSave(); pyrRefresh(); }
+    else if (m.t === "pyr_done") pyrFinished(Array.isArray(m.who) ? m.who : []);
   }
 
   function setEra(modern) {
@@ -612,7 +693,7 @@ const Cancun = (() => {
       body.instanceColor.needsUpdate = hat.instanceColor.needsUpdate = true;
     }
   }
-  const show = (v) => { if (root) root.visible = v; showCard(false); if (!v) { haveGear = false; if (snorkeling) setSnorkel(false); } };
+  const show = (v) => { if (root) root.visible = v; showCard(false); if (!v) { carrying = false; if (carryMesh) carryMesh.visible = false; haveGear = false; if (snorkeling) setSnorkel(false); } };
   const homeInside = (x, z) => Math.abs(x - X(HOME.x)) < HOME.hw - 0.3 && Math.abs(z - HOME.z) < HOME.hd - 0.3;
   const homeSpot = () => ({ x: X(HOME.x), z: HOME.z + 1.4 });
   function update(dt, px, pz) {
@@ -621,6 +702,8 @@ const Cancun = (() => {
     if (Math.abs(px - CX) > 1100) return;
     lastDt = dt;
     updatePeople(dt);
+    if (carrying && carryMesh) carryMesh.position.set(player.x, player.feet + 2.25, player.z);
+    pyrAsk += dt; if (pyrAsk > 25) { pyrAsk = 0; if (typeof Online !== "undefined" && Online.connected && Math.abs(px - X(PYR.x)) < 600) Online.navalSend({ t: "pyr_get" }); }
     for (const c of chests) if (c.g.visible) { const k = 2.6 + Math.sin(clock * 3 + c.i) * 0.5; c.glow.scale.set(k, k, 1); }
     if (px > CX + 700 || Math.hypot(px - X(POND.x), pz - POND.z) < 120) placeFish();
     if (snorkeling) { if (!inWater(px, pz)) setSnorkel(false); else spot(); }
@@ -631,7 +714,7 @@ const Cancun = (() => {
   return {
     build, show, setEra, update, homeInside, homeSpot, setEquinox, SPAWN, BOUNDS: BOUNDS_C, MAP: MAP_C,
     fishAt: () => fish.map((f) => [f.sp.id, f.cx + Math.cos(f.a) * f.r, f.y, f.cz + Math.sin(f.a) * f.r]),
-    inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
+    pyrOn, inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
     snorkelSnapshot: () => ({ seen: [...seen], rounds }),
     // from your account: the list and the round you are on. A saved game from an earlier round never brings a finished list back.
     snorkelRestore: (o) => {
