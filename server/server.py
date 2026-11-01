@@ -2796,6 +2796,37 @@ def on_stock(conn, m):
     conn.send({"t": "stock_fill", "side": a, "id": sid, "n": n, "price": price, "fee": fee, "total": round(gross + fee) if a == "buy" else max(0, round(gross - fee))})
 
 
+
+# ---- race events: the best time of each player on each course (a street race, an air race, a metro time trial). In memory only, for players with an account.
+EVENT_BEST = {}            # course id -> {friend id: {"name", "ms"}}
+EVENT_LIFE_MAX = 2000      # courses kept at most
+
+
+def on_event_time(conn, m):
+    course = m.get("course")
+    if not isinstance(course, str) or not re.fullmatch(r"(rome|delhi|cancun)-(car|air|metro)", course):
+        return
+    ms, length = int(num(m.get("ms"), 0, 36e5, 0)), num(m.get("len"), 0, 50000, 0)
+    if ms < 10000 or length < 100:
+        return
+    if length / (ms / 1000.0) > 300:
+        flag("impossible race time", "%s finished a %d m course in %.1f s" % (course, length, ms / 1000.0), "medium", conn=conn, gap=300)
+        return
+    if len(EVENT_BEST) >= EVENT_LIFE_MAX and course not in EVENT_BEST:
+        return
+    board = EVENT_BEST.setdefault(course, {})
+    if conn.fid not in board or ms < board[conn.fid]["ms"]:
+        board[conn.fid] = {"name": conn.name, "ms": ms}
+    on_event_top(conn, {"course": course})
+
+
+def on_event_top(conn, m):
+    course = m.get("course")
+    board = EVENT_BEST.get(course) if isinstance(course, str) else None
+    rows = sorted((board or {}).values(), key=lambda r: r["ms"])[:10]
+    conn.send({"t": "ev_top", "course": course, "list": [[r["name"], r["ms"]] for r in rows]})
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -2900,6 +2931,10 @@ def on_social(conn, m):
         return on_trade(conn, a, m)
     if a == "stats":
         return on_stats(conn, m)
+    if a == "ev_time":
+        return on_event_time(conn, m)
+    if a == "ev_top":
+        return on_event_top(conn, m)
     if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick"):
         return on_guild(conn, a, m)
     if a == "leaders":

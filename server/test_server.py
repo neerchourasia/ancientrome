@@ -1533,6 +1533,25 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(base * 0.15 <= server.STOCKS["p"][sid] <= base * 6)
             self.assertLessEqual(len(server.STOCKS["hist"][sid]), server.STOCK_HIST)
 
+    async def test_race_events_keep_each_players_best_time(self):
+        server.EVENT_BEST.clear()
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "ev_time", "course": "rome-car", "ms": 90000, "len": 1500})
+        bob.send({"t": "social", "a": "ev_time", "course": "rome-car", "ms": 80000, "len": 1500})
+        await asyncio.sleep(0.2)
+        ann.send({"t": "social", "a": "ev_time", "course": "rome-car", "ms": 95000, "len": 1500})     # slower: the best stays
+        ann.send({"t": "social", "a": "ev_top", "course": "rome-car"})
+        top = await ann.until(lambda m: m["t"] == "ev_top" and len(m["list"]) == 2 and m["list"][0][0] == "Bob")
+        self.assertEqual(top["list"], [["Bob", 80000], ["Ann", 90000]])
+        ann.send({"t": "social", "a": "ev_time", "course": "rome-car", "ms": 12000, "len": 40000})  # 3,300 m/s is not possible
+        ann.send({"t": "social", "a": "ev_time", "course": "mars-car", "ms": 90000, "len": 1500})    # no such course
+        await asyncio.sleep(0.2)
+        ann.send({"t": "social", "a": "ev_top", "course": "rome-car"})
+        top = await ann.until(lambda m: m["t"] == "ev_top")
+        self.assertEqual(top["list"][1], ["Ann", 90000])
+        self.assertNotIn("mars-car", server.EVENT_BEST)
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

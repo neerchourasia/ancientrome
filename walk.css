@@ -733,3 +733,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .ex-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .ex-btns button { padding: 3px 8px; font-size: .75rem; }
 @media (max-width: 640px) { .ex-row { grid-template-columns: 1fr 80px; } .ex-spark { display: none; } .ex-btns { grid-column: 1 / -1; justify-content: flex-start; } }
+#event-hud { position: fixed; left: 50%; transform: translateX(-50%); top: 64px; z-index: 4; max-width: 92vw; padding: 6px 14px; font-size: .88rem; font-weight: 700; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; }
+#event-hud[hidden] { display: none; }
+.ev-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.ev-info small { display: block; color: var(--muted); font-size: .78rem; }
