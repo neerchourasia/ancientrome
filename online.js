@@ -71,6 +71,7 @@ const Online = (() => {
       case "fr_trade": Swap.on(m); break;
       case "leaders": Leaders.show(m); break;
       case "guild": case "guilds": case "g_paid": case "g_got": Guilds.on(m); break;
+      case "stocks": case "stock_fill": case "stock_no": Exchange.on(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }
       case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
       case "ridenote": toast(m.text); break;

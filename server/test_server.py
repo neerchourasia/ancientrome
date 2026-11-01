@@ -1507,6 +1507,32 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.2)
         self.assertEqual(server.GUILDS, {})                                                              # the last member out closes the guild
 
+    async def test_the_exchange_shows_shared_prices_and_prices_each_trade(self):
+        ann, bob = await self.player("Ann"), await self.player("Bob")
+        ann.send({"t": "stock", "a": "list"})
+        a = await ann.until(lambda m: m["t"] == "stocks")
+        self.assertEqual(len(a["list"]), 8)
+        bob.send({"t": "stock", "a": "list"})
+        b = await bob.until(lambda m: m["t"] == "stocks")
+        self.assertEqual([(r["id"], r["price"]) for r in a["list"]], [(r["id"], r["price"]) for r in b["list"]])        # everyone sees the same prices
+        price = a["list"][0]["price"]
+        ann.send({"t": "stock", "a": "buy", "id": a["list"][0]["id"], "n": 10})
+        fill = await ann.until(lambda m: m["t"] == "stock_fill")
+        self.assertEqual((fill["side"], fill["n"], fill["price"]), ("buy", 10, price))
+        self.assertGreater(fill["total"], price * 10)                                                                   # the one percent fee is added
+        ann.send({"t": "stock", "a": "sell", "id": a["list"][0]["id"], "n": 10 ** 9})                                    # a silly amount is clamped
+        self.assertEqual((await ann.until(lambda m: m["t"] == "stock_fill"))["n"], server.STOCK_MAX_N)
+        ann.send({"t": "stock", "a": "buy", "id": "nonsense", "n": 5})
+        with self.assertRaises(asyncio.TimeoutError):
+            await ann.until(lambda m: m["t"] == "stock_fill", timeout=0.4)
+
+    def test_prices_wander_but_stay_in_bounds(self):
+        server.STOCKS["t"] -= 3600 * 6
+        server.stocks_catch_up()
+        for sid, name, base, vol in server.STOCK_DEFS:
+            self.assertTrue(base * 0.15 <= server.STOCKS["p"][sid] <= base * 6)
+            self.assertLessEqual(len(server.STOCKS["hist"][sid]), server.STOCK_HIST)
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

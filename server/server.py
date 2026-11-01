@@ -2737,6 +2737,65 @@ def guild_say(g, text):
     del g["chat"][:-40]
 
 
+
+# ---- the exchange: eight companies whose prices wander (a random walk that is pulled back towards its usual price, with the odd piece of news). Everyone sees
+# the same prices, which only the server knows, so nobody can work them out ahead. Prices move every 20 seconds; the server catches up when somebody asks.
+STOCK_DEFS = [("tiber", "Tiber Grain Co.", 40, 0.035), ("forum", "Forum Bank", 120, 0.02), ("legion", "Legion Armoury", 75, 0.05), ("silk", "Silk Road Traders", 60, 0.045),
+              ("aqua", "Aqueduct Works", 30, 0.03), ("games", "Colosseum Games", 90, 0.06), ("olive", "Olive Oil Guild", 25, 0.04), ("ships", "Ostia Shipping", 55, 0.05)]
+STOCK_TICK, STOCK_HIST, STOCK_FEE, STOCK_MAX_N = 20.0, 60, 0.01, 500
+STOCK_NEWS = [("{n} wins a big contract", 0.12), ("{n} has a poor harvest", -0.12), ("A storm delays {n}", -0.08), ("{n} opens a new branch", 0.08), ("Rumours of trouble at {n}", -0.1), ("Everyone wants shares in {n}", 0.1)]
+STOCKS = {"t": time.time(), "p": {d[0]: float(d[2]) for d in STOCK_DEFS}, "hist": {d[0]: [float(d[2])] for d in STOCK_DEFS}, "news": []}
+
+
+def stocks_catch_up():
+    n = min(STOCK_HIST, int((time.time() - STOCKS["t"]) / STOCK_TICK))
+    if n <= 0:
+        return
+    STOCKS["t"] += n * STOCK_TICK if n < STOCK_HIST else (time.time() - STOCKS["t"])
+    for _ in range(n):
+        for sid, name, base, vol in STOCK_DEFS:
+            p = STOCKS["p"][sid]
+            p *= math.exp(0.05 * (math.log(base) - math.log(p)) + random.gauss(0, vol))
+            if random.random() < 0.004:
+                text, jump = random.choice(STOCK_NEWS)
+                p *= 1 + jump
+                STOCKS["news"].append({"ts": int(time.time()), "text": text.format(n=name), "up": jump > 0})
+                del STOCKS["news"][:-6]
+            STOCKS["p"][sid] = p = max(base * 0.15, min(base * 6, p))
+            STOCKS["hist"][sid].append(round(p, 2))
+            del STOCKS["hist"][sid][:-STOCK_HIST]
+
+
+def stocks_view():
+    stocks_catch_up()
+    return {"t": "stocks", "list": [{"id": sid, "name": name, "price": round(STOCKS["p"][sid], 2), "hist": STOCKS["hist"][sid]} for sid, name, base, vol in STOCK_DEFS], "news": STOCKS["news"]}
+
+
+def on_stock(conn, m):
+    t = now()
+    conn.stock_n = min(5.0, getattr(conn, "stock_n", 5.0) + (t - getattr(conn, "stock_t", t)) * 1.0)
+    conn.stock_t = t
+    if conn.stock_n < 1:
+        return conn.send({"t": "stock_no", "msg": "Slow down a little."})
+    conn.stock_n -= 1
+    a = m.get("a")
+    view = stocks_view()
+    if a == "list":
+        return conn.send(view)
+    sid = m.get("id")
+    if a not in ("buy", "sell") or sid not in STOCKS["p"]:
+        return
+    n = int(num(m.get("n"), 0, STOCK_MAX_N, 0))
+    if n < 1:
+        return
+    price = round(STOCKS["p"][sid], 2)
+    gross = price * n
+    fee = max(1, round(gross * STOCK_FEE))
+    if a == "sell" and gross > 50000:
+        flag("big share sale", "sold %d shares of %s for %d denarii" % (n, sid, gross), "low", conn=conn, gap=300)
+    conn.send({"t": "stock_fill", "side": a, "id": sid, "n": n, "price": price, "fee": fee, "total": round(gross + fee) if a == "buy" else max(0, round(gross - fee))})
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -3042,6 +3101,8 @@ async def handle_msg(conn, m):
         return on_walk(conn, m)
     if t == "emote":
         return on_emote(conn, m)
+    if t == "stock":
+        return on_stock(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":

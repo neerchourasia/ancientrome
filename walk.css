@@ -726,3 +726,10 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .gd-list .dim { color: var(--muted); }
 .gd-chat { margin: 6px 0; padding: 6px 8px; list-style: none; height: 120px; overflow-y: auto; background: rgba(0,0,0,.18); border-radius: 6px; font-size: .85rem; line-height: 1.4; }
 .gd-chat .sys { color: var(--muted); font-style: italic; }
+.ex-row { display: grid; grid-template-columns: 1fr 90px 80px auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.ex-name small, .ex-price small { display: block; color: var(--muted); font-size: .75rem; }
+.ex-price { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.ex-price small.up { color: #5fd28a; } .ex-price small.down { color: #e5736a; }
+.ex-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.ex-btns button { padding: 3px 8px; font-size: .75rem; }
+@media (max-width: 640px) { .ex-row { grid-template-columns: 1fr 80px; } .ex-spark { display: none; } .ex-btns { grid-column: 1 / -1; justify-content: flex-start; } }
