@@ -3393,7 +3393,9 @@ def world_on():
 
 def world_headers(extra=None):
     key = CFG["service_key"]
-    h = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json"}
+    h = {"apikey": key, "Content-Type": "application/json"}
+    if not key.startswith("sb_"):                           # (the newer sb_secret_ keys go in the apikey header only; the older service_role key is a login token too)
+        h["Authorization"] = "Bearer " + key
     h.update(extra or {})
     return h
 
