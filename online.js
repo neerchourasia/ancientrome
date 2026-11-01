@@ -69,6 +69,7 @@ const Online = (() => {
       case "adminjourney": Admin.showJourney(m); break;
       case "adminchat": Admin.showChat(m); break;
       case "fr_trade": Swap.on(m); break;
+      case "leaders": Leaders.show(m); break;
       case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;

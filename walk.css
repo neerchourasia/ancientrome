@@ -92,6 +92,8 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #dialog .dbtns { display: flex; gap: 8px; justify-content: flex-end; }
 #dialog button { font: inherit; font-weight: 700; cursor: pointer; padding: 7px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); color: var(--ink); background: var(--panel); }
 #dialog #dlg-ok { color: #2a2118; background: var(--gold); border-color: var(--gold); }
+.lb-list { margin: 4px 0 10px; padding-left: 22px; font-size: .9rem; line-height: 1.6; }
+.lb-list .dim { list-style: none; margin-left: -22px; color: var(--muted); }
 .sw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .sw-list { list-style: none; margin: 4px 0 8px; padding: 0; max-height: 36vh; overflow-y: auto; font-size: .88rem; }
 .sw-list li { padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.1); }

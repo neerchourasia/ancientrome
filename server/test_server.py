@@ -1428,6 +1428,26 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         bob.send({"t": "social", "a": "trade_cancel"})
         self.assertIn("stopped the trade", (await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "closed"))["why"])
 
+    async def test_leaderboards_rank_players_and_let_them_hide(self):
+        server.LEADERS.clear()
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "stats", "coins": 5000, "relics": 3, "houses": 1})
+        bob.send({"t": "social", "a": "stats", "coins": 9000, "relics": 0, "houses": 4})
+        await asyncio.sleep(0.2)
+        ann.send({"t": "social", "a": "leaders"})
+        top = await ann.until(lambda m: m["t"] == "leaders")
+        self.assertEqual(top["coins"], [["Bob", 9000], ["Ann", 5000]])
+        self.assertEqual((top["relics"], top["houses"]), ([["Ann", 3]], [["Bob", 4], ["Ann", 1]]))        # a zero is not listed
+        bob.send({"t": "social", "a": "stats", "hide": 1}); await asyncio.sleep(0.2)                           # Bob switches himself off
+        ann.send({"t": "social", "a": "leaders"})
+        top = await ann.until(lambda m: m["t"] == "leaders")
+        self.assertEqual(top["coins"], [["Ann", 5000]])
+        ann.send({"t": "social", "a": "stats", "coins": 10 ** 15, "relics": 99, "houses": -5}); await asyncio.sleep(0.2)   # silly numbers are clamped
+        ann.send({"t": "social", "a": "leaders"})
+        top = await ann.until(lambda m: m["t"] == "leaders")
+        self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

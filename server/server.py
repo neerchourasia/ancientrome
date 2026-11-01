@@ -2548,6 +2548,33 @@ def on_trade(conn, a, m):
         return
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# leaderboards: players with an account tell the server a few numbers (denarii, treasures, houses) every minute; the server keeps the top ten of each (memory only).
+# The numbers come from each browser, so they are only as honest as the players; anyone can switch themselves off the boards.
+
+LEADERS = {}               # friend id -> {"name", "coins", "relics", "houses", "t"}
+LEADER_LIFE = 7 * 86400.0
+
+
+def top_boards():
+    t = time.time()
+    rows = [r for r in LEADERS.values() if t - r["t"] < LEADER_LIFE]
+    out = {}
+    for key in ("coins", "relics", "houses"):
+        best = sorted((r for r in rows if r[key] > 0), key=lambda r: r[key], reverse=True)[:10]
+        out[key] = [[r["name"], r[key]] for r in best]
+    return out
+
+
+def on_stats(conn, m):
+    if m.get("hide"):
+        LEADERS.pop(conn.fid, None)
+        return
+    if len(LEADERS) >= 5000 and conn.fid not in LEADERS:
+        return
+    LEADERS[conn.fid] = {"name": conn.name, "coins": int(num(m.get("coins"), 0, 1e12, 0)), "relics": int(num(m.get("relics"), 0, 12, 0)), "houses": int(num(m.get("houses"), 0, 30, 0)), "t": time.time()}
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -2650,6 +2677,10 @@ def on_social(conn, m):
     conn.social_n -= 1
     if a in ("trade_req", "trade_yes", "trade_no", "trade_cancel", "trade_offer", "trade_ok"):
         return on_trade(conn, a, m)
+    if a == "stats":
+        return on_stats(conn, m)
+    if a == "leaders":
+        return conn.send(dict(top_boards(), t="leaders"))
     if a == "online":
         rows = [{"fid": c.fid, "name": c.name, "friend": mutual(conn.fid, c.fid), "sent": conn.fid in REQS.get(c.fid, {})}
                 for c in CONNS if c.hello and not c.closed and c.fid and c is not conn]
