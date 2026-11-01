@@ -7,8 +7,8 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 http://localhost:8765 http://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app https://*.onrender.com https://*.fly.dev https://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=392">
-  <link rel="stylesheet" href="walk.css?v=392">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=393">
+  <link rel="stylesheet" href="walk.css?v=393">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -17,7 +17,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac). <small id="fatal-why"></small></p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=392"></script>
+  <script src="boot.js?v=393"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -46,6 +46,7 @@
         <button id="btn-sound" type="button">Sound on <kbd>O</kbd></button>
         <button id="btn-controller" type="button" title="Play with an Arduino joystick plugged in by USB (Chrome or Edge)">🎮 Controller</button>
         <button id="btn-stick" type="button" title="Tune how the joystick feels" hidden>🎮 Stick settings</button>
+        <button id="btn-quest" type="button" title="See your quest, or give it up">📜 Quest</button>
         <button id="btn-report" type="button" title="Tell the admins about a player who is breaking the rules">🚩 Report a player</button>
         <button id="btn-relics" type="button" title="The rare treasures you have traded for">💎 Treasure</button>
         <button id="btn-learn" type="button" title="Teach the game which key of your IR remote does what" hidden>🎮 Learn remote</button>
@@ -568,6 +569,17 @@
     </div>
   </div>
 
+  <div id="quest" class="dpanel" role="dialog" aria-label="A citizen needs help">
+    <div class="box">
+      <header><h2>A citizen needs help</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
+      <p id="qs-text" class="dnote"></p>
+      <p id="qs-pay" class="dnote small"></p>
+      <div class="dbtns"><button id="qs-accept" type="button">Accept</button><button id="qs-no" type="button">Not now</button></div>
+    </div>
+  </div>
+
+  <div id="quest-hud" hidden></div>
+
   <div id="relic" class="dpanel" role="dialog" aria-label="A sparkling citizen">
     <div class="box">
       <header><h2 id="rl-name">Treasure</h2><button type="button" class="dclose" aria-label="Close">×</button></header>
@@ -653,68 +665,69 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=392"></script>
-  <script src="cancun-data.js?v=392"></script>
-  <script src="delhi-data.js?v=392"></script>
-  <script src="config.js?v=392"></script>
-  <script src="character.js?v=392"></script>
-  <script src="physics.js?v=392"></script>
-  <script src="vitals.js?v=392"></script>
-  <script src="narrator.js?v=392"></script>
-  <script src="audio.js?v=392"></script>
-  <script src="music.js?v=392"></script>
-  <script src="world.js?v=392"></script>
-  <script src="city.js?v=392"></script>
-  <script src="weather.js?v=392"></script>
-  <script src="modern.js?v=392"></script>
-  <script src="delhi.js?v=392"></script>
-  <script src="cancun.js?v=392"></script>
-  <script src="delhi-games.js?v=392"></script>
-  <script src="doors.js?v=392"></script>
-  <script src="home.js?v=392"></script>
-  <script src="spectators.js?v=392"></script>
-  <script src="fight.js?v=392"></script>
-  <script src="nav.js?v=392"></script>
-  <script src="show.js?v=392"></script>
-  <script src="shipyard.js?v=392"></script>
-  <script src="naval.js?v=392"></script>
-  <script src="theatre.js?v=392"></script>
-  <script src="watch.js?v=392"></script>
-  <script src="race.js?v=392"></script>
-  <script src="account.js?v=392"></script>
-  <script src="online.js?v=392"></script>
-  <script src="journey.js?v=392"></script>
-  <script src="subway.js?v=392"></script>
-  <script src="ride.js?v=392"></script>
-  <script src="chute.js?v=392"></script>
-  <script src="estate.js?v=392"></script>
-  <script src="relics.js?v=392"></script>
-  <script src="dialog.js?v=392"></script>
-  <script src="controller.js?v=392"></script>
-  <script src="chat.js?v=392"></script>
-  <script src="social.js?v=392"></script>
-  <script src="gifts.js?v=392"></script>
-  <script src="tax.js?v=392"></script>
-  <script src="pets.js?v=392"></script>
-  <script src="cage.js?v=392"></script>
-  <script src="treasure.js?v=392"></script>
-  <script src="fares.js?v=392"></script>
-  <script src="trade.js?v=392"></script>
-  <script src="aircraft.js?v=392"></script>
-  <script src="car.js?v=392"></script>
-  <script src="market.js?v=392"></script>
-  <script src="garage.js?v=392"></script>
-  <script src="dresser.js?v=392"></script>
-  <script src="festival.js?v=392"></script>
-  <script src="harbour.js?v=392"></script>
-  <script src="disease.js?v=392"></script>
-  <script src="jail.js?v=392"></script>
-  <script src="guards.js?v=392"></script>
-  <script src="police.js?v=392"></script>
-  <script src="weapons.js?v=392"></script>
-  <script src="stalls.js?v=392"></script>
-  <script src="robbery.js?v=392"></script>
-  <script src="jobs.js?v=392"></script>
-  <script src="game.js?v=392"></script>
+  <script src="landmarks.js?v=393"></script>
+  <script src="cancun-data.js?v=393"></script>
+  <script src="delhi-data.js?v=393"></script>
+  <script src="config.js?v=393"></script>
+  <script src="character.js?v=393"></script>
+  <script src="physics.js?v=393"></script>
+  <script src="vitals.js?v=393"></script>
+  <script src="narrator.js?v=393"></script>
+  <script src="audio.js?v=393"></script>
+  <script src="music.js?v=393"></script>
+  <script src="world.js?v=393"></script>
+  <script src="city.js?v=393"></script>
+  <script src="weather.js?v=393"></script>
+  <script src="modern.js?v=393"></script>
+  <script src="delhi.js?v=393"></script>
+  <script src="cancun.js?v=393"></script>
+  <script src="delhi-games.js?v=393"></script>
+  <script src="doors.js?v=393"></script>
+  <script src="home.js?v=393"></script>
+  <script src="spectators.js?v=393"></script>
+  <script src="fight.js?v=393"></script>
+  <script src="nav.js?v=393"></script>
+  <script src="show.js?v=393"></script>
+  <script src="shipyard.js?v=393"></script>
+  <script src="naval.js?v=393"></script>
+  <script src="theatre.js?v=393"></script>
+  <script src="watch.js?v=393"></script>
+  <script src="race.js?v=393"></script>
+  <script src="account.js?v=393"></script>
+  <script src="online.js?v=393"></script>
+  <script src="journey.js?v=393"></script>
+  <script src="subway.js?v=393"></script>
+  <script src="ride.js?v=393"></script>
+  <script src="chute.js?v=393"></script>
+  <script src="estate.js?v=393"></script>
+  <script src="relics.js?v=393"></script>
+  <script src="quests.js?v=393"></script>
+  <script src="dialog.js?v=393"></script>
+  <script src="controller.js?v=393"></script>
+  <script src="chat.js?v=393"></script>
+  <script src="social.js?v=393"></script>
+  <script src="gifts.js?v=393"></script>
+  <script src="tax.js?v=393"></script>
+  <script src="pets.js?v=393"></script>
+  <script src="cage.js?v=393"></script>
+  <script src="treasure.js?v=393"></script>
+  <script src="fares.js?v=393"></script>
+  <script src="trade.js?v=393"></script>
+  <script src="aircraft.js?v=393"></script>
+  <script src="car.js?v=393"></script>
+  <script src="market.js?v=393"></script>
+  <script src="garage.js?v=393"></script>
+  <script src="dresser.js?v=393"></script>
+  <script src="festival.js?v=393"></script>
+  <script src="harbour.js?v=393"></script>
+  <script src="disease.js?v=393"></script>
+  <script src="jail.js?v=393"></script>
+  <script src="guards.js?v=393"></script>
+  <script src="police.js?v=393"></script>
+  <script src="weapons.js?v=393"></script>
+  <script src="stalls.js?v=393"></script>
+  <script src="robbery.js?v=393"></script>
+  <script src="jobs.js?v=393"></script>
+  <script src="game.js?v=393"></script>
 </body>
 </html>

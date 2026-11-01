@@ -64,6 +64,7 @@ function init() {
   Controller.bind();
   Estate.bind();
   Relics.bind();
+  Quests.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -182,6 +183,7 @@ function wireInput(canvas) {
       if (Subway.key(k)) { /* the metro: F at an entrance or on a platform, R and U on a platform */ }
       else if (k === "KeyF" && Estate.at()) Estate.open();
       else if (k === "KeyF" && Relics.at()) Relics.open();
+      else if (k === "KeyF" && Quests.at()) Quests.open();
       else if (k === "KeyF" && city === "cancun" && Cancun.promptText() && Cancun.act()) { /* hired snorkel gear, or put your face in the water */ }
       else if (k === "KeyF" && Stalls.at(player.x, player.z, player.feet)) Stalls.open();
       else if (k === "KeyF" && Jobs.at(player.x, player.z, player.feet)) Jobs.act();
@@ -253,6 +255,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "metro") { Subway.key("KeyF"); return; }
     if ($("#prompt").dataset.kind === "estate") { Estate.open(); return; }
     if ($("#prompt").dataset.kind === "relic") { Relics.open(); return; }
+    if ($("#prompt").dataset.kind === "quest") { Quests.open(); return; }
     if ($("#prompt").dataset.kind === "ride") { Ride.tryBoard(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
@@ -1232,6 +1235,7 @@ function updatePrompt() {
     if (!text) { const mt = Subway.promptAt(); if (mt) { text = mt; p.dataset.kind = "metro"; } }
     if (!text) { const et = Estate.promptText(); if (et) { text = et; p.dataset.kind = "estate"; } }
     if (!text) { const rt = Relics.promptText(); if (rt) { text = rt; p.dataset.kind = "relic"; } }
+    if (!text) { const qt = Quests.promptText(); if (qt) { text = qt; p.dataset.kind = "quest"; } }
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text) { const rt = Ride.promptText(); if (rt) { text = rt; p.dataset.kind = "ride"; } }
@@ -1660,7 +1664,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
