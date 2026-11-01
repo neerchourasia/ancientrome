@@ -261,7 +261,7 @@ const Admin = (() => {
     for (const v of list) {
       const r = t.insertRow();
       if (v.flags) r.className = v.flags > 2 ? "lv-high" : "lv-medium";
-      cell(r, (v.online ? "● " : "") + when(v.last)); cell(r, when(v.first)); cell(r, v.visits); cell(r, v.plays); cell(r, v.name || ""); cell(r, v.acct || "guest"); cell(r, v.ua); cell(r, v.last_ip_mask); cell(r, v.flags || ""); cell(r, String(v.vid || "").slice(0, 8));
+      cell(r, (v.online ? "● " : "") + when(v.last)); cell(r, when(v.first)); cell(r, v.visits); cell(r, v.plays); cell(r, v.name || ""); cell(r, v.acct || "guest"); cell(r, v.ua); cell(r, v.last_ip || v.last_ip_mask); cell(r, v.flags || ""); cell(r, String(v.vid || "").slice(0, 8));
       const act = r.insertCell();
       if (v.blocked) { act.textContent = "BLOCKED "; button(act, "Unblock", () => { Online.navalSend({ t: "admin", a: "unblock", vid: v.vid }); setTimeout(loadOnline, 600); }); }
       else button(act, "Block", () => { if (confirm(`Block ${v.name || "this visitor"} (${String(v.vid).slice(0, 8)}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: v.vid }); setTimeout(loadOnline, 600); } });
@@ -280,7 +280,7 @@ const Admin = (() => {
     for (const e of list) {
       const r = t.insertRow();
       r.className = e.level === "high" ? "lv-high" : e.level === "medium" ? "lv-medium" : "";
-      cell(r, when(e.t)); cell(r, e.kind); cell(r, e.detail); cell(r, e.who || ""); cell(r, e.ip); cell(r, e.vid || "");
+      cell(r, when(e.t)); cell(r, e.kind); cell(r, e.detail); cell(r, e.who || ""); cell(r, e.ip_full || e.ip); cell(r, e.vid || "");
       const act = r.insertCell();
       if (e.vid) button(act, "Block", () => { if (confirm(`Block ${e.who || "this visitor"} (${e.vid}) from the game for 30 days and remove them now?`)) { Online.navalSend({ t: "admin", a: "block", vid: e.vid }); setTimeout(loadOnline, 600); } });
     }

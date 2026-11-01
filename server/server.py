@@ -1810,6 +1810,7 @@ def note_visit(vid, ip, ua, lang=None, name=None, acct=None, email=None, kind="p
         v["acct"] = "account"
     m = mask_ip(ip)
     v["last_ip_mask"] = m
+    v["last_ip"] = str(ip or "")[:64]                       # the whole address: only the admins can see it (in memory only)
     if m not in v["ips"]:
         v["ips"] = (v["ips"] + [m])[-4:]
     # many different visitors coming from one address within the hour can be one person using many accounts
@@ -1866,7 +1867,7 @@ def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60):
         FLAG_GAP.clear()
     if vid and vid in VISITS:
         VISITS[vid]["flags"] += 1
-    EVENTS.append({"t": stamp(), "kind": kind, "detail": str(detail)[:160], "level": level, "who": who, "ip": mask_ip(ip), "vid": (vid or "")[:8]})
+    EVENTS.append({"t": stamp(), "kind": kind, "detail": str(detail)[:160], "level": level, "who": who, "ip": mask_ip(ip), "ip_full": str(ip or "")[:64], "vid": (vid or "")[:8]})
 
 
 # ---------------------------------------------------------------------------------------------------------------
