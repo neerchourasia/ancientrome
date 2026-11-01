@@ -65,6 +65,7 @@ function init() {
   Estate.bind();
   Relics.bind();
   Quests.bind();
+  Swap.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();

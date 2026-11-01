@@ -442,6 +442,7 @@ const Market = (() => {
     houseName: () => homes()[tier()].name,
     houseRest: () => homes()[tier()].rest,
     relics: RELICS,
+    typeOf: (id) => (ITEMS[id] ? ITEMS[id].type : ""), priceOf: (id) => (ITEMS[id] ? ITEMS[id].price : 0),
     take(id) { if (!s.items.includes(id)) return false; s.items = s.items.filter((x) => x !== id); save(); applyAll(); return true; },     // used up or sold (relics.js)
     snapshot: () => ({ house: s.house, dhouse: s.dhouse, items: s.items.slice(), worn: s.worn.slice(), paint: { ...s.paint } }),
     livery: (id) => LIVERIES.find((l) => l.id === s.paint[id]) || null,

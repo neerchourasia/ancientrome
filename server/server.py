@@ -295,6 +295,7 @@ class Conn:
         self.veh, self.park = None, None     # the vehicle they are in / the one they left parked
         self.coins = None          # the denarii they say they have (shown to admins)
         self.palt, self.proll = 0.0, 0.0     # how high above the ground they are (in an aircraft) and how far it leans
+        self.trade = None                    # the trade they are in (a dict shared with the other player), or None
         self.ride, self.riders = None, []    # the driver whose vehicle they are riding in as a passenger / the passengers in their vehicle
         self.seen = set()          # the other walkers this connection has been told about
         self.ship = None           # the ship design they chose for the naval battle
@@ -2463,7 +2464,92 @@ def social_start(conn, m):
     presence(conn, True)
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# trading between friends: both sides see what the other offers (up to 6 things and some denarii) and must LOCK IN; any change to an offer unlocks both.
+# When both are locked the server tells each browser what it gets. (Each browser keeps what its player owns, so the server only relays and limits.)
+
+TRADE_ITEMS, TRADE_COINS, TRADE_REQ_LIFE = 6, 100000, 60.0
+TRADE_REQS = {}            # (fid of the one asking, fid of the one asked) -> when
+
+
+def clean_offer(m):
+    items = [i for i in (m.get("items") or []) if isinstance(i, str) and re.fullmatch(r"[a-z0-9_]{2,24}", i)] if isinstance(m.get("items"), list) else []
+    return {"items": list(dict.fromkeys(items))[:TRADE_ITEMS], "coins": int(num(m.get("coins"), 0, TRADE_COINS, 0)), "ok": False}
+
+
+def trade_other(conn):
+    tr = conn.trade
+    return None if not tr else (tr["b"] if tr["a"] is conn else tr["a"])
+
+
+def trade_close(conn, why):
+    """End a trade for both sides (declined, cancelled, someone left)."""
+    tr = getattr(conn, "trade", None)
+    if not tr:
+        return
+    for c in (tr["a"], tr["b"]):
+        c.trade = None
+        if not c.closed:
+            c.send({"t": "fr_trade", "s": "closed", "why": why})
+
+
+def on_trade(conn, a, m):
+    t = now()
+    if a == "trade_req":
+        fid = clean_fid(m.get("fid"))
+        others = [c for c in conns_of(fid) if not c.room] if fid else []
+        if not fid or not mutual(conn.fid, fid):
+            return social_msg(conn, "You can only trade with your friends.")
+        if conn.trade or conn.room or not others or others[0].trade:
+            return social_msg(conn, "Your friend is not free to trade right now (offline, busy or already trading).")
+        TRADE_REQS[(conn.fid, fid)] = t
+        for c in others:
+            c.send({"t": "fr_trade", "s": "req", "fid": conn.fid, "name": conn.name})
+        return social_msg(conn, "Trade request sent.")
+    if a in ("trade_yes", "trade_no"):
+        fid = clean_fid(m.get("fid"))
+        asked = TRADE_REQS.pop((fid, conn.fid), None) if fid else None
+        starters = [c for c in conns_of(fid) if not c.room and not c.trade] if fid else []
+        if asked is None or t - asked > TRADE_REQ_LIFE or not starters or not mutual(conn.fid, fid):
+            return social_msg(conn, "That trade request has run out.")
+        if a == "trade_no":
+            return starters[0].send({"t": "fr_trade", "s": "closed", "why": "%s said no thanks." % conn.name})
+        if conn.trade or conn.room:
+            return
+        tr = {"a": starters[0], "b": conn, "o": {}}
+        tr["o"][id(tr["a"])] = {"items": [], "coins": 0, "ok": False}
+        tr["o"][id(conn)] = {"items": [], "coins": 0, "ok": False}
+        tr["a"].trade = conn.trade = tr
+        tr["a"].send({"t": "fr_trade", "s": "open", "name": conn.name})
+        conn.send({"t": "fr_trade", "s": "open", "name": tr["a"].name})
+        return
+    tr = getattr(conn, "trade", None)
+    if not tr:
+        return
+    other = trade_other(conn)
+    if a == "trade_cancel":
+        return trade_close(conn, "%s stopped the trade." % conn.name)
+    if a == "trade_offer":
+        tr["o"][id(conn)] = clean_offer(m)
+        tr["o"][id(other)]["ok"] = False
+        other.send({"t": "fr_trade", "s": "theirs", "items": tr["o"][id(conn)]["items"], "coins": tr["o"][id(conn)]["coins"], "ok": False})
+        conn.send({"t": "fr_trade", "s": "unlock"})
+        return
+    if a == "trade_ok":
+        tr["o"][id(conn)]["ok"] = True
+        other.send({"t": "fr_trade", "s": "theirs_ok"})
+        if tr["o"][id(other)]["ok"]:
+            mine, theirs = tr["o"][id(conn)], tr["o"][id(other)]
+            for c, give, get in ((conn, mine, theirs), (other, theirs, mine)):
+                c.trade = None
+                c.send({"t": "fr_trade", "s": "done", "get": {"items": get["items"], "coins": get["coins"]}, "give": {"items": give["items"], "coins": give["coins"]}})
+            if mine["coins"] >= 3000 or theirs["coins"] >= 3000:
+                flag("large trade", "%s and %s traded %d / %d denarii" % (conn.name, other.name, mine["coins"], theirs["coins"]), "low", conn=conn, gap=300)
+        return
+
+
 def social_drop(conn):
+    trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
         presence(conn, False)
 
@@ -2562,6 +2648,8 @@ def on_social(conn, m):
     if conn.social_n < 1:
         return social_msg(conn, "Slow down a little.")
     conn.social_n -= 1
+    if a in ("trade_req", "trade_yes", "trade_no", "trade_cancel", "trade_offer", "trade_ok"):
+        return on_trade(conn, a, m)
     if a == "online":
         rows = [{"fid": c.fid, "name": c.name, "friend": mutual(conn.fid, c.fid), "sent": conn.fid in REQS.get(c.fid, {})}
                 for c in CONNS if c.hello and not c.closed and c.fid and c is not conn]

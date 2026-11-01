@@ -1389,6 +1389,45 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "social", "a": "give", "fid": stranger["fid"], "n": 10})
         self.assertIn("only give", (await ann.until(lambda m: m["t"] == "fr_msg" and "only give" in m["msg"]))["msg"])
 
+    async def test_friends_can_trade_with_a_lock_in_from_both_sides(self):
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        ann.send({"t": "social", "a": "req", "name": "bob"})
+        asked = await bob.until(lambda m: m["t"] == "fr_in")
+        bob.send({"t": "social", "a": "ans", "fid": asked["fid"], "ok": True})
+        added = await ann.until(lambda m: m["t"] == "fr_added")
+        await bob.until(lambda m: m["t"] == "fr_added")
+        fa, fb = added["fid"], asked["fid"]
+        # only friends can be asked
+        cy.send({"t": "social", "a": "trade_req", "fid": fa})                                               # Cy is nobody's friend
+        self.assertIn("only trade with your friends", (await cy.until(lambda m: m["t"] == "fr_msg" and "friends" in m["msg"]))["msg"])
+        # Ann asks, Bob says yes: both windows open
+        ann.send({"t": "social", "a": "trade_req", "fid": fa})                                              # (fa is Bob's friend id, as Ann sees it)
+        req = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "req")
+        self.assertEqual(req["name"], "Ann")
+        bob.send({"t": "social", "a": "trade_yes", "fid": req["fid"]})
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open"); await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
+        # offers: each sees the other's, bad ids are dropped, and changing an offer unlocks both
+        ann.send({"t": "social", "a": "trade_offer", "items": ["r_ring", "bad id!", "r_ring", "hound"], "coins": 50})
+        seen = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        self.assertEqual((seen["items"], seen["coins"]), (["r_ring", "hound"], 50))
+        bob.send({"t": "social", "a": "trade_offer", "items": ["wreath"], "coins": 0})
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        ann.send({"t": "social", "a": "trade_ok"})
+        await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs_ok")
+        bob.send({"t": "social", "a": "trade_offer", "items": ["wreath", "crown"], "coins": 0})            # a change after Ann locked in: Ann is unlocked again
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        ann.send({"t": "social", "a": "trade_ok"}); bob.send({"t": "social", "a": "trade_ok"})
+        done_a = await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "done")
+        done_b = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "done")
+        self.assertEqual((done_a["get"]["items"], done_a["give"]["items"]), (["wreath", "crown"], ["r_ring", "hound"]))
+        self.assertEqual((done_b["get"]["items"], done_b["get"]["coins"]), (["r_ring", "hound"], 50))
+        # cancelling and leaving close the trade
+        ann.send({"t": "social", "a": "trade_req", "fid": fa}); req = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "req")
+        bob.send({"t": "social", "a": "trade_yes", "fid": req["fid"]}); await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
+        bob.send({"t": "social", "a": "trade_cancel"})
+        self.assertIn("stopped the trade", (await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "closed"))["why"])
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")
