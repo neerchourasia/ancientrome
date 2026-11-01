@@ -106,6 +106,7 @@ const Account = (() => {
         snorkel: typeof Cancun !== "undefined" ? Cancun.snorkelSnapshot() : { seen: [], rounds: 1 },
         daily: Gifts.snapshot(),
         estate: typeof Estate !== "undefined" ? Estate.snapshot() : {},
+        treasure: typeof Treasure !== "undefined" ? Treasure.snapshot() : {},
         era,
       },
     };
@@ -132,6 +133,7 @@ const Account = (() => {
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);
     if (p.disease && typeof p.disease === "object") Disease.restore(p.disease);
     if (p.estate && typeof p.estate === "object" && typeof Estate !== "undefined") Estate.restore(p.estate);
+    if (p.treasure && typeof Treasure !== "undefined") Treasure.merge(p.treasure);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.trade && typeof p.trade === "object" && typeof Trade !== "undefined") Trade.restore(p.trade);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);
@@ -151,6 +153,7 @@ const Account = (() => {
   function keepMineOverServer(row, at) {
     const so = row.progress && row.progress.owned ? row.progress.owned : {}, mo = Market.snapshot();
     Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
+    if (typeof Treasure !== "undefined" && row.progress && row.progress.treasure) Treasure.merge(row.progress.treasure);
     if (typeof Estate !== "undefined" && row.progress && row.progress.estate) Estate.merge(row.progress.estate);   // the houses bought on the other device too
     if (at) setKnown(at);
     lastSaved = "";

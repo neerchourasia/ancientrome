@@ -1,7 +1,8 @@
 "use strict";
 // The day's gold coins: every morning ten gold coins glint around the city you are in (each with a tall golden light, so you can see it from far away),
 // some close to the sights and some a little off the beaten path. Walk (or drive) over one to pick it up. Find all ten for a bonus. The coins are
-// different in each city and each era, and new ones appear every day of the game. Saved in the browser. Depends on physics.js, home.js (Time) and vitals.js.
+// different in each city and each era, and new ones appear every day of the game. There are only ten a day in each city, however many times you switch between
+// its eras: coins you took in one era are gone from the other. Saved in the browser and with your account. Depends on physics.js, home.js (Time) and vitals.js.
 
 const Treasure = (() => {
   const T = THREE;
@@ -13,6 +14,8 @@ const Treasure = (() => {
   try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") got = v; } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(got)); } catch (e) { /* ignore */ } };
   const keyNow = () => `${city}-${era}-${Math.floor(Time.day)}`;
+  const foundKey = () => `found:${city}-${Math.floor(Time.day)}`;      // how many coins you have taken today in this city (in either era)
+  const foundNow = () => got[foundKey()] || 0;
   const dayOf = (k) => k.slice(k.lastIndexOf("-") + 1);
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
@@ -21,6 +24,7 @@ const Treasure = (() => {
     coins = []; builtKey = key;
     const rnd = seeded(key), lms = (typeof LANDMARKS !== "undefined" ? LANDMARKS : []).filter((l) => !l.home);
     const done = got[key] || [];
+    let gone = Math.max(0, foundNow() - done.length);                  // taken in the other era of this city today: that many are missing here too
     for (let tries = 0; tries < 400 && coins.length < COUNT; tries++) {
       const l = lms.length && rnd() < 0.7 ? lms[Math.floor(rnd() * lms.length)] : null, a = rnd() * Math.PI * 2, d = 12 + rnd() * 90;
       const x = l ? l.x + Math.cos(a) * d : BOUNDS.minX + 60 + rnd() * (BOUNDS.maxX - BOUNDS.minX - 120), z = l ? l.z + Math.sin(a) * d : BOUNDS.minZ + 60 + rnd() * (BOUNDS.maxZ - BOUNDS.minZ - 120);
@@ -31,9 +35,10 @@ const Treasure = (() => {
       if (coins.some((c) => Math.hypot(c.x - x, c.z - z) < 40)) continue;
       const g = new T.Group(), coin = new T.Mesh(coinGeo, goldMat), beam = new T.Mesh(beamGeo, beamMat);
       coin.rotation.x = Math.PI / 2; coin.position.y = 1.1; beam.position.y = 7; g.add(coin, beam); g.position.set(x, y, z);
-      g.visible = !done.includes(coins.length);
+      const taken = done.includes(coins.length) || gone-- > 0;
+      g.visible = !taken;
       root.add(g);
-      coins.push({ g, coin, x, z, y, value, taken: done.includes(coins.length) });
+      coins.push({ g, coin, x, z, y, value, taken });
     }
   }
   const left = () => coins.filter((c) => !c.taken).length;
@@ -53,12 +58,24 @@ const Treasure = (() => {
       c.coin.position.y = 1.1 + Math.sin(t * 2 + c.x) * 0.15; c.coin.rotation.z += dt * 2;
       if (!walking || Math.hypot(player.x - c.x, player.z - c.z) > 2.2 || Math.abs(player.feet - c.y) > 3) continue;
       c.taken = true; c.g.visible = false;
-      (got[key] = got[key] || []).push(coins.indexOf(c)); save();
+      (got[key] = got[key] || []).push(coins.indexOf(c)); got[foundKey()] = foundNow() + 1; save();
       Vitals.coins += c.value; Sfx.play("coin");
-      if (!left()) { Vitals.coins += BONUS; toast(`The last gold coin! +${c.value}, and a bonus of ${BONUS} denarii for finding all ${coins.length} today.`); }
-      else toast(`A gold coin! +${c.value} denarii (${left()} more today).`);
+      if (foundNow() >= COUNT) { Vitals.coins += BONUS; toast(`The last gold coin! +${c.value}, and a bonus of ${BONUS} denarii for finding all ${COUNT} today.`); }
+      else toast(`A gold coin! +${c.value} denarii (${COUNT - foundNow()} more today).`);
     }
   }
 
-  return { update, get left() { return left(); }, debug: () => coins.map((c) => ({ x: c.x, z: c.z, taken: c.taken, value: c.value })) };
+  // kept with your account too, so another computer does not offer the same coins again
+  const snapshot = () => JSON.parse(JSON.stringify(got));
+  function merge(raw) {
+    if (!raw || typeof raw !== "object") return;
+    for (const [k, v] of Object.entries(raw)) {
+      if (!/^(found:)?(rome|delhi|cancun)(-(ancient|modern))?-\d+$/.test(k)) continue;
+      if (k.startsWith("found:")) { if (Number.isFinite(v)) got[k] = Math.max(got[k] || 0, Math.min(COUNT, Math.floor(v))); }
+      else if (Array.isArray(v)) got[k] = [...new Set([...(got[k] || []), ...v.filter((i) => Number.isInteger(i) && i >= 0 && i < COUNT)])];
+    }
+    for (const k of Object.keys(got)) if (dayOf(k) !== dayOf(keyNow())) delete got[k];
+    save(); builtKey = "";                                                                      // draw the coins again with what the account knows
+  }
+  return { update, snapshot, merge, get left() { return left(); }, debug: () => coins.map((c) => ({ x: c.x, z: c.z, taken: c.taken, value: c.value })) };
 })();
