@@ -1475,6 +1475,38 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         top = await ann.until(lambda m: m["t"] == "leaders")
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
 
+    async def test_guilds_share_a_chat_and_a_treasury_the_leader_controls(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear()
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead!"})
+        st = await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        self.assertEqual((st["g"]["name"], st["g"]["tag"], len(st["g"]["members"])), ("Red Eagles", "EAD", 1))
+        bob.send({"t": "social", "a": "g_make", "name": "red eagles", "tag": "XX"})                     # the name is taken
+        self.assertIn("already a guild", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})
+        st = await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["members"]) == 2)
+        bob.send({"t": "social", "a": "g_say", "text": "hello guild"})
+        st = await ann.until(lambda m: m["t"] == "guild" and any(c["text"] == "hello guild" for c in m["g"]["chat"]))
+        bob.send({"t": "social", "a": "g_dep", "n": 800})
+        paid = await bob.until(lambda m: m["t"] == "g_paid")
+        self.assertEqual(paid["n"], 800)
+        bob.send({"t": "social", "a": "g_pay", "fid": server.fid_of("u-bob"), "n": 100})                # only the leader pays out
+        self.assertIn("leader", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_pay", "fid": server.fid_of("u-bob"), "n": 500})
+        self.assertEqual((await bob.until(lambda m: m["t"] == "g_got"))["n"], 500)
+        ann.send({"t": "social", "a": "g_pay", "fid": server.fid_of("u-bob"), "n": 500})                # more than the treasury holds
+        self.assertIn("treasury holds 300", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_list"})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "guilds"))["list"][0]["treasury"], 300)
+        ann.send({"t": "chat", "text": "hi all"})
+        self.assertEqual((await cy.until(lambda m: m["t"] == "chat" and m.get("text") == "hi all"))["tag"], "EAD")   # the tag shows in the main chat
+        ann.send({"t": "social", "a": "g_kick", "fid": server.fid_of("u-bob")})
+        await bob.until(lambda m: m["t"] == "guild" and m["g"] is None)
+        ann.send({"t": "social", "a": "g_leave"})
+        await asyncio.sleep(0.2)
+        self.assertEqual(server.GUILDS, {})                                                              # the last member out closes the guild
+
     async def test_nobody_can_make_themselves_a_friend(self):
         self.accounts("ann", "mal")
         ann = await self.player("Ann", token="ann")

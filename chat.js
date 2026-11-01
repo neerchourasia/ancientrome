@@ -27,6 +27,7 @@ const Chat = (() => {
       const who = document.createElement("b");
       who.textContent = entry.w ? (entry.name === Character.name && entry.to ? `You → ${entry.to}` : `${entry.name} (whisper)`) : entry.name;
       if (entry.adm) { who.className = "adm"; who.textContent = "★ " + who.textContent; }
+      if (entry.tag && !entry.w) who.textContent = `[${entry.tag}] ${who.textContent}`;
       li.append(who, document.createTextNode(": " + entry.text));
       if (entry.w) li.className = "whisper";
     }

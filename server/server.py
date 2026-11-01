@@ -2034,7 +2034,7 @@ def on_chat(conn, m):
     conn.ctok -= 1
     if text.startswith("/"):
         return chat_command(conn, text)
-    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time())}   # ts: when it was sent, so everyone can see the time
+    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time()), "tag": guild_tag_of(conn)}   # ts: when it was sent, so everyone can see the time
     ADMIN_CHAT.append({"ts": entry["ts"], "id": conn.id, "name": conn.name, "vid": (conn.vid or "")[:8], "text": text or "(sent a picture)", "adm": entry["adm"]})
     if pic:
         CHAT_LOG.append(dict(entry, text=text or "(sent a picture)"))      # people who join later do not get the picture, only that there was one
@@ -2590,6 +2590,153 @@ def on_stats(conn, m):
     LEADERS[conn.fid] = {"name": conn.name, "coins": int(num(m.get("coins"), 0, 1e12, 0)), "relics": int(num(m.get("relics"), 0, 12, 0)), "houses": int(num(m.get("houses"), 0, 30, 0)), "t": time.time()}
 
 
+
+# ---- guilds: a few players with accounts who share a name, a chat and a treasury. Kept in memory only (a restart empties them), like the friends lists.
+GUILDS = {}                # key (lower-case name) -> {"name", "tag", "leader" (friend id), "members": {fid: name}, "treasury", "chat": [...], "paid": [window start, total paid out]}
+GUILD_OF = {}              # friend id -> key
+GUILD_MAX, GUILD_COST, GUILD_PAY_MAX, GUILD_PAY_HOUR = 20, 500, 1000, 3000
+GUILD_DEP_MAX = 1000000
+
+
+def guild_name(v):
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z0-9 '\-]", "", str(v if v is not None else ""))).strip()[:18]
+
+
+def guild_tag(v):
+    return re.sub(r"[^A-Z0-9]", "", str(v if v is not None else "").upper())[:4]
+
+
+def guild_of(conn):
+    return GUILDS.get(GUILD_OF.get(conn.fid)) if conn.fid else None
+
+
+def guild_state(g, conn=None):
+    mem = [{"fid": f, "name": n, "online": bool(conns_of(f)), "leader": f == g["leader"]} for f, n in g["members"].items()]
+    mem.sort(key=lambda r: (not r["leader"], not r["online"], r["name"].lower()))
+    return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX}}
+
+
+def guild_push(g):
+    for f in g["members"]:
+        for c in conns_of(f):
+            c.send(guild_state(g, c))
+
+
+def guild_tag_of(conn):
+    g = guild_of(conn)
+    return g["tag"] if g else ""
+
+
+def on_guild(conn, a, m):
+    g = guild_of(conn)
+    if a == "g_me":
+        return conn.send(guild_state(g, conn) if g else {"t": "guild", "g": None})
+    if a == "g_list":
+        rows = sorted(GUILDS.values(), key=lambda x: (-x["treasury"], -len(x["members"])))[:30]
+        return conn.send({"t": "guilds", "list": [{"name": x["name"], "tag": x["tag"], "n": len(x["members"]), "treasury": x["treasury"]} for x in rows]})
+    if a == "g_make":
+        if g:
+            return social_msg(conn, "Leave your guild first.")
+        name, tag = guild_name(m.get("name")), guild_tag(m.get("tag"))
+        if len(name) < 3 or len(tag) < 2:
+            return social_msg(conn, "A guild needs a name of 3 or more letters and a tag of 2 to 4 letters or numbers.")
+        if BAD_WORDS.search(name) or BAD_WORDS.search(tag):
+            return social_msg(conn, "Please choose another guild name.")
+        if name.lower() in GUILDS:
+            return social_msg(conn, "There is already a guild with that name.")
+        if len(GUILDS) >= 500:
+            return social_msg(conn, "There are too many guilds right now.")
+        GUILDS[name.lower()] = {"name": name, "tag": tag, "leader": conn.fid, "members": {conn.fid: conn.name}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+        GUILD_OF[conn.fid] = name.lower()
+        conn.send({"t": "g_paid", "n": GUILD_COST, "why": "founding the guild"})
+        return guild_push(GUILDS[name.lower()])
+    if a == "g_join":
+        if g:
+            return social_msg(conn, "Leave your guild first.")
+        k = guild_name(m.get("name")).lower()
+        tg = GUILDS.get(k)
+        if not tg:
+            return social_msg(conn, "There is no guild with that name.")
+        if len(tg["members"]) >= GUILD_MAX:
+            return social_msg(conn, "That guild is full.")
+        tg["members"][conn.fid] = conn.name
+        GUILD_OF[conn.fid] = k
+        guild_say(tg, "%s joined the guild." % conn.name)
+        return guild_push(tg)
+    if not g:
+        return social_msg(conn, "You are not in a guild.")
+    if a == "g_leave":
+        g["members"].pop(conn.fid, None)
+        GUILD_OF.pop(conn.fid, None)
+        conn.send({"t": "guild", "g": None})
+        if not g["members"]:
+            GUILDS.pop(g["name"].lower(), None)
+            return
+        if g["leader"] == conn.fid:
+            g["leader"] = next(iter(g["members"]))                    # the longest-standing member leads now
+        guild_say(g, "%s left the guild." % conn.name)
+        return guild_push(g)
+    if a == "g_say":
+        text = clean_chat(m.get("text"))
+        t = now()
+        if t < conn.muted_until or not text:
+            return
+        conn.ctok = min(3.0, conn.ctok + (t - conn.ctok_t) / 1.5)
+        conn.ctok_t = t
+        if conn.ctok < 1:
+            return social_msg(conn, "Slow down a little.")
+        conn.ctok -= 1
+        g["chat"].append({"name": conn.name, "text": text, "ts": int(time.time())})
+        del g["chat"][:-40]
+        return guild_push(g)
+    if a == "g_dep":
+        n = int(num(m.get("n"), 0, GUILD_DEP_MAX, 0))
+        if n < 1:
+            return
+        g["treasury"] += n
+        conn.send({"t": "g_paid", "n": n, "why": "the guild treasury"})
+        guild_say(g, "%s put %d denarii in the treasury." % (conn.name, n))
+        return guild_push(g)
+    if a in ("g_pay", "g_kick"):
+        if g["leader"] != conn.fid:
+            return social_msg(conn, "Only the guild leader can do that.")
+        f = clean_fid(m.get("fid"))
+        if not f or f not in g["members"]:
+            return social_msg(conn, "That player is not in your guild.")
+        if a == "g_kick":
+            if f == conn.fid:
+                return social_msg(conn, "Use Leave guild to go yourself.")
+            nm = g["members"].pop(f)
+            GUILD_OF.pop(f, None)
+            for c in conns_of(f):
+                c.send({"t": "guild", "g": None})
+            guild_say(g, "%s was sent away by the leader." % nm)
+            return guild_push(g)
+        n = int(num(m.get("n"), 0, GUILD_PAY_MAX, 0))
+        if n < 1 or n > g["treasury"]:
+            return social_msg(conn, "The treasury holds %d denarii (1 to %d at a time)." % (g["treasury"], GUILD_PAY_MAX))
+        t = time.time()
+        if t - g["paid"][0] > 3600:
+            g["paid"] = [t, 0]
+        if g["paid"][1] + n > GUILD_PAY_HOUR:
+            flag("guild payouts", "%s tried to pay out more than %d denarii from guild %s in an hour" % (conn.name, GUILD_PAY_HOUR, g["name"]), "low", conn=conn, gap=300)
+            return social_msg(conn, "The guild can pay out %d denarii an hour." % GUILD_PAY_HOUR)
+        cs = conns_of(f)
+        if not cs:
+            return social_msg(conn, "They must be online to be paid.")
+        g["paid"][1] += n
+        g["treasury"] -= n
+        for c in cs:
+            c.send({"t": "g_got", "n": n, "from": g["name"]})
+        guild_say(g, "%s was paid %d denarii from the treasury." % (g["members"][f], n))
+        return guild_push(g)
+
+
+def guild_say(g, text):
+    g["chat"].append({"name": "", "text": text, "ts": int(time.time())})
+    del g["chat"][:-40]
+
+
 def social_drop(conn):
     trade_close(conn, "%s left." % conn.name)
     if conn.fid and not [c for c in conns_of(conn.fid) if c is not conn]:
@@ -2694,6 +2841,8 @@ def on_social(conn, m):
         return on_trade(conn, a, m)
     if a == "stats":
         return on_stats(conn, m)
+    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick"):
+        return on_guild(conn, a, m)
     if a == "leaders":
         return conn.send(dict(top_boards(), t="leaders"))
     if a == "online":

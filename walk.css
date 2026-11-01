@@ -718,3 +718,11 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 /* the admin's lists: serious and worth-a-look rows */
 .dtable tr.lv-high td { background: rgba(200, 50, 40, .28); }
 .dtable tr.lv-medium td { background: rgba(220, 160, 40, .2); }
+
+.gd-row { display: flex; gap: 6px; margin: 6px 0; }
+.gd-row input { flex: 1; min-width: 0; }
+.gd-row #gd-tag { flex: 0 0 70px; text-transform: uppercase; }
+.gd-list { margin: 4px 0 10px; padding: 0; list-style: none; font-size: .9rem; line-height: 1.9; }
+.gd-list .dim { color: var(--muted); }
+.gd-chat { margin: 6px 0; padding: 6px 8px; list-style: none; height: 120px; overflow-y: auto; background: rgba(0,0,0,.18); border-radius: 6px; font-size: .85rem; line-height: 1.4; }
+.gd-chat .sys { color: var(--muted); font-style: italic; }
