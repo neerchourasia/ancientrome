@@ -301,6 +301,64 @@ const Cancun = (() => {
     sign(g, X(x), 3.7, z + HOME.hd + 0.3, 2.6, 0.8, "CASITA", "your home", Math.PI);
   }
 
+
+  // ---------- the casita grows: seven upgrades from the builder in the market, each one added on top of the last (see market.js: HOUSES_C). The first brings a garden and a garage. ----------
+  const cT = [null], CONE = new T.ConeGeometry(1, 1, 8), SPH = new T.SphereGeometry(1, 12, 8);
+  let cTier = 0, cPending = 0;
+  function buildHouseTiers() {
+    const x0 = HOME.x, z0 = HOME.z;
+    for (let t = 1; t <= 7; t++) { const g = new T.Group(); g.visible = false; root.add(g); cT[t] = { g, blockers: [] }; }
+    const tb = (t, cx, y0, cz, w, h, d, m, solid = true) => { const me = mbox(cT[t].g, X(cx), y0, cz, w, h, d, m); if (solid) cT[t].blockers.push(addBlockerBox(X(cx) - w / 2, X(cx) + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h)); return me; };
+    const tc = (t, cx, y0, cz, r, h, m, solid = true) => { const me = mcyl(cT[t].g, X(cx), y0, cz, r, h, m); if (solid) cT[t].blockers.push(addBlockerCircle(X(cx), cz, r, y0, y0 + h)); return me; };
+    const cone = (t, cx, y0, cz, r, h, m) => { const me = new T.Mesh(CONE, m); me.scale.set(r, h, r); me.position.set(X(cx), y0 + h / 2, cz); me.castShadow = true; cT[t].g.add(me); return me; };
+    const ball = (t, cx, y, cz, r, m) => { const me = new T.Mesh(SPH, m); me.scale.set(r, r, r); me.position.set(X(cx), y, cz); me.castShadow = true; cT[t].g.add(me); return me; };
+    const palm = (t, cx, cz, h = 5) => { tc(t, cx, 0, cz, 0.22, h, C.wood, false); for (let k = 0; k < 5; k++) { const l = new T.Mesh(BOX, C.leaf); l.scale.set(3, 0.1, 0.7); l.position.set(X(cx), h, cz); l.rotation.y = (k / 5) * Math.PI; l.rotation.z = 0.18; cT[t].g.add(l); } };
+    const fountain = (t, cx, cz) => { tc(t, cx, 0, cz, 1.9, 0.55, C.stone); tc(t, cx, 0.5, cz, 1.5, 0.1, C.water, false); tc(t, cx, 0.5, cz, 0.25, 1.4, C.stone, false); ball(t, cx, 2.0, cz, 0.35, C.water); };
+    const pool = (t, cx, cz, w, d) => { tb(t, cx, -0.02, cz, w + 1.2, 0.35, d + 1.2, C.stone, false); tb(t, cx, 0.3, cz, w, 0.05, d, C.water, false); };
+
+    // 1: a walled garden in front, and a garage to the east (open to the west: stand at its front and press F)
+    for (const [cx, cz, w, d] of [[x0, z0 + 22, 30, 0.4], [x0 - 15, z0 + 12, 0.4, 20], [x0 + 15, z0 + 12, 0.4, 20]]) tb(1, cx, 0, cz, w, 0.8, d, C.white, false);
+    for (const [px, pz] of [[x0 - 12, z0 + 8], [x0 + 12, z0 + 8], [x0 - 12, z0 + 19], [x0 + 12, z0 + 19]]) palm(1, px, pz);
+    fountain(1, x0, z0 + 13);
+    const gm = { wall: C.lime, roof: C.red, dark: C.dark, door: C.wood };
+    for (const p of Garage.parts(x0 + 22, z0, "w")) tb(1, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], !!p.solid);
+    Garage.register("cancun", cT[1].g, X(x0 + 22), z0, "w", () => cTier);
+    // 2: a second wing to the west and a pillared veranda along the front
+    tb(2, x0 - 11.5, 0, z0, 8.4, 3.1, 6.2, C.lime); tb(2, x0 - 11.5, 3.1, z0, 9.4, 0.5, 7.2, C.red, false);
+    for (let k = 0; k < 6; k++) tc(2, x0 - 11 + k * 4.4, 0, z0 + 4.6, 0.3, 3.1, C.white);
+    tb(2, x0, 3.1, z0 + 4.6, 24, 0.35, 2.2, C.red, false);
+    // 3: a tower, a swimming pool and a courtyard wall behind
+    tc(3, x0 + 11, 0, z0 - 6, 2.2, 11, C.lime); tc(3, x0 + 11, 11, z0 - 6, 2.7, 0.5, C.stone, false); cone(3, x0 + 11, 11.5, z0 - 6, 2.9, 3, C.red);
+    pool(3, x0 - 18, z0 + 17, 12, 6);
+    tb(3, x0, 0, z0 - 12, 34, 2.4, 0.5, C.lime); tb(3, x0 - 17, 0, z0 - 6, 0.5, 2.4, 12, C.lime); tb(3, x0 + 17, 0, z0 - 6, 0.5, 2.4, 12, C.lime);
+    // 4: the Maya palace: a stepped hall behind, with columns and four corner towers
+    for (let k = 0; k < 3; k++) tb(4, x0, k * 1.2, z0 - 22, 30 - k * 4, 1.2, 12 - k * 2, k % 2 ? C.stone : C.lime2, k === 0);
+    tb(4, x0, 3.6, z0 - 22, 20, 3.6, 7, C.lime); tb(4, x0, 7.2, z0 - 22, 22, 0.5, 9, C.red, false);
+    for (let k = 0; k < 8; k++) tc(4, x0 - 8.4 + k * 2.4, 3.6, z0 - 17.8, 0.4, 3.6, C.white, false);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { tc(4, x0 + sx * 16, 0, z0 - 22 + sz * 7, 1.5, 9, C.lime); cone(4, x0 + sx * 16, 9, z0 - 22 + sz * 7, 1.9, 2.4, C.red); }
+    // 5: golden roofs, statues along the path and a gate at the road
+    tb(5, x0, 7.7, z0 - 22, 20.6, 0.3, 7.6, C.gold, false);
+    for (const sx of [-1, 1]) { tc(5, x0 + sx * 4, 0, z0 + 28, 0.9, 5, C.white); ball(5, x0 + sx * 4, 5.6, z0 + 28, 0.9, C.gold); }
+    tb(5, x0, 5, z0 + 28, 8.8, 0.8, 1.4, C.gold, false);
+    for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) { tc(5, x0 + sx * 3.2, 0, z0 + 14 + k * 3.4, 0.4, 1.4, C.stone, false); ball(5, x0 + sx * 3.2, 1.8, z0 + 14 + k * 3.4, 0.4, C.gold); }
+    // 6: the Palace of the Sun: a little stepped pyramid on top, a gold sun disc, torches and a long reflecting pool
+    for (let k = 0; k < 4; k++) tb(6, x0, 7.7 + k * 1.1, z0 - 22, 14 - k * 3, 1.1, 5 - k * 0.9, k % 2 ? C.stone : C.lime2, false);
+    const disc = new T.Mesh(new T.CylinderGeometry(1.6, 1.6, 0.25, 24), C.gold); disc.rotation.x = Math.PI / 2; disc.position.set(X(x0), 14.5, z0 - 19.4); cT[6].g.add(disc);
+    for (let k = 0; k < 6; k++) { const px = x0 - 10 + k * 4; tc(6, px, 0, z0 + 24, 0.12, 2, C.wood, false); ball(6, px, 2.2, z0 + 24, 0.3, C.gold); }
+    pool(6, x0 - 28, z0 + 10, 6, 26);
+    // 7: the Palace of Kukulcán: gold domes, white stone, a feathered serpent winding along the path, and more fountains
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) ball(7, x0 + sx * 16, 11.2, z0 - 22 + sz * 7, 2.1, C.gold);
+    ball(7, x0 + 11, 15.2, z0 - 6, 2.2, C.gold); ball(7, x0 - 11.5, 4.2, z0, 2.4, C.gold);
+    for (let k = 0; k < 14; k++) ball(7, x0 + Math.sin(k * 0.8) * 2.2 + 9, 0.7 + (k === 13 ? 0.5 : 0), z0 + 14 + k * 1.3, k === 13 ? 0.75 : 0.55, k % 2 ? C.leaf : C.gold);
+    fountain(7, x0 - 8, z0 + 26); fountain(7, x0 + 8, z0 + 26);
+    cT.forEach((t, i) => { if (t) { t.g.visible = false; } });
+    setHouseTier(cPending);
+  }
+  function setHouseTier(t) {
+    cPending = t; cTier = t;
+    for (let i = 1; i <= 7; i++) if (cT[i]) { cT[i].g.visible = t >= i; cT[i].blockers.forEach((b) => { b.off = t < i; }); }
+  }
+
   // ---------- the coast: Tulum and a fishing village in Maya days, the Hotel Zone today ----------
 
   function buildCoast() {
@@ -603,6 +661,7 @@ const Cancun = (() => {
     buildCenote();
     buildJungle();
     buildCasita();
+    buildHouseTiers();
     buildCoast();
     buildSea();
     buildPond();
@@ -717,7 +776,7 @@ const Cancun = (() => {
   return {
     build, show, setEra, update, homeInside, homeSpot, setEquinox, SPAWN, BOUNDS: BOUNDS_C, MAP: MAP_C,
     fishAt: () => fish.map((f) => [f.sp.id, f.cx + Math.cos(f.a) * f.r, f.y, f.cz + Math.sin(f.a) * f.r]),
-    pyrOn, inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
+    setTier: setHouseTier, get tier() { return cTier; }, pyrOn, inWater, swimMul, avatarDrop, camDrop, promptText, act, get snorkeling() { return snorkeling; }, stopSnorkel: () => setSnorkel(false),
     snorkelSnapshot: () => ({ seen: [...seen], rounds }),
     // from your account: the list and the round you are on. A saved game from an earlier round never brings a finished list back.
     snorkelRestore: (o) => {

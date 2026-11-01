@@ -158,7 +158,7 @@ const Account = (() => {
   // This device is further along than the saved game: keep it, take in whatever the saved game has that this device lacks (things bought elsewhere), and save it all
   function keepMineOverServer(row, at) {
     const so = row.progress && row.progress.owned ? row.progress.owned : {}, mo = Market.snapshot();
-    Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
+    Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), chouse: Math.max(mo.chouse | 0, so.chouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
     if (typeof Treasure !== "undefined" && row.progress && row.progress.treasure) Treasure.merge(row.progress.treasure);
     if (typeof Ventures !== "undefined" && row.progress && row.progress.ventures) Ventures.merge(row.progress.ventures);
     if (typeof Exchange !== "undefined" && row.progress && row.progress.stocks) Exchange.merge(row.progress.stocks);
@@ -195,7 +195,7 @@ const Account = (() => {
   // Put back what this device had that the saved game lacks: things bought, sights found, the bigger house, and (if this device had played longer) the purse
   function keepLocal(mine, row) {
     const mo = mine.progress.owned || {}, so = Market.snapshot();
-    Market.restore({ house: Math.max(so.house, mo.house | 0), dhouse: Math.max(so.dhouse, mo.dhouse | 0), items: [...new Set([...so.items, ...(mo.items || [])])], worn: so.worn.length ? so.worn : (mo.worn || []) });
+    Market.restore({ house: Math.max(so.house, mo.house | 0), dhouse: Math.max(so.dhouse, mo.dhouse | 0), chouse: Math.max(so.chouse | 0, mo.chouse | 0), items: [...new Set([...so.items, ...(mo.items || [])])], worn: so.worn.length ? so.worn : (mo.worn || []) });
     if (Array.isArray(mine.progress.discovered)) {
       discovered = new Set([...discovered, ...mine.progress.discovered.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game))]);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
