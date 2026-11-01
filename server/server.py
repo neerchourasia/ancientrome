@@ -72,7 +72,8 @@ CLASS_MODS = {  # only what a duel needs
     "tabellarius": {"melee": 0.9, "taken": 1.0},
 }
 LOOK_COUNTS = {"skin": 6, "hair": 6, "toga": 7, "sash": 6}
-ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield")   # bought in the Market; cosmetic only
+ACCESSORIES = ("wreath", "helmet", "crown", "cloak", "royalcloak", "cuirass", "armbands", "boots", "shield",
+               "phrygian", "petasos", "turban", "headdress", "greencloak", "bluecloak", "furcloak", "jerkin", "mail", "silverplate", "silverbands", "bracers", "redboots", "sandals", "staff", "scroll")   # bought in the Market; cosmetic only
 PETS = ("hound", "eagle", "cat", "monkey", "peacock", "owl", "parrot", "cub")
 VEHICLES = ("scooter", "citycar", "sportscar", "rickshaw", "oxcart", "elephant", "horse", "camel", "donkey", "bicycle", "motorcycle", "suv", "taxi", "truck", "bus", "chariot", "plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport", "b737max", "b787", "b777", "b767f", "bbj", "vc25", "b52", "kc46", "p8", "a220", "a320neo", "a321xlr", "a330neo", "a350f", "a400m", "a330mrtt", "f15ex", "superhornet", "growler", "f47", "typhoon", "mq25", "mq28", "littlebird", "h125", "h145", "h160", "nh90", "apache", "chinook")   # what a walker can be seen riding or leaving parked
 
@@ -175,7 +176,7 @@ def clean_look(look):
         ok = isinstance(i, int) and not isinstance(i, bool) and 0 <= i < n
         out[part] = i if ok else 0
     acc = look.get("acc") if isinstance(look, dict) else None
-    out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:5] if isinstance(acc, list) else []
+    out["acc"] = list(dict.fromkeys(a for a in acc if isinstance(a, str) and a in ACCESSORIES))[:6] if isinstance(acc, list) else []
     pet = look.get("pet") if isinstance(look, dict) else None
     out["pet"] = pet if pet in PETS else None      # a companion that follows them (shown to others)
     w = look.get("weapon") if isinstance(look, dict) else None

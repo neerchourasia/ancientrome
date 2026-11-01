@@ -72,10 +72,43 @@ const Market = (() => {
     camel: { type: "mount", name: "Camel", price: 220, note: "A tall camel with a red saddle cloth, from the caravans. Top speed 40 km/h, and you ride high above the crowd." },
     donkey: { type: "mount", name: "Donkey", price: 70, note: "A hardy little donkey: slow but cheap. Top speed 29 km/h." },
     elephant: { type: "mount", name: "Elephant", price: 800, note: "A tall elephant with a red and gold howdah. Top speed 50 km/h, and you can see over the crowd." },
+    // more things to wear (the clothier)
+    phrygian: { type: "wear", slot: "head", name: "Phrygian cap", price: 55, note: "A soft red cap, the sign of a freed slave." },
+    petasos: { type: "wear", slot: "head", name: "Traveller's hat", price: 45, note: "A wide-brimmed straw hat against the sun." },
+    turban: { type: "wear", slot: "head", name: "Turban", price: 85, note: "A wrapped cream turban, worn across India." },
+    headdress: { type: "wear", slot: "head", name: "Feathered headdress", price: 170, note: "Green, red and blue feathers, as worn by Maya nobles." },
+    greencloak: { type: "wear", slot: "back", name: "Forest-green cloak", price: 80, note: "A deep green cloak for the road." },
+    bluecloak: { type: "wear", slot: "back", name: "Sea-blue cloak", price: 85, note: "A blue cloak the colour of the Mediterranean." },
+    furcloak: { type: "wear", slot: "back", name: "Leopard-skin cloak", price: 190, note: "A spotted pelt over the shoulders: the dress of a hunter-king." },
+    jerkin: { type: "wear", slot: "body", name: "Leather jerkin", price: 100, note: "A tough brown leather vest." },
+    mail: { type: "wear", slot: "body", name: "Chain mail", price: 160, note: "Thousands of little iron rings, linked into a shirt." },
+    silverplate: { type: "wear", slot: "body", name: "Silver breastplate", price: 220, note: "Polished silver armour that gleams in the sun." },
+    silverbands: { type: "wear", slot: "arms", name: "Silver armbands", price: 55, note: "Plain silver bands for the upper arms." },
+    bracers: { type: "wear", slot: "arms", name: "Leather bracers", price: 45, note: "Wide leather guards for the forearms." },
+    redboots: { type: "wear", slot: "feet", name: "Red leather boots", price: 65, note: "Soft boots dyed a bright red." },
+    sandals: { type: "wear", slot: "feet", name: "Golden sandals", price: 75, note: "Sandals with gold straps wound up the calf." },
+    staff: { type: "wear", slot: "hand", name: "Walking staff", price: 40, note: "A long wooden staff for the road." },
+    scroll: { type: "wear", slot: "hand", name: "Scroll", price: 35, note: "A rolled scroll, for the scholar." },
+    // more house decorations (the builder)
+    urns: { type: "decor", name: "Garden urns", price: 70, note: "Two big terracotta urns with green shrubs at the corners of your house." },
+    torches: { type: "decor", name: "Door torches", price: 85, note: "Two flaming torches on poles by your front door." },
+    statue: { type: "decor", name: "Marble statue", price: 160, note: "A white marble statue on a pedestal beside your house." },
     banners: { type: "decor", name: "Door banners", price: 60, note: "Two crimson banners either side of your front door." },
     mosaic: { type: "decor", name: "Mosaic floor", price: 90, note: "A patterned floor of coloured tiles inside your house." },
     salve: { type: "supply", name: "Healing salve", price: 40, note: "Heals 40 health at once." },
     fodder: { type: "supply", name: "Fodder for the horses", price: 40, note: "Restores 40 points of your horses' fitness at once." },
+    // more permanent bonuses (the healer and trainer); each one multiplies a bonus the game already has
+    wingedsandals: { type: "perk", name: "Winged sandals", price: 300, note: "You walk 10% faster." },
+    tablets: { type: "perk", name: "Scholar's tablets", price: 350, note: "Every new sight you discover pays 50% more." },
+    ledger: { type: "perk", name: "Merchant's ledger", price: 450, note: "Jobs and deliveries pay 10% more." },
+    luckpurse: { type: "perk", name: "Lucky purse", price: 400, note: "Prizes from the arena and the races are 15% bigger." },
+    amulet: { type: "perk", name: "Healer's amulet", price: 500, note: "You heal 25% faster." },
+    lining: { type: "perk", name: "Padded tunic", price: 450, note: "You take 10% less damage in the arena." },
+    axles: { type: "perk", name: "Racing axles", price: 400, note: "Your chariot is 5% faster in races." },
+    plating: { type: "perk", name: "Iron ship plating", price: 500, note: "Your ships have 15% more hull strength." },
+    fletching: { type: "perk", name: "Fletcher's arrows", price: 300, note: "Your bow hits 15% harder." },
+    scribe: { type: "perk", name: "Tax scribe", price: 600, note: "Your tax bill is 20% lower." },
+    contract: { type: "perk", name: "Naval prize contract", price: 450, note: "Naval battles pay 20% more." },
     horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
@@ -147,6 +180,20 @@ const Market = (() => {
     c_neem: { type: "cure", name: "Neem and giloy tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["delhi"] },
     c_rasa: { type: "cure", name: "Ayurvedic rasayana", price: 130, note: "The strongest medicine of the vaidyas: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["delhi"] },
   };
+  Object.assign(FOODS, {   // more dishes in every city and era
+    f_figs: F("Figs and dates", 7, 11, "Sweet dried fruit, the sweets of ancient Rome.", ["rome", "ancient"]),
+    f_lentils: F("Lentil stew", 16, 24, "A thick, hearty stew of lentils and onion.", ["rome", "ancient"]),
+    f_suppli: F("Supplì", 7, 10, "A fried rice ball with a core of melting mozzarella.", ["rome", "modern"]),
+    f_tiramisu: F("Tiramisu", 12, 16, "Layers of coffee-soaked sponge and sweet cream.", ["rome", "modern"]),
+    f_kheer: F("Kheer", 9, 13, "Creamy rice pudding with cardamom and pistachio.", ["delhi", "ancient"]),
+    f_naan: F("Tandoor naan", 10, 15, "Soft bread slapped on the wall of a clay oven.", ["delhi", "ancient"]),
+    f_golgappa: F("Golgappa", 6, 8, "Crisp hollow shells filled with spicy, tangy water.", ["delhi", "modern"]),
+    f_paratha: F("Aloo paratha", 11, 17, "A flaky flatbread stuffed with spiced potato.", ["delhi", "modern"]),
+    f_squash: F("Roasted squash", 8, 12, "Sweet squash baked in the embers.", ["cancun", "ancient"]),
+    f_ramon: F("Ramón nuts", 6, 9, "Nutty seeds of the breadnut tree, roasted over a fire.", ["cancun", "ancient"]),
+    f_quesadilla: F("Quesadilla", 12, 18, "A folded tortilla full of melted cheese.", ["cancun", "modern"]),
+    f_paleta: F("Fruit paleta", 5, 7, "A frozen fruit ice on a stick.", ["cancun", "modern"]),
+  });
   Object.assign(ITEMS, CURES);
   Object.assign(ITEMS, FOODS);
   const foodHere = (it) => it.where[0] === (typeof city !== "undefined" ? city : "rome") && it.where[1] === (typeof era !== "undefined" ? era : "ancient") && (!it.fest || (typeof Festival !== "undefined" && Festival.id === it.fest));   // festival dishes only on their festival
@@ -167,7 +214,11 @@ const Market = (() => {
   const SECTIONS = [
     ["Hot food and drink", "food"], ["Medicines (for illness)", "cure"], ["Things to wear", "wear"], ["Weapons for the arena", "weapon"], ["Companions", "pet"], ["Cars, bikes, buses and rickshaws (modern cities only)", "car"], ["Aircraft: planes, helicopters, balloons and jets (modern cities)", "air"], ["Animals to ride and carts (ancient cities only)", "mount"], ["Decorate your house", "decor"], ["Supplies", "supply"], ["Training and horses", "perk"],
   ];
-  const PERKS = { horses: { tire: 0.85 }, training: { melee: 1.1 } };
+  const PERKS = {
+    horses: { tire: 0.85 }, training: { melee: 1.1 },
+    wingedsandals: { walk: 1.1 }, tablets: { explore: 1.5 }, ledger: { wage: 1.1, delivery: 1.1 }, luckpurse: { coin: 1.15 }, amulet: { regen: 1.25 }, lining: { taken: 0.9 },
+    axles: { racespeed: 1.05 }, plating: { hull: 1.15 }, fletching: { arrow: 1.15 }, scribe: { tax: 0.8 }, contract: { navalpurse: 1.2 },
+  };
 
   let s = { house: 0, dhouse: 0, items: [], worn: [], paint: {} };
   try {
@@ -204,7 +255,7 @@ const Market = (() => {
   function applyAll() {
     Home.setTier(s.house);
     Delhi.setTier(s.dhouse);
-    Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic") });
+    Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic"), urns: s.items.includes("urns"), torches: s.items.includes("torches"), statue: s.items.includes("statue") });
     if (avFig) applyAccessories(avFig, s.worn.filter((id) => ITEMS[id].type === "wear"));
     Pets.set(s.worn.find((id) => ITEMS[id].type === "pet"));
     if (typeof avFig !== "undefined" && avFig) Weapons.setFigure(avFig, s.worn.find((id) => ITEMS[id].type === "weapon"));

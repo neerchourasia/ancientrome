@@ -128,10 +128,30 @@ const Home = (() => {
       const tas = shadowed(new T.Mesh(BOX, trimGold)); tas.scale.set(0.12, 0.3, 0.06); tas.position.set(bx, 0.7, 44.88);
       for (const m of [b, bar, tas]) { m.visible = false; worldScene.add(m); banners.push(m); }
     }
+    buildExtras();                                                                              // urns, torches and a statue (hidden until bought)
   }
 
-  // Market decorations: the banners outside, a mosaic floor inside
+  // Market decorations: the banners outside, a mosaic floor inside, urns, torches and a statue at the front
+  const extras = { urns: [], torches: [], statue: [] };
+  function buildExtras() {
+    const terra = lambert(0xb5653a), leaf = lambert(0x3f7a3a), pole = lambert(0x3a2a1a), marble = lambert(0xece8dc), flame = new T.MeshBasicMaterial({ color: 0xffa530 });
+    const put = (list, m, x, y, z) => { m.position.set(x, groundAt(x, z) + y, z); m.visible = false; shadowed(m); worldScene.add(m); list.push(m); return m; };
+    for (const x of [249.5, 260.5]) {                                                         // two urns with shrubs at the corners of the house
+      put(extras.urns, new T.Mesh(new T.CylinderGeometry(0.4, 0.28, 0.9, 10), terra), x, 0.45, 43.8);
+      put(extras.urns, new T.Mesh(new T.SphereGeometry(0.42, 8, 6), leaf), x, 1.1, 43.8);
+    }
+    for (const x of [251.3, 258.7]) {                                                         // two torches by the door
+      put(extras.torches, new T.Mesh(new T.CylinderGeometry(0.05, 0.06, 2.3, 6), pole), x, 1.15, 44.3);
+      put(extras.torches, new T.Mesh(new T.CylinderGeometry(0.16, 0.08, 0.2, 8), pole), x, 2.4, 44.3);
+      put(extras.torches, new T.Mesh(new T.ConeGeometry(0.12, 0.38, 8), flame), x, 2.7, 44.3);
+    }
+    put(extras.statue, new T.Mesh(new T.BoxGeometry(0.9, 1.0, 0.9), marble), 263.2, 0.5, 43.6);   // a statue beside the house: pedestal, robed body, head and a raised arm
+    put(extras.statue, new T.Mesh(new T.CylinderGeometry(0.22, 0.3, 1.1, 8), marble), 263.2, 1.55, 43.6);
+    put(extras.statue, new T.Mesh(new T.SphereGeometry(0.17, 8, 6), marble), 263.2, 2.28, 43.6);
+    put(extras.statue, new T.Mesh(new T.BoxGeometry(0.1, 0.55, 0.1), marble), 263.5, 2.0, 43.45).rotation.z = -0.5;
+  }
   function setDecor(d) {
+    for (const k of ["urns", "torches", "statue"]) for (const m of extras[k]) m.visible = !!d[k];
     for (const m of banners) m.visible = !!d.banners;
     if (floorMat) {
       if (d.mosaic && !mosaicTex) mosaicTex = makeMosaic();

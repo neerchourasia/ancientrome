@@ -771,6 +771,26 @@ function createFigure() {
   shield.add(disc, boss); shield.position.set(-0.08, -0.3, -0.12); armL.add(shield);
   acc.wreath = [wreath]; acc.helmet = [helmet]; acc.crown = [crown]; acc.cloak = [cloak, clasp]; acc.royalcloak = [royalcloak, trim2];
   acc.cuirass = [cuirass]; acc.armbands = bands; acc.boots = boots; acc.shield = [shield];
+  // more outfits (market.js): hats, cloaks, armour, arm guards, boots and things to hold
+  const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); return m; };
+  const phrygian = new THREE.Group(); phrygian.add(part(new THREE.SphereGeometry(0.235, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), lam(0xc0282d), 0, 1.54, 0), part(new THREE.ConeGeometry(0.1, 0.3, 8), lam(0xc0282d), 0, 1.88, -0.1));
+  const petasos = new THREE.Group(); petasos.add(part(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 16), lam(0xd9c27a), 0, 1.7, 0), part(new THREE.CylinderGeometry(0.2, 0.22, 0.14, 12), lam(0xd9c27a), 0, 1.78, 0));
+  const turban = new THREE.Group(); for (let i = 0; i < 3; i++) turban.add(part(new THREE.TorusGeometry(0.22 - i * 0.02, 0.07, 8, 14), lam(0xf0e6cc), 0, 1.62 + i * 0.07, 0).rotateX(Math.PI / 2)); turban.add(part(new THREE.SphereGeometry(0.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), lam(0xf0e6cc), 0, 1.78, 0));
+  const headdress = new THREE.Group(); headdress.add(part(new THREE.CylinderGeometry(0.22, 0.22, 0.08, 14, 1, true), lam(0xc9a13a), 0, 1.7, 0));
+  [0x2f9d57, 0xc0282d, 0x2a6fd0, 0xe0b83c, 0x2f9d57, 0xc0282d, 0x2a6fd0].forEach((c, i, a) => { const t = (i / (a.length - 1) - 0.5) * 2.4, f = part(new THREE.ConeGeometry(0.045, 0.5, 5), lam(c), Math.sin(t) * 0.26, 1.98 + (1 - Math.abs(t) / 1.2) * 0.1, 0.14); f.rotation.z = -t * 0.5; headdress.add(f); });
+  const cloakOf = (c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.0, 0.04), new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide })); m.position.set(0, 1.0, 0.24); m.rotation.x = 0.1; return m; };
+  const furcloak = cloakOf(0xb7843a); for (let i = 0; i < 7; i++) furcloak.add(part(new THREE.BoxGeometry(0.1, 0.1, 0.05), lam(0x3a2a14), ((i * 37) % 11 - 5) * 0.05, ((i * 53) % 9 - 4) * 0.1, 0.02));
+  const jerkin = part(new THREE.CylinderGeometry(0.27, 0.32, 0.5, 10), lam(0x6b4a2b), 0, 1.12, 0);
+  const mail = part(new THREE.CylinderGeometry(0.29, 0.35, 0.56, 10), lam(0x8c9198), 0, 1.1, 0);
+  const silverplate = part(new THREE.CylinderGeometry(0.285, 0.35, 0.5, 10), new THREE.MeshLambertMaterial({ color: 0xd9dde2, emissive: 0x1a1c20 }), 0, 1.12, 0);
+  const silverbands = [armL, armR].map((arm) => { const b = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.022, 6, 12), new THREE.MeshLambertMaterial({ color: 0xcfd3d8, emissive: 0x16181b })); b.rotation.x = Math.PI / 2; b.position.y = -0.12; arm.add(b); return b; });
+  const bracers = [armL, armR].map((arm) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.075, 0.2, 8), lam(0x5a3a22)); b.position.y = -0.4; arm.add(b); return b; });
+  const redboots = [legL, legR].map((leg) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.1, 0.24, 8), lam(0xb02a2a)); b.position.y = -0.5; leg.add(b); return b; });
+  const sandals = [legL, legR].map((leg) => { const g2 = new THREE.Group(); for (const y of [-0.5, -0.4, -0.3]) g2.add(part(new THREE.TorusGeometry(0.085, 0.012, 5, 10), new THREE.MeshLambertMaterial({ color: 0xe0b83c, emissive: 0x3d2f05 }), 0, y, 0).rotateX(Math.PI / 2)); leg.add(g2); return g2; });
+  const staff = new THREE.Group(); staff.add(part(new THREE.CylinderGeometry(0.025, 0.03, 1.7, 6), lam(0x7a5a33), 0, -0.4, -0.1), part(new THREE.SphereGeometry(0.05, 8, 6), lam(0xb08a3a), 0, 0.46, -0.1)); armR.add(staff);
+  const scroll = new THREE.Group(); scroll.add(part(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8), lam(0xf0e6cc), 0, -0.52, -0.12).rotateX(Math.PI / 2), part(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 8), lam(0xa8342c), 0, -0.52, -0.27).rotateX(Math.PI / 2), part(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 8), lam(0xa8342c), 0, -0.52, 0.03).rotateX(Math.PI / 2)); armR.add(scroll);
+  Object.assign(acc, { phrygian: [phrygian], petasos: [petasos], turban: [turban], headdress: [headdress], greencloak: [cloakOf(0x2f6b3a)], bluecloak: [cloakOf(0x2a4a8f)], furcloak: [furcloak], jerkin: [jerkin], mail: [mail], silverplate: [silverplate], silverbands, bracers, redboots, sandals, staff: [staff], scroll: [scroll] });
   for (const list of Object.values(acc)) for (const o of list) { o.visible = false; if (!o.parent) g.add(o); }
 
   // a short sword in the right hand (shown in duels)
@@ -796,7 +816,7 @@ function paintFigure(mats, look) {
 function applyAccessories(fig, ids) {
   const worn = new Set(Array.isArray(ids) ? ids : []);
   for (const [id, list] of Object.entries(fig.acc)) for (const o of list) o.visible = worn.has(id);
-  fig.hair.visible = !worn.has("helmet");
+  fig.hair.visible = !(worn.has("helmet") || worn.has("turban") || worn.has("phrygian"));
 }
 
 let avFig = null;
