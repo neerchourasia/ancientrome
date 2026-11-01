@@ -121,7 +121,23 @@ const Estate = (() => {
     return g;
   }
 
+  // each house is also a place in the Places list (teleport there, or walking directions), so you can find them
+  function syncPlace(h) {
+    if (!h.lm) return;
+    const own = state.owned[h.id], lv = levelOf(h);
+    h.lm.name = own ? `Your house: ${h.name}` : `House for sale: ${h.name}`;
+    h.lm.sub = own ? `Level ${lv} · ${own.rented ? "rented, +" + rentOf(h) + " a day" : "not rented"}` : `${h.price} denarii · press F at the sign`;
+  }
+  function addPlace(h) {
+    const src = city === "delhi" ? DELHI_LANDMARKS : city === "cancun" ? CANCUN_LANDMARKS : ROME_LANDMARKS;
+    h.lm = { id: "e-" + h.id, game: true, name: "", sub: "", x: h.x, z: h.z, r: 10, stand: [h.x, h.z + h.d / 2 + 4],
+      text: "A house you can buy and rent out. Walk up to its sign and press F: Buy it, then press Rent so tenants move in and pay you every morning, and Upgrade it for more rent.",
+      fact: "Rent is paid every game morning: 4% of the price a day, more after each upgrade." };
+    src.push(h.lm); syncPlace(h);
+  }
+
   function rebuild(h) {                                   // draw the house again (its sign and level may have changed)
+    syncPlace(h);
     if (!h.mesh) return;
     built[h.city].group.remove(h.mesh);
     h.mesh = houseMesh(h); h.mesh.position.set(h.x, groundAt(h.x, h.z), h.z); built[h.city].group.add(h.mesh);
@@ -146,7 +162,9 @@ const Estate = (() => {
       const mesh = houseMesh(h); mesh.position.set(h.x, groundAt(h.x, h.z), h.z); group.add(mesh); h.mesh = mesh;
       addBlockerBox(h.x - h.w / 2, h.x + h.w / 2, h.z - h.d / 2, h.z + h.d / 2, 0, 9);
       if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "r", x0: h.x - h.w / 2, x1: h.x + h.w / 2, z0: h.z - h.d / 2, z1: h.z + h.d / 2, c: "#f2c230" });
+      addPlace(h);
     }
+    if (typeof refreshLandmarks === "function") refreshLandmarks();                                                  // (the houses join the Places list)
   }
 
   // ---------------------------------------------------------------- walking up to one
