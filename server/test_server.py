@@ -330,6 +330,19 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ride = await pas.until(lambda m: m["t"] == "ride")
         self.assertTrue(ride["on"])
 
+    async def test_a_teleport_the_game_reports_is_not_flagged_but_a_silent_jump_is(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
+        ann = await WS.connect(self.port); self.clients.append(ann)
+        ann.send({"t": "hello", "name": "Ann", "cls": "gladiator", "look": {}, "vid": "a" * 32}); ann.welcome = await ann.until(lambda m: m["t"] == "welcome")
+        ann.send({"t": "walk", "c": "rome", "x": 0, "z": 0, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.2)
+        ann.send({"t": "walk", "c": "rome", "x": 400, "z": 0, "yaw": 0, "s": 0, "tp": 1})              # the Go there button
+        await asyncio.sleep(0.3)
+        self.assertFalse(any(e["kind"] == "jumped across the city" for e in server.EVENTS))
+        ann.send({"t": "walk", "c": "rome", "x": -400, "z": 0, "yaw": 0, "s": 0})                      # a jump nobody reported
+        await asyncio.sleep(0.3)
+        self.assertTrue(any(e["kind"] == "jumped across the city" for e in server.EVENTS))
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):

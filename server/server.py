@@ -1441,7 +1441,8 @@ def on_walk(conn, m):
     if city not in WORLD_CITIES:
         return
     nx, nz, tnow = num(m.get("x"), -20000, 20000, conn.px), num(m.get("z"), -20000, 20000, conn.pz), now()
-    if conn.wlast and conn.wlast[2] == city:           # watch for a walker who moves faster than anyone honestly could
+    teleported = bool(m.get("tp"))                      # the game says "I teleported" (Go there, travel, getting out of a vehicle ...): that is not a jump to flag
+    if conn.wlast and conn.wlast[2] == city and not teleported:   # watch for a walker who moves faster than anyone honestly could
         dt, d = max(0.05, tnow - conn.wlast[3]), math.hypot(nx - conn.wlast[0], nz - conn.wlast[1])
         veh = m.get("v")
         lim = 260 if veh in AIR_VEH else 50 if veh in VEHICLES else 20

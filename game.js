@@ -666,6 +666,7 @@ function updatePlayer(dt) {
 }
 
 // Teleport to (x, z), moving to the nearest open spot if that one is blocked.
+let lastTeleport = 0;
 function placeAt(x, z, yaw) {
   for (let r = 0; r < 60; r += 2) {
     for (let k = 0; k < (r === 0 ? 1 : 12); k++) {
@@ -674,6 +675,7 @@ function placeAt(x, z, yaw) {
       const g = groundAt(px, pz);
       if (!blockedAt(px, pz, g)) {
         player.x = px; player.z = pz; player.feet = g; player.vx = player.vz = 0;
+        lastTeleport = performance.now();                                          // (the next position update tells the game server this was a teleport, not a jump)
         if (yaw !== undefined) player.yaw = yaw;
         return;
       }
