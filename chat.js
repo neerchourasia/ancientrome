@@ -30,6 +30,11 @@ const Chat = (() => {
       li.append(who, document.createTextNode(": " + entry.text));
       if (entry.w) li.className = "whisper";
     }
+    if (entry.ts) {                                                    // when it was sent, in your own time zone (hover for the date)
+      const when = new Date(entry.ts * 1000), tm = document.createElement("time");
+      tm.className = "ct"; tm.textContent = when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); tm.title = when.toLocaleString();
+      li.prepend(tm, " ");
+    }
     $c("chat-log").append(li);
     lines.push({ el: li, at: performance.now() });
     while (lines.length > 60) { lines.shift().el.remove(); }

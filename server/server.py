@@ -2005,7 +2005,7 @@ def on_chat(conn, m):
     conn.ctok -= 1
     if text.startswith("/"):
         return chat_command(conn, text)
-    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0}
+    entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time())}   # ts: when it was sent, so everyone can see the time
     if pic:
         CHAT_LOG.append(dict(entry, text=text or "(sent a picture)"))      # people who join later do not get the picture, only that there was one
         entry["pic"] = pic
@@ -2053,7 +2053,7 @@ async def sing_task(conn, lines):
         for line in lines:
             if conn.closed:
                 return
-            broadcast_chat({"t": "chat", "id": conn.id, "name": conn.name, "text": "\u266a " + line + " \u266a", "sing": 1, "adm": 1 if conn.admin else 0})
+            broadcast_chat({"t": "chat", "id": conn.id, "name": conn.name, "text": "\u266a " + line + " \u266a", "sing": 1, "adm": 1 if conn.admin else 0, "ts": int(time.time())})
             await asyncio.sleep(SING_GAP)
     finally:
         conn.singing = None
@@ -2086,7 +2086,7 @@ def chat_command(conn, text):
             return say_to(conn, "Nobody online has that name. Whisper with: /w name your message")
         if not msg:
             return say_to(conn, "Whisper with: /w name your message")
-        entry = {"t": "chat", "id": conn.id, "name": conn.name, "to": target.name, "text": msg, "w": 1, "adm": 1 if conn.admin else 0}
+        entry = {"t": "chat", "id": conn.id, "name": conn.name, "to": target.name, "text": msg, "w": 1, "adm": 1 if conn.admin else 0, "ts": int(time.time())}
         target.send(entry)
         if target is not conn:
             conn.send(entry)
@@ -2102,7 +2102,7 @@ def chat_command(conn, text):
         names = ["%s (%s, %s)" % (c.name, where_is(c)["city"], (where_is(c)["place"] + ", " if where_is(c)["place"] else "") + where_is(c)["doing"]) for c in CONNS if c.hello and not c.closed]
         return say_to(conn, "Online (%d): %s" % (len(names), ", ".join(names) or "nobody"))
     if cmd == "say" and rest.strip():
-        entry = {"t": "chat", "sys": 1, "text": "Announcement: " + rest.strip()[:CHAT_MAX]}
+        entry = {"t": "chat", "sys": 1, "text": "Announcement: " + rest.strip()[:CHAT_MAX], "ts": int(time.time())}
         CHAT_LOG.append(entry)
         return broadcast_chat(entry)
     if cmd in ("kick", "mute", "unmute") and rest.strip():
