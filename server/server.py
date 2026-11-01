@@ -3332,7 +3332,7 @@ async def handle_http(reader, writer):
         cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
         return await reply(writer, 200, json.dumps({"ok": ok, "reason": why, "name": nm}).encode(), "application/json", cors)
     if path == "/health":
-        return await reply(writer, 200, json.dumps({"ok": True, "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
+        return await reply(writer, 200, json.dumps({"ok": True, "world": world_on(), "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
 
     if path == "/play" and hdr.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in hdr:
         if not origin_ok(hdr.get("origin")):
