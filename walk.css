@@ -737,3 +737,14 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #event-hud[hidden] { display: none; }
 .ev-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .ev-info small { display: block; color: var(--muted); font-size: .78rem; }
+.tv-sea { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
+#voyage { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: linear-gradient(#7fb7d8, #1c5a8a 55%, #0b2c4a); color: #fff; text-align: center; }
+#voyage[hidden] { display: none; }
+#voyage h2 { margin: 0; font-size: 1.3rem; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.vy-sea { height: 90px; display: flex; align-items: flex-end; justify-content: center; }
+.vy-ship { font-size: 64px; animation: vy-bob 2.4s ease-in-out infinite; }
+@keyframes vy-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-10px) rotate(4deg); } }
+.vy-bar { width: min(420px, 90vw); height: 8px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; }
+.vy-bar i { display: block; height: 100%; width: 0; background: #ffe08a; transition: width 1.5s linear; }
+#vy-log { list-style: none; margin: 0; padding: 0; width: min(520px, 92vw); max-height: 34vh; overflow-y: auto; font-size: .95rem; line-height: 1.5; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+#vy-log li { padding: 3px 0; }

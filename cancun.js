@@ -367,6 +367,9 @@ const Cancun = (() => {
   // ---------- the sea floor, the coral reef and its fish; the cenote swimming pond; snorkelling ----------
 
   const SEA_SHORE = 920, SEA_FAR = 1185;                          // you can wade and swim from the shore out to here (local x)
+  const CHESTS_AT = [[1010, -90, 0.9], [1070, 130, 0.4], [1105, -230, 0.7], [985, 255, 0.5], [1150, 40, 1.0]];   // sunken chests: local x, z and how rich they are
+  const CHESTS = CHESTS_AT, chests = [], DIVE_KEY = "rome-dive";
+  let diveDay = -1, diveTaken = [];
   const POND = { x: -330, z: 215, r: 13 };                        // Cenote Azul: an open sinkhole with clear water, for swimming
   const SPECIES = [                                               // what you can see snorkelling: name, colour, size (length), where
     { id: "parrot", name: "parrotfish", col: 0x20c9b8, len: 0.9, hh: 0.28, reef: true },
@@ -412,6 +415,15 @@ const Cancun = (() => {
     const wreck = new T.Group(); wreck.position.set(X(1010), -6, -90); wreck.rotation.set(0.12, 0.7, 0.2);
     const hullM = new T.Mesh(BOX, C.wood); hullM.scale.set(2.2, 0.8, 8); wreck.add(hullM); const rib = new T.Mesh(BOX, C.wood); rib.scale.set(0.2, 1.4, 0.2); rib.position.set(0.5, 0.9, -1); wreck.add(rib);
     const anchor = new T.Mesh(new T.TorusGeometry(0.6, 0.1, 6, 12), C.dark); anchor.position.set(3.5, 0.6, 2); anchor.rotation.x = 1.2; wreck.add(anchor); root.add(wreck);
+    // sunken treasure: golden chests on the sea floor (the first one beside the wreck)
+    const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,240,160,1)"); gr.addColorStop(0.3, "rgba(255,200,60,.6)"); gr.addColorStop(1, "rgba(255,200,60,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.CanvasTexture(c); })();
+    CHESTS.forEach(([cx, cz, rich], i) => {
+      const g = new T.Group(); g.position.set(X(cx + (i === 0 ? 6 : 0)), -5.7, cz + (i === 0 ? 4 : 0)); g.rotation.y = i * 1.3;
+      const body = new T.Mesh(BOX, C.wood); body.scale.set(1.2, 0.7, 0.8); body.position.y = 0.35; g.add(body);
+      const lid = new T.Mesh(new T.CylinderGeometry(0.4, 0.4, 1.2, 10, 1, false, 0, Math.PI), new T.MeshLambertMaterial({ color: 0xc89b2a })); lid.rotation.z = Math.PI / 2; lid.rotation.y = Math.PI / 2; lid.position.y = 0.7; lid.scale.set(1, 1, 1); g.add(lid);
+      const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.set(3, 3, 1); glow.position.y = 1; g.add(glow);
+      root.add(g); chests.push({ g, glow, x: X(cx + (i === 0 ? 6 : 0)), z: cz + (i === 0 ? 4 : 0), rich, i });
+    });
     // the fish: bodies and tails, each in a school that swims slowly in circles over the reef (and a few tetras in the cenote)
     const reefSp = SPECIES.filter((s) => s.reef), pondSp = SPECIES.filter((s) => s.pond);
     const REEF_FISH = 330, total = REEF_FISH + 22;                                                  // lots of fish: schools of every kind over each patch of reef
@@ -518,13 +530,14 @@ const Cancun = (() => {
     }
     overlay.classList.toggle("show", snorkeling); hud.classList.toggle("show", snorkeling);
     showCard(snorkeling);                                            // the list of creatures is on the screen only while you snorkel
-    if (snorkeling) hud.textContent = `🤿 Snorkelling · ${seen.size} of ${SPECIES.length} creatures seen. Swim to the reef out to sea (or around the cenote): fish swim close by. Press Esc or F to come up.`;
+    if (snorkeling) hud.textContent = `🤿 Snorkelling · ${seen.size} of ${SPECIES.length} creatures seen. Swim to the reef out to sea (or around the cenote): fish swim close by, and golden chests lie near the wrecks (F to dive for one). Press Esc or F to come up.`;
   }
   // the one key for water things: hire the gear on the beach, or put your face in the water
   function promptText() {
     if (!built || city !== "cancun") return "";
     const nearHut = modernNow && Math.hypot(player.x - X(HIRE.x), player.z - HIRE.z) < 6;
     if (nearHut && !haveGear) return `F: rent snorkel gear (${HIRE_PRICE} denarii)`;
+    if (snorkeling && inWater(player.x, player.z) && chestNear()) return "F: dive for the sunken treasure chest";
     if (inWater(player.x, player.z)) return !modernNow || haveGear ? (snorkeling ? "F or Esc: lift your head out of the water" : "F: put your face in the water (snorkel)") : `F: snorkel (a mask, snorkel and fins: ${HIRE_PRICE} denarii)`;
     if (player.x > X(860) && player.x < X(SEA_SHORE) && Math.abs(player.z) < 380) return "Walk east into the sea to swim, then press F to snorkel";
     return "";
@@ -538,6 +551,7 @@ const Cancun = (() => {
       toast("You have a mask, a snorkel and fins until you leave Cancún. Wade into the sea (or the cenote) and press F to put your face in the water.");
       return true;
     }
+    if (snorkeling && inWater(player.x, player.z)) { const c = chestNear(); if (c) { openChest(c); return true; } }
     if (inWater(player.x, player.z)) {
       if (modernNow && !haveGear) {                                                   // gear hired on the spot, if you did not hire it at the hut
         if (Vitals.coins < HIRE_PRICE) { toast(`A mask, snorkel and fins cost ${HIRE_PRICE} denarii.`); return true; }
@@ -546,6 +560,20 @@ const Cancun = (() => {
       setSnorkel(!snorkeling); return true;
     }
     return false;
+  }
+  // a new set of chests every game day: the ones you have already opened today stay shut
+  function diveSync() {
+    const day = Payroll.epoch(); if (day === diveDay) return; diveDay = day; diveTaken = [];
+    try { const r = JSON.parse(localStorage.getItem(DIVE_KEY) || "null"); if (r && r.day === day && Array.isArray(r.taken)) diveTaken = r.taken.filter((n) => Number.isInteger(n)); } catch (e) { /* storage unavailable */ }
+    for (const c of chests) c.g.visible = !diveTaken.includes(c.i);
+  }
+  const chestNear = () => { diveSync(); let best = null, bd = 7; for (const c of chests) { if (diveTaken.includes(c.i)) continue; const d = Math.hypot(c.x - player.x, c.z - player.z); if (d < bd) { bd = d; best = c; } } return best; };
+  function openChest(c) {
+    diveTaken.push(c.i); c.g.visible = false;
+    try { localStorage.setItem(DIVE_KEY, JSON.stringify({ day: diveDay, taken: diveTaken })); } catch (e) { /* ignore */ }
+    const gold = Math.round((90 + c.rich * 260 * (0.75 + 0.25 * Math.abs(Math.sin(diveDay * 12.9898 + c.i * 78.233)))) / 10) * 10;
+    Vitals.coins += gold; Sfx.play("coin");
+    toast(`🏴‍☠️ You dive down and open a sunken chest: +${gold} denarii! (${chests.length - diveTaken.length} more on the sea floor today)`);
   }
   const swimMul = () => (inWater(player.x, player.z) ? (snorkeling ? 0.85 : 1.1) : 1);   // swimming is about as fast as walking, a little faster at the surface
   const avatarDrop = () => (inWater(player.x, player.z) ? -0.95 : 0);
@@ -593,6 +621,7 @@ const Cancun = (() => {
     if (Math.abs(px - CX) > 1100) return;
     lastDt = dt;
     updatePeople(dt);
+    for (const c of chests) if (c.g.visible) { const k = 2.6 + Math.sin(clock * 3 + c.i) * 0.5; c.glow.scale.set(k, k, 1); }
     if (px > CX + 700 || Math.hypot(px - X(POND.x), pz - POND.z) < 120) placeFish();
     if (snorkeling) { if (!inWater(px, pz)) setSnorkel(false); else spot(); }
     if (snorkeling && seen.size >= SPECIES.length) { doneT += dt; if (doneT > 4) { doneT = 0; newRound(); } } else doneT = 0;   // a complete list never stays: after a few seconds the next round begins
