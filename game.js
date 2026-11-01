@@ -828,7 +828,7 @@ function buildAvatar() {
 }
 
 function updateAvatar(dt) {
-  avatar.visible = ((viewId() !== "first" || creatorOpen) && mode === "walk") || mode === "online";
+  avatar.visible = ((viewId() !== "first" || creatorOpen) && mode === "walk") || mode === "online" || mode === "chute";
   if (!avatar.visible) return;
   avatar.position.set(player.x, player.feet + player.airY + (city === "cancun" ? Cancun.avatarDrop() : 0), player.z);   // swimming: in the water up to your chest
   avatar.rotation.y = player.yaw;
@@ -1051,7 +1051,7 @@ function closePanels() {
   panelOpen = false;
 }
 function openPanel(id) {
-  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive" || mode === "dgame" || mode === "ride") return;
+  if (mode === "fight" || mode === "race" || mode === "naval" || mode === "online" || mode === "drive" || mode === "dgame" || mode === "ride" || mode === "chute") return;
   if (creatorOpen && !Character.exists) return;
   closePanels();
   $(id).classList.add("show");
@@ -1668,6 +1668,7 @@ function tick(dt) {
   else if (mode === "dgame") DGames.update(dt, keys);
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (mode === "ride") Ride.update(dt);
+  else if (mode === "chute") Chute.update(dt);
   else if (started && !panelOpen && deathT === 0) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
     else updatePlayer(dt);
@@ -1680,6 +1681,7 @@ function tick(dt) {
   else if (mode === "naval") Naval.camera(camera, dt);
   else if (mode === "drive") Car.camera(camera, dt);
   else if (mode === "ride") Ride.camera(camera);
+  else if (mode === "chute") Chute.camera(camera);
   else if (mode === "dgame" && DGames.camera(camera, dt)) { /* the game's own camera */ }
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {

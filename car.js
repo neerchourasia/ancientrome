@@ -201,7 +201,7 @@ const Car = (() => {
 
   // the controls shown for each kind of aircraft: [the hint line, the toast when you get in]
   function airHelp(M) {
-    const tail = " · <kbd>C</kbd> pilot view · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground)";
+    const tail = " · <kbd>C</kbd> pilot view · <kbd>F</kbd> fly on at the edge of the city · <kbd>X</kbd> get out (on the ground) · <kbd>Esc</kbd> parachute (above 15 m)";
     if (M.glide) return ["<kbd>W</kbd> tow rope (up to 80 m) · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> pull up · <kbd>Shift</kbd> dive" + tail, "Glider: hold W for a tow up to 80 m, then glide. Look for a thermal (rising air) to climb again. Land gently, and press X to get out."];
     if (M.air === "heli" || M.air === "vtol") return ["<kbd>W</kbd> forward · <kbd>S</kbd> back · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> descend" + tail, `${M.name}: hold Space to lift straight off; W flies forward. Land gently and press X to get out.`];
     if (M.air === "blimp") return ["<kbd>W</kbd> forward · <kbd>S</kbd> back · <kbd>A</kbd><kbd>D</kbd> turn · <kbd>Space</kbd> climb · <kbd>Shift</kbd> descend" + tail, "Airship: slow and gentle. Hold Space to rise, W to move, and Shift to come down again."];
@@ -228,8 +228,17 @@ const Car = (() => {
   function exit(silent) {
     if (!driving) return;
     if (car.M.rail && !silent && !Subway.canLeave({ x: car.x, z: car.z, v: car.v })) { toast("Stop the train inside a station to get off."); return; }
-    if (car.M.fly && car.alt > 1.5) {                                                                // you cannot step out of a plane in the air (unless you are forced to)
-      if (!silent) { toast("Land first! Slow down and come down gently on a street or a square."); return; }
+    if (car.M.fly && car.alt > Chute.MIN_HEIGHT && !silent) {                                        // high enough in the air: bail out and parachute down (chute.js)
+      const info = { x: car.x, z: car.z, y: car.y, yaw: car.yaw, v: Math.abs(car.v), name: car.M.name };
+      if (typeof Trade !== "undefined") Trade.lose();                                                // the crates it carried are lost
+      driving = false; car.v = 0;
+      $("#drive-hud").classList.remove("show"); $("#drive-alt").textContent = "";
+      scene.remove(car.g); car = null; placeCircles(false);                                          // the aircraft crashes somewhere out of sight and is back in your garage
+      Chute.bail(info);
+      return;
+    }
+    if (car.M.fly && car.alt > 1.5) {                                                                // too low for a parachute, and you cannot step out of a plane in the air (unless you are forced to)
+      if (!silent) { toast(car.alt > 6 ? "Land first! Slow down and come down gently on a street or a square, or climb above 15 m and press Esc to parachute." : "Land first! Slow down and come down gently on a street or a square."); return; }
       car.alt = 0; car.vy = 0; car.y = groundAt(car.x, car.z); car.g.position.y = car.y;
     }
     if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; car.vx = car.vz = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
@@ -660,7 +669,7 @@ const Car = (() => {
   }
 
   return {
-    nudge: (o) => { if (!car) return; if (o.v !== undefined) car.v = o.v; if (o.yaw !== undefined) car.yaw = o.yaw; if (o.autopilot !== undefined) car.autopilot = o.autopilot; },
+    nudge: (o) => { if (!car) return; if (o.v !== undefined) car.v = o.v; if (o.yaw !== undefined) car.yaw = o.yaw; if (o.autopilot !== undefined) car.autopilot = o.autopilot; if (o.alt !== undefined) { car.alt = o.alt; car.y = groundAt(car.x, car.z) + o.alt; } },
     MODELS, model, deploy, stow, enter, exit, toggleEnter, togglePilot, update, camera, nearby, onEra,
     // Click on your parked car and it goes back to your garage (if you have one)
     clickAt(cx, cy, cam, canvasEl) {
