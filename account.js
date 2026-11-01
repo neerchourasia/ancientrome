@@ -105,6 +105,7 @@ const Account = (() => {
         trade: typeof Trade !== "undefined" ? Trade.snapshot() : {},
         snorkel: typeof Cancun !== "undefined" ? Cancun.snorkelSnapshot() : { seen: [], rounds: 1 },
         daily: Gifts.snapshot(),
+        estate: typeof Estate !== "undefined" ? Estate.snapshot() : {},
         era,
       },
     };
@@ -130,6 +131,7 @@ const Account = (() => {
     if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);
     if (p.disease && typeof p.disease === "object") Disease.restore(p.disease);
+    if (p.estate && typeof p.estate === "object" && typeof Estate !== "undefined") Estate.restore(p.estate);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.trade && typeof p.trade === "object" && typeof Trade !== "undefined") Trade.restore(p.trade);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);
@@ -142,12 +144,14 @@ const Account = (() => {
   const richness = (p) => {
     p = p || {};
     const items = p.owned && Array.isArray(p.owned.items) ? p.owned.items.length : 0, found = Array.isArray(p.discovered) ? p.discovered.length : 0;
-    return (p.time && Number.isFinite(p.time.day) ? p.time.day : 0) + items * 3 + found * 3 + (p.jobs && Number.isFinite(p.jobs.shifts) ? p.jobs.shifts : 0);
+    const houses = p.estate && p.estate.owned && typeof p.estate.owned === "object" ? Object.keys(p.estate.owned).length : 0;
+    return (p.time && Number.isFinite(p.time.day) ? p.time.day : 0) + items * 3 + found * 3 + houses * 3 + (p.jobs && Number.isFinite(p.jobs.shifts) ? p.jobs.shifts : 0);
   };
   // This device is further along than the saved game: keep it, take in whatever the saved game has that this device lacks (things bought elsewhere), and save it all
   function keepMineOverServer(row, at) {
     const so = row.progress && row.progress.owned ? row.progress.owned : {}, mo = Market.snapshot();
     Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
+    if (typeof Estate !== "undefined" && row.progress && row.progress.estate) Estate.merge(row.progress.estate);   // the houses bought on the other device too
     if (at) setKnown(at);
     lastSaved = "";
   }
