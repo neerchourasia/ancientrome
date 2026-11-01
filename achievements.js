@@ -36,6 +36,8 @@ const Achievements = (() => {
     ["pyr2", "🗿", "Pyramid builder", "Lay 50 blocks.", "Builder", 200, () => typeof Cancun !== "undefined" && Cancun.stats.laid >= 50],
     ["fish1", "🎣", "Angler", "Catch a fish.", "", 10, () => typeof Fishing !== "undefined" && Fishing.caught >= 1],
     ["fish2", "🐟", "Master angler", "Catch 100 fish.", "Angler", 200, () => typeof Fishing !== "undefined" && Fishing.caught >= 100],
+    ["story1", "📖", "Storyteller", "Finish the story of a city.", "Storyteller", 100, () => typeof Story !== "undefined" && Story.finished >= 1],
+    ["story3", "📚", "Chronicler", "Finish the stories of all three cities.", "Chronicler", 600, () => typeof Story !== "undefined" && Story.finished >= 3],
     ["thief", "🥷", "Thief taker", "Catch a pickpocket.", "", 20, () => typeof Thieves !== "undefined" && Thieves.caught >= 1],
     ["thief2", "🚔", "Lawman", "Catch 10 pickpockets.", "Lawman", 150, () => typeof Thieves !== "undefined" && Thieves.caught >= 10],
   ];

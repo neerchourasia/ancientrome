@@ -113,6 +113,7 @@ const Account = (() => {
         ach: typeof Achievements !== "undefined" ? Achievements.snapshot() : {},
         fish: typeof Fishing !== "undefined" ? Fishing.snapshot() : {},
         tmap: typeof TreasureMaps !== "undefined" ? TreasureMaps.snapshot() : {},
+        story: typeof Story !== "undefined" ? Story.snapshot() : {},
         era,
       },
     };
@@ -146,6 +147,7 @@ const Account = (() => {
     if (p.ach && typeof p.ach === "object" && typeof Achievements !== "undefined") Achievements.restore(p.ach);
     if (p.fish && typeof p.fish === "object" && typeof Fishing !== "undefined") Fishing.restore(p.fish);
     if (p.tmap && typeof p.tmap === "object" && typeof TreasureMaps !== "undefined") TreasureMaps.restore(p.tmap);
+    if (p.story && typeof p.story === "object" && typeof Story !== "undefined") Story.restore(p.story);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.trade && typeof p.trade === "object" && typeof Trade !== "undefined") Trade.restore(p.trade);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);
@@ -171,6 +173,7 @@ const Account = (() => {
     if (typeof Events !== "undefined" && row.progress && row.progress.events) Events.merge(row.progress.events);
     if (typeof Achievements !== "undefined" && row.progress && row.progress.ach) Achievements.merge(row.progress.ach);
     if (typeof Fishing !== "undefined" && row.progress && row.progress.fish) Fishing.merge(row.progress.fish);
+    if (typeof Story !== "undefined" && row.progress && row.progress.story) Story.merge(row.progress.story);
     if (typeof Estate !== "undefined" && row.progress && row.progress.estate) Estate.merge(row.progress.estate);   // the houses bought on the other device too
     if (at) setKnown(at);
     lastSaved = "";
