@@ -70,6 +70,7 @@ const Online = (() => {
       case "adminchat": Admin.showChat(m); break;
       case "fr_trade": Swap.on(m); break;
       case "leaders": Leaders.show(m); break;
+      case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }
       case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
@@ -190,6 +191,7 @@ const Online = (() => {
       p.ph += dt * (p.spd / 5.5) * 6.2;
       const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
       a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
+      if (p.emote) Emotes.peer(p, dt);
       vehicleUpdate(p, dt, show);
       if (p.pet) petUpdate(p, dt, show && !p.vm);
     }

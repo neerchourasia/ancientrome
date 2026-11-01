@@ -66,6 +66,7 @@ function init() {
   Relics.bind();
   Quests.bind();
   Swap.bind();
+  Emotes.bind(); Photo.bind();
   Leaders.bind();
   Ventures.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
@@ -853,6 +854,7 @@ function updateAvatar(dt) {
   avParts.armL.rotation.x = swing; avParts.armR.rotation.x = -swing;
   avParts.legL.rotation.x = -swing; avParts.legR.rotation.x = swing;
   if (mode === "online") Online.poseMine(avParts);
+  Emotes.update(avFig, dt);
 }
 
 function refreshViewButton() { $("#btn-view").innerHTML = `View: ${VIEWS[viewIndex].name} <kbd>C</kbd>`; }

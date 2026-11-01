@@ -1526,6 +1526,21 @@ def eject_riders(driver, why):
         leave_ride(r, why)
 
 
+EMOTES = ("wave", "dance", "bow", "cheer", "clap", "laugh")
+
+
+def on_emote(conn, m):
+    """A player does an emote (wave, dance ...): the other walkers near them see it. One every two seconds."""
+    e = m.get("e")
+    t = now()
+    if e not in EMOTES or conn.room or not conn.city or t - getattr(conn, "emote_at", -9) < 2.0:
+        return
+    conn.emote_at = t
+    for c in list(CONNS):
+        if c is not conn and c.hello and not c.closed and not c.room and c.city == conn.city and math.hypot(c.px - conn.px, c.pz - conn.pz) <= WORLD_RANGE:
+            c.send({"t": "emote", "id": conn.id, "e": e})
+
+
 def on_board(conn, m):
     """Someone asks to ride in another player's vehicle."""
     if conn.room or not conn.hello or conn.ride or conn.riders or conn.veh:
@@ -2876,6 +2891,8 @@ async def handle_msg(conn, m):
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
     if t == "walk":
         return on_walk(conn, m)
+    if t == "emote":
+        return on_emote(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":

@@ -316,6 +316,33 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         gone = await pas.until(lambda m: m["t"] == "ride" and not m["on"])
         self.assertIn("driver got out", gone["why"])
 
+    async def test_emotes_reach_the_players_nearby_only_and_not_too_often(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
+        async def player(name):
+            c = await WS.connect(self.port); self.clients.append(c)
+            c.send({"t": "hello", "name": name, "cls": "gladiator", "look": {}}); c.welcome = await c.until(lambda m: m["t"] == "welcome")
+            return c
+        ann, bea, far = await player("Ann"), await player("Bea"), await player("Far")
+        for c, x in ((ann, 0), (bea, 20), (far, 900)):
+            c.send({"t": "walk", "c": "rome", "x": x, "z": 0, "yaw": 0, "s": 0})
+        await asyncio.sleep(0.3)
+        ann.send({"t": "emote", "e": "dance"})
+        got = await bea.until(lambda m: m["t"] == "emote")
+        self.assertEqual((got["id"], got["e"]), (ann.welcome["id"], "dance"))
+        ann.send({"t": "emote", "e": "wave"}); ann.send({"t": "emote", "e": "hack"})                   # too soon, and not an emote
+        await asyncio.sleep(0.4)
+        self.assertEqual(ann.welcome["id"], got["id"])
+        try:
+            extra = await bea.until(lambda m: m["t"] == "emote", timeout=0.6)
+        except (asyncio.TimeoutError, AssertionError):
+            extra = None
+        self.assertIsNone(extra)
+        try:
+            seen_far = await far.until(lambda m: m["t"] == "emote", timeout=0.6)
+        except (asyncio.TimeoutError, AssertionError):
+            seen_far = None
+        self.assertIsNone(seen_far)
+
     async def test_a_big_aircraft_can_be_boarded_from_its_wing(self):
         server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
         self.assertGreater(server.board_range("a380"), server.board_range("citycar"))
