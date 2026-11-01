@@ -112,4 +112,10 @@ const CANCUN_LANDMARKS = [
     text: "A paved square south of the great plaza with a well in the middle and five stalls along its south side: a food stall, a clothier, animals and rides, a builder and a healer. Walk up to a stall and press F to shop.",
     fact: "Maya markets traded cacao beans as money, and maize, beans, chilli, salt, honey, cotton cloth and feathers.",
   }),
+  cn({
+    id: "g-pyramid", game: true, name: "The Pyramid Site", sub: "Build a pyramid together with other players",
+    x: -215, z: 70, r: 60, stand: [-215, 100],
+    text: "A building site west of the plaza where everyone in Cancún builds a pyramid together. Take a stone block from the quarry (press F), carry it to the site and press F to lay it: 100 blocks finish a pyramid, and everyone who laid five or more is paid. Finished pyramids stay standing, and the next one is begun beside them.",
+    fact: "Maya pyramids were built in layers, each new stage covering the old one, and El Castillo hides an older temple inside it.",
+  }),
 ];

@@ -375,7 +375,7 @@ const Cancun = (() => {
   // counts the blocks of all the players; when the last one goes on, the pyramid is finished and everybody who laid five or more is paid, and a new one is begun.
   const PYR = { x: -215, z: 70, half: 16, layers: 8, lh: 1.8, base: 1.2, qx: -262, qz: 112 }, PYR_NEED = [24, 20, 16, 13, 10, 8, 6, 3], PYR_TOTAL = PYR_NEED.reduce((a, b) => a + b, 0);
   const PYR_KEY = "rome-pyramid", PYR_PAY = 4, PYR_BONUS = 150;
-  let pyr = { blocks: 0, done: 0, mine: 0, top: [] }, pyrMeshes = [], pyrShown = -1, carrying = false, carryMesh = null, pyrAsk = 0, pyrMonuments = null, capstone = null;
+  let pyr = { blocks: 0, done: 0, mine: 0, top: [] }, pyrMeshes = [], pyrShown = -1, carrying = false, carryMesh = null, pyrAsk = 0;
   try { const r = JSON.parse(localStorage.getItem(PYR_KEY) || "null"); if (r && typeof r === "object") pyr = { blocks: Math.max(0, Math.min(PYR_TOTAL - 1, Math.floor(r.blocks) || 0)), done: Math.max(0, Math.floor(r.done) || 0), mine: Math.max(0, Math.floor(r.mine) || 0), top: [] }; } catch (e) { /* storage unavailable */ }
   const pyrSave = () => { try { localStorage.setItem(PYR_KEY, JSON.stringify({ blocks: pyr.blocks, done: pyr.done, mine: pyr.mine })); } catch (e) { /* ignore */ } };                        // Cenote Azul: an open sinkhole with clear water, for swimming
   const SPECIES = [                                               // what you can see snorkelling: name, colour, size (length), where
@@ -613,44 +613,47 @@ const Cancun = (() => {
     setEra(false);
   }
 
+  const SITES = 3, SITE_GAP = 37, siteX = (k) => PYR.x + k * SITE_GAP;                                     // the finished pyramids stay: the next one is built beside it
+  const pyrSite = () => Math.min(pyr.done, SITES - 1);
+  let siteSigns = [];
   function buildPyramid() {
-    const stone = lambert(0xcdbf9a), dark = lambert(0x9a8e6e), x = X(PYR.x), z = PYR.z, total = PYR.layers;
-    mbox(root, x, 0, z, PYR.half * 2 + 3, PYR.base, PYR.half * 2 + 3, dark);                                       // the foundation
-    addBlockerBox(x - PYR.half - 1.5, x + PYR.half + 1.5, z - PYR.half - 1.5, z + PYR.half + 1.5, 0, 14);
-    for (let k = 0; k < total; k++) {
-      const size = PYR.half * 2 - k * (PYR.half * 2 - 3) / total, m = new T.Mesh(BOX, k % 2 ? stone : lambert(0xd9ccaa));
-      m.castShadow = m.receiveShadow = true; m.userData.size = size; m.visible = false; root.add(m); pyrMeshes.push(m);
+    const stone = lambert(0xcdbf9a), dark = lambert(0x9a8e6e), z = PYR.z, total = PYR.layers;
+    for (let n = 0; n < SITES; n++) {
+      const x = X(siteX(n)), site = { found: null, layers: [], cap: null };
+      site.found = mbox(root, x, 0, z, PYR.half * 2 + 3, PYR.base, PYR.half * 2 + 3, dark);                         // the foundation
+      addBlockerBox(x - PYR.half - 1.5, x + PYR.half + 1.5, z - PYR.half - 1.5, z + PYR.half + 1.5, 0, 14);
+      for (let k = 0; k < total; k++) {
+        const size = PYR.half * 2 - k * (PYR.half * 2 - 3) / total, m = new T.Mesh(BOX, k % 2 ? stone : lambert(0xd9ccaa));
+        m.castShadow = m.receiveShadow = true; m.userData.size = size; m.visible = false; root.add(m); site.layers.push(m);
+      }
+      site.cap = new T.Mesh(new T.ConeGeometry(1.8, 2.4, 4), C.gold); site.cap.position.set(x, PYR.base + total * PYR.lh + 1.2, z); site.cap.rotation.y = Math.PI / 4; site.cap.visible = false; root.add(site.cap);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(root, x + sx * (PYR.half + 2), 0, z + sz * (PYR.half + 2), 0.4, 3.6, 0.4, C.wood);
+      pyrMeshes.push(site);
     }
-    capstone = new T.Mesh(new T.ConeGeometry(1.8, 2.4, 4), C.gold); capstone.position.set(x, PYR.base + total * PYR.lh + 1.2, z); capstone.rotation.y = Math.PI / 4; capstone.visible = false; root.add(capstone);
-    // the quarry: a heap of blocks and a sign; the site has its own sign and four corner posts
+    // the quarry: a heap of blocks and a sign; the site has its own sign
     for (let i = 0; i < 9; i++) mbox(root, X(PYR.qx) + (i % 3) * 1.7 - 1.7, Math.floor(i / 3) * 0.8 * (i % 2 ? 0.8 : 1), PYR.qz + ((i * 7) % 3) * 1.5 - 1.5, 1.5, 0.8, 1.3, i % 2 ? stone : dark);
     sign(root, X(PYR.qx), 3.2, PYR.qz + 3.2, 5.4, 1.7, "QUARRY", "press F to take a block", 0);
-    sign(root, x, 3.4, z + PYR.half + 3.2, 8.4, 2.1, "BUILD THE PYRAMID", "everyone in Cancún builds it together", 0);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mbox(root, x + sx * (PYR.half + 2), 0, z + sz * (PYR.half + 2), 0.4, 3.6, 0.4, C.wood);
+    sign(root, X(PYR.x - 24), 3.4, z + PYR.half + 3.2, 8.4, 2.1, "BUILD THE PYRAMID", "everyone in Cancún builds it together", 0);
     carryMesh = new T.Mesh(BOX, stone); carryMesh.scale.set(0.6, 0.45, 0.6); carryMesh.visible = false; root.add(carryMesh);
-    pyrMonuments = new T.Group(); root.add(pyrMonuments);
     pyrRefresh();
   }
-  // the layers rise as blocks go on; every finished pyramid leaves a little gold monument beside the site
+  // the layers rise as blocks go on; finished pyramids stay standing, and a new one is begun beside the last
   function pyrRefresh() {
     const key = pyr.blocks * 1000 + pyr.done; if (key === pyrShown) return; pyrShown = key;
-    let left = pyr.blocks;
-    pyrMeshes.forEach((m, k) => {
-      const f = Math.max(0, Math.min(1, left / PYR_NEED[k])); left -= PYR_NEED[k];
-      m.visible = f > 0;
-      if (f > 0) { const h = PYR.lh * f; m.scale.set(m.userData.size, h, m.userData.size); m.position.set(X(PYR.x), PYR.base + k * PYR.lh + h / 2, PYR.z); }
+    const cur = pyrSite();
+    pyrMeshes.forEach((site, n) => {
+      site.found.visible = n <= cur;
+      let left = n < cur || (n === cur && pyr.done >= SITES) ? PYR_TOTAL : n === cur ? pyr.blocks : 0;                // (after the last site, it is rebuilt over and over)
+      site.layers.forEach((m, k) => {
+        const f = Math.max(0, Math.min(1, left / PYR_NEED[k])); left -= PYR_NEED[k];
+        m.visible = f > 0;
+        if (f > 0) { const h = PYR.lh * f; m.scale.set(m.userData.size, h, m.userData.size); m.position.set(X(siteX(n)), PYR.base + k * PYR.lh + h / 2, PYR.z); }
+      });
+      site.cap.visible = n < cur || (n === cur && (pyr.blocks >= PYR_TOTAL - 1 || pyr.done >= SITES));
     });
-    capstone.visible = pyr.blocks >= PYR_TOTAL - 1;
-    if (pyrMonuments) {
-      pyrMonuments.clear();
-      for (let i = 0; i < Math.min(pyr.done, 12); i++) {
-        const g = new T.Group(); for (let k = 0; k < 4; k++) { const b = new T.Mesh(BOX, k === 3 ? C.gold : lambert(0xd9ccaa)); const sz = 3 - k * 0.7; b.scale.set(sz, 0.7, sz); b.position.y = 0.35 + k * 0.7; g.add(b); }
-        g.position.set(X(PYR.x - 22 + (i % 6) * 6), 0, PYR.z - 28 - Math.floor(i / 6) * 6); pyrMonuments.add(g);
-      }
-    }
   }
   const nearQuarry = () => Math.hypot(player.x - X(PYR.qx), player.z - PYR.qz) < 6;
-  const nearSite = () => Math.max(Math.abs(player.x - X(PYR.x)), Math.abs(player.z - PYR.z)) < PYR.half + 11;
+  const nearSite = () => Math.max(Math.abs(player.x - X(siteX(pyrSite()))), Math.abs(player.z - PYR.z)) < PYR.half + 11;
   function pyrPrompt() {
     if (!built || city !== "cancun") return "";
     if (!carrying && nearQuarry()) return `F: take a stone block for the pyramid (${pyr.blocks} of ${PYR_TOTAL} laid)`;
@@ -675,8 +678,8 @@ const Cancun = (() => {
     const paid = who ? who.includes(Character.name) : pyr.mine >= 5;
     pyr.done++; pyr.blocks = 0; const mine = pyr.mine; pyr.mine = 0; pyrSave(); pyrRefresh();
     Sfx.play("cheer");
-    if (paid && mine >= 5) { Vitals.coins += PYR_BONUS; toast(`🔺 The pyramid is finished! Everyone who laid five blocks or more is paid: +${PYR_BONUS} denarii. A gold monument stands beside the site, and a new pyramid is begun.`); }
-    else toast("🔺 The pyramid is finished! A gold monument stands beside the site, and a new one is begun.");
+    if (paid && mine >= 5) { Vitals.coins += PYR_BONUS; toast(`🔺 The pyramid is finished! Everyone who laid five blocks or more is paid: +${PYR_BONUS} denarii. , and a new pyramid is begun.`); }
+    else toast("🔺 The pyramid is finished! , and a new one is begun.");
   }
   // news from the game server: the shared count, or the pyramid being finished
   function pyrOn(m) {
