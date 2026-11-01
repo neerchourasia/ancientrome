@@ -343,6 +343,37 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.3)
         self.assertTrue(any(e["kind"] == "jumped across the city" for e in server.EVENTS))
 
+    async def test_admin_chat_log_player_reports_and_big_money_jumps(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear(); server.ADMIN_CHAT.clear()
+        async def player(name, vid):
+            c = await WS.connect(self.port); self.clients.append(c)
+            c.send({"t": "hello", "name": name, "cls": "gladiator", "look": {}, "vid": vid}); c.welcome = await c.until(lambda m: m["t"] == "welcome")
+            return c
+        ann, bea = await player("Ann", "a" * 32), await player("Bea", "b" * 32)
+        next(c for c in server.CONNS if c.id == ann.welcome["id"]).admin = True
+        # the chat log has public messages, with who sent them, and no whispers
+        bea.send({"t": "chat", "text": "hello everyone"}); await asyncio.sleep(0.2)
+        bea.send({"t": "chat", "text": "/w Ann a secret"}); await asyncio.sleep(0.2)
+        ann.send({"t": "admin", "a": "chatlog"})
+        log = await ann.until(lambda m: m["t"] == "adminchat")
+        self.assertEqual([(e["name"], e["text"]) for e in log["m"]], [("Bea", "hello everyone")])
+        self.assertEqual(log["m"][0]["vid"], "b" * 8)
+        # a player reports another: it appears in the suspicious list, and reports are limited
+        ann.send({"t": "chat", "text": "/report Bea was rude in chat"}); await asyncio.sleep(0.3)
+        ev = [e for e in server.EVENTS if e["kind"] == "reported by a player"]
+        self.assertEqual((len(ev), ev[0]["who"]), (1, "Bea"))
+        self.assertIn("Ann reported Bea", ev[0]["detail"])
+        # a sudden pile of denarii is flagged, unless the server itself gave it
+        bea.send({"t": "walk", "c": "rome", "x": 5, "z": 5, "yaw": 0, "s": 0, "d": 100}); await asyncio.sleep(0.1)
+        bea.send({"t": "walk", "c": "rome", "x": 5, "z": 5, "yaw": 0, "s": 0, "d": 9000}); await asyncio.sleep(0.3)
+        self.assertTrue(any(e["kind"] == "big jump in denarii" for e in server.EVENTS))
+        server.EVENTS.clear(); server.FLAG_GAP.clear()
+        cb = next(c for c in server.CONNS if c.id == bea.welcome["id"])
+        cb.coin_hist = [(server.now(), 9000)]
+        cb.coin_credit = [(server.now(), 8000)]
+        bea.send({"t": "walk", "c": "rome", "x": 5, "z": 5, "yaw": 0, "s": 0, "d": 17000}); await asyncio.sleep(0.3)
+        self.assertFalse(any(e["kind"] == "big jump in denarii" for e in server.EVENTS))
+
     # ---------------------------------------------------------------- basics
 
     async def test_health_and_unknown_page(self):

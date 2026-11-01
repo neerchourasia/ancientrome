@@ -193,7 +193,23 @@ const Admin = (() => {
     for (const pane of document.querySelectorAll("#admin .ad-pane")) pane.hidden = pane.dataset.pane !== name;
   }
 
-  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); Online.navalSend({ t: "admin", a: "journey" }); }
+  function loadOnline() { Online.navalSend({ t: "admin", a: "who" }); Online.navalSend({ t: "admin", a: "events" }); Online.navalSend({ t: "admin", a: "visits" }); Online.navalSend({ t: "admin", a: "journey" }); Online.navalSend({ t: "admin", a: "chatlog" }); }
+
+  // the Chat log tab: the last public messages with who sent them, newest first, each with a Block button
+  function showChat(m) {
+    const t = $a("ad-chat"), list = m.m || [];
+    t.replaceChildren();
+    $a("ad-chat-n").textContent = `${list.length} recent message${list.length === 1 ? "" : "s"}`;
+    $a("ad-chat-b").textContent = list.length || "";
+    const head = t.insertRow();
+    for (const h of ["Time", "Who", "Message", "Id", ""]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const e of list) {
+      const r = t.insertRow();
+      cell(r, new Date(e.ts * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })); cell(r, (e.adm ? "★ " : "") + e.name); cell(r, e.text); cell(r, e.vid || "");
+      const act = r.insertCell();
+      if (e.vid && !e.adm) button(act, "Block", () => { Dialog.confirm(`Block ${e.name} (${e.vid}) from the game for 30 days and remove them now?`).then((yes) => { if (yes) { Online.navalSend({ t: "admin", a: "block", vid: e.vid }); setTimeout(loadOnline, 600); } }); });
+    }
+  }
 
   // the User journey tab: a list of visitors, and each visit of the one you pick as a timeline
   const CITY = { rome: "Rome", delhi: "Delhi", cancun: "Cancún" };
@@ -340,5 +356,5 @@ const Admin = (() => {
     $a("btn-admin").hidden = !Account.admin;
   }
 
-  return { bind, showOnline, showVisits, showEvents, showJourney, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
+  return { bind, showOnline, showVisits, showEvents, showJourney, showChat, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };
 })();

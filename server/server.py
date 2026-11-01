@@ -1461,6 +1461,15 @@ def on_walk(conn, m):
     conn.palt, conn.proll = num(m.get("a"), 0, 600, 0), num(m.get("r"), -1.5, 1.5, 0)
     if m.get("d") is not None:
         conn.coins = int(num(m.get("d"), 0, 1e12, 0))
+        hist = getattr(conn, "coin_hist", None)
+        if hist is None:
+            hist = conn.coin_hist = []
+        hist.append((tnow, conn.coins))
+        del hist[:-40]
+        low = min((c for tt, c in hist if tnow - tt <= 60), default=conn.coins)
+        credited = sum(n for tt, n in getattr(conn, "coin_credit", []) if tnow - tt <= 90)      # what the server itself gave them (gifts from friends or admins)
+        if conn.coins - low - credited >= 5000:
+            flag("big jump in denarii", "+%d denarii in under a minute (now %d): sold something big, or cheating" % (conn.coins - low - credited, conn.coins), "low", conn=conn, gap=300)
     veh = m.get("v")
     conn.veh = veh if veh in VEHICLES else None
     pk = m.get("k")
@@ -1853,12 +1862,12 @@ def note_journey(vid, sid, name, ua, events):
     return added
 
 
-def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60):
+def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60, who=None):
     """Log something suspicious. The same kind from the same person is logged at most once every `gap` seconds."""
-    who = ""
     if conn is not None:
         ip, vid = ip or conn.ip, vid or getattr(conn, "vid", None)
-        who = conn.name
+        who = who if who is not None else conn.name
+    who = who or ""
     key = (kind, vid or ip)
     t = now()
     if t - FLAG_GAP.get(key, -1e9) < gap:
@@ -1875,6 +1884,7 @@ def flag(kind, detail, level="low", conn=None, ip=None, vid=None, gap=60):
 # chat, and the admin's tools
 
 CHAT_LOG = collections.deque(maxlen=40)     # the last messages, shown to people who join
+ADMIN_CHAT = collections.deque(maxlen=300)  # the last public messages with who sent them, for the admins' Chat log (memory only; whispers are never in it)
 BLOCKED = {}                                # kicked: login id or address -> until when
 CHAT_MAX = 140
 BAD_WORDS = re.compile(r"(fuck|shit|bitch|cunt|asshole|nigg|fagg)", re.I)   # masked, not blocked
@@ -2009,6 +2019,7 @@ def on_chat(conn, m):
     if text.startswith("/"):
         return chat_command(conn, text)
     entry = {"t": "chat", "id": conn.id, "name": conn.name, "text": text, "adm": 1 if conn.admin else 0, "ts": int(time.time())}   # ts: when it was sent, so everyone can see the time
+    ADMIN_CHAT.append({"ts": entry["ts"], "id": conn.id, "name": conn.name, "vid": (conn.vid or "")[:8], "text": text or "(sent a picture)", "adm": entry["adm"]})
     if pic:
         CHAT_LOG.append(dict(entry, text=text or "(sent a picture)"))      # people who join later do not get the picture, only that there was one
         entry["pic"] = pic
@@ -2081,6 +2092,17 @@ def chat_command(conn, text):
     cmd = head.lower()
     if cmd in ("sing", "song"):
         return start_song(conn, rest)
+    if cmd == "report":
+        target, why = match_name(rest)
+        t = now()
+        conn.reports = [x for x in getattr(conn, "reports", []) if t - x < 300]
+        if len(conn.reports) >= 3:
+            return say_to(conn, "You have sent a few reports already. An admin will look at them.")
+        if not target or target is conn or not why.strip():
+            return say_to(conn, "Report someone with: /report name what they did")
+        conn.reports.append(t)
+        flag("reported by a player", "%s reported %s: %s" % (conn.name, target.name, clean_chat(why)[:100]), "medium", ip=target.ip, vid=target.vid, gap=20, who=target.name)
+        return say_to(conn, "Thank you. An admin will look at your report about %s." % target.name)
     if cmd == "songs":
         return say_to(conn, "Songs (%d): " % len(SONGS) + ", ".join(SONGS) + ". Type /sing and a name (or just /sing for a surprise).")
     if cmd in ("w", "whisper", "msg"):
@@ -2145,6 +2167,9 @@ def on_admin(conn, m):
         rows = sorted(VISITS.values(), key=lambda v: v["last"], reverse=True)[:300]
         online_vids = {c.vid for c in CONNS if c.hello and not c.closed and c.vid}
         conn.send({"t": "adminvisits", "total": len(VISITS), "v": [dict(v, ips=None, online=v["vid"] in online_vids, blocked=BLOCKED.get(v["vid"], 0) > now()) for v in rows]})
+        return
+    if a == "chatlog":
+        conn.send({"t": "adminchat", "m": list(ADMIN_CHAT)[::-1]})
         return
     if a == "journey":
         vid = str(m.get("vid") or "")
@@ -2217,6 +2242,7 @@ def on_admin(conn, m):
         gift = {"id": GIFT_SEQ[0], "fid": "", "from": conn.name + " (admin)", "n": n, "t": now()}
         if target.fid:
             PENDING_GIFTS.setdefault(target.fid, []).append(gift)
+        target.coin_credit = [x for x in getattr(target, "coin_credit", []) if now() - x[0] < 120] + [(now(), n)]   # (so a gift is not mistaken for cheating)
         target.send({"t": "fr_gift", "id": gift["id"], "fid": "", "name": gift["from"], "n": n})
         flag("admin gave denarii", "%s gave %d denarii to %s" % (conn.name, n, target.name), "low", conn=conn, gap=0)
         return say_to(conn, "Gave %d denarii to %s." % (n, target.name))
@@ -2618,6 +2644,7 @@ def on_social(conn, m):
         GIFT_SEQ[0] += 1
         gift = {"id": GIFT_SEQ[0], "fid": conn.fid, "from": conn.name, "n": n, "t": t}
         PENDING_GIFTS.setdefault(fid, []).append(gift)
+        others[0].coin_credit = [x for x in getattr(others[0], "coin_credit", []) if now() - x[0] < 120] + [(now(), n)]
         others[0].send({"t": "fr_gift", "id": gift["id"], "fid": conn.fid, "name": conn.name, "n": n})
         if n >= 3000:
             flag("large gift of denarii", "%d denarii to a friend" % n, "low", conn=conn, gap=300)
