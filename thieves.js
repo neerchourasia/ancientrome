@@ -58,11 +58,13 @@ const Thieves = (() => {
     const d0 = Math.hypot(player.x - t.x, player.z - t.z);
     if (t.state === "stalk") {
       if (t.life <= 0 || d0 > 90) { remove(); return; }
+      if (d0 < 9 && typeof PetPerks !== "undefined" && PetPerks.scares()) { toast("🐾 Your lion cub growls and the thief runs off!"); remove(); return; }
       step(dt, player.x, player.z, 3.4);
       if (d0 < TOUCH && !Jail.active && Vitals.coins >= MIN_COINS) {
         const n = Math.max(10, Math.min(MAX_STEAL, Math.round((Vitals.coins * 0.1) / 5) * 5));
         Vitals.coins -= n; t.loot = n; t.state = "flee"; t.left = FLEE_TIME; Sfx.play("oof");
-        toast(`A thief grabbed ${n} denarii! Catch him (he runs from you, the red ! shows where he is) before he gets away.`);
+        const back = typeof PetPerks !== "undefined" ? PetPerks.recover(n) : 0; if (back) { Vitals.coins += back; t.loot = n - back; }
+        toast(`${back ? `Your monkey grabbed ${back} back! ` : ""}A thief grabbed ${n} denarii! Catch him (he runs from you, the red ! shows where he is) before he gets away.`);
       }
     } else {
       t.left -= dt;

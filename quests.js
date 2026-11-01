@@ -112,7 +112,7 @@ const Quests = (() => {
   function deliver() { if (active && active.kind === "letter" && !active.done) complete(); }
   function complete() {
     const q = active; if (!q || q.done) return;
-    q.done = true; Vitals.coins += q.reward; Sfx.play("discover"); doneToday++; total++; try { localStorage.setItem("rome-quests-done", String(total)); } catch (e) { /* ignore */ }
+    q.done = true; q.reward = Math.round(q.reward * (typeof PetPerks !== "undefined" ? PetPerks.mul("quest") : 1)); Vitals.coins += q.reward; Sfx.play("discover"); doneToday++; total++; try { localStorage.setItem("rome-quests-done", String(total)); } catch (e) { /* ignore */ }
     toast(`Quest done! +${q.reward} denarii.`); finish(true);
   }
   function finish(ok) { active = null; hideHud(); }
