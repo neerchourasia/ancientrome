@@ -763,3 +763,10 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .ach-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .ach-list li small { display: block; color: var(--muted); font-size: .78rem; }
 .ach-list li.lock { opacity: .55; }
+#tut { position: fixed; left: 50%; transform: translateX(-50%); top: 100px; z-index: 5; width: min(420px, 92vw); padding: 10px 14px; color: var(--ink); background: rgba(28,22,16,.92); border: 1px solid rgba(226,185,85,.6); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+#tut[hidden] { display: none; }
+#tut b { color: var(--gold); }
+#tut p { margin: 4px 0 8px; font-size: .88rem; line-height: 1.4; }
+.tut-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; margin-bottom: 8px; }
+.tut-bar i { display: block; height: 100%; width: 0; background: #ffe08a; transition: width .5s; }
+#tut button { font: inherit; font-size: .78rem; color: var(--muted); background: none; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 2px 8px; cursor: pointer; }

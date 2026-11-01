@@ -722,10 +722,10 @@ const Cancun = (() => {
   }
   function pyrAct() {
     if (!built || city !== "cancun") return false;
-    if (!carrying && nearQuarry()) { carrying = true; carryMesh.visible = true; Sfx.play("discover"); toast("You pick up a heavy stone block. Carry it to the pyramid site (you walk slower) and press F there."); return true; }
+    if (!carrying && nearQuarry()) { carrying = true; carryMesh.visible = true; Sfx.play("stone"); toast("You pick up a heavy stone block. Carry it to the pyramid site (you walk slower) and press F there."); return true; }
     if (carrying && nearSite()) {
       carrying = false; carryMesh.visible = false;
-      pyr.blocks++; pyr.mine++; laidTotal++; try { localStorage.setItem("rome-laid", String(laidTotal)); } catch (e) { /* ignore */ }
+      Sfx.play("stone"); pyr.blocks++; pyr.mine++; laidTotal++; try { localStorage.setItem("rome-laid", String(laidTotal)); } catch (e) { /* ignore */ }
       Vitals.coins += PYR_PAY; Sfx.play("coin");
       const online = typeof Online !== "undefined" && Online.connected;
       if (online) Online.navalSend({ t: "pyr_add" });

@@ -172,6 +172,13 @@ const Sfx = (() => {
     hail: () => { tone(2300 + Math.random() * 1600, 0.05, "square", 0.07, 1400); puff(0.05, 3200, 2, 0.12); },
     tornado: () => { puff(2.2, 140, 0.6, 0.5, null, "lowpass", 0.4); tone(55, 2, "sawtooth", 0.25, 38); },
     thunder: () => { puff(2.6, 120, 0.4, 0.8, null, "lowpass", 0.08); puff(1.4, 260, 0.5, 0.5, null, "lowpass", 0.02, 0.15); tone(48, 2.2, "sine", 0.55, 28); },
+    stone: () => { puff(0.16, 260, 0.8, 0.5); tone(70, 0.22, "sine", 0.5, 40); },                                  // a heavy block set down
+    gate: () => { tone(660, 0.12, "triangle", 0.2); tone(990, 0.2, "triangle", 0.18, null, null, 0.09); },        // a race gate
+    go: () => { tone(440, 0.18, "square", 0.12); tone(880, 0.4, "square", 0.14, null, null, 0.2); },              // the clock starts
+    medal: () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.4, "triangle", 0.18, null, null, i * 0.1)); puff(0.9, 2400, 0.5, 0.12, null, "bandpass", 0.05, 0.3); },
+    ka: () => { tone(1568, 0.07, "square", 0.08); tone(2093, 0.22, "sine", 0.16, null, null, 0.06); puff(0.08, 5200, 2, 0.12); },   // a trade on the exchange
+    news: () => { tone(740, 0.16, "sine", 0.14); tone(554, 0.3, "sine", 0.14, null, null, 0.17); },
+    unlock: () => { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.7, "sine", 0.15, null, null, i * 0.12)); tone(392, 1.1, "triangle", 0.12); },
     gong: () => { tone(82, 2.2, "sine", 0.5); tone(164, 1.6, "sine", 0.2); puff(0.3, 900, 0.5, 0.2); },
   };
 

@@ -61,7 +61,7 @@ const Thieves = (() => {
       step(dt, player.x, player.z, 3.4);
       if (d0 < TOUCH && !Jail.active && Vitals.coins >= MIN_COINS) {
         const n = Math.max(10, Math.min(MAX_STEAL, Math.round((Vitals.coins * 0.1) / 5) * 5));
-        Vitals.coins -= n; t.loot = n; t.state = "flee"; t.left = FLEE_TIME; Sfx.play("crash");
+        Vitals.coins -= n; t.loot = n; t.state = "flee"; t.left = FLEE_TIME; Sfx.play("oof");
         toast(`A thief grabbed ${n} denarii! Catch him (he runs from you, the red ! shows where he is) before he gets away.`);
       }
     } else {

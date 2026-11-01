@@ -35,12 +35,12 @@ const Voyage = (() => {
     if (mode !== "walk" || sleepT > 0 || !started || travelBusy) { toast("Stop what you are doing first to sail."); return; }
     if (Vitals.coins < FARE) { toast(`The passage costs ${FARE} denarii.`); return; }
     closePanels(); travelBusy = true; Vitals.stopRest(); Nav.clear();
-    coins(-FARE); Sfx.play("coin");
+    coins(-FARE); Sfx.play("horn");
     if (!box) build();
     logEl.replaceChildren(); progress(0); $v("vy-title").textContent = `Sailing to ${NAMES[to]}`; box.hidden = false;
     try {
       say(`You board a ship (${FARE} denarii). The sails fill and the shore slips away.`); await sleep(3500); progress(0.2);
-      const r = Math.random();
+      const r = Math.random(); Sfx.play("splash");
       if (r < 0.4) { say("Calm seas and a fair wind."); } else if (r < 0.65) { coins(15); say("Dolphins race the bow! The crew toss you 15 denarii for luck."); } else if (r < 0.85) { coins(-25); say("A storm! The ship is battered and the repairs cost you 25 denarii."); } else say("A long, lazy swell. You doze on the deck.");
       await sleep(6000); progress(0.55);
       const q = Math.random();

@@ -87,7 +87,7 @@ const Events = (() => {
     const had = prev && prev.medal ? MEDALS[prev.medal - 1][2] : 0, now = medal ? MEDALS[medal - 1][2] : 0, pay = Math.max(0, now - had);
     const record = !prev || ms < prev.ms;
     best[c.id] = { ms: record ? ms : prev.ms, medal: prev && prev.medal && (!medal || prev.medal < medal) ? prev.medal : medal }; save();
-    if (pay) { Vitals.coins += pay; Sfx.play("coin"); }
+    Vitals.coins += pay; Sfx.play(medal ? "medal" : "gate");
     toast(`${KINDS[c.kind].name} done in ${fmt(ms)}! ${medal ? MEDALS[medal - 1][0] : "No medal this time"}${pay ? ` +${pay} denarii` : ""}${record && prev ? " · a new best!" : ""}`);
     if (Online.connected && Account.loggedIn) { send({ a: "ev_time", course: c.id, ms, len: Math.round(c.len) }); }
     active = null; placeBeams(); hud("");
@@ -121,8 +121,8 @@ const Events = (() => {
     const g = c.gates[active.gate], d = Math.hypot(st.x - g.x, st.z - g.z), R = KINDS[c.kind].ring + 4;
     const hit = d < R && (c.kind === "car" || Math.abs((st.alt || 0) - ALT) < 30);
     if (hit) {
-      if (!active.running) { active.running = true; active.ms = 0; toast("Go!"); Sfx.play("discover"); }
-      else Sfx.play("discover");
+      if (!active.running) { active.running = true; active.ms = 0; toast("Go!"); Sfx.play("go"); }
+      else Sfx.play("gate");
       if (active.gate === c.gates.length - 1) { finish(active.ms); return; }
       active.gate++; placeBeams();
     }

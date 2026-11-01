@@ -57,7 +57,7 @@ const Exchange = (() => {
 
   function on(m) {
     if (m.t === "stocks") {
-      quotes = Array.isArray(m.list) ? m.list.filter((q) => q && typeof q.price === "number" && Array.isArray(q.hist)) : []; news = Array.isArray(m.news) ? m.news : [];
+      quotes = Array.isArray(m.list) ? m.list.filter((q) => q && typeof q.price === "number" && Array.isArray(q.hist)) : []; const before = news.length ? news[news.length - 1].ts : 0; news = Array.isArray(m.news) ? m.news : []; if (news.length && news[news.length - 1].ts > before && before) Sfx.play("news");
       if ($x("exchange").classList.contains("show")) render();
     } else if (m.t === "stock_no") { toast(m.msg || "Slow down a little."); }
     else if (m.t === "stock_fill") {
@@ -65,12 +65,12 @@ const Exchange = (() => {
       const q = quotes.find((x) => x.id === m.id), name = q ? q.name : m.id, n = held[m.id] || 0;
       if (m.side === "buy") {
         if (Vitals.coins < m.total) { toast("The price moved and you can no longer afford it."); return; }
-        Vitals.coins -= m.total; held[m.id] = Math.min(MAX_HELD, n + m.n); Sfx.play("coin");
+        Vitals.coins -= m.total; held[m.id] = Math.min(MAX_HELD, n + m.n); Sfx.play("ka");
         toast(`Bought ${m.n} ${name} at ${m.price.toFixed(2)} (fee ${m.fee}): -${m.total} denarii.`);
       } else {
         const sold = Math.min(n, m.n); if (!sold) return;
         const got = Math.max(0, Math.round(m.price * sold - m.fee));
-        Vitals.coins += got; held[m.id] = n - sold; if (!held[m.id]) delete held[m.id]; Sfx.play("coin");
+        Vitals.coins += got; held[m.id] = n - sold; if (!held[m.id]) delete held[m.id]; Sfx.play("ka");
         toast(`Sold ${sold} ${name} at ${m.price.toFixed(2)}: +${got} denarii.`);
       }
       save(); send({ a: "list" }); render();

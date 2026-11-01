@@ -61,7 +61,7 @@ const Achievements = (() => {
       if (!ok) continue;
       state.done[id] = Date.now(); any = true;
       if (reward) Vitals.coins += reward;
-      Sfx.play("cheer");
+      Sfx.play("unlock");
       toast(`${icon} Achievement: ${name}!${reward ? ` +${reward} denarii` : ""}${title ? ` · you can now wear the title "${title}"` : ""}`);
     }
     if (any) { save(); if ($a("ach").classList.contains("show")) render(); }
