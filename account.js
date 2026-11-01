@@ -112,6 +112,7 @@ const Account = (() => {
         events: typeof Events !== "undefined" ? Events.snapshot() : {},
         ach: typeof Achievements !== "undefined" ? Achievements.snapshot() : {},
         fish: typeof Fishing !== "undefined" ? Fishing.snapshot() : {},
+        tmap: typeof TreasureMaps !== "undefined" ? TreasureMaps.snapshot() : {},
         era,
       },
     };
@@ -144,6 +145,7 @@ const Account = (() => {
     if (p.events && typeof p.events === "object" && typeof Events !== "undefined") Events.restore(p.events);
     if (p.ach && typeof p.ach === "object" && typeof Achievements !== "undefined") Achievements.restore(p.ach);
     if (p.fish && typeof p.fish === "object" && typeof Fishing !== "undefined") Fishing.restore(p.fish);
+    if (p.tmap && typeof p.tmap === "object" && typeof TreasureMaps !== "undefined") TreasureMaps.restore(p.tmap);
     if (p.social && typeof p.social === "object") Social.restore(p.social);
     if (p.trade && typeof p.trade === "object" && typeof Trade !== "undefined") Trade.restore(p.trade);
     if (p.daily && typeof p.daily === "object") Gifts.restore(p.daily);

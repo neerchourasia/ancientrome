@@ -770,3 +770,5 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .tut-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; margin-bottom: 8px; }
 .tut-bar i { display: block; height: 100%; width: 0; background: #ffe08a; transition: width .5s; }
 #tut button { font: inherit; font-size: .78rem; color: var(--muted); background: none; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+#tmap-hud { position: fixed; left: 50%; transform: translateX(-50%); top: 132px; z-index: 4; max-width: 92vw; padding: 5px 14px; font-size: .85rem; font-weight: 700; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; }
+#tmap-hud[hidden] { display: none; }
