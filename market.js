@@ -32,6 +32,21 @@ const Market = (() => {
 
   // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
   // supply (used up at once) or perk (a permanent bonus in single-player games).
+  // Rare relics carried by the bots (relics.js): you trade for them, and keep or sell them. [id, name, value in denarii, what it is]
+  const RELICS = [
+    ["r_scarab", "Emerald scarab", 450, "A beetle of green stone, carved for a pharaoh's tomb."],
+    ["r_mirror", "Silver mirror", 300, "A polished silver mirror with an ivory handle."],
+    ["r_comb", "Ivory comb", 250, "A fine comb carved from a single tusk."],
+    ["r_amber", "Amber necklace", 380, "Beads of Baltic amber, with a small insect inside one."],
+    ["r_ring", "Ruby ring", 700, "A heavy gold ring set with a blood-red ruby."],
+    ["r_pearls", "Pearl earrings", 520, "Two large pearls on gold hooks."],
+    ["r_seal", "Sapphire seal", 800, "A blue stone cut with the seal of a forgotten governor."],
+    ["r_dagger", "Obsidian dagger", 600, "Black volcanic glass, chipped to a razor edge."],
+    ["r_caesar", "Coin of Caesar", 1200, "A gold coin with the head of Julius Caesar, struck in his lifetime."],
+    ["r_jade", "Jade mask", 1500, "A funeral mask carved from green jade by the Maya."],
+    ["r_peacock", "Peacock jewel", 1800, "A Mughal brooch shaped like a peacock, set with a hundred stones."],
+    ["r_skull", "Crystal skull", 2500, "A skull of clear rock crystal. Nobody knows who made it."],
+  ];
   const ITEMS = {
     wreath: { type: "wear", slot: "head", name: "Laurel wreath", price: 60, note: "The crown of a victor." },
     helmet: { type: "wear", slot: "head", name: "Crested helmet", price: 120, note: "Bronze, with a crimson crest." },
@@ -112,6 +127,7 @@ const Market = (() => {
     horses: { type: "perk", name: "Well-bred horses", price: 350, note: "Your racing horses tire 15% more slowly." },
     training: { type: "perk", name: "Gladiator training", price: 400, note: "Your sword hits 10% harder against the arena's gladiators (not in duels against real people)." },
   };
+  for (const [id, name, value, note] of RELICS) ITEMS[id] = { type: "relic", name, price: value, note };   // (not sold at any stall)
   for (const [id, M] of Object.entries(AIRCRAFT)) ITEMS[id] = { type: "car", air: true, name: M.name, price: M.price, note: M.note };   // the aircraft (aircraft.js) are sold at the animals and rides stall
   // Food from the food stall. Each dish belongs to one city and era. `heal` is health at once; eating also leaves you "fed",
   // which speeds up how fast you heal on your own for a few minutes.
@@ -425,6 +441,8 @@ const Market = (() => {
     rent: () => homes()[tier()].rent,
     houseName: () => homes()[tier()].name,
     houseRest: () => homes()[tier()].rest,
+    relics: RELICS,
+    take(id) { if (!s.items.includes(id)) return false; s.items = s.items.filter((x) => x !== id); save(); applyAll(); return true; },     // used up or sold (relics.js)
     snapshot: () => ({ house: s.house, dhouse: s.dhouse, items: s.items.slice(), worn: s.worn.slice(), paint: { ...s.paint } }),
     livery: (id) => LIVERIES.find((l) => l.id === s.paint[id]) || null,
     setLivery(id, lid) {
