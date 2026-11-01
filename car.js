@@ -212,6 +212,7 @@ const Car = (() => {
 
   function enter() {
     if (!nearby() || eraOf(car.M) !== era) return;
+    if (car.M.fly && Weather.grounded) { toast(`Flights are grounded in this weather (${Weather.kind}). Wait for it to pass.`); return; }
     driving = true; mode = "drive";
     showPilot();
     placeCircles(false);
@@ -539,10 +540,10 @@ const Car = (() => {
       if (brake) car.v -= (car.v > 0.3 ? 26 : 9) * dt;
       if (!gas && !brake) car.v -= Math.sign(car.v) * Math.min(Math.abs(car.v), (1.8 + Math.abs(car.v) * 0.12) * dt); // coasting
       if (keys.has("Space")) car.v *= Math.max(0, 1 - 3.2 * dt);
-      car.v = Math.max(-7, Math.min(M.max, car.v));
+      car.v = Math.max(-7, Math.min(M.max * (M.rail ? 1 : Weather.wade(car.y || 0)), car.v));
     }
 
-    const grip = Math.min(1, Math.abs(car.v) / 4) * (1 - 0.45 * Math.abs(car.v) / M.max);
+    const grip = Math.min(1, Math.abs(car.v) / 4) * (1 - 0.45 * Math.abs(car.v) / M.max) * (M.rail ? 1 : Math.max(0.35, Weather.grip));   // ice and rain loosen the grip
     car.yaw += steer * M.turn * grip * Math.sign(car.v || 1) * dt;
     const dx = -Math.sin(car.yaw) * car.v * dt, dz = -Math.cos(car.yaw) * car.v * dt;
     let hit = false;

@@ -629,7 +629,7 @@ function updatePlayer(dt) {
   if (keys.has("KeyE")) turn -= 1;
   player.yaw += turn * 1.9 * dt * Controller.turnMul;
 
-  const speed = Controller.walkMul * (mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul * Robbery.chaseBoost * Character.mod("walk"), walkSpeed()) : walkSpeed()) * (city === "cancun" ? Cancun.swimMul() : 1); // in a duel everyone is the same speed (Shift blocks); swimming is slower
+  const speed = Controller.walkMul * (mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul * Robbery.chaseBoost * Character.mod("walk"), walkSpeed()) : walkSpeed()) * (city === "cancun" ? Cancun.swimMul() : 1) * Weather.wade(player.feet); // in a duel everyone is the same speed (Shift blocks); swimming is slower
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   const rx = -fz, rz = fx;
   let tx = fx * fwd + rx * side, tz = fz * fwd + rz * side;

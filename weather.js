@@ -61,6 +61,7 @@ const Weather = (() => {
   const cur = { rain: 0, snow: 0, hail: 0, fog: 0, dark: 0, grey: 0, wind: 0, cover: 0 };
   let sky = null, scene = null, forced = null, kind = "clear", season = 0, appliedSeason = -1, appliedSnow = -1, lastSky = 0;
   let clouds = [], cloudTex = null, hail = null, hailPos = null, funnel = null, funnelBits = null, tx = 0, tz = 0, tdir = 0, hailT = 0, hurtT = 0, warned = "", drops = null, dropPos = null, dropVel = null, flakes = null, flakePos = null, bits = null, bitPos = null, bitSeed = null, boltT = 12, flash = 0, thunderT = -1, hudT = 0, lastBadge = "", clock = 0;
+  let flood = 0, floodSheet = null;                         // standing water after a downpour: 0 (dry) to 1 (ankle deep everywhere flat)
   const NH = 420, N = 1100, NF = 1500, NB = 170, NC = 90;   // NC: clouds in the sky; how many show depends on the weather
 
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -357,12 +358,28 @@ const Weather = (() => {
       for (const sp of c.children) { sp.material.opacity = (0.55 + 0.4 * cur.cover) * u.fade; sp.material.color.setScalar(ground); sp.userData.k = sp.userData.k || sp.scale.x; sp.scale.set(sp.userData.k * grow, sp.userData.k * grow * 0.45, 1); }
     }
     Sfx.setWeather(inside ? rain * 0.25 : rain, inside ? cur.wind * 0.2 : cur.wind);   // muffled behind walls
+    // a downpour (a thunderstorm or a hurricane) floods the flat ground in about a minute; it drains away slowly afterwards
+    flood = Math.max(0, Math.min(1, flood + (cur.rain > 0.85 ? dt / 60 : -dt / 150)));
+    if (!floodSheet && flood > 0.02 && scene) {
+      floodSheet = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x4f7fa0, transparent: true, opacity: 0.45, depthWrite: false }));
+      floodSheet.rotation.x = -Math.PI / 2; floodSheet.renderOrder = 2; scene.add(floodSheet);
+    }
+    if (floodSheet) {
+      floodSheet.visible = flood > 0.05; floodSheet.position.set(camera.position.x, 0.04 + flood * 0.2, camera.position.z);
+      if (flood > 0.5 && warned !== "flood" && started) { warned = "flood"; toast("The streets are flooding! You wade and drive slowly until the water drains."); }
+      if (flood < 0.2 && warned === "flood") warned = "";
+    }
     lightning(dt);
     hudT += dt; if (hudT > 1) { hudT = 0; badge(); }
   }
 
   return {
     init, update, refreshFoliage, forecast, TYPES,
+    // flights stop in the worst weather; roads are slippery in snow, hail and rain; flood water slows you on flat ground
+    get grounded() { return ["storm", "blizzard", "tornado", "cyclone", "hail"].includes(kind); },
+    get grip() { return 1 - 0.55 * Math.min(1, cur.snow + cur.hail * 0.7) - 0.18 * cur.rain; },
+    get flood() { return flood; },
+    wade(y) { return y < 0.3 + flood * 0.2 ? 1 - 0.45 * Math.min(1, flood * 1.5) : 1; },
     force(k) { forced = TYPES.includes(k) ? k : null; },
     get kind() { return kind; }, get season() { return season; }, get seasonName() { return (SEASONS[city] || SEASONS.rome)[season]; }, get fog() { return cur.fog; }, get rain() { return cur.rain; }, get snow() { return cur.snow; }, get hail() { return cur.hail; }, get tornado() { return funnel && funnel.visible ? { x: tx, z: tz } : null; }, get wind() { return cur.wind; },
   };
