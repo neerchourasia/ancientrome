@@ -7,8 +7,8 @@
   <meta name="description" content="Walk the streets of Ancient Rome in 3D, c. 128 AD. Discover the Forum, Colosseum, Pantheon and more.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 http://localhost:8765 http://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app https://*.onrender.com https://*.fly.dev https://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=405">
-  <link rel="stylesheet" href="walk.css?v=405">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=406">
+  <link rel="stylesheet" href="walk.css?v=406">
 </head>
 <body>
   <canvas id="view"></canvas>
@@ -17,7 +17,7 @@
     <p><strong>Something went wrong loading the game.</strong> Reload the page. If it keeps happening, hard-refresh with Ctrl+Shift+R (Cmd+Shift+R on Mac). <small id="fatal-why"></small></p>
     <button type="button" id="fatal-reload">Reload</button>
   </div>
-  <script src="boot.js?v=405"></script>
+  <script src="boot.js?v=406"></script>
 
   <div id="hud">
     <div class="top-left">
@@ -40,41 +40,53 @@
       <canvas id="minimap" width="200" height="200" title="Click to open the full map"></canvas>
       <div class="buttons collapsed">
         <button id="btn-menu" type="button" aria-expanded="false" aria-label="Menu" title="Menu"><svg class="spark" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><defs><radialGradient id="fbOuter" cx="50%" cy="50%" r="50%"><stop offset=".34" stop-color="#fffbe4"/><stop offset=".7" stop-color="#ffeeb0"/><stop offset=".87" stop-color="#f6b640"/><stop offset=".96" stop-color="#d27422"/><stop offset="1" stop-color="#8a3510"/></radialGradient><radialGradient id="fbCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb04a"/><stop offset=".25" stop-color="#d9741f"/><stop offset=".62" stop-color="#6b250a"/><stop offset="1" stop-color="#220a03"/></radialGradient><filter id="fbRough" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="3" seed="7" result="n"><animate attributeName="baseFrequency" values=".045;.056;.045" dur="3.5s" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="fbSoft"><feGaussianBlur stdDeviation=".6"/></filter></defs><g filter="url(#fbRough)"><circle cx="50" cy="50" r="45" fill="url(#fbOuter)"/><circle cx="50" cy="50" r="19" fill="url(#fbCore)"/></g><g stroke="#f0953a" stroke-width=".7" opacity=".55" filter="url(#fbSoft)"><line x1="56.0" y1="50.0" x2="69.0" y2="50.0"/><line x1="55.5" y1="52.4" x2="67.4" y2="57.7"/><line x1="54.6" y1="53.9" x2="64.6" y2="62.2"/><line x1="52.6" y1="55.4" x2="58.3" y2="67.1"/><line x1="51.0" y1="55.9" x2="53.3" y2="68.7"/><line x1="48.5" y1="55.8" x2="45.4" y2="68.4"/><line x1="47.0" y1="55.2" x2="40.5" y2="66.5"/><line x1="45.1" y1="53.5" x2="34.6" y2="61.2"/><line x1="44.4" y1="52.1" x2="32.1" y2="56.5"/><line x1="44.0" y1="49.6" x2="31.0" y2="48.7"/><line x1="44.4" y1="47.9" x2="32.1" y2="43.5"/><line x1="45.7" y1="45.8" x2="36.3" y2="36.8"/><line x1="47.0" y1="44.8" x2="40.5" y2="33.5"/><line x1="49.4" y1="44.0" x2="48.0" y2="31.1"/><line x1="51.0" y1="44.1" x2="53.3" y2="31.3"/><line x1="53.4" y1="45.0" x2="60.6" y2="34.3"/><line x1="54.6" y1="46.1" x2="64.6" y2="37.8"/><line x1="55.8" y1="48.3" x2="68.3" y2="44.8"/></g></svg><span class="mi">☰</span></button>
-        <button id="btn-map" type="button">Map <kbd>M</kbd></button>
         <button id="btn-dirs" type="button">Directions <kbd>G</kbd></button>
-        <button id="btn-places" type="button">Places <kbd>P</kbd></button>
-        <button id="btn-sound" type="button">Sound on <kbd>O</kbd></button>
-        <button id="btn-controller" type="button" title="Play with an Arduino joystick plugged in by USB (Chrome or Edge)">🎮 Controller</button>
-        <button id="btn-stick" type="button" title="Tune how the joystick feels" hidden>🎮 Stick settings</button>
-        <button id="btn-emotes" type="button" title="Wave, dance, bow, cheer, clap or laugh">😀 Emotes</button>
-        <button id="btn-photo" type="button" title="Hide the screen furniture and take a picture">📷 Photo</button>
-        <button id="btn-business" type="button" title="Buy businesses and a museum that pay you every morning">🏢 Business</button>
-        <button id="btn-events" type="button" title="Timed street races, air races and metro trials with medals">🏁 Events</button>
-        <button id="btn-exchange" type="button" title="Buy and sell shares in eight companies whose prices move all day">📈 Exchange</button>
-        <button id="btn-guild" type="button" title="Found a guild or join one: a chat and a treasury shared with your friends">🛡 Guild</button>
-        <button id="btn-leaders" type="button" title="The richest players and the biggest collections">🏆 Leaderboard</button>
-        <button id="btn-quest" type="button" title="See your quest, or give it up">📜 Quest</button>
-        <button id="btn-report" type="button" title="Tell the admins about a player who is breaking the rules">🚩 Report a player</button>
-        <button id="btn-relics" type="button" title="The rare treasures you have traded for">💎 Treasure</button>
-        <button id="btn-learn" type="button" title="Teach the game which key of your IR remote does what" hidden>🎮 Learn remote</button>
-        <button id="btn-music" type="button">Music on</button>
-        <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
-        <button id="btn-time" type="button">Time <kbd>T</kbd></button>
-        <button id="btn-char" type="button">Character <kbd>Y</kbd></button>
-        <button id="btn-online" type="button">🌐 Play online</button>
-        <button id="btn-account" type="button">Log in</button>
-        <button id="btn-view" type="button">View <kbd>C</kbd></button>
-        <button id="btn-era" type="button">Modern Rome <kbd>K</kbd></button>
-        <button id="btn-dgames" type="button" hidden>🎮 Delhi games <kbd>N</kbd></button>
-        <button id="btn-tax" type="button">💰 Tax</button>
-        <button id="btn-jobs" type="button">💼 Jobs</button>
-        <button id="btn-chat" type="button">💬 Chat <kbd>Enter</kbd></button>
-        <button id="btn-friends" type="button">👥 Friends</button>
-        <button id="btn-shove" type="button">🤜 Shove <kbd>R</kbd></button>
-        <button id="btn-gift" type="button">🎁 Daily gift</button>
-        <button id="btn-admin" type="button" hidden>🛠 Admin</button>
-        <button id="btn-city" type="button">✈ Travel <kbd>B</kbd></button>
-        <button id="btn-controls" type="button">Controls <kbd>H</kbd></button>
+        <div class="mgroup"><span class="mh">Getting around</span>
+          <button id="btn-map" type="button">Map <kbd>M</kbd></button>
+          <button id="btn-places" type="button">Places <kbd>P</kbd></button>
+          <button id="btn-city" type="button">✈ Travel <kbd>B</kbd></button>
+          <button id="btn-view" type="button">View <kbd>C</kbd></button>
+          <button id="btn-era" type="button">Modern Rome <kbd>K</kbd></button>
+          <button id="btn-time" type="button">Time <kbd>T</kbd></button>
+        </div>
+        <div class="mgroup"><span class="mh">Money and work</span>
+          <button id="btn-jobs" type="button">💼 Jobs</button>
+          <button id="btn-business" type="button" title="Buy businesses and a museum that pay you every morning">🏢 Business</button>
+          <button id="btn-exchange" type="button" title="Buy and sell shares in eight companies whose prices move all day">📈 Exchange</button>
+          <button id="btn-tax" type="button">💰 Tax</button>
+          <button id="btn-quest" type="button" title="See your quest, or give it up">📜 Quest</button>
+          <button id="btn-relics" type="button" title="The rare treasures you have traded for">💎 Treasure</button>
+          <button id="btn-gift" type="button">🎁 Daily gift</button>
+        </div>
+        <div class="mgroup"><span class="mh">Play and compete</span>
+          <button id="btn-online" type="button">🌐 Play online</button>
+          <button id="btn-events" type="button" title="Timed street races, air races and metro trials with medals">🏁 Events</button>
+          <button id="btn-leaders" type="button" title="The richest players and the biggest collections">🏆 Leaderboard</button>
+          <button id="btn-dgames" type="button" hidden>🎮 Delhi games <kbd>N</kbd></button>
+          <button id="btn-shove" type="button">🤜 Shove <kbd>R</kbd></button>
+        </div>
+        <div class="mgroup"><span class="mh">People</span>
+          <button id="btn-chat" type="button">💬 Chat <kbd>Enter</kbd></button>
+          <button id="btn-friends" type="button">👥 Friends</button>
+          <button id="btn-guild" type="button" title="Found a guild or join one: a chat and a treasury shared with your friends">🛡 Guild</button>
+          <button id="btn-emotes" type="button" title="Wave, dance, bow, cheer, clap or laugh">😀 Emotes</button>
+          <button id="btn-photo" type="button" title="Hide the screen furniture and take a picture">📷 Photo</button>
+          <button id="btn-report" type="button" title="Tell the admins about a player who is breaking the rules">🚩 Report a player</button>
+        </div>
+        <div class="mgroup"><span class="mh">You</span>
+          <button id="btn-char" type="button">Character <kbd>Y</kbd></button>
+          <button id="btn-account" type="button">Log in</button>
+          <button id="btn-admin" type="button" hidden>🛠 Admin</button>
+        </div>
+        <div class="mgroup"><span class="mh">Settings</span>
+          <button id="btn-sound" type="button">Sound on <kbd>O</kbd></button>
+          <button id="btn-music" type="button">Music on</button>
+          <button id="btn-voice" type="button">Voice on <kbd>J</kbd></button>
+          <button id="btn-controller" type="button" title="Play with an Arduino joystick plugged in by USB (Chrome or Edge)">🎮 Controller</button>
+          <button id="btn-stick" type="button" title="Tune how the joystick feels" hidden>🎮 Stick settings</button>
+          <button id="btn-learn" type="button" title="Teach the game which key of your IR remote does what" hidden>🎮 Learn remote</button>
+          <button id="btn-controls" type="button">Controls <kbd>H</kbd></button>
+        </div>
       </div>
     </div>
 
@@ -761,79 +773,79 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js" integrity="sha512-6p9lGA4Cm89KiwN1CixiOVQU2H9e13LeYoN6/Hj/qoUhtrMW5vNiqQz9Z96Z7/I8u89ghL6SPBz9na5HFVzF3g==" crossorigin="anonymous"></script>
-  <script src="landmarks.js?v=405"></script>
-  <script src="cancun-data.js?v=405"></script>
-  <script src="delhi-data.js?v=405"></script>
-  <script src="config.js?v=405"></script>
-  <script src="character.js?v=405"></script>
-  <script src="physics.js?v=405"></script>
-  <script src="vitals.js?v=405"></script>
-  <script src="payroll.js?v=405"></script>
-  <script src="narrator.js?v=405"></script>
-  <script src="audio.js?v=405"></script>
-  <script src="music.js?v=405"></script>
-  <script src="world.js?v=405"></script>
-  <script src="city.js?v=405"></script>
-  <script src="weather.js?v=405"></script>
-  <script src="modern.js?v=405"></script>
-  <script src="delhi.js?v=405"></script>
-  <script src="cancun.js?v=405"></script>
-  <script src="delhi-games.js?v=405"></script>
-  <script src="doors.js?v=405"></script>
-  <script src="home.js?v=405"></script>
-  <script src="spectators.js?v=405"></script>
-  <script src="fight.js?v=405"></script>
-  <script src="nav.js?v=405"></script>
-  <script src="show.js?v=405"></script>
-  <script src="shipyard.js?v=405"></script>
-  <script src="naval.js?v=405"></script>
-  <script src="theatre.js?v=405"></script>
-  <script src="watch.js?v=405"></script>
-  <script src="race.js?v=405"></script>
-  <script src="account.js?v=405"></script>
-  <script src="online.js?v=405"></script>
-  <script src="journey.js?v=405"></script>
-  <script src="subway.js?v=405"></script>
-  <script src="ride.js?v=405"></script>
-  <script src="chute.js?v=405"></script>
-  <script src="estate.js?v=405"></script>
-  <script src="relics.js?v=405"></script>
-  <script src="quests.js?v=405"></script>
-  <script src="swap.js?v=405"></script>
-  <script src="leaders.js?v=405"></script>
-  <script src="ventures.js?v=405"></script>
-  <script src="emotes.js?v=405"></script>
-  <script src="guilds.js?v=405"></script>
-  <script src="exchange.js?v=405"></script>
-  <script src="events.js?v=405"></script>
-  <script src="voyage.js?v=405"></script>
-  <script src="thieves.js?v=405"></script>
-  <script src="dialog.js?v=405"></script>
-  <script src="controller.js?v=405"></script>
-  <script src="chat.js?v=405"></script>
-  <script src="social.js?v=405"></script>
-  <script src="gifts.js?v=405"></script>
-  <script src="tax.js?v=405"></script>
-  <script src="pets.js?v=405"></script>
-  <script src="cage.js?v=405"></script>
-  <script src="treasure.js?v=405"></script>
-  <script src="fares.js?v=405"></script>
-  <script src="trade.js?v=405"></script>
-  <script src="aircraft.js?v=405"></script>
-  <script src="car.js?v=405"></script>
-  <script src="market.js?v=405"></script>
-  <script src="garage.js?v=405"></script>
-  <script src="dresser.js?v=405"></script>
-  <script src="festival.js?v=405"></script>
-  <script src="harbour.js?v=405"></script>
-  <script src="disease.js?v=405"></script>
-  <script src="jail.js?v=405"></script>
-  <script src="guards.js?v=405"></script>
-  <script src="police.js?v=405"></script>
-  <script src="weapons.js?v=405"></script>
-  <script src="stalls.js?v=405"></script>
-  <script src="robbery.js?v=405"></script>
-  <script src="jobs.js?v=405"></script>
-  <script src="game.js?v=405"></script>
+  <script src="landmarks.js?v=406"></script>
+  <script src="cancun-data.js?v=406"></script>
+  <script src="delhi-data.js?v=406"></script>
+  <script src="config.js?v=406"></script>
+  <script src="character.js?v=406"></script>
+  <script src="physics.js?v=406"></script>
+  <script src="vitals.js?v=406"></script>
+  <script src="payroll.js?v=406"></script>
+  <script src="narrator.js?v=406"></script>
+  <script src="audio.js?v=406"></script>
+  <script src="music.js?v=406"></script>
+  <script src="world.js?v=406"></script>
+  <script src="city.js?v=406"></script>
+  <script src="weather.js?v=406"></script>
+  <script src="modern.js?v=406"></script>
+  <script src="delhi.js?v=406"></script>
+  <script src="cancun.js?v=406"></script>
+  <script src="delhi-games.js?v=406"></script>
+  <script src="doors.js?v=406"></script>
+  <script src="home.js?v=406"></script>
+  <script src="spectators.js?v=406"></script>
+  <script src="fight.js?v=406"></script>
+  <script src="nav.js?v=406"></script>
+  <script src="show.js?v=406"></script>
+  <script src="shipyard.js?v=406"></script>
+  <script src="naval.js?v=406"></script>
+  <script src="theatre.js?v=406"></script>
+  <script src="watch.js?v=406"></script>
+  <script src="race.js?v=406"></script>
+  <script src="account.js?v=406"></script>
+  <script src="online.js?v=406"></script>
+  <script src="journey.js?v=406"></script>
+  <script src="subway.js?v=406"></script>
+  <script src="ride.js?v=406"></script>
+  <script src="chute.js?v=406"></script>
+  <script src="estate.js?v=406"></script>
+  <script src="relics.js?v=406"></script>
+  <script src="quests.js?v=406"></script>
+  <script src="swap.js?v=406"></script>
+  <script src="leaders.js?v=406"></script>
+  <script src="ventures.js?v=406"></script>
+  <script src="emotes.js?v=406"></script>
+  <script src="guilds.js?v=406"></script>
+  <script src="exchange.js?v=406"></script>
+  <script src="events.js?v=406"></script>
+  <script src="voyage.js?v=406"></script>
+  <script src="thieves.js?v=406"></script>
+  <script src="dialog.js?v=406"></script>
+  <script src="controller.js?v=406"></script>
+  <script src="chat.js?v=406"></script>
+  <script src="social.js?v=406"></script>
+  <script src="gifts.js?v=406"></script>
+  <script src="tax.js?v=406"></script>
+  <script src="pets.js?v=406"></script>
+  <script src="cage.js?v=406"></script>
+  <script src="treasure.js?v=406"></script>
+  <script src="fares.js?v=406"></script>
+  <script src="trade.js?v=406"></script>
+  <script src="aircraft.js?v=406"></script>
+  <script src="car.js?v=406"></script>
+  <script src="market.js?v=406"></script>
+  <script src="garage.js?v=406"></script>
+  <script src="dresser.js?v=406"></script>
+  <script src="festival.js?v=406"></script>
+  <script src="harbour.js?v=406"></script>
+  <script src="disease.js?v=406"></script>
+  <script src="jail.js?v=406"></script>
+  <script src="guards.js?v=406"></script>
+  <script src="police.js?v=406"></script>
+  <script src="weapons.js?v=406"></script>
+  <script src="stalls.js?v=406"></script>
+  <script src="robbery.js?v=406"></script>
+  <script src="jobs.js?v=406"></script>
+  <script src="game.js?v=406"></script>
 </body>
 </html>
