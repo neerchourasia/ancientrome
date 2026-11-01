@@ -3,7 +3,7 @@
 //   STREET RACE: drive any road vehicle through six gates (tall yellow beams) placed at famous places, as fast as you can. The clock starts at the first gate.
 //   AIR RACE:    fly any aircraft through the same six gates, high up (fly through the beam about 45 m up). The clock starts at the first gate.
 //   METRO TRIAL: drive the metro train yourself from one end of the line to the other and stop properly in the last station. The clock starts when you pull away.
-// Press Start in the box, then get going. Getting out of the vehicle ends the run. A medal (gold, silver, bronze) is judged against a par time, and pays 75, 150 or 300
+// Press Start in the box (on foot: panels cannot open while you drive), then get into the vehicle and go. Getting out of it once you are in ends the run. A medal (gold, silver, bronze) is judged against a par time, and pays 75, 150 or 300
 // denarii the first time you win it. Your best times are kept with your account, and the server lists the fastest players of each course.
 // Depends on car.js (Car.state, Car.current, Car.driving, Car.MODELS), subway.js, online.js, vitals.js and the globals of game.js (LANDMARKS, city, scene, player).
 
@@ -69,14 +69,14 @@ const Events = (() => {
   }
 
   // ---------------------------------------------------------------- a run
+  const rightVehicle = (c, M) => !!M && (c.kind === "metro" ? !!M.rail : !M.rail && !!M.fly === (c.kind === "air"));
   function start(c) {
-    const st = Car.state(), M = Car.current ? Car.MODELS[Car.current] : null;
-    if (c.kind === "metro") {
-      if (!(st && M && M.rail && Subway.underground && !Subway.auto)) { toast("Go down to the metro (a blue METRO sign), press F to drive a train yourself, then press Start at an end station."); return; }
-    } else if (!(st && M && !M.rail && !!M.fly === (c.kind === "air"))) { toast(c.kind === "air" ? "Get into an aircraft first (and take off), then press Start." : "Get into a car or other road vehicle first, then press Start."); return; }
-    active = { course: c, gate: 0, t0: 0, running: false, ms: 0 };
+    const M = Car.driving && Car.current ? Car.MODELS[Car.current] : null;
+    if (c.kind === "metro" && !(M && M.rail && Subway.underground && !Subway.auto)) { toast("Go down to the metro (a blue METRO sign), press F to drive a train yourself, then stand at an end station: the clock starts when you pull away."); }
+    active = { course: c, gate: 0, t0: 0, running: false, ms: 0, entered: rightVehicle(c, M) };      // (the panel cannot be opened while you drive, so you start on foot and then get in)
     closePanels(); placeBeams();
-    toast(c.kind === "metro" ? `Metro trial: pull away from an end of the line and stop in the station at the other end.` : `${KINDS[c.kind].name}: go through the first gate (${c.gates[0].name}) to start the clock.`);
+    if (c.kind === "metro") return;
+    toast(active.entered ? `${KINDS[c.kind].name}: go through the first gate (${c.gates[0].name}) to start the clock.` : c.kind === "air" ? "Air race ready: get into an aircraft (X), take off, then fly through the first gate about 45 m up." : "Street race ready: get into a car or other road vehicle (X), then drive through the first gate.");
   }
   function cancel(why) { if (!active) return; active = null; placeBeams(); hud(""); if (why) toast(why); }
   function hud(text) { const h = $e("event-hud"); if (!h) return; h.hidden = !text; h.textContent = text; }
@@ -96,7 +96,12 @@ const Events = (() => {
   function update(dt) {
     if (!active || typeof started === "undefined" || !started) return;
     const c = active.course, st = Car.state(), M = Car.current ? Car.MODELS[Car.current] : null;
-    if (!st || !M || (c.kind === "metro" ? !M.rail : (M.rail || !!M.fly !== (c.kind === "air")))) { cancel("You left the vehicle: the race is over."); return; }
+    if (!st || !rightVehicle(c, M)) {
+      if (active.entered) { cancel("You left the vehicle: the race is over."); return; }
+      hud(c.kind === "metro" ? "🏁 Metro trial ready: drive a train yourself and pull away from an end station" : `🏁 ${KINDS[c.kind].name} ready: get into ${c.kind === "air" ? "an aircraft" : "a car or other road vehicle"} (X), then go through ${c.gates[0].name}`);
+      return;
+    }
+    active.entered = true;
     if (active.running) active.ms += dt * 1000;
     const secs = fmt(active.ms);
     if (c.kind === "metro") {
