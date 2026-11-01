@@ -775,3 +775,16 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .st-text p { margin: 6px 0; font-size: .92rem; line-height: 1.5; }
 .st-text .st-old { color: var(--muted); }
 .st-text .st-now { color: var(--ink); border-left: 3px solid var(--gold); padding-left: 8px; }
+
+/* the menu as a bar along the bottom of the screen: ☰, Directions and the six sections in a row, and the open section's buttons pop up above it */
+.top-right .buttons { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: min(calc(100vw - 24px), 760px); max-height: none; overflow: visible; padding: 5px 8px; background: rgba(20,15,10,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; }
+.top-right .buttons.collapsed { background: none; border: 0; padding: 0; }
+.top-right .buttons #btn-dirs { order: 0; flex-basis: auto; padding: 6px 14px; font-size: .9rem; border-width: 1px !important; box-shadow: none; }
+.mgroup { position: static; display: block; width: auto; padding: 0; border: 0; }
+.mgroup .mh { display: inline-block; width: auto; text-align: center; padding: 6px 12px; font: 700 .8rem/1.2 system-ui, sans-serif; }
+.mgroup .mh::after { content: "▴"; float: none; margin-left: 6px; }
+.mgroup.open .mh::after { transform: none; content: "▾"; }
+.mgroup.open .mh { border-color: var(--gold); }
+.mpop { display: none; position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: max-content; max-width: min(94vw, 560px); flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px; background: rgba(20,15,10,.92); border: 1px solid rgba(226,185,85,.5); border-radius: 12px; }
+.mgroup.open .mpop { display: flex; }
+.mpop button[hidden] { display: none !important; }
