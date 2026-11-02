@@ -594,7 +594,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .mk-note { margin: 6px 0; font-size: .82rem; color: var(--muted); }
 .rank-badge { display: inline-block; padding: 0 7px; margin-left: 2px; border-radius: 999px; background: rgba(226,185,85,.2); border: 1px solid rgba(226,185,85,.55); color: #ffe8a8; font-size: .78rem; white-space: nowrap; }
 /* the menu button: a fireball (a cream ring of flame round a dark, glowing core) with the menu icon in the middle */
-#btn-menu { position: fixed; right: 10px; bottom: 30px; z-index: 7; width: 104px; height: 104px; padding: 0 !important; border: 0 !important; border-radius: 50%; background: transparent !important; display: grid; place-items: center; }
+#btn-menu { position: fixed; left: 8px; bottom: 14px; z-index: 7; width: 104px; height: 104px; padding: 0 !important; border: 0 !important; border-radius: 50%; background: transparent !important; display: grid; place-items: center; }
 #btn-menu .spark { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 0 7px rgba(255,140,40,.65)); transition: transform .35s ease, filter .35s ease; }
 #btn-menu:hover .spark, #btn-menu:focus-visible .spark { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(255,170,60,.95)); }
 #btn-menu .mi { position: relative; font-size: 1.35rem; line-height: 1; color: #fff3cf; text-shadow: 0 0 6px #5a1d05, 0 1px 3px rgba(0,0,0,.9); }
@@ -809,3 +809,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #ball-hud b { font: 700 1.3rem Georgia, serif; color: var(--gold); }
 #ball-hud span { min-height: 1.2em; font-weight: 700; color: #ffe08a; }
 #ball-hud small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+#card { left: 120px; width: min(400px, calc(100vw - 136px)); }   /* (the fireball menu button sits at the far left, so the landmark card moves over) */
