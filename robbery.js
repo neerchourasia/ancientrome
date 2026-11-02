@@ -309,6 +309,14 @@ const Robbery = (() => {
         h.id = "npc:" + n.plot; h.g.visible = true; setLabel(h, n.name); h.tiers.forEach((t, k) => { t.visible = n.tier > k; }); h.blockers.forEach((b) => { b.off = false; }); h.tier = n.tier;
       });
     },
+    // visit a friend's house on the Via Domus (in Rome): where it stands while the owner is online
+    visit(name) {
+      const row = list.find((r) => r[2] === name);
+      if (!row) return false;
+      const p = plotAt(row[0]), go = () => placeAt(p.door[0], p.door[1] + (p.face > 0 ? 4 : -4), p.face > 0 ? 0 : Math.PI);
+      if (city === "rome") go(); else { travel("rome"); setTimeout(go, 1500); }
+      return true;
+    },
     setHouses, at, act, begin, pos, end, update, guardsCaught,
     get active() { return !!heist; },
     get role() { return heist ? heist.role : null; },
