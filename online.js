@@ -70,6 +70,7 @@ const Online = (() => {
       case "adminchat": Admin.showChat(m); break;
       case "fr_trade": Swap.on(m); break;
       case "leaders": Leaders.show(m); break;
+      case "chal": onChallenge(m); break;
       case "guild": case "guilds": case "g_paid": case "g_got": Guilds.on(m); break;
       case "stocks": case "stock_fill": case "stock_no": Exchange.on(m); break;
       case "ev_top": Events.on(m); break;
@@ -122,6 +123,39 @@ const Online = (() => {
     fillShips();
     connect();
     refreshLobby();
+  }
+
+  // ------------------------------------------------------------------ challenge someone who is online right now
+
+  let chalList = [];
+  function renderChal() {
+    const ul = $o("ch-list"); ul.replaceChildren();
+    if (!chalList.length) { const li = document.createElement("li"); li.className = "dim"; li.textContent = welcome ? "Nobody else is online right now." : "Connecting to the game server..."; ul.append(li); return; }
+    for (const p of chalList) {
+      const li = document.createElement("li"), t = document.createElement("span");
+      t.textContent = `${p.name} · rating ${p.r}${p.busy ? " · in a game" : ""} `;
+      const b = document.createElement("button"); b.type = "button"; b.textContent = "Challenge"; b.disabled = !!p.busy;
+      b.addEventListener("click", () => { send({ t: "challenge", a: "send", id: p.id }); b.disabled = true; });
+      li.append(t, b); ul.append(li);
+    }
+  }
+  function openChallenge() {
+    if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
+    if (city !== "rome") { toast("Challenges are fought in the Colosseum arena in Rome. Press B to travel back."); return; }
+    connect(); chalList = []; renderChal(); openPanel("#challenge");
+    const ask = () => { if (welcome) send({ t: "challenge", a: "list" }); };
+    ask(); setTimeout(ask, 1500);
+  }
+  function onChallenge(m) {
+    if (m.a === "list") { chalList = Array.isArray(m.list) ? m.list : []; if ($o("challenge").classList.contains("show")) renderChal(); }
+    else if (m.a === "sent") toast(`Challenge sent to ${m.name}. Waiting for them to answer (45 seconds)...`);
+    else if (m.a === "declined") toast(`${m.name} said no.`);
+    else if (m.a === "no") toast(m.msg || "The challenge did not work.");
+    else if (m.a === "in") {
+      if (mode !== "walk" || city !== "rome" || duel || typeof started === "undefined" || !started) { send({ t: "challenge", a: "decline", from: m.from }); return; }   // busy: the challenger is told no
+      Sfx.play("horn");
+      Dialog.confirm(`${m.name} (rating ${m.r}) challenges you to a ranked duel in the arena. Accept?`).then((yes) => send({ t: "challenge", a: yes ? "accept" : "decline", from: m.from }));
+    }
   }
 
   function queue(game) {
@@ -337,6 +371,8 @@ const Online = (() => {
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("btn-online").addEventListener("click", openLobby);
+    $o("btn-chal").addEventListener("click", openChallenge);
+    $o("ch-refresh").addEventListener("click", () => { if (welcome) send({ t: "challenge", a: "list" }); });
   }
 
   // ------------------------------------------------------------------ fights: duels and team battles

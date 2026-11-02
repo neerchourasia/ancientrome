@@ -823,6 +823,71 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(room.over)
 
 
+    # ---------------------------------------------------------------- challenging someone who is online
+
+    async def test_challenge_list_shows_the_others_online(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "challenge", "a": "list"})
+        m = await a.until(lambda m: m["t"] == "chal" and m["a"] == "list")
+        self.assertEqual([p["name"] for p in m["list"]], ["Ben"])
+        self.assertEqual(m["list"][0]["busy"], 0)
+
+    async def test_challenge_accepted_starts_a_ranked_duel(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "challenge", "a": "list"})
+        lst = await a.until(lambda m: m["t"] == "chal" and m["a"] == "list")
+        a.send({"t": "challenge", "a": "send", "id": lst["list"][0]["id"]})
+        inc = await b.until(lambda m: m["t"] == "chal" and m["a"] == "in")
+        self.assertEqual(inc["name"], "Ann")
+        await a.until(lambda m: m["t"] == "chal" and m["a"] == "sent")
+        b.send({"t": "challenge", "a": "accept", "from": inc["from"]})
+        ma = await a.until(lambda m: m["t"] == "match")
+        mb = await b.until(lambda m: m["t"] == "match")
+        self.assertEqual((ma["mode"], ma["ranked"], mb["mode"]), ("duel", True, "duel"))
+        self.assertEqual(sorted(p["name"].split(" ")[0] for p in ma["players"]), ["Ann", "Ben"])
+
+    async def test_challenge_declined_tells_the_challenger(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "challenge", "a": "send", "id": next(c.id for c in server.CONNS if c.name == "Ben")})
+        inc = await b.until(lambda m: m["t"] == "chal" and m["a"] == "in")
+        b.send({"t": "challenge", "a": "decline", "from": inc["from"]})
+        no = await a.until(lambda m: m["t"] == "chal" and m["a"] == "declined")
+        self.assertEqual(no["name"], "Ben")
+        b.send({"t": "challenge", "a": "accept", "from": inc["from"]})        # too late: it is gone
+        late = await b.until(lambda m: m["t"] == "chal" and m["a"] == "no")
+        self.assertIn("run out", late["msg"])
+
+    async def test_challenge_cannot_target_yourself_or_someone_busy(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        ann = next(c for c in server.CONNS if c.name == "Ann")
+        ben = next(c for c in server.CONNS if c.name == "Ben")
+        a.send({"t": "challenge", "a": "send", "id": ann.id})
+        self.assertEqual((await a.until(lambda m: m["t"] == "chal"))["a"], "no")
+        ben.room = object()                                # Ben is in a game
+        a.send({"t": "challenge", "a": "send", "id": ben.id})
+        m = await a.until(lambda m: m["t"] == "chal")
+        self.assertEqual((m["a"], m["msg"]), ("no", "They are not free right now."))
+        ben.room = None
+
+    async def test_challenge_cannot_be_spammed(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        ben = next(c for c in server.CONNS if c.name == "Ben")
+        a.send({"t": "challenge", "a": "send", "id": ben.id})
+        await a.until(lambda m: m["t"] == "chal" and m["a"] == "sent")
+        a.send({"t": "challenge", "a": "send", "id": ben.id})
+        m = await a.until(lambda m: m["t"] == "chal" and m["a"] == "no")
+        self.assertIn("Wait", m["msg"])
+
+    async def test_challenge_goes_away_when_the_challenger_leaves(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "challenge", "a": "send", "id": next(c.id for c in server.CONNS if c.name == "Ben")})
+        inc = await b.until(lambda m: m["t"] == "chal" and m["a"] == "in")
+        a.w.close()
+        await asyncio.sleep(0.4)
+        b.send({"t": "challenge", "a": "accept", "from": inc["from"]})
+        no = await b.until(lambda m: m["t"] == "chal" and m["a"] == "no")
+        self.assertTrue(no["msg"])
+
     # ---------------------------------------------------------------- arena brawl and 2v2
 
     async def start_arena(self, kind, n):

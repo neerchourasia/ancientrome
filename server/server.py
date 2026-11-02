@@ -289,6 +289,7 @@ class Conn:
         self.uid = None
         self.name, self.cls, self.look = "Player", "gladiator", clean_look({})
         self.queue = None          # "duel" / "race" while waiting
+        self.chal_t = None         # when they last challenged someone
         self.queued_at = 0.0
         self.want_bot = False
         self.room = None
@@ -3167,6 +3168,73 @@ def on_fest(conn, m):
 SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the game allows, for lag)
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# challenges: pick someone who is online right now and challenge them to a ranked duel. They see a box, and if they say yes the duel starts for both.
+
+CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
+CHAL_TTL = 45.0
+
+
+def conn_by_id(cid):
+    for c in CONNS:
+        if c.id == cid:
+            return c
+    return None
+
+
+def chal_free(c):
+    return bool(c) and not c.closed and c.hello and not c.room and not c.heist and not c.trade
+
+
+def chal_clear(conn, why=None):
+    """Forget the challenges a connection sent or was sent (they left, or started a game)."""
+    for cid, ch in list(CHALLENGES.items()):
+        if cid == conn.id or ch["to"] == conn.id:
+            del CHALLENGES[cid]
+            other = conn_by_id(ch["to"] if cid == conn.id else cid)
+            if why and other:
+                other.send({"t": "chal", "a": "no", "msg": why})
+
+
+def on_challenge(conn, m):
+    if not conn.hello:
+        return
+    a, t = m.get("a"), now()
+    if a == "list":
+        out = [{"id": c.id, "name": c.name, "r": rating_of(c)["r"], "busy": 0 if chal_free(c) else 1} for c in CONNS if c is not conn and not c.closed and c.hello]
+        out.sort(key=lambda o: (o["busy"], -o["r"], o["name"]))
+        return conn.send({"t": "chal", "a": "list", "list": out[:40]})
+    if a == "send":
+        target = conn_by_id(str(m.get("id"))[:16])
+        if conn.chal_t is not None and t - conn.chal_t < 4.0:
+            return conn.send({"t": "chal", "a": "no", "msg": "Wait a moment before challenging again."})
+        if not chal_free(conn):
+            return conn.send({"t": "chal", "a": "no", "msg": "You are in a game already."})
+        if target is None or target is conn or not chal_free(target):
+            return conn.send({"t": "chal", "a": "no", "msg": "They are not free right now."})
+        chal_clear(conn)
+        conn.chal_t = t
+        CHALLENGES[conn.id] = {"to": target.id, "t": t}
+        target.send({"t": "chal", "a": "in", "from": conn.id, "name": conn.name, "r": rating_of(conn)["r"]})
+        return conn.send({"t": "chal", "a": "sent", "name": target.name})
+    challenger = conn_by_id(str(m.get("from"))[:16])
+    ch = CHALLENGES.get(challenger.id) if challenger else None
+    if not ch or ch["to"] != conn.id:
+        if a == "accept":
+            conn.send({"t": "chal", "a": "no", "msg": "That challenge has run out."})
+        return
+    if a == "decline":
+        del CHALLENGES[challenger.id]
+        return challenger.send({"t": "chal", "a": "declined", "name": conn.name})
+    if a == "accept":
+        del CHALLENGES[challenger.id]
+        if t - ch["t"] > CHAL_TTL or not chal_free(challenger) or not chal_free(conn):
+            return conn.send({"t": "chal", "a": "no", "msg": "That challenge has run out."})
+        leave_queue(challenger)
+        leave_queue(conn)
+        DuelRoom([challenger, conn], ranked=True)
+
+
 def on_shove(conn, m):
     t = now()
     target = next((c for c in CONNS if c.hello and not c.closed and c.id == m.get("to")), None)
@@ -3433,6 +3501,8 @@ async def handle_msg(conn, m):
         return on_fest(conn, m)
     if t == "shove":
         return on_shove(conn, m)
+    if t == "challenge":
+        return on_challenge(conn, m)
     if t == "admin":
         if not conn.admin:
             flag("tried an admin command", "a non-admin sent an admin command (%s)" % str(m.get("a"))[:20], "high", conn=conn, gap=120)
@@ -3457,6 +3527,7 @@ async def handle_msg(conn, m):
 
 
 def drop(conn):
+    chal_clear(conn, "They left the game.")
     social_drop(conn)
     if conn.riders:
         eject_riders(conn, "The driver left the game.")
