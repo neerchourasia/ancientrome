@@ -174,6 +174,18 @@ const Online = (() => {
     arriveIn(b.city); placeAt(b.x, b.z, b.yaw);
   }
 
+  // standing on the Great Ball Court in Cancún: F starts a game of pok-ta-pok (a real person if one is waiting, otherwise a practice bot)
+  function atBallCourt() {
+    return city === "cancun" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Math.abs(player.x - (CANCUN_X - 150)) < 14 && Math.abs(player.z + 35) < 36;
+  }
+  function playBall() {
+    if (typeof Account !== "undefined" && Account.demo) { toast("Playing against other people needs an account: log in first."); return; }
+    if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
+    $o("on-bot").checked = true;
+    queue("ball");
+    toast("Looking for someone to play pok-ta-pok with... a practice bot joins if nobody comes.");
+  }
+
   function queue(game) {
     if (!welcome) { connect(); return; }
     send({ t: "queue", mode: game, bot: $o("on-bot").checked, ship: game === "naval" ? Shipyard.onlineDesign() : undefined });
@@ -652,5 +664,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, atBallCourt, playBall, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

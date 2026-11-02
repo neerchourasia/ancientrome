@@ -187,6 +187,7 @@ function wireInput(canvas) {
       if (Subway.key(k)) { /* the metro: F at an entrance or on a platform, R and U on a platform */ }
       else if (k === "KeyF" && Estate.at()) Estate.open();
       else if (k === "KeyF" && Relics.at()) Relics.open();
+      else if (k === "KeyF" && Online.atBallCourt()) Online.playBall();
       else if (k === "KeyF" && Fishing.at()) Fishing.act();
       else if (k === "KeyF" && TreasureMaps.at()) TreasureMaps.act();
       else if (k === "KeyF" && Quests.at()) Quests.open();
@@ -261,6 +262,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "metro") { Subway.key("KeyF"); return; }
     if ($("#prompt").dataset.kind === "estate") { Estate.open(); return; }
     if ($("#prompt").dataset.kind === "relic") { Relics.open(); return; }
+    if ($("#prompt").dataset.kind === "ball") { Online.playBall(); return; }
     if ($("#prompt").dataset.kind === "fish") { Fishing.act(); return; }
     if ($("#prompt").dataset.kind === "dig") { TreasureMaps.act(); return; }
     if ($("#prompt").dataset.kind === "quest") { Quests.open(); return; }
@@ -1250,6 +1252,7 @@ function updatePrompt() {
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && mode === "walk") { const sp = shovablePlayer().peer; if (sp) { text = `R: shove ${sp.name}`; p.dataset.kind = "shove"; } }
+    if (!text && Online.atBallCourt()) { text = "F: play pok-ta-pok on the Great Ball Court (against a person or a practice bot)"; p.dataset.kind = "ball"; }
     if (!text && city === "cancun") { const ct = Cancun.promptText(); if (ct) { text = ct; p.dataset.kind = "cancun"; } }
     if (!text && Cage.at(player.x, player.z, player.feet)) { text = "F: open the cage (choose which animal comes with you)"; p.dataset.kind = "cage"; }
     if (!text) { const hb = Harbour.at(player.x, player.z, player.feet); if (hb) { text = hb.text; p.dataset.kind = "harbour"; } }
