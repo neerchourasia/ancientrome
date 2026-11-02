@@ -54,13 +54,14 @@ const TreasureMaps = (() => {
     if (typeof started === "undefined" || !started) return;
     if (!hud) hud = document.getElementById("tmap-hud");
     if (!mark) {
-      mark = new T.Group(); const mat = new T.MeshLambertMaterial({ color: 0x7a1f12 });
-      for (const r of [Math.PI / 4, -Math.PI / 4]) { const b = new T.Mesh(new T.BoxGeometry(2.4, 0.08, 0.35), mat); b.rotation.y = r; b.position.y = 0.06; mark.add(b); }
+      mark = new T.Group(); const mat = new T.MeshBasicMaterial({ color: 0xff2a14 });
+      for (const r of [Math.PI / 4, -Math.PI / 4]) { const b = new T.Mesh(new T.BoxGeometry(4.2, 0.12, 0.6), mat); b.rotation.y = r; b.position.y = 0.1; mark.add(b); }
+      const beam = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 60, 10, 1, true), new T.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false })); beam.position.y = 30; mark.add(beam);   // a light pillar: you can see where the cross is from a long way off
       mark.visible = false; scene.add(mark);
     }
     if (!m || m.city !== city) { mark.visible = false; if (hud) hud.hidden = true; return; }
     const d = Math.hypot(player.x - m.x, player.z - m.z);
-    mark.visible = d < 30; if (mark.visible) mark.position.set(m.x, groundAt(m.x, m.z), m.z);
+    mark.visible = d < 160; if (mark.visible) mark.position.set(m.x, groundAt(m.x, m.z), m.z);
     if (hud) {
       hud.hidden = mode !== "walk" && mode !== "drive";
       hud.textContent = `🗺 ${d > 300 ? "Cold" : d > 150 ? "Cool" : d > 60 ? "Warm" : d > 25 ? "Hot" : "Burning!"} · ${m.clue}`;

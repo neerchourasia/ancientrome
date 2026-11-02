@@ -49,6 +49,7 @@ def load_config():
         "race_wait": float(e("RACE_WAIT", "6")),      # seconds to wait for more racers once two are queued
         "coop_wait": float(e("COOP_WAIT", "8")),      # seconds to wait for more teammates once two are queued
         "naval_wait": float(e("NAVAL_WAIT", "8")),    # seconds to wait for more captains once two are queued
+        "arena_wait": float(e("ARENA_WAIT", "10")),   # seconds to wait for more fighters (brawl, 2v2) once two are queued
         "origins": [o.strip() for o in e("ALLOWED_ORIGINS", "").split(",") if o.strip()],
         "max_conns": int(e("MAX_CONNS", "400")),
         "max_per_ip": int(e("MAX_PER_IP", "8")),
@@ -721,6 +722,206 @@ class CoopRoom:
                 f.conn.room = f.conn.me = None
         self.task.cancel()
 
+BRAWL_NAMES = ("Brutus", "Lucius", "Gaius", "Cassius", "Titus", "Marcus", "Decimus", "Flavius")
+ARENA_TIME = 180.0
+
+
+class Brawler(Duelist):
+    """Anyone in a free-for-all brawl or a 2v2: a player or a practice bot, on a team (in a brawl everybody is their own team)."""
+    def __init__(self, conn, index, team, name=None):
+        super().__init__(conn, 0, bot=conn is None, name=name)
+        self.i, self.team, self.down = index, team, False
+        if conn is None:
+            self.look = clean_look({"toga": 1 + index % 5, "sash": index % 4, "hair": index % 3})
+            self.cls, self.melee, self.taken, self.hp = "gladiator", 0.85, 1.0, 90.0
+            self.speed, self.cool, self.cool_span = 3.1, 1.7, 1.2
+
+    def state(self):
+        return super().state() + [1 if self.down else 0, self.team]
+
+
+class ArenaRoom:
+    """A fight between real people in the arena that is bigger than a duel: kind "brawl" is every fighter for themselves (up to six), kind "team2" is two teams
+    (two against two). The server moves nobody and decides every hit. A fighter who falls is out; the last one (or the last team) standing wins."""
+    TICK = 0.05
+
+    def __init__(self, roster, kind):
+        """roster: [(connection or None for a practice bot, team)]"""
+        self.id = os.urandom(3).hex()
+        self.kind = kind
+        self.fighters = []
+        for k, (c, team) in enumerate(roster):
+            self.fighters.append(Brawler(c, k, k if kind == "brawl" else team, name=None if c else BRAWL_NAMES[k % len(BRAWL_NAMES)] + " (practice bot)"))
+        n = len(self.fighters)
+        for k, f in enumerate(self.fighters):
+            if kind == "team2":                 # the teams start on opposite sides, in a line
+                mates = [g for g in self.fighters if g.team == f.team]
+                idx = mates.index(f)
+                side = -1.0 if f.team == 0 else 1.0
+                f.x, f.z, f.yaw = side * 14.0, (idx - (len(mates) - 1) / 2) * 4.0, -side * math.pi / 2
+            else:                               # a brawl: evenly round the edge, facing the middle
+                a = math.pi * 2 * k / n
+                f.x, f.z = 14.0 * math.cos(a), 14.0 * math.sin(a)
+                f.yaw = math.atan2(f.x, f.z)       # forward is (-sin, -cos): facing the centre
+        self.humans = sum(1 for f in self.fighters if f.conn)
+        self.ranked = self.humans >= 2
+        self.t0, self.over, self.events, self.order = now(), False, [], []     # order: who fell, first to last
+        for f in self.fighters:
+            if f.conn:
+                f.conn.room, f.conn.me, f.conn.queue = self, f, None
+        roster_msg = [{"i": f.i, "name": f.name, "cls": f.cls, "look": f.look, "team": f.team, "bot": 1 if f.bot else 0, "x": round(f.x, 2), "z": round(f.z, 2), "yaw": round(f.yaw, 2)} for f in self.fighters]
+        for f in self.fighters:
+            if f.conn:
+                f.conn.send({"t": "match", "mode": kind, "room": self.id, "you": f.i, "radius": ARENA_R, "ranked": self.ranked, "players": roster_msg})
+        self.task = asyncio.ensure_future(self.run())
+
+    # --- messages from a player
+    def on_msg(self, conn, m):
+        p, t = conn.me, m.get("t")
+        if self.over or p is None or p.down:
+            return
+        if t == "pos":
+            DuelRoom.move(self, p, num(m.get("x"), -100, 100), num(m.get("z"), -100, 100), num(m.get("yaw"), -50, 50))
+        elif t == "swing":
+            if p.swing < 0 and p.st >= p.swing_cost and not p.block:
+                p.swing, p.hit_done, p.st = 0.0, False, p.st - p.swing_cost
+        elif t == "block":
+            p.block = bool(m.get("on")) and p.swing < 0
+
+    def leave(self, conn):
+        p = conn.me
+        if p is None or self.over:
+            return
+        p.conn, p.hp, p.down, p.swing, p.block = None, 0.0, True, -1.0, False      # a player who leaves is out (and it still counts for their rating)
+        if p not in self.order:
+            self.order.append(p)
+        if not any(f.conn for f in self.fighters):
+            self.finish("empty")
+        else:
+            self.check_end()
+
+    # --- the simulation
+    async def run(self):
+        try:
+            while not self.over:
+                await asyncio.sleep(self.TICK)
+                self.step(self.TICK)
+        except asyncio.CancelledError:
+            pass
+
+    def nearest_foe(self, p):
+        best, bd = None, 1e9
+        for q in self.fighters:
+            if q.team != p.team and not q.down:
+                d = math.hypot(q.x - p.x, q.z - p.z)
+                if d < bd:
+                    best, bd = q, d
+        return best
+
+    def step(self, dt):
+        for p in self.fighters:
+            if p.down:
+                continue
+            if p.bot:
+                target = self.nearest_foe(p)
+                if target:
+                    bot_think(p, target, dt)
+            if p.swing < 0:
+                p.st = min(100.0, p.st + (6.0 if p.block else 16.0) * dt)
+            else:
+                p.swing += dt
+                if not p.hit_done and p.swing >= p.hit_at:
+                    p.hit_done = True
+                    self.strike(p)
+                if p.swing >= p.end_at:
+                    p.swing = -1.0
+        live = [f for f in self.fighters if not f.down]            # nobody stands inside anybody else
+        for i, a in enumerate(live):
+            for b in live[i + 1:]:
+                d = math.hypot(a.x - b.x, a.z - b.z)
+                if 0 < d < 1.0:
+                    push, ux, uz = (1.0 - d) / 2, (a.x - b.x) / d, (a.z - b.z) / d
+                    a.x += ux * push; a.z += uz * push
+                    b.x -= ux * push; b.z -= uz * push
+        if self.over:
+            return
+        payload = {"t": "arena", "p": [f.state() for f in self.fighters], "ev": self.events}
+        self.events = []
+        for f in self.fighters:
+            if f.conn:
+                f.conn.send(payload)
+        self.check_end()
+        if not self.over and now() - self.t0 > ARENA_TIME:
+            self.finish("time")
+
+    def check_end(self):
+        if self.over:
+            return
+        if len({f.team for f in self.fighters if not f.down}) <= 1:
+            self.finish("ko")
+
+    def strike(self, p):
+        best, bd = None, 1e9
+        fx, fz = -math.sin(p.yaw), -math.cos(p.yaw)
+        for q in self.fighters:
+            if q.team == p.team or q.down:
+                continue
+            dx, dz = q.x - p.x, q.z - p.z
+            d = math.hypot(dx, dz)
+            if d > p.reach + REACH_SLACK or (d > 0.01 and (fx * dx + fz * dz) / d < math.cos(1.1)):
+                continue
+            if d < bd:
+                best, bd = q, d
+        if best is None:
+            return self.events.append(["miss", p.i])
+        q = best
+        dx, dz = q.x - p.x, q.z - p.z
+        dmg = 20.0 * (0.85 + random.random() * 0.3) * p.melee * p.wdmg * q.taken
+        qf = (-math.sin(q.yaw), -math.cos(q.yaw))
+        facing = bd > 0.01 and (qf[0] * -dx + qf[1] * -dz) / bd > math.cos(1.3)
+        if q.block and q.st > 0 and facing:
+            dmg *= 0.15
+            q.st = max(0.0, q.st - 16.0)
+            self.events.append(["block", p.i, q.i])
+        else:
+            self.events.append(["hit", p.i, q.i, round(dmg, 1)])
+        q.hp = max(0.0, q.hp - dmg)
+        if q.hp <= 0:
+            q.down, q.swing, q.block = True, -1.0, False
+            self.order.append(q)
+            self.events.append(["down", q.i])
+
+    def places(self):
+        """Each fighter's finishing place (0 = best): the ones still up (most health first), then the ones who fell, last to fall first."""
+        up = sorted((f for f in self.fighters if not f.down), key=lambda f: -f.hp)
+        ranking = up + list(reversed(self.order))
+        place = {id(f): k for k, f in enumerate(ranking)}
+        if self.kind == "team2":                                    # the winning team shares first place
+            alive = {f.team for f in up}
+            best = max(alive, key=lambda t: sum(f.hp for f in up if f.team == t)) if alive else None
+            if best is None:                                        # (everyone fell together: the team that fell last)
+                best = self.order[-1].team if self.order else 0
+            return {id(f): 0 if f.team == best else 1 for f in self.fighters}, best
+        return place, (ranking[0].team if ranking else -1)
+
+    def finish(self, reason):
+        if self.over:
+            return
+        self.over = True
+        place, winner = self.places()
+        humans = [f.who for f in self.fighters if f.who]
+        ranks = rate_placements([(f.who, place[id(f)]) for f in self.fighters if f.who]) if self.ranked and reason != "empty" else {}
+        for f in self.fighters:
+            if f.conn:
+                msg = {"t": "end", "mode": self.kind, "reason": reason, "ranked": self.ranked, "winner": winner, "n": len(self.fighters), "place": place[id(f)], "won": place[id(f)] == 0 and winner == f.team,
+                       "hp": [round(g.hp, 1) for g in self.fighters]}
+                rk = ranks.get(id(f.who))
+                if rk:
+                    msg["rank"] = rk
+                f.conn.send(msg)
+                f.conn.room = f.conn.me = None
+        self.task.cancel()
+
 
 class Racer:
     def __init__(self, conn, index, bot=False):
@@ -1248,7 +1449,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1294,6 +1495,33 @@ def match_once():
     if team:
         # friendly bots fill a small team up to three, when someone asked for bots
         CoopRoom(team, allies=max(0, 3 - len(team)) if any(c.want_bot for c in team) else 0)
+
+    q = QUEUES["brawl"]
+    q[:] = [c for c in q if not c.closed]
+    if len(q) >= 6:
+        ArenaRoom([(q.pop(0), 0) for _ in range(6)], "brawl")
+    elif len(q) >= 2 and t - q[1].queued_at >= CFG["arena_wait"]:
+        humans = [q.pop(0) for _ in range(min(6, len(q)))]
+        fill = max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0
+        ArenaRoom([(c, 0) for c in humans] + [(None, 0)] * fill, "brawl")
+    elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        ArenaRoom([(q.pop(0), 0)] + [(None, 0)] * 3, "brawl")
+
+    q = QUEUES["team2"]
+    q[:] = [c for c in q if not c.closed]
+    if len(q) >= 4:
+        four = [q.pop(0) for _ in range(4)]
+        ArenaRoom([(c, k % 2) for k, c in enumerate(four)], "team2")
+    elif len(q) >= 2 and t - q[1].queued_at >= CFG["arena_wait"]:
+        humans = [q.pop(0) for _ in range(min(4, len(q)))]
+        roster = [(c, k % 2) for k, c in enumerate(humans)]
+        if len(humans) == 3 or any(c.want_bot for c in humans):          # a bot makes the teams even
+            for team in (0, 1):
+                if sum(1 for _, tm in roster if tm == team) < 2:
+                    roster.append((None, team))
+        ArenaRoom(roster, "team2")
+    elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        ArenaRoom([(q.pop(0), 0), (None, 0), (None, 1), (None, 1)], "team2")
 
     q = QUEUES["naval"]
     q[:] = [c for c in q if not c.closed]
@@ -1394,8 +1622,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2"}
 
 
 def where_is(c):

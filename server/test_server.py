@@ -823,6 +823,108 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(room.over)
 
 
+    # ---------------------------------------------------------------- arena brawl and 2v2
+
+    async def start_arena(self, kind, n):
+        server.CFG["arena_wait"] = 0.6
+        ws = [await self.player(nm) for nm in ("Ann", "Ben", "Cyd", "Dee", "Eve", "Fay")[:n]]
+        for w in ws:
+            w.send({"t": "queue", "mode": kind})
+        ms = [await w.until(lambda m: m["t"] == "match", timeout=4) for w in ws]
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        return ws, ms, room
+
+    async def test_brawl_everybody_is_their_own_team(self):
+        ws, ms, room = await self.start_arena("brawl", 3)
+        self.assertEqual(ms[0]["mode"], "brawl")
+        self.assertEqual([m["you"] for m in ms], [0, 1, 2])
+        self.assertEqual(sorted(p["team"] for p in ms[0]["players"]), [0, 1, 2])
+        self.assertTrue(ms[0]["ranked"])
+        room.step(0.05)
+        st = await ws[0].until(lambda m: m["t"] == "arena")
+        self.assertEqual(len(st["p"]), 3)
+
+    async def test_brawl_a_hit_hurts_whoever_is_in_front_and_the_last_one_standing_wins(self):
+        ws, ms, room = await self.start_arena("brawl", 3)
+        ann, ben, cyd = room.fighters
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0
+        ann.x, ann.z, ann.yaw = 0.0, 0.0, -math.pi / 2     # Ann faces east
+        ben.x, ben.z = 2.0, 0.0                            # Ben is two metres ahead
+        cyd.x, cyd.z = -15.0, -15.0
+        ws[0].send({"t": "swing"})
+        await asyncio.sleep(0.2)
+        for _ in range(8):
+            room.step(0.05)
+        self.assertLess(ben.hp, 100.0)
+        self.assertEqual((ann.hp, cyd.hp), (100.0, 100.0))
+        ben.hp, cyd.hp = 0.0, 0.0                          # now Ben and Cyd both fall
+        ben.down, cyd.down = True, True
+        room.order += [cyd, ben]
+        room.step(0.05)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["won"], end["place"], end["reason"]), ("brawl", True, 0, "ko"))
+        endb = await ws[1].until(lambda m: m["t"] == "end", timeout=3)
+        endc = await ws[2].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((endb["place"], endc["place"], endb["won"]), (1, 2, False))   # Ben fell last of the two
+        self.assertIn("rank", end)
+
+    async def test_brawl_leaving_does_not_stop_the_others(self):
+        ws, ms, room = await self.start_arena("brawl", 3)
+        ws[2].w.close()
+        await asyncio.sleep(0.4)
+        room.step(0.05)
+        st = await ws[0].until(lambda m: m["t"] == "arena", timeout=3)
+        self.assertEqual(st["p"][2][8], 1)                 # Cyd is shown as out
+        self.assertFalse(room.over)
+
+    async def test_brawl_a_lone_player_who_asks_gets_practice_bots_that_do_not_count(self):
+        server.CFG["bot_wait"] = 0.5
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "brawl", "bot": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertEqual(len(m["players"]), 4)
+        self.assertEqual(sum(1 for p in m["players"] if p["bot"]), 3)
+        self.assertFalse(m["ranked"])
+
+    async def test_team2_two_teams_of_two_and_no_friendly_fire(self):
+        ws, ms, room = await self.start_arena("team2", 4)
+        self.assertEqual([p["team"] for p in ms[0]["players"]], [0, 1, 0, 1])
+        ann, ben, cyd, dee = room.fighters
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0
+        ann.x, ann.z, ann.yaw = 0.0, 0.0, -math.pi / 2
+        cyd.x, cyd.z = 1.5, 1.5                            # her partner stands right beside her
+        ben.x, ben.z = 2.0, 0.0                            # an opponent two metres ahead
+        ws[0].send({"t": "swing"})
+        await asyncio.sleep(0.2)
+        for _ in range(8):
+            room.step(0.05)
+        self.assertLess(ben.hp, 100.0)
+        self.assertEqual(cyd.hp, 100.0)
+
+    async def test_team2_the_team_left_standing_wins_together(self):
+        ws, ms, room = await self.start_arena("team2", 4)
+        ann, ben, cyd, dee = room.fighters
+        for f in room.fighters:
+            f.x, f.z = 18.0, 18.0
+        for f in (ben, dee):
+            f.down, f.hp = True, 0.0
+            room.order.append(f)
+        room.step(0.05)
+        ends = [await w.until(lambda m: m["t"] == "end", timeout=3) for w in ws]
+        self.assertEqual([e["won"] for e in ends], [True, False, True, False])
+        self.assertEqual([e["place"] for e in ends], [0, 1, 0, 1])
+
+    async def test_team2_a_lone_player_gets_a_partner_and_two_opponents(self):
+        server.CFG["bot_wait"] = 0.5
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "team2", "bot": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertEqual(sorted(p["team"] for p in m["players"]), [0, 0, 1, 1])
+        self.assertFalse(m["ranked"])
+
     # ---------------------------------------------------------------- naval battle (every ship for itself)
 
     async def start_naval(self, n=2):

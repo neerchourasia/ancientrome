@@ -79,11 +79,11 @@ const Online = (() => {
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
       case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
-      case "duel": case "coop": onFight(m); break;
+      case "duel": case "coop": case "arena": onFight(m); break;
       case "world": onWorld(m); break;
       case "houses": Robbery.setHouses(m.h, m.mine); break;
       case "heist_no": toast(m.msg || "You cannot rob that house."); break;
@@ -109,6 +109,8 @@ const Online = (() => {
     $o("on-race").disabled = !ready;
     $o("on-coop").disabled = !ready;
     $o("on-naval").disabled = !ready;
+    $o("on-brawl").disabled = !ready;
+    $o("on-team2").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
   }
@@ -329,6 +331,8 @@ const Online = (() => {
     $o("on-race").addEventListener("click", () => queue("race"));
     $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-naval").addEventListener("click", () => queue("naval"));
+    $o("on-brawl").addEventListener("click", () => queue("brawl"));
+    $o("on-team2").addEventListener("click", () => queue("team2"));
     $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
@@ -366,11 +370,12 @@ const Online = (() => {
     if (mode !== "walk") return;
     closePanels();
     Vitals.stopRest();
-    const me = m.you, coop = m.mode === "coop";
+    const me = m.you, coop = m.mode === "coop", arena = m.mode === "brawl" || m.mode === "team2";
+    const teamOf = (p) => (p.team !== undefined ? p.team : p.role === "enemy" ? 1 : 0);
     duel = { kind: m.mode, ranked: !!m.ranked, you: me, radius: m.radius, players: m.players, figs: {}, st: {}, block: false, sendT: 0, over: false, rev: {}, enemies: m.enemies || 0, notice: "" };
     for (const p of m.players) {
       const x = p.x !== undefined ? p.x : (p.i === 0 ? -12 : 12), z = p.z || 0, yaw = p.yaw !== undefined ? p.yaw : (p.i === 0 ? -Math.PI / 2 : Math.PI / 2);
-      duel.st[p.i] = { x, z, yaw, hp: 100, st: 100, swing: -1, block: 0, down: 0, team: p.role === "enemy" ? 1 : 0 };
+      duel.st[p.i] = { x, z, yaw, hp: 100, st: 100, swing: -1, block: 0, down: 0, team: teamOf(p) };
       if (p.i === me) continue;
       const f = createFigure();
       paintFigure(f.mats, p.look);
@@ -378,7 +383,7 @@ const Online = (() => {
       Weapons.setFigure(f, p.look.weapon);
       f.sword.visible = true;
       f.g.rotation.order = "YXZ";
-      f.g.add(label(p.name, p.role === "enemy" ? "#ff9d8c" : p.role === "ally" ? "#9fd8a8" : "#fff"));
+      f.g.add(label(p.name.replace(" (practice bot)", " (bot)"), arena ? (teamOf(p) === duel.st[me].team && m.mode === "team2" ? "#9fd8a8" : "#ff9d8c") : p.role === "enemy" ? "#ff9d8c" : p.role === "ally" ? "#9fd8a8" : "#fff"));
       f.g.position.set(ARENA.cx + x, 0, ARENA.cz + z);
       f.g.rotation.y = yaw;
       scene.add(f.g);
@@ -393,18 +398,18 @@ const Online = (() => {
     player.pitch = -0.05;
     Crowd.setCheer(true);
     $o("online-hud").classList.add("show");
-    $o("online-hud").classList.toggle("coop", coop);
+    $o("online-hud").classList.toggle("coop", coop || arena);
     $o("od-me-name").textContent = m.players[me].name;
-    const foe = m.players.find((p) => p.i !== me && p.role !== "enemy" && !coop);
-    $o("od-foe-name").textContent = coop ? "" : (foe ? foe.name : "");
-    const team = $o("od-team");
-    team.replaceChildren(...(coop ? m.players.filter((p) => p.i !== me && p.role !== "enemy").map((p) => {
+    const foe = m.players.find((p) => p.i !== me && p.role !== "enemy" && !coop && !arena);
+    $o("od-foe-name").textContent = coop || arena ? "" : (foe ? foe.name : "");
+    const team = $o("od-team"), mates = coop ? m.players.filter((p) => p.i !== me && p.role !== "enemy") : m.mode === "team2" ? m.players.filter((p) => p.i !== me && teamOf(p) === teamOf(m.players[me])) : [];
+    team.replaceChildren(...(mates.length ? mates.map((p) => {
       const chip = document.createElement("div"), nm = document.createElement("span"), bar = document.createElement("div"), fill = document.createElement("div");
       chip.className = "od-chip"; chip.dataset.i = p.i; nm.textContent = p.name.replace(" (ally bot)", ""); bar.className = "bar"; bar.append(fill);
       chip.append(nm, bar);
       return chip;
     }) : []));
-    toast(coop ? "Team battle! Beat all 5 bots together. Stand next to a fallen teammate for 3 seconds to revive them." : m.ranked ? "Ranked duel! Win to climb the ladder. Space swings, hold Shift to block" : "Duel! Space swings, hold Shift to block");
+    toast(m.mode === "brawl" ? "Arena brawl! Every fighter for themselves: be the last one standing. Space swings, hold Shift to block" : m.mode === "team2" ? "2 v 2! Beat both opponents together. Space swings, hold Shift to block" : coop ? "Team battle! Beat all 5 bots together. Stand next to a fallen teammate for 3 seconds to revive them." : m.ranked ? "Ranked duel! Win to climb the ladder. Space swings, hold Shift to block" : "Duel! Space swings, hold Shift to block");
     Sfx.play("horn");
   }
 
@@ -489,6 +494,16 @@ const Online = (() => {
       }
       const reviving = Object.entries(duel.rev).filter(([, sec]) => sec > 0).map(([i, sec]) => (Number(i) === duel.you ? `A teammate is reviving you: ${Math.round((sec / 3) * 100)}%` : `Reviving ${nameOf(Number(i)).replace(" (ally bot)", "")}: ${Math.round((sec / 3) * 100)}%`));
       $o("od-note").textContent = me.down && !reviving.length ? "You are down. Stay close to your teammates: one of them can revive you." : reviving.join("  ·  ");
+    } else if (duel.kind === "brawl" || duel.kind === "team2") {
+      const myTeam = me.team, foes = duel.players.filter((p) => duel.st[p.i].team !== myTeam), alive = foes.filter((p) => !duel.st[p.i].down);
+      $o("od-foe-name").textContent = duel.kind === "brawl" ? `Fighters left: ${alive.length} of ${foes.length}` : `Opponents left: ${alive.length} of ${foes.length}`;
+      $o("od-foe-hp").style.width = `${Math.max(0, alive.length ? alive.reduce((t, p) => t + duel.st[p.i].hp, 0) / foes.length : 0)}%`;
+      for (const chip of $o("od-team").children) {
+        const s = duel.st[chip.dataset.i];
+        chip.classList.toggle("down", !!s.down);
+        chip.lastChild.firstChild.style.width = `${s.hp}%`;
+      }
+      $o("od-note").textContent = me.down ? "You are out. Stay and watch how it ends (Esc leaves)." : "";
     } else {
       const foe = duel.st[duel.players.find((p) => p.i !== duel.you).i];
       $o("od-foe-hp").style.width = `${foe.hp}%`;
@@ -524,6 +539,15 @@ const Online = (() => {
       endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladderText(m.rank)}`, m.won ? "Victory for the team!" : "Defeat");
       return;
     }
+    if (m.mode === "brawl" || m.mode === "team2") {
+      const first = m.place === 0 && m.won, many = m.n >= 4;
+      const prize = m.mode === "brawl" ? (first ? 80 : m.place === 1 && many ? 30 : 0) : (first ? 50 : 0);
+      Vitals.coins += prize;
+      const ord = ["1st", "2nd", "3rd", "4th", "5th", "6th"][m.place] || `${m.place + 1}th`;
+      const why = m.mode === "brawl" ? (first ? "You are the last one standing!" : m.reason === "time" ? `Time ran out. You finished ${ord}.` : `You were knocked out. You finished ${ord} of ${m.n}.`) : (first ? "Your team beat both opponents. Well fought!" : m.reason === "time" ? "Time ran out and the other team had more health." : "Your team was beaten.");
+      endFight(`${why}${prize ? ` Prize: +${prize} denarii.` : ""}${m.ranked ? ladderText(m.rank) : ""}`, first ? (m.mode === "brawl" ? "Champion of the brawl!" : "Victory for the team!") : "Defeat");
+      return;
+    }
     const won = m.winner === duel.you, draw = m.winner === -1;
     const why = { ko: won ? "You knocked your opponent out." : "You were knocked out.", time: "Time ran out.", left: won ? "Your opponent left the arena." : "You left." }[m.reason] || "";
     const prize = won ? (duel.ranked ? 40 : 30) : 0;
@@ -545,7 +569,7 @@ const Online = (() => {
     mode = "walk";
     placeAt(ARENA.cx - 16, ARENA.cz, -Math.PI / 2);
     showResult(title, text, [
-      { label: kind === "coop" ? "Fight again" : ranked ? "Ranked again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
+      { label: kind !== "duel" ? "Fight again" : ranked ? "Ranked again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
       { label: "Leave the arena", fn: closePanels },
     ]);
   }
