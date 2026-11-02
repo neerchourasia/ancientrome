@@ -1,7 +1,7 @@
 "use strict";
-// City games against real people: kushti wrestling and a kite fight (Old Delhi) and the ball game pok-ta-pok (Cancún). Each is a small two-player game on a drawing that covers the screen.
-// The browser only says what you are doing (a key press, where your kite or your player is); the game server decides every throw, cut and point and who wins (it is also what a
-// practice bot is, when nobody else is looking). You pick one in 🌐 Play online, or challenge somebody to it from 🎯 Challenge someone. Winning pays 40 denarii (20 against a bot)
+// City games against real people: kushti wrestling and a kite fight (Old Delhi), drawn on a picture that covers the screen, and the ball game pok-ta-pok, played in 3D on the real
+// Great Ball Court at Chichén Itzá in Cancún, like the fights in the Colosseum (you walk about the court and hit the ball with Space). The browser only says what you are doing (a key
+// press, where your kite or you are standing); the game server decides every throw, cut and point and who wins (it is also what a practice bot is, when nobody else is looking). You pick one in 🌐 Play online, or challenge somebody to it from 🎯 Challenge someone. Winning pays 40 denarii (20 against a bot)
 // and counts towards your rank when it is against another person. Depends on online.js (Online.navalSend, Online.ladderText, Online.openLobby), vitals.js and the globals of game.js.
 
 const Mini = (() => {
@@ -10,11 +10,12 @@ const Mini = (() => {
   const HELP = {
     kushti: "Wait for GO, then press Space as fast as you can. More presses than your opponent wins the throw. First to two throws wins.",
     kites: "A D W S (or the arrow keys) fly your kite. Get close to the other kite and press Space to pull: their string frays. First string cut loses. Esc leaves.",
-    ball: "A D (or the arrows) move you, Space hits the ball when it is close. It scores 1 when it lands on their side and 3 through the stone ring on their wall. First to 7. Esc leaves.",
+    ball: "WASD walk, Space hits the ball when it is close, towards the way you face. Don't let it land on your half (the other player scores 1); it scores 3 for the one who hit it last through a stone ring on the long walls. First to 5. Esc leaves.",
   };
   let ov = null, cv = null, g = null, head = null, help = null, m = null, st = null, raf = 0, last = 0, sendT = 0, note = "", noteT = 0;
   const held = new Set();
-  let kite = { x: 22, y: 30 }, bx = 25, ball = [50, 30], hitAt = [0, 0], pullAt = [0, 0];
+  let kite = { x: 22, y: 30 }, hitAt = [0, 0], pullAt = [0, 0];
+  let bg = null;      // the 3D ball game: { ball (the mesh), fig (the other player's figure), hud, last (when each player last hit) }
   const send = (o) => Online.navalSend(o);
   const me = () => (m ? m.you : 0), foe = () => 1 - me();
   const nameOf = (i) => (m && m.players[i] ? m.players[i].name : "?");
@@ -31,10 +32,11 @@ const Mini = (() => {
   function start(msg) {
     if (m) return;
     if (typeof mode === "undefined" || mode !== "walk") { send({ t: "leave" }); return; }
+    if (msg.mode === "ball") return start3d(msg);
     if (!ov) build();
     closePanels(); Vitals.stopRest();
     if (document.pointerLockElement) document.exitPointerLock();
-    m = msg; st = null; note = ""; held.clear(); kite = { x: m.you === 0 ? 22 : 78, y: 30 }; bx = m.you === 0 ? 25 : 75; ball = [50, 30]; hitAt = [0, 0]; pullAt = [0, 0];
+    m = msg; st = null; note = ""; held.clear(); kite = { x: m.you === 0 ? 22 : 78, y: 30 }; hitAt = [0, 0]; pullAt = [0, 0];
     mode = "online";
     head.textContent = `${TITLES[m.kind || m.mode]}${m.ranked ? " (ranked)" : ""}`;
     m.kind = m.mode; help.textContent = HELP[m.kind];
@@ -51,10 +53,9 @@ const Mini = (() => {
     if (e.code === "Escape") { leave(); return; }
     if (e.repeat) return;
     held.add(e.code);
-    if (e.code === "Space" || (m.kind === "ball" && (e.code === "KeyW" || e.code === "ArrowUp"))) {
+    if (e.code === "Space") {
       if (m.kind === "kushti") { if (st && st.ph === "mash") send({ t: "press" }); }
       else if (m.kind === "kites") { send({ t: "pull" }); pullAt[me()] = performance.now(); Sfx.play("swing"); }
-      else if (m.kind === "ball") { send({ t: "hit" }); }
     }
   }
   function onUp(e) { if (m && GAME_KEYS.has(e.code)) { held.delete(e.code); e.stopPropagation(); } }
@@ -67,11 +68,6 @@ const Mini = (() => {
       kite.x = Math.max(2, Math.min(98, kite.x + dir(["KeyA", "ArrowLeft"], ["KeyD", "ArrowRight"]) * 40 * dt));
       kite.y = Math.max(4, Math.min(56, kite.y + dir(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) * 40 * dt));
       sendT -= dt; if (sendT <= 0) { sendT = 0.08; send({ t: "kite", x: +kite.x.toFixed(1), y: +kite.y.toFixed(1) }); }
-    } else if (m.kind === "ball") {
-      const lo = me() === 0 ? 3 : 53, hi = me() === 0 ? 47 : 97;
-      bx = Math.max(lo, Math.min(hi, bx + dir(["KeyA", "ArrowLeft"], ["KeyD", "ArrowRight"]) * 42 * dt));
-      sendT -= dt; if (sendT <= 0) { sendT = 0.06; send({ t: "ballx", x: +bx.toFixed(1) }); }
-      if (st && st.b) { ball[0] += (st.b[0] - ball[0]) * Math.min(1, dt * 18); ball[1] += (st.b[1] - ball[1]) * Math.min(1, dt * 18); }
     }
     noteT -= dt; if (noteT <= 0) note = "";
     draw(now);
@@ -85,7 +81,7 @@ const Mini = (() => {
       if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
       else if (e[0] === "draw") setNote("A draw: the throw is wrestled again.");
       else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("stone"); }
-      else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(`${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}${e[3] === "ring" ? " through the ring!" : ""}`); }
+      else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(`${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}${e[3] === "ring" ? " with the ring!" : ""}`); }
     }
     if (m.kind === "kites" && s.p) for (let i = 0; i < 2; i++) if (s.p[i][3]) pullAt[i] = performance.now();
   }
@@ -101,7 +97,7 @@ const Mini = (() => {
   }
   function draw(now) {
     g.clearRect(0, 0, W, H);
-    if (m.kind === "kushti") drawKushti(now); else if (m.kind === "kites") drawKites(now); else drawBall(now);
+    if (m.kind === "kushti") drawKushti(now); else drawKites(now);
     if (note) label(note, W / 2, H - 14, 20, "#ffe08a");
   }
 
@@ -150,25 +146,62 @@ const Mini = (() => {
     if (Math.abs(a.x - b.x) < 58 && Math.abs(a.y - b.y) < 46) label("⚔ close: pull!", (a.x + b.x) / 2, Math.min(a.y, b.y) - 36, 16, "#fff3a0");
   }
 
-  const X = (x) => (x / 100) * W, Y = (y) => H - 44 - (y / 50) * (H - 130);
-  function drawBall(now) {
-    g.fillStyle = "#e9d7a8"; g.fillRect(0, 0, W, H);
-    g.fillStyle = "#cdb98a"; g.fillRect(0, H - 44, W, 44);
-    g.fillStyle = "#b9a374"; g.fillRect(0, 0, 14, H); g.fillRect(W - 14, 0, 14, H);               // the two long walls
-    g.strokeStyle = "#d8a933"; g.lineWidth = 5;
-    for (const wx of [14, W - 14]) { g.beginPath(); g.ellipse(wx, (Y(21) + Y(27)) / 2, 8, (Y(21) - Y(27)) / 2, 0, 0, Math.PI * 2); g.stroke(); }
-    g.fillStyle = "#6f5a35"; g.fillRect(X(50) - 3, Y(12), 6, H - 44 - Y(12));                       // the net
-    scoreLine();
-    const px = (i) => (i === me() ? bx : st && st.p ? st.p[i] : i ? 75 : 25);
-    for (let i = 0; i < 2; i++) {
-      const x = X(px(i)), up = now - hitAt[i] < 160, col = i === me() ? "#2d6cb0" : "#b04a2d";
-      g.fillStyle = col; g.fillRect(x - 12, H - 44 - 52, 24, 40); g.fillStyle = "#e7b98b"; g.beginPath(); g.arc(x, H - 44 - 62, 11, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = col; g.lineWidth = 6; g.lineCap = "round"; g.beginPath(); g.moveTo(x, H - 44 - 38); g.lineTo(x + (i ? -1 : 1) * 18, H - 44 - (up ? 70 : 24)); g.stroke();
-      g.fillStyle = col; g.fillRect(x - 10, H - 44 - 12, 8, 12); g.fillRect(x + 2, H - 44 - 12, 8, 12);
-      if (i === me()) label("you", x, H - 44 - 82, 13, "#2d4f80");
+  // ------------------------------------------------------------------ pok-ta-pok in 3D, on the real Great Ball Court
+  // The court is 30 m wide and 70 m long, centred on (CANCUN_X - 150, -35) with its long walls east and west of you. You and the other player each keep to your own half (north and
+  // south of the middle line). The server owns the ball; here it is only drawn where the server says it is.
+  const court = () => ({ x: CANCUN_X - 150, z: -35 });
+  const HALF_U = 12.5, HALF_W = 34;
+
+  function start3d(msg) {
+    if (city !== "cancun") { send({ t: "leave" }); toast("The ball game is played on the Great Ball Court in Cancún."); return; }
+    closePanels(); Vitals.stopRest();
+    m = msg; m.kind = "ball"; st = null; note = ""; sendT = 0;
+    const c = court(), me0 = m.you === 0, pl = m.players[foe()];
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 10), new THREE.MeshLambertMaterial({ color: 0x7a2d12 }));
+    ball.position.set(c.x, 6, c.z); scene.add(ball);
+    const fig = createFigure(); paintFigure(fig.mats, pl.look); applyAccessories(fig, pl.look.acc);
+    fig.sword.visible = false; fig.g.rotation.order = "YXZ";
+    const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
+    x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = "#ffb09c"; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.2; tag.renderOrder = 10; fig.g.add(tag);
+    fig.g.position.set(c.x, 0.05, c.z + (me0 ? 12 : -12)); fig.g.rotation.y = me0 ? 0 : Math.PI; scene.add(fig.g);
+    const hud = document.createElement("div"); hud.id = "ball-hud"; hud.innerHTML = '<b id="bh-score"></b><span id="bh-note"></span><small id="bh-help"></small>'; document.body.append(hud);
+    hud.querySelector("#bh-help").textContent = HELP.ball;
+    bg = { ball, fig, hud, last: [0, 0], tx: c.x, tz: c.z + (me0 ? 12 : -12), tyaw: me0 ? 0 : Math.PI, phase: 0, prev: null };
+    mode = "online";
+    placeAt(c.x, c.z + (me0 ? -12 : 12), me0 ? Math.PI : 0); player.pitch = -0.12;
+    Sfx.play("horn"); toast(`Pok-ta-pok${m.ranked ? " (ranked)" : ""}! Hit the ball with Space, keep it off your half.`);
+  }
+
+  function swing() { if (bg && m) { send({ t: "hit", yaw: +player.yaw.toFixed(3) }); } }
+
+  function update(dt) {
+    if (!bg || !m) return;
+    updatePlayer(dt);
+    const c = court(), lo = me() === 0 ? -HALF_W : 0.8, hi = me() === 0 ? -0.8 : HALF_W;
+    player.x = Math.max(c.x - HALF_U, Math.min(c.x + HALF_U, player.x)); player.z = Math.max(c.z + lo, Math.min(c.z + hi, player.z));
+    sendT -= dt; if (sendT <= 0) { sendT = 0.066; send({ t: "pos", x: +(player.x - c.x).toFixed(2), z: +(player.z - c.z).toFixed(2), yaw: +player.yaw.toFixed(3) }); }
+    const k = Math.min(1, dt * 14);
+    if (st && st.b) {
+      bg.ball.position.x += (c.x + st.b[0] - bg.ball.position.x) * k; bg.ball.position.y += (st.b[1] - bg.ball.position.y) * k; bg.ball.position.z += (c.z + st.b[2] - bg.ball.position.z) * k;
     }
-    g.fillStyle = "#7a2d12"; g.beginPath(); g.arc(X(ball[0]), Math.min(H - 52, Y(Math.max(0, ball[1]))), 9, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = "#3a1406"; g.lineWidth = 2; g.stroke();
+    if (st && st.p) { const o = st.p[foe()]; bg.tx = c.x + o[0]; bg.tz = c.z + o[1]; bg.tyaw = o[2]; }
+    const f = bg.fig, px = f.g.position.x, pz = f.g.position.z;
+    f.g.position.x += (bg.tx - px) * k; f.g.position.z += (bg.tz - pz) * k; f.g.position.y = 0.05;
+    let dy = bg.tyaw - f.g.rotation.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI; f.g.rotation.y += dy * k;
+    const speed = Math.hypot(bg.tx - px, bg.tz - pz) / Math.max(dt, 0.001); f.phase = (f.phase || 0) + dt * Math.min(speed, 8) * 1.1;
+    const w = Math.min(1, speed / 5) * 0.7 * Math.sin(f.phase), hit = performance.now() - hitAt[foe()] < 220;
+    f.parts.armL.rotation.x = -w; f.parts.armR.rotation.x = hit ? 2.2 : w; f.parts.legL.rotation.x = -w; f.parts.legR.rotation.x = w;
+    noteT -= dt; if (noteT <= 0) note = "";
+    const s = st ? st.s : [0, 0];
+    bg.hud.querySelector("#bh-score").textContent = `${nameOf(0)} ${s[0]}  –  ${s[1]} ${nameOf(1)}`;
+    bg.hud.querySelector("#bh-note").textContent = note;
+  }
+
+  function cleanup3d() {
+    if (!bg) return;
+    scene.remove(bg.ball); scene.remove(bg.fig.g); bg.hud.remove(); bg = null;
+    const c = court(); placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.02;       // back on foot beside the court's south end
   }
 
   // ------------------------------------------------------------------ the end
@@ -176,6 +209,7 @@ const Mini = (() => {
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); if (ov) ov.classList.remove("show");
+    cleanup3d();
     m = null; st = null;
     if (mode === "online") mode = "walk";
   }
@@ -184,7 +218,7 @@ const Mini = (() => {
     const kind = m.kind, won = res.winner === me(), draw = res.winner === -1, ranked = !!res.ranked;
     const prize = won ? (ranked ? 40 : 20) : 0;
     Vitals.coins += prize;
-    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached seven points first." : "They reached seven points first.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
+    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached five points first." : "They reached five points first.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
     const ladder = ranked && res.rank && typeof Online !== "undefined" ? Online.ladderText(res.rank) : "";
     cleanup();
     showResult(draw ? "A draw" : won ? "Victory!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, [
@@ -200,5 +234,5 @@ const Mini = (() => {
   }
   function lost() { if (m) { cleanup(); toast("The connection to the game server was lost."); } }
 
-  return { start, on, end, leave, lost, get active() { return !!m; } };
+  return { start, on, end, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg; } };
 })();

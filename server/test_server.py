@@ -992,47 +992,65 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.2)
         self.assertLess(a.x, 40.0)
 
-    async def test_ball_ground_ring_and_first_to_seven(self):
+    async def test_ball_ground_ring_and_first_to_five(self):
         ws, ms, room = await self.start_mini("ball")
         a, b = room.players
         room.hold = 0.0
-        room.bx, room.by, room.bvx, room.bvy = 70.0, 0.3, 0.0, -10.0         # lands on Ben's side: Ann scores 1
+        room.b, room.v = [0.0, 0.4, 10.0], [0.0, -10.0, 0.0]            # lands on the south half (Ben's): Ann scores 1
         room.step(0.05)
         self.assertEqual((a.score, b.score), (1, 0))
         room.hold = 0.0
-        room.bx, room.by, room.bvx, room.bvy = 0.4, 24.0, -30.0, 0.0         # flies into the ring on the left wall: Ben scores 3
+        room.last = 1                                                   # Ben hit it last and it flies through the ring on the left wall: Ben scores 3
+        room.b, room.v = [14.6, 6.4, 0.0], [20.0, 0.0, 0.0]
         room.step(0.05)
         self.assertEqual((a.score, b.score), (1, 3))
-        a.score = 6
         room.hold = 0.0
-        room.bx, room.by, room.bvx, room.bvy = 80.0, 0.3, 0.0, -10.0
+        room.last = 1                                                   # an inch outside the ring is only a bounce
+        room.b, room.v = [14.6, 6.4, 4.0], [20.0, 0.0, 0.0]
+        room.step(0.05)
+        self.assertEqual((a.score, b.score), (1, 3))
+        self.assertLess(room.v[0], 0.0)
+        a.score = 4
+        room.hold = 0.0
+        room.b, room.v = [0.0, 0.4, 10.0], [0.0, -10.0, 0.0]
         room.step(0.05)
         end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
-        self.assertEqual((end["mode"], end["winner"], end["score"]), ("ball", 0, [7, 3]))
+        self.assertEqual((end["mode"], end["winner"], end["score"]), ("ball", 0, [5, 3]))
 
-    async def test_ball_net_blocks_and_hits_need_you_to_be_near(self):
+    async def test_ball_hits_need_you_near_and_go_where_you_face(self):
         ws, ms, room = await self.start_mini("ball")
         a, b = room.players
+        a.x, a.z, a.yaw = 0.0, -10.0, math.pi                          # Ann faces south, towards Ben's half
         room.hold = 0.0
-        room.bx, room.by, room.bvx, room.bvy = 48.5, 5.0, 40.0, 0.0
-        room.step(0.1)
-        self.assertLess(room.bx, 50.0)                        # the net stopped it
-        a.x, room.bx, room.by, room.bvx, room.bvy = 20.0, 60.0, 5.0, 0.0, 0.0
+        room.b, room.v = [10.0, 1.0, -10.0], [0.0, 0.0, 0.0]            # ten metres away: nothing happens
         ws[0].send({"t": "hit"})
         await asyncio.sleep(0.2)
-        self.assertEqual(room.bvx, 0.0)                       # too far away: nothing happens
-        room.bx = 22.0
+        self.assertEqual(room.v, [0.0, 0.0, 0.0])
+        room.b = [0.5, 1.0, -9.0]
         ws[0].send({"t": "hit"})
         await asyncio.sleep(0.2)
-        self.assertGreater(room.bvx, 10.0)                    # a real hit sends it towards Ben's side
+        self.assertGreater(room.v[2], 5.0)                              # towards the south
+        self.assertGreater(room.v[1], 5.0)                              # and up
+        self.assertEqual(room.last, 0)
+
+    async def test_ball_players_stay_on_their_own_half_and_inside_the_court(self):
+        ws, ms, room = await self.start_mini("ball")
+        a = room.players[0]
+        a.last_t = time.monotonic() - 5.0
+        ws[0].send({"t": "pos", "x": 40.0, "z": 30.0, "yaw": 0})
+        await asyncio.sleep(0.2)
+        self.assertLessEqual(a.x, 12.5)
+        self.assertLessEqual(a.z, -0.8)
 
     async def test_city_game_with_bots_and_leaving(self):
         ws, ms, room = await self.start_mini("ball", bots=True)
         self.assertEqual((len(ms[0]["players"]), ms[0]["ranked"]), (2, False))
         room.hold = 0.0
-        room.bx, room.by, room.bvx, room.bvy = 75.0, 20.0, 0.0, 0.0
-        for _ in range(8):
+        room.b, room.v = [3.0, 1.2, 8.0], [0.0, 0.0, 0.0]
+        bot = room.players[1]
+        for _ in range(12):
             room.step(0.05)
+        self.assertLess(math.hypot(bot.x - 3.0, bot.z - 8.0), 6.0)       # the bot ran at the ball
         ws[0].w.close()
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)

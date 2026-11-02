@@ -1227,39 +1227,58 @@ class KiteRoom(MiniRoom):
 
 
 class BallRoom(MiniRoom):
-    """Pok-ta-pok, a little like volleyball on the Great Ball Court: keep the ball off the ground on your side. It scores 1 when it lands on the other side, and 3 when it goes through
-    the stone ring high on the other team's wall. First to 7."""
+    """Pok-ta-pok on the Great Ball Court at Chichén Itzá, one against one, a little like volleyball: each player has their half of the alley (north and south of the middle line) and
+    must keep the ball from landing on it. The ball scores 1 for the other player where it lands, and 3 for whoever hit it last when it flies through one of the two stone rings high
+    on the long walls. First to 5. The positions are in metres from the middle of the court: u across (the two long walls are at 13 to 15 m each side), w along it (the temples
+    are at the two ends, 35 m away) and y up."""
     TICK = 0.05
-    TIME_LIMIT = 150.0
-    NET_H, RING = 12.0, (21.0, 27.0)
-    GOAL = 7
+    TIME_LIMIT = 180.0
+    HALF_U, HALF_W = 12.5, 34.0
+    WALL_LOW, WALL_HIGH, BENCH_H = 13.0, 15.0, 2.2
+    RING_R, RING_Y = 1.3, 6.4
+    GOAL = 5
+    SPEED = 8.0
 
     def setup(self):
         for p in self.players:
-            p.x = (25.0, 75.0)[p.i % 2]
+            p.x, p.z, p.yaw = 0.0, (-12.0, 12.0)[p.i % 2], (math.pi, 0.0)[p.i % 2]
+        self.last = None
         self.serve(0)
 
     def serve(self, side):
-        self.bx, self.by, self.bvx, self.bvy = 25.0 + 50.0 * side, 34.0, 0.0, 0.0
-        self.hold = now() + 1.2
+        """Drops the ball on the half of the player who lost the point."""
+        self.b = [0.0, 6.0, (-10.0, 10.0)[side]]
+        self.v = [0.0, 0.0, 0.0]
+        self.hold = now() + 2.0
+        self.last = None
 
     def msg(self, p, m):
         t, tm = m.get("t"), now()
-        if t == "ballx":
+        if t == "pos":
             dt = max(0.03, min(0.5, tm - p.last_t))
             p.last_t = tm
-            lo, hi = (3.0, 47.0) if p.i == 0 else (53.0, 97.0)
-            x = num(m.get("x"), lo, hi, p.x)
-            p.x = max(p.x - (45.0 * dt + 1.0), min(p.x + (45.0 * dt + 1.0), x))
+            lo, hi = (-self.HALF_W, -0.8) if p.i == 0 else (0.8, self.HALF_W)
+            x, z = num(m.get("x"), -self.HALF_U, self.HALF_U, p.x), num(m.get("z"), lo, hi, p.z)
+            lim = self.SPEED * dt + 0.6
+            d = math.hypot(x - p.x, z - p.z)
+            if d > lim:
+                x, z = p.x + (x - p.x) * lim / d, p.z + (z - p.z) * lim / d
+            p.x, p.z, p.yaw = x, z, num(m.get("yaw"), -50, 50, p.yaw)
         elif t == "hit":
             self.hit(p, tm)
 
     def hit(self, p, tm):
-        if tm < p.cool or tm < self.hold or abs(self.bx - p.x) > 9 or self.by > 16:
+        dx, dz = self.b[0] - p.x, self.b[2] - p.z
+        if tm < p.cool or tm < self.hold or math.hypot(dx, dz) > 2.4 or self.b[1] > 2.6:
             return
-        d = 1.0 if p.i == 0 else -1.0
-        self.bvx, self.bvy = d * (16.0 + random.random() * 10.0), 30.0 + random.random() * 6.0
-        p.cool = tm + 0.35
+        fx, fz = -math.sin(p.yaw), -math.cos(p.yaw)                  # the way they face, nudged towards the other half so a hit usually goes over
+        aim = 1.0 if p.i == 0 else -1.0
+        ax, az = fx * 0.65, fz * 0.65 + aim * 0.35
+        n = math.hypot(ax, az) or 1.0
+        speed = 10.0 + random.random() * 4.0
+        self.v = [ax / n * speed, 7.5 + random.random() * 2.0, az / n * speed]
+        p.cool = tm + 0.45
+        self.last = p.i
         self.events.append(["hit", p.i])
 
     def point(self, w, pts, why):
@@ -1269,30 +1288,39 @@ class BallRoom(MiniRoom):
             return self.finish(w, "score")
         self.serve(1 - w)
 
+    def bot_move(self, p, dt):
+        lo, hi = (-self.HALF_W, -0.8) if p.i == 0 else (0.8, self.HALF_W)
+        tx, tz = max(-self.HALF_U, min(self.HALF_U, self.b[0])), max(lo, min(hi, self.b[2]))
+        d = math.hypot(tx - p.x, tz - p.z)
+        step = min(d, 4.6 * dt)
+        if d > 0.01:
+            p.x, p.z = p.x + (tx - p.x) / d * step, p.z + (tz - p.z) / d * step
+        other = self.players[1 - p.i]
+        p.yaw = math.atan2(-(other.x - p.x), -(other.z - p.z))      # face the other player
+        if math.hypot(self.b[0] - p.x, self.b[2] - p.z) < 2.0 and self.b[1] < 2.4 and random.random() < 0.6:
+            self.hit(p, now())
+
     def step(self, dt):
         t = now()
         for p in self.players:
             if p.bot:
-                lo, hi = (3.0, 47.0) if p.i == 0 else (53.0, 97.0)
-                goal = max(lo, min(hi, self.bx + (4.0 if p.i == 0 else -4.0)))
-                p.x += max(-28 * dt, min(28 * dt, goal - p.x))
-                if abs(self.bx - p.x) < 7 and self.by < 14 and self.bvy <= 0 and random.random() < 0.7:
-                    self.hit(p, t)
+                self.bot_move(p, dt)
         if t >= self.hold:
-            px = self.bx
-            self.bvy -= 42.0 * dt
-            self.bx += self.bvx * dt
-            self.by += self.bvy * dt
-            if (px - 50.0) * (self.bx - 50.0) < 0 and self.by < self.NET_H:     # the net
-                self.bx, self.bvx = px, -self.bvx * 0.4
-            if self.bx <= 0.0 or self.bx >= 100.0:                               # the walls, with a stone ring high on each
-                left = self.bx <= 0.0
-                if self.RING[0] < self.by < self.RING[1]:
-                    return self.point(1 if left else 0, 3, "ring")
-                self.bx, self.bvx = (0.0 if left else 100.0), -self.bvx * 0.6
-            if self.by <= 0.0:
-                return self.point(1 if self.bx < 50.0 else 0, 1, "ground")
-        self.send_state({"b": [round(self.bx, 1), round(self.by, 1)], "p": [round(p.x, 1) for p in self.players]})
+            b, v = self.b, self.v
+            v[1] -= 9.8 * dt
+            for k in range(3):
+                b[k] += v[k] * dt
+            if abs(b[0]) > self.WALL_LOW and b[1] < self.BENCH_H:         # the sloping benches along the foot of the walls
+                b[0], v[0] = math.copysign(self.WALL_LOW, b[0]), -v[0] * 0.6
+            elif abs(b[0]) > self.WALL_HIGH:                              # the walls, with a stone ring high on each
+                if self.last is not None and abs(b[2]) < self.RING_R and abs(b[1] - self.RING_Y) < self.RING_R:
+                    return self.point(self.last, 3, "ring")
+                b[0], v[0] = math.copysign(self.WALL_HIGH, b[0]), -v[0] * 0.6
+            if abs(b[2]) > 35.0:                                          # the temples at the two ends
+                b[2], v[2] = math.copysign(35.0, b[2]), -v[2] * 0.6
+            if b[1] <= 0.3:
+                return self.point(1 if b[2] < 0 else 0, 1, "ground")      # it landed on someone's half: the other player scores
+        self.send_state({"b": [round(x, 2) for x in self.b], "p": [[round(p.x, 2), round(p.z, 2), round(p.yaw, 2)] for p in self.players]})
 
 
 # ---------------------------------------------------------------------------------------------------------------

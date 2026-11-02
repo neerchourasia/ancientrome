@@ -84,7 +84,7 @@ const Online = (() => {
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "kushti" || m.mode === "kites" || m.mode === "ball") Mini.start(m); else if (toRome(), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if (toCity("rome"), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "world": onWorld(m); break;
@@ -160,13 +160,13 @@ const Online = (() => {
     }
   }
 
-  // the arena games are held in Rome: from another city you are taken there for the match and brought back to where you stood afterwards
+  // the arena games are held in Rome and the ball game on the Great Ball Court in Cancún: from another city you are taken there for the match and brought back to where you stood afterwards
   let sentFrom = null;
-  function toRome() {
-    if (city === "rome" || sentFrom) return;
-    sentFrom = { city, x: player.x, z: player.z, yaw: player.yaw };
-    arriveIn("rome");
-    toast("You are taken to Rome for the match, and brought back afterwards.");
+  function toCity(name) {
+    if (city === name) return;
+    if (!sentFrom) sentFrom = { city, x: player.x, z: player.z, yaw: player.yaw };
+    arriveIn(name);
+    toast(`You are taken to ${name === "rome" ? "Rome" : "Cancún"} for the match, and brought back afterwards.`);
   }
   function comeBack() {
     if (!sentFrom || mode !== "walk" || panelOpen || duel || waiting || (typeof Race !== "undefined" && Race.active) || (typeof Mini !== "undefined" && Mini.active)) return;
@@ -471,6 +471,7 @@ const Online = (() => {
   }
 
   function swing() {
+    if (typeof Mini !== "undefined" && Mini.is3d) { Mini.swing(); return; }
     if (!duel || duel.over) return;
     const s = duel.st[duel.you];
     if (s.down || s.swing >= 0 || s.st < 14 * Weapons.cur().cost) return;
@@ -510,6 +511,7 @@ const Online = (() => {
   }
 
   function update(dt, keys) {
+    if (typeof Mini !== "undefined" && Mini.is3d) { Mini.update(dt, keys); return; }
     if (!duel) return;
     const me = duel.st[duel.you];
     if (!me.down) {
