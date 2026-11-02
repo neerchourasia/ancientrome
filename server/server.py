@@ -2866,7 +2866,7 @@ def on_pyr(conn, m):
 
 
 
-ACH_TITLES = ("Veteran", "Tycoon", "Magnate", "Courier", "Collector", "Curator", "Landlord", "Entrepreneur", "Palace Owner", "Champion", "Explorer", "Diver", "Builder", "Lawman", "Angler", "Storyteller", "Chronicler")
+ACH_TITLES = ("Veteran", "Tycoon", "Magnate", "Courier", "Collector", "Curator", "Landlord", "Entrepreneur", "Palace Owner", "Champion", "Explorer", "Diver", "Builder", "Lawman", "Angler", "Storyteller", "Chronicler", "Reveller")
 
 
 def on_title(conn, m):
