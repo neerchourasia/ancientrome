@@ -777,7 +777,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .st-text .st-now { color: var(--ink); border-left: 3px solid var(--gold); padding-left: 8px; }
 
 /* the menu as a bar along the bottom of the screen: ☰, Directions and the six sections in a row, and the open section's buttons pop up above it */
-.top-right .buttons { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: min(calc(100vw - 24px), 760px); max-height: none; overflow: visible; padding: 5px 8px; background: rgba(20,15,10,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; }
+.top-right .buttons { position: fixed; left: 120px; bottom: 30px; transform: none; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; width: max-content; max-width: min(calc(100vw - 136px), 760px); max-height: none; overflow: visible; padding: 5px 8px; background: rgba(20,15,10,.72); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; }
 .top-right .buttons.collapsed { background: none; border: 0; padding: 0; }
 .top-right .buttons #btn-dirs { order: 0; flex-basis: auto; padding: 6px 14px; font-size: .9rem; border-width: 1px !important; box-shadow: none; }
 .mgroup { position: static; display: block; width: auto; padding: 0; border: 0; }
@@ -785,7 +785,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .mgroup .mh::after { content: "▴"; float: none; margin-left: 6px; }
 .mgroup.open .mh::after { transform: none; content: "▾"; }
 .mgroup.open .mh { border-color: var(--gold); }
-.mpop { display: none; position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: max-content; max-width: min(94vw, 560px); flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px; background: rgba(20,15,10,.92); border: 1px solid rgba(226,185,85,.5); border-radius: 12px; }
+.mpop { display: none; position: absolute; left: 0; bottom: calc(100% + 8px); transform: none; width: max-content; max-width: min(94vw, 560px); flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px; background: rgba(20,15,10,.92); border: 1px solid rgba(226,185,85,.5); border-radius: 12px; }
 .mgroup.open .mpop { display: flex; }
 .mpop button[hidden] { display: none !important; }
 
@@ -810,3 +810,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #ball-hud span { min-height: 1.2em; font-weight: 700; color: #ffe08a; }
 #ball-hud small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
 #card { left: 120px; width: min(400px, calc(100vw - 136px)); }   /* (the fireball menu button sits at the far left, so the landmark card moves over) */
+#card { bottom: 118px; }   /* (above the menu bar, which now runs along the bottom-left next to the fireball) */
