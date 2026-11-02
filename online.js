@@ -42,6 +42,7 @@ const Online = (() => {
       if (ws !== sock) return;
       ws = null; welcome = null; waiting = false; clearInterval(pingT); clearPeers();
       if (typeof Ride !== "undefined") Ride.lost();
+      if (typeof Mini !== "undefined" && Mini.active) Mini.lost();
       if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
       else if (Naval.isOnline()) Naval.stop();
@@ -80,11 +81,12 @@ const Online = (() => {
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "kushti" || m.mode === "kites" || m.mode === "ball") Mini.start(m); else if (toRome(), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
+      case "mini": Mini.on(m); break;
       case "world": onWorld(m); break;
       case "houses": Robbery.setHouses(m.h, m.mine); break;
       case "heist_no": toast(m.msg || "You cannot rob that house."); break;
@@ -93,7 +95,7 @@ const Online = (() => {
       case "heist_end": Robbery.end(m); break;
       case "race": case "derby": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
-      case "end": if ((m.mode === "race" || m.mode === "derby" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race" || m.mode === "derby") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
+      case "end": if (m.mode === "kushti" || m.mode === "kites" || m.mode === "ball") { Mini.end(m); break; } if ((m.mode === "race" || m.mode === "derby" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race" || m.mode === "derby") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -112,6 +114,7 @@ const Online = (() => {
     $o("on-naval").disabled = !ready;
     $o("on-brawl").disabled = !ready;
     $o("on-derby").disabled = !ready;
+    for (const [id, c] of [["on-kushti", "delhi"], ["on-kites", "delhi"], ["on-ball", "cancun"]]) { $o(id).hidden = city !== c; $o(id).disabled = !ready; }
     $o("on-team2").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
@@ -119,7 +122,6 @@ const Online = (() => {
 
   function openLobby() {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
-    if (city !== "rome") { toast("The online games are held in Rome. Press B to travel back."); return; }
     openPanel("#online");
     fillShips();
     connect();
@@ -136,13 +138,12 @@ const Online = (() => {
       const li = document.createElement("li"), t = document.createElement("span");
       t.textContent = `${p.name} · rating ${p.r}${p.busy ? " · in a game" : ""} `;
       const b = document.createElement("button"); b.type = "button"; b.textContent = "Challenge"; b.disabled = !!p.busy;
-      b.addEventListener("click", () => { send({ t: "challenge", a: "send", id: p.id }); b.disabled = true; });
+      b.addEventListener("click", () => { send({ t: "challenge", a: "send", id: p.id, game: $o("ch-game").value }); b.disabled = true; });
       li.append(t, b); ul.append(li);
     }
   }
   function openChallenge() {
     if (mode !== "walk" || panelOpen || !canStart()) { toast("Close what is open and stop the game first"); return; }
-    if (city !== "rome") { toast("Challenges are fought in the Colosseum arena in Rome. Press B to travel back."); return; }
     connect(); chalList = []; renderChal(); openPanel("#challenge");
     const ask = () => { if (welcome) send({ t: "challenge", a: "list" }); };
     ask(); setTimeout(ask, 1500);
@@ -153,10 +154,24 @@ const Online = (() => {
     else if (m.a === "declined") toast(`${m.name} said no.`);
     else if (m.a === "no") toast(m.msg || "The challenge did not work.");
     else if (m.a === "in") {
-      if (mode !== "walk" || city !== "rome" || duel || typeof started === "undefined" || !started) { send({ t: "challenge", a: "decline", from: m.from }); return; }   // busy: the challenger is told no
+      if (mode !== "walk" || duel || typeof started === "undefined" || !started) { send({ t: "challenge", a: "decline", from: m.from }); return; }   // busy: the challenger is told no
       Sfx.play("horn");
-      Dialog.confirm(`${m.name} (rating ${m.r}) challenges you to a ranked duel in the arena. Accept?`).then((yes) => send({ t: "challenge", a: yes ? "accept" : "decline", from: m.from }));
+      Dialog.confirm(`${m.name} (rating ${m.r}) challenges you to ${m.what || "a ranked duel"}. Accept?`).then((yes) => send({ t: "challenge", a: yes ? "accept" : "decline", from: m.from }));
     }
+  }
+
+  // the arena games are held in Rome: from another city you are taken there for the match and brought back to where you stood afterwards
+  let sentFrom = null;
+  function toRome() {
+    if (city === "rome" || sentFrom) return;
+    sentFrom = { city, x: player.x, z: player.z, yaw: player.yaw };
+    arriveIn("rome");
+    toast("You are taken to Rome for the match, and brought back afterwards.");
+  }
+  function comeBack() {
+    if (!sentFrom || mode !== "walk" || panelOpen || duel || waiting || (typeof Race !== "undefined" && Race.active) || (typeof Mini !== "undefined" && Mini.active)) return;
+    const b = sentFrom; sentFrom = null;
+    arriveIn(b.city); placeAt(b.x, b.z, b.yaw);
   }
 
   function queue(game) {
@@ -368,12 +383,16 @@ const Online = (() => {
     $o("on-naval").addEventListener("click", () => queue("naval"));
     $o("on-brawl").addEventListener("click", () => queue("brawl"));
     $o("on-derby").addEventListener("click", () => queue("derby"));
+    $o("on-kushti").addEventListener("click", () => queue("kushti"));
+    $o("on-kites").addEventListener("click", () => queue("kites"));
+    $o("on-ball").addEventListener("click", () => queue("ball"));
     $o("on-team2").addEventListener("click", () => queue("team2"));
     $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("btn-online").addEventListener("click", openLobby);
     $o("btn-chal").addEventListener("click", openChallenge);
+    setInterval(comeBack, 700);
     $o("ch-refresh").addEventListener("click", () => { if (welcome) send({ t: "challenge", a: "list" }); });
   }
 
@@ -614,6 +633,7 @@ const Online = (() => {
 
   // Esc / Leave while in a fight (a race is left through Race.stop, which calls leaveGame)
   function leave() {
+    if (typeof Mini !== "undefined" && Mini.active) { Mini.leave(); return; }
     if (!duel) return;
     send({ t: "leave" });
     endFight("You left the battle.", "You left");

@@ -1036,6 +1036,266 @@ class RaceRoom:
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# city games against real people: kushti wrestling and a kite fight (Delhi) and the ball game pok-ta-pok (Cancún). Small two-player games the server referees:
+# the browsers only say what the player is doing (a key press, where their kite or their player is) and the server decides who scores and who wins.
+
+class Contender:
+    def __init__(self, conn, index, bot=False):
+        self.conn, self.i, self.bot, self.who = conn, index, bot, conn
+        self.name = conn.name if conn else "Practice bot"
+        self.cls = conn.cls if conn else "gladiator"
+        self.look = conn.look if conn else clean_look({"toga": 2, "sash": 1})
+        self.score = 0
+        self.cool = 0.0
+        self.last_t = now()
+
+
+class MiniRoom:
+    TICK = 0.1
+    TIME_LIMIT = 200.0
+
+    def __init__(self, kind, conns, bots=0):
+        self.id = os.urandom(3).hex()
+        self.kind = kind
+        self.players = [Contender(c, i) for i, c in enumerate(conns)]
+        for _ in range(bots):
+            self.players.append(Contender(None, len(self.players), bot=True))
+        self.ranked = sum(1 for p in self.players if p.conn) >= 2
+        self.over, self.t0, self.events = False, now(), []
+        for p in self.players:
+            if p.conn:
+                p.conn.room, p.conn.me, p.conn.queue = self, p, None
+        self.setup()
+        roster = [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else ""), "cls": q.cls, "look": q.look} for q in self.players]
+        for p in self.players:
+            if p.conn:
+                p.conn.send({"t": "match", "mode": kind, "room": self.id, "you": p.i, "ranked": self.ranked, "players": roster})
+        self.task = asyncio.ensure_future(self.run())
+
+    def setup(self):
+        pass
+
+    def on_msg(self, conn, m):
+        if not self.over and conn.me is not None:
+            self.msg(conn.me, m)
+
+    def msg(self, p, m):
+        pass
+
+    def leave(self, conn):
+        p = conn.me
+        if p is None or self.over:
+            return
+        p.conn = None
+        others = [q for q in self.players if q is not p and q.conn]
+        if others or any(q.bot for q in self.players if q is not p):
+            self.finish(1 - p.i if len(self.players) == 2 else -1, "left")
+        else:
+            self.finish(-1, "empty")
+
+    async def run(self):
+        try:
+            while not self.over:
+                await asyncio.sleep(self.TICK)
+                self.step(self.TICK)
+                if not self.over and now() - self.t0 > self.TIME_LIMIT:
+                    self.timeout()
+        except asyncio.CancelledError:
+            pass
+
+    def timeout(self):
+        a, b = self.players[0], self.players[1]
+        self.finish(-1 if a.score == b.score else a.i if a.score > b.score else b.i, "time")
+
+    def send_state(self, extra):
+        payload = dict({"t": "mini", "k": self.kind, "ev": self.events, "s": [p.score for p in self.players]}, **extra)
+        self.events = []
+        for p in self.players:
+            if p.conn:
+                p.conn.send(payload)
+
+    def finish(self, winner, reason):
+        if self.over:
+            return
+        self.over = True
+        entries = [(p.who, 0 if p.i == winner or winner == -1 else 1) for p in self.players if p.who]
+        ranks = rate_placements(entries) if self.ranked and reason != "empty" else {}
+        for p in self.players:
+            if p.conn:
+                msg = {"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked}
+                if id(p.who) in ranks:
+                    msg["rank"] = ranks[id(p.who)]
+                p.conn.send(msg)
+                p.conn.room = p.conn.me = None
+        self.task.cancel()
+
+
+class KushtiRoom(MiniRoom):
+    """Wrestling: before each throw a three-second wait, then five seconds of mashing the key; the one with more presses wins the throw. First to two throws wins."""
+    TICK = 0.2
+    PRESS_RATE = 12.0          # presses a second the server counts from one player
+
+    def setup(self):
+        self.phase, self.pt, self.c, self.over_after = "ready", now() + 3.0, [0, 0], False
+        for p in self.players:
+            p.tok, p.tok_t = 6.0, now()
+
+    def msg(self, p, m):
+        if m.get("t") != "press" or self.phase != "mash":
+            return
+        t = now()
+        p.tok = min(6.0, p.tok + (t - p.tok_t) * self.PRESS_RATE)
+        p.tok_t = t
+        if p.tok >= 1.0:
+            p.tok -= 1.0
+            self.c[p.i] += 1
+
+    def step(self, dt):
+        t = now()
+        if self.phase == "mash":
+            for p in self.players:
+                if p.bot and random.random() < 6.5 * dt:
+                    self.c[p.i] += 1
+        if t >= self.pt:
+            if self.phase == "ready":
+                self.phase, self.pt, self.c = "mash", t + 5.0, [0, 0]
+            elif self.phase == "mash":
+                a, b = self.c
+                if a != b:
+                    w = self.players[0 if a > b else 1]
+                    w.score += 1
+                    self.events.append(["throw", w.i])
+                else:
+                    self.events.append(["draw"])
+                self.phase, self.pt = "rest", t + 2.4
+            elif self.phase == "rest":
+                if any(p.score >= 2 for p in self.players):
+                    return self.finish(next(p.i for p in self.players if p.score >= 2), "throws")
+                self.phase, self.pt, self.c = "ready", t + 2.0, [0, 0]
+        self.send_state({"ph": self.phase, "left": round(max(0.0, self.pt - t), 1), "c": list(self.c)})
+
+
+class KiteRoom(MiniRoom):
+    """Kite fight: each player flies a kite round the sky; while the two kites are close and you pull, the other string frays. The string that is cut first loses."""
+    TICK = 0.1
+    TIME_LIMIT = 90.0
+    KITE_SPEED = 48.0
+
+    def setup(self):
+        for p in self.players:
+            p.x, p.y, p.string, p.pull_until = (22.0, 78.0)[p.i % 2], 30.0, 100.0, 0.0
+
+    def msg(self, p, m):
+        t, tm = m.get("t"), now()
+        if t == "kite":
+            dt = max(0.03, min(0.5, tm - p.last_t))
+            p.last_t = tm
+            x, y = num(m.get("x"), 2, 98, p.x), num(m.get("y"), 4, 56, p.y)
+            lim = self.KITE_SPEED * dt + 1.0
+            d = math.hypot(x - p.x, y - p.y)
+            if d > lim:
+                x, y = p.x + (x - p.x) * lim / d, p.y + (y - p.y) * lim / d
+            p.x, p.y = x, y
+        elif t == "pull" and tm >= p.cool:
+            p.pull_until, p.cool = tm + 0.5, tm + 1.3
+
+    def step(self, dt):
+        t = now()
+        a, b = self.players
+        for p, o in ((a, b), (b, a)):
+            if p.bot:                                           # a practice bot drifts towards the other kite and pulls when it gets close
+                p.x += max(-22 * dt, min(22 * dt, o.x - p.x + random.uniform(-6, 6)))
+                p.y += max(-22 * dt, min(22 * dt, o.y - p.y + random.uniform(-4, 4)))
+                p.x, p.y = max(2.0, min(98.0, p.x)), max(4.0, min(56.0, p.y))
+                if t >= p.cool and abs(p.x - o.x) < 9 and abs(p.y - o.y) < 8 and random.random() < 0.5:
+                    p.pull_until, p.cool = t + 0.5, t + 1.6
+        if abs(a.x - b.x) < 9 and abs(a.y - b.y) < 8:
+            ap, bp = t < a.pull_until, t < b.pull_until
+            if ap and bp:
+                a.string -= 15 * dt
+                b.string -= 15 * dt
+            elif ap:
+                b.string -= 40 * dt
+            elif bp:
+                a.string -= 40 * dt
+        a.string, b.string = max(0.0, a.string), max(0.0, b.string)
+        for p in self.players:
+            p.score = int(p.string)
+        if a.string <= 0 or b.string <= 0:
+            return self.finish(-1 if a.string <= 0 and b.string <= 0 else b.i if a.string <= 0 else a.i, "cut")
+        self.send_state({"p": [[round(p.x, 1), round(p.y, 1), round(p.string, 1), 1 if t < p.pull_until else 0] for p in self.players]})
+
+
+class BallRoom(MiniRoom):
+    """Pok-ta-pok, a little like volleyball on the Great Ball Court: keep the ball off the ground on your side. It scores 1 when it lands on the other side, and 3 when it goes through
+    the stone ring high on the other team's wall. First to 7."""
+    TICK = 0.05
+    TIME_LIMIT = 150.0
+    NET_H, RING = 12.0, (21.0, 27.0)
+    GOAL = 7
+
+    def setup(self):
+        for p in self.players:
+            p.x = (25.0, 75.0)[p.i % 2]
+        self.serve(0)
+
+    def serve(self, side):
+        self.bx, self.by, self.bvx, self.bvy = 25.0 + 50.0 * side, 34.0, 0.0, 0.0
+        self.hold = now() + 1.2
+
+    def msg(self, p, m):
+        t, tm = m.get("t"), now()
+        if t == "ballx":
+            dt = max(0.03, min(0.5, tm - p.last_t))
+            p.last_t = tm
+            lo, hi = (3.0, 47.0) if p.i == 0 else (53.0, 97.0)
+            x = num(m.get("x"), lo, hi, p.x)
+            p.x = max(p.x - (45.0 * dt + 1.0), min(p.x + (45.0 * dt + 1.0), x))
+        elif t == "hit":
+            self.hit(p, tm)
+
+    def hit(self, p, tm):
+        if tm < p.cool or tm < self.hold or abs(self.bx - p.x) > 9 or self.by > 16:
+            return
+        d = 1.0 if p.i == 0 else -1.0
+        self.bvx, self.bvy = d * (16.0 + random.random() * 10.0), 30.0 + random.random() * 6.0
+        p.cool = tm + 0.35
+        self.events.append(["hit", p.i])
+
+    def point(self, w, pts, why):
+        self.players[w].score += pts
+        self.events.append(["point", w, pts, why])
+        if self.players[w].score >= self.GOAL:
+            return self.finish(w, "score")
+        self.serve(1 - w)
+
+    def step(self, dt):
+        t = now()
+        for p in self.players:
+            if p.bot:
+                lo, hi = (3.0, 47.0) if p.i == 0 else (53.0, 97.0)
+                goal = max(lo, min(hi, self.bx + (4.0 if p.i == 0 else -4.0)))
+                p.x += max(-28 * dt, min(28 * dt, goal - p.x))
+                if abs(self.bx - p.x) < 7 and self.by < 14 and self.bvy <= 0 and random.random() < 0.7:
+                    self.hit(p, t)
+        if t >= self.hold:
+            px = self.bx
+            self.bvy -= 42.0 * dt
+            self.bx += self.bvx * dt
+            self.by += self.bvy * dt
+            if (px - 50.0) * (self.bx - 50.0) < 0 and self.by < self.NET_H:     # the net
+                self.bx, self.bvx = px, -self.bvx * 0.4
+            if self.bx <= 0.0 or self.bx >= 100.0:                               # the walls, with a stone ring high on each
+                left = self.bx <= 0.0
+                if self.RING[0] < self.by < self.RING[1]:
+                    return self.point(1 if left else 0, 3, "ring")
+                self.bx, self.bvx = (0.0 if left else 100.0), -self.bvx * 0.6
+            if self.by <= 0.0:
+                return self.point(1 if self.bx < 50.0 else 0, 1, "ground")
+        self.send_state({"b": [round(self.bx, 1), round(self.by, 1)], "p": [round(p.x, 1) for p in self.players]})
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # chariot derby: the same Circus track, but nobody has to finish: ram the others. Each chariot has 100 health; a hit from behind hurts the one in front most and
 # the harder, the faster you were going. A wrecked chariot is out. The last chariot running wins. The server decides every hit (the browsers only say where they are).
 
@@ -1611,7 +1871,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1654,6 +1914,14 @@ def match_once():
         DerbyRoom(humans, bots=max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0)
     elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DerbyRoom([q.pop(0)], bots=3)
+
+    for kind, room_class in (("kushti", KushtiRoom), ("kites", KiteRoom), ("ball", BallRoom)):
+        q = QUEUES[kind]
+        q[:] = [c for c in q if not c.closed]
+        while len(q) >= 2:
+            room_class(kind, [q.pop(0), q.pop(0)])
+        if len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+            room_class(kind, [q.pop(0)], bots=1)
 
     q = QUEUES["coop"]
     q[:] = [c for c in q if not c.closed]
@@ -1794,8 +2062,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game"}
 
 
 def where_is(c):
@@ -3344,6 +3612,19 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 
 CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
 CHAL_TTL = 45.0
+CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball")      # what the challenger can pick
+CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok"}
+
+
+def chal_room(game, a, b):
+    if game == "duel":
+        DuelRoom([a, b], ranked=True)
+    elif game == "brawl":
+        ArenaRoom([(a, 0), (b, 0)], "brawl")
+    elif game == "derby":
+        DerbyRoom([a, b])
+    else:
+        {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}[game](game, [a, b])
 
 
 def conn_by_id(cid):
@@ -3383,10 +3664,11 @@ def on_challenge(conn, m):
             return conn.send({"t": "chal", "a": "no", "msg": "You are in a game already."})
         if target is None or target is conn or not chal_free(target):
             return conn.send({"t": "chal", "a": "no", "msg": "They are not free right now."})
+        game = m.get("game") if m.get("game") in CHAL_GAMES else "duel"
         chal_clear(conn)
         conn.chal_t = t
-        CHALLENGES[conn.id] = {"to": target.id, "t": t}
-        target.send({"t": "chal", "a": "in", "from": conn.id, "name": conn.name, "r": rating_of(conn)["r"]})
+        CHALLENGES[conn.id] = {"to": target.id, "t": t, "game": game}
+        target.send({"t": "chal", "a": "in", "from": conn.id, "name": conn.name, "r": rating_of(conn)["r"], "game": game, "what": CHAL_NAMES[game]})
         return conn.send({"t": "chal", "a": "sent", "name": target.name})
     challenger = conn_by_id(str(m.get("from"))[:16])
     ch = CHALLENGES.get(challenger.id) if challenger else None
@@ -3403,7 +3685,7 @@ def on_challenge(conn, m):
             return conn.send({"t": "chal", "a": "no", "msg": "That challenge has run out."})
         leave_queue(challenger)
         leave_queue(conn)
-        DuelRoom([challenger, conn], ranked=True)
+        chal_room(ch.get("game", "duel"), challenger, conn)
 
 
 def on_shove(conn, m):

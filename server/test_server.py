@@ -846,6 +846,23 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((ma["mode"], ma["ranked"], mb["mode"]), ("duel", True, "duel"))
         self.assertEqual(sorted(p["name"].split(" ")[0] for p in ma["players"]), ["Ann", "Ben"])
 
+    async def test_challenge_lets_the_challenger_pick_the_game(self):
+        for game, mode in (("kushti", "kushti"), ("kites", "kites"), ("ball", "ball"), ("derby", "derby"), ("brawl", "brawl"), ("nonsense", "duel")):
+            a, b = await self.player("Ann"), await self.player("Ben")
+            ben = next(c for c in server.CONNS if c.name == "Ben")
+            a.send({"t": "challenge", "a": "send", "id": ben.id, "game": game})
+            inc = await b.until(lambda m: m["t"] == "chal" and m["a"] == "in")
+            self.assertEqual(inc["game"], "duel" if game == "nonsense" else game)
+            b.send({"t": "challenge", "a": "accept", "from": inc["from"]})
+            ma = await a.until(lambda m: m["t"] == "match", timeout=4)
+            self.assertEqual(ma["mode"], mode)
+            for c in list(server.CONNS):
+                if c.room:
+                    c.room.task.cancel()
+                c.close()
+            server.CONNS.clear()
+            await asyncio.sleep(0.2)
+
     async def test_challenge_declined_tells_the_challenger(self):
         a, b = await self.player("Ann"), await self.player("Ben")
         a.send({"t": "challenge", "a": "send", "id": next(c.id for c in server.CONNS if c.name == "Ben")})
@@ -887,6 +904,138 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         b.send({"t": "challenge", "a": "accept", "from": inc["from"]})
         no = await b.until(lambda m: m["t"] == "chal" and m["a"] == "no")
         self.assertTrue(no["msg"])
+
+    # ---------------------------------------------------------------- city games: kushti, kite fight, ball game
+
+    async def start_mini(self, kind, bots=False):
+        server.CFG["bot_wait"] = 0.5
+        if bots:
+            ws = [await self.player("Ann")]
+            ws[0].send({"t": "queue", "mode": kind, "bot": True})
+        else:
+            ws = [await self.player("Ann"), await self.player("Ben")]
+            for w in ws:
+                w.send({"t": "queue", "mode": kind})
+        ms = [await w.until(lambda m: m["t"] == "match", timeout=4) for w in ws]
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        return ws, ms, room
+
+    async def test_kushti_more_presses_win_the_throw_and_two_throws_win_the_bout(self):
+        ws, ms, room = await self.start_mini("kushti")
+        self.assertEqual((ms[0]["mode"], ms[0]["ranked"]), ("kushti", True))
+        for rnd in range(2):
+            room.pt = 0.0
+            room.step(0.2)                                    # ready -> mash
+            self.assertEqual(room.phase, "mash")
+            for _ in range(5):
+                ws[0].send({"t": "press"})
+            for _ in range(2):
+                ws[1].send({"t": "press"})
+            await asyncio.sleep(0.2)
+            room.pt = 0.0
+            room.step(0.2)                                    # mash -> rest, Ann takes the throw
+            self.assertEqual(room.players[0].score, rnd + 1)
+            room.pt = 0.0
+            room.step(0.2)
+        end = await ws[1].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["reason"]), ("kushti", 0, "throws"))
+        self.assertIn("rank", end)
+
+    async def test_kushti_a_draw_replays_and_presses_are_rate_limited(self):
+        ws, ms, room = await self.start_mini("kushti")
+        room.pt = 0.0
+        room.step(0.2)
+        for _ in range(60):
+            ws[0].send({"t": "press"})                        # a macro pressing far too fast
+        await asyncio.sleep(0.4)
+        self.assertLess(room.c[0], 15)
+        room.c = [4, 4]
+        room.pt = 0.0
+        room.step(0.2)
+        self.assertEqual([p.score for p in room.players], [0, 0])
+
+    async def test_kites_pulling_in_range_cuts_the_other_string(self):
+        ws, ms, room = await self.start_mini("kites")
+        a, b = room.players
+        a.x, a.y, b.x, b.y = 50.0, 30.0, 53.0, 31.0
+        a.pull_until = time.monotonic() + 5
+        for _ in range(30):
+            room.step(0.1)
+        self.assertLess(b.string, 90.0)
+        self.assertEqual(a.string, 100.0)                     # the one who did not pull is not hurt... and the puller is safe
+        b.pull_until = time.monotonic() + 5
+        a.string = b.string = 100.0
+        for _ in range(10):
+            room.step(0.1)
+        self.assertLess(a.string, 100.0)                      # pulling against each other frays both
+        self.assertLess(b.string, 100.0)
+
+    async def test_kites_too_far_apart_nothing_happens_and_a_cut_string_loses(self):
+        ws, ms, room = await self.start_mini("kites")
+        a, b = room.players
+        a.x, b.x = 10.0, 90.0
+        a.pull_until = time.monotonic() + 5
+        room.step(0.1)
+        self.assertEqual(b.string, 100.0)
+        a.x, a.y, b.x, b.y = 50.0, 30.0, 52.0, 30.0
+        b.string = 2.0
+        room.step(0.1)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["reason"]), ("kites", 0, "cut"))
+
+    async def test_kite_moves_are_speed_limited(self):
+        ws, ms, room = await self.start_mini("kites")
+        a = room.players[0]
+        a.last_t = time.monotonic() - 0.1
+        ws[0].send({"t": "kite", "x": 98, "y": 56})
+        await asyncio.sleep(0.2)
+        self.assertLess(a.x, 40.0)
+
+    async def test_ball_ground_ring_and_first_to_seven(self):
+        ws, ms, room = await self.start_mini("ball")
+        a, b = room.players
+        room.hold = 0.0
+        room.bx, room.by, room.bvx, room.bvy = 70.0, 0.3, 0.0, -10.0         # lands on Ben's side: Ann scores 1
+        room.step(0.05)
+        self.assertEqual((a.score, b.score), (1, 0))
+        room.hold = 0.0
+        room.bx, room.by, room.bvx, room.bvy = 0.4, 24.0, -30.0, 0.0         # flies into the ring on the left wall: Ben scores 3
+        room.step(0.05)
+        self.assertEqual((a.score, b.score), (1, 3))
+        a.score = 6
+        room.hold = 0.0
+        room.bx, room.by, room.bvx, room.bvy = 80.0, 0.3, 0.0, -10.0
+        room.step(0.05)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["score"]), ("ball", 0, [7, 3]))
+
+    async def test_ball_net_blocks_and_hits_need_you_to_be_near(self):
+        ws, ms, room = await self.start_mini("ball")
+        a, b = room.players
+        room.hold = 0.0
+        room.bx, room.by, room.bvx, room.bvy = 48.5, 5.0, 40.0, 0.0
+        room.step(0.1)
+        self.assertLess(room.bx, 50.0)                        # the net stopped it
+        a.x, room.bx, room.by, room.bvx, room.bvy = 20.0, 60.0, 5.0, 0.0, 0.0
+        ws[0].send({"t": "hit"})
+        await asyncio.sleep(0.2)
+        self.assertEqual(room.bvx, 0.0)                       # too far away: nothing happens
+        room.bx = 22.0
+        ws[0].send({"t": "hit"})
+        await asyncio.sleep(0.2)
+        self.assertGreater(room.bvx, 10.0)                    # a real hit sends it towards Ben's side
+
+    async def test_city_game_with_bots_and_leaving(self):
+        ws, ms, room = await self.start_mini("ball", bots=True)
+        self.assertEqual((len(ms[0]["players"]), ms[0]["ranked"]), (2, False))
+        room.hold = 0.0
+        room.bx, room.by, room.bvx, room.bvy = 75.0, 20.0, 0.0, 0.0
+        for _ in range(8):
+            room.step(0.05)
+        ws[0].w.close()
+        await asyncio.sleep(0.4)
+        self.assertTrue(room.over)
 
     # ---------------------------------------------------------------- chariot derby
 
