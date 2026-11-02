@@ -888,6 +888,85 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         no = await b.until(lambda m: m["t"] == "chal" and m["a"] == "no")
         self.assertTrue(no["msg"])
 
+    # ---------------------------------------------------------------- chariot derby
+
+    async def start_derby(self, n=2):
+        server.CFG["race_wait"] = 0.6
+        ws = [await self.player(nm) for nm in ("Ann", "Ben", "Cyd", "Dee")[:n]]
+        for w in ws:
+            w.send({"t": "queue", "mode": "derby", "bot": False})
+        ms = [await w.until(lambda m: m["t"] == "match", timeout=4) for w in ws]
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        room.start_at = 0.0                   # (no countdown)
+        return ws, ms, room
+
+    async def test_derby_match_has_staggered_chariots_and_no_finish_line(self):
+        ws, ms, room = await self.start_derby(3)
+        self.assertEqual(ms[0]["mode"], "derby")
+        self.assertEqual([p["s"] for p in ms[0]["players"]], [0.0, 7.0, 14.0])
+        self.assertGreater(ms[0]["laps"], 100)
+        room.step(0.1)
+        st = await ws[0].until(lambda m: m["t"] == "derby")
+        self.assertEqual(len(st["p"]), 3)
+        self.assertEqual(st["p"][0][4], 100)             # everyone starts on 100 health
+
+    async def test_derby_a_hit_from_behind_hurts_the_one_in_front_most(self):
+        ws, ms, room = await self.start_derby(2)
+        a, b = room.players
+        a.s, a.d, a.v = 100.0, 5.0, 25.0                 # Ann is behind and fast
+        b.s, b.d, b.v = 102.0, 5.5, 10.0                 # Ben is just ahead and slower
+        room.step(0.1)
+        self.assertLess(b.hp, a.hp)
+        self.assertLess(b.hp, 90.0)
+        self.assertLess(a.hp, 100.0)                     # the rammer is bruised too
+        before = (a.hp, b.hp)
+        room.step(0.1)                                   # the same touch does not count twice straight away
+        self.assertEqual((a.hp, b.hp), before)
+
+    async def test_derby_chariots_apart_do_not_hurt_each_other(self):
+        ws, ms, room = await self.start_derby(2)
+        a, b = room.players
+        a.s, a.d, b.s, b.d = 100.0, 0.0, 100.0, 10.0     # side by side but a lane apart
+        room.step(0.1)
+        self.assertEqual((a.hp, b.hp), (100.0, 100.0))
+        b.s, b.d = 100.0 + server.RACE_LEN, 0.0               # exactly a lap ahead is the same place on the track
+        room.step(0.1)
+        self.assertLess(a.hp, 100.0)
+
+    async def test_derby_a_wrecked_chariot_is_out_and_the_last_one_running_wins(self):
+        ws, ms, room = await self.start_derby(3)
+        a, b, c = room.players
+        a.s, a.d, a.v = 100.0, 5.0, 30.0
+        b.s, b.d, b.v = 102.0, 5.0, 0.0
+        c.s, c.d = 300.0, 0.0
+        b.hp = 3.0
+        room.step(0.1)
+        self.assertTrue(b.out)
+        st = await ws[0].until(lambda m: m["t"] == "derby")
+        self.assertTrue(any(e[0] == "wreck" and e[1] == 1 for e in st["ev"]))
+        self.assertFalse(room.over)                      # two are still running
+        c.hp, c.out = 0.0, True
+        room.order.append(c)
+        room.step(0.1)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["reason"], end["order"][0]["i"]), ("derby", "last", 0))
+        self.assertEqual([o["i"] for o in end["order"]], [0, 2, 1])    # Cyd was wrecked after Ben, so she is second
+        self.assertIn("rank", end)
+
+    async def test_derby_a_lone_player_who_asks_gets_three_bots(self):
+        server.CFG["bot_wait"] = 0.5
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "derby", "bot": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertEqual(len(m["players"]), 4)
+        room = next(c.room for c in server.CONNS if c.room)
+        s0 = [p.s for p in room.players if p.bot]
+        room.task.cancel()
+        room.start_at = 0.0
+        room.step(0.1)
+        self.assertTrue(all(p.s > s for p, s in zip([q for q in room.players if q.bot], s0)))     # the bots drive themselves
+
     # ---------------------------------------------------------------- arena brawl and 2v2
 
     async def start_arena(self, kind, n):

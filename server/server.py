@@ -1036,6 +1036,167 @@ class RaceRoom:
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# chariot derby: the same Circus track, but nobody has to finish: ram the others. Each chariot has 100 health; a hit from behind hurts the one in front most and
+# the harder, the faster you were going. A wrecked chariot is out. The last chariot running wins. The server decides every hit (the browsers only say where they are).
+
+DERBY_TIME = 150.0
+DERBY_COOL = 0.8         # seconds before the same two chariots can hurt each other again
+
+
+class Wreck(Racer):
+    """A chariot in the derby."""
+    def __init__(self, conn, index, bot=False):
+        super().__init__(conn, index, bot)
+        self.s = index * 7.0                  # staggered, so the ones at the back have someone to catch
+        self.hp, self.out = 100.0, False
+        self.d_goal = self.d
+
+
+class DerbyRoom:
+    kind = "derby"
+    TICK = 0.1
+
+    def __init__(self, conns, bots=0):
+        self.id = os.urandom(3).hex()
+        self.players = [Wreck(c, i) for i, c in enumerate(conns)]
+        for k in range(bots):
+            self.players.append(Wreck(None, len(self.players), bot=True))
+        self.start_at = now() + RACE_COUNTDOWN
+        self.over = False
+        self.events, self.order, self.cool = [], [], {}       # order: who was wrecked, first to last
+        for p in self.players:
+            if p.conn:
+                p.conn.room, p.conn.me, p.conn.queue = self, p, None
+        roster = [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look, "d": q.d, "s": q.s} for q in self.players]
+        for p in self.players:
+            if p.conn:
+                p.conn.send({"t": "match", "mode": "derby", "room": self.id, "you": p.i, "countdown": RACE_COUNTDOWN, "laps": 999, "length": round(RACE_LEN, 2), "players": roster})
+        self.task = asyncio.ensure_future(self.run())
+
+    def on_msg(self, conn, m):
+        p = conn.me
+        if self.over or p is None or p.out or m.get("t") != "race":
+            return
+        t = now()
+        if t < self.start_at:
+            return
+        if p.last_t is None:
+            p.last_t = max(self.start_at, t - 0.1)
+        dt = max(0.05, t - p.last_t)
+        p.last_t = t
+        s = num(m.get("s"), 0, 1e7)
+        if s < p.s - 3:                                   # cannot drive backwards
+            s = p.s
+        s = min(s, p.s + RACE_VMAX * dt + 2.0)            # cannot be faster than a chariot can go
+        p.v = (s - p.s) / dt
+        p.s, p.d = s, num(m.get("d"), -16, 26, p.d)
+
+    def leave(self, conn):
+        p = conn.me
+        if p is None or self.over:
+            return
+        p.conn, p.hp, p.out, p.v = None, 0.0, True, 0.0
+        if p not in self.order:
+            self.order.append(p)
+        if not any(q.conn for q in self.players):
+            self.finish("empty")
+        else:
+            self.check_end()
+
+    async def run(self):
+        try:
+            while not self.over:
+                await asyncio.sleep(self.TICK)
+                self.step(self.TICK)
+        except asyncio.CancelledError:
+            pass
+
+    def gap(self, a, b):
+        """How far b is ahead of a along the loop (negative: behind), wrapped round the lap."""
+        return (b.s - a.s + RACE_LEN / 2) % RACE_LEN - RACE_LEN / 2
+
+    def bot_drive(self, p, dt):
+        p.speed = max(15.0, min(23.0, p.speed + (random.random() - 0.5) * 2))
+        p.s += p.speed * dt
+        p.v = p.speed
+        prey, best = None, 45.0
+        for q in self.players:                              # aim for the nearest live chariot just ahead
+            if q is not p and not q.out and 0 < self.gap(p, q) < best:
+                prey, best = q, self.gap(p, q)
+        if prey is not None:
+            p.d_goal = prey.d
+        p.d += max(-5.0 * dt, min(5.0 * dt, p.d_goal - p.d))
+        p.d = max(-16.0, min(26.0, p.d))
+
+    def hurt(self, p, dmg):
+        p.hp = max(0.0, p.hp - dmg)
+        if p.hp <= 0 and not p.out:
+            p.out, p.v = True, 0.0
+            self.order.append(p)
+            self.events.append(["wreck", p.i])
+
+    def collide(self, t):
+        live = [p for p in self.players if not p.out]
+        for x, a in enumerate(live):
+            for b in live[x + 1:]:
+                g = self.gap(a, b)
+                if abs(g) > 3.4 or abs(a.d - b.d) > 2.2:
+                    continue
+                key = (a.i, b.i)
+                if self.cool.get(key, 0.0) > t:
+                    continue
+                self.cool[key] = t + DERBY_COOL
+                rear, front = (a, b) if g > 0 else (b, a)
+                dv = max(0.0, min(20.0, rear.v - front.v))
+                if abs(g) < 1.5:                            # side by side: both take a knock
+                    d1 = d2 = 4.0 + 0.3 * dv
+                else:
+                    d1, d2 = 5.0 + 1.0 * dv, 2.0 + 0.3 * dv     # the one in front takes the most
+                self.hurt(front, d1)
+                self.hurt(rear, d2)
+                self.events.append(["ram", rear.i, front.i, round(d1, 1)])
+
+    def step(self, dt):
+        t = now()
+        if t >= self.start_at:
+            for p in self.players:
+                if p.bot and not p.out:
+                    self.bot_drive(p, dt)
+            self.collide(t)
+        payload = {"t": "derby", "p": [[p.i, round(p.s, 1), round(p.d, 1), round(p.v, 1), round(p.hp), 1 if p.out else 0] for p in self.players], "ev": self.events}
+        self.events = []
+        for p in self.players:
+            if p.conn:
+                p.conn.send(payload)
+        if t >= self.start_at:
+            self.check_end()
+            if not self.over and t - self.start_at > DERBY_TIME:
+                self.finish("time")
+
+    def check_end(self):
+        if self.over:
+            return
+        alive = [p for p in self.players if not p.out]
+        if len(alive) <= 1 or not any(p.conn and not p.out for p in self.players):
+            self.finish("last")
+
+    def finish(self, reason):
+        if self.over:
+            return
+        self.over = True
+        up = sorted((p for p in self.players if not p.out), key=lambda p: -p.hp)
+        order = up + list(reversed(self.order))                # first place first
+        msg = {"t": "end", "mode": "derby", "reason": reason, "order": [{"i": p.i, "name": p.name, "hp": round(p.hp)} for p in order]}
+        humans = [(p.who, k) for k, p in enumerate(order) if p.who]
+        ranks = rate_placements(humans) if reason != "empty" else {}
+        for p in self.players:
+            if p.conn:
+                p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
+                p.conn.room = p.conn.me = None
+        self.task.cancel()
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # naval battle: every ship for itself (no teams). Players steer their own galley (the browser sends where it is, as
 # with duels, and the server clamps how fast it can move); the SERVER owns cannonballs, hits, rams, hull and the winner.
 
@@ -1450,7 +1611,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1483,6 +1644,16 @@ def match_once():
         RaceRoom([q.pop(0) for _ in range(min(4, len(q)))])
     elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         RaceRoom([q.pop(0)], bots=3)
+
+    q = QUEUES["derby"]
+    q[:] = [c for c in q if not c.closed]
+    if len(q) >= 4:
+        DerbyRoom([q.pop(0) for _ in range(4)])
+    elif len(q) >= 2 and t - q[1].queued_at >= CFG["race_wait"]:
+        humans = [q.pop(0) for _ in range(min(4, len(q)))]
+        DerbyRoom(humans, bots=max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0)
+    elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        DerbyRoom([q.pop(0)], bots=3)
 
     q = QUEUES["coop"]
     q[:] = [c for c in q if not c.closed]
@@ -1623,8 +1794,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby"}
 
 
 def where_is(c):

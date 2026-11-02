@@ -80,10 +80,10 @@ const Online = (() => {
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "race") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "world": onWorld(m); break;
       case "houses": Robbery.setHouses(m.h, m.mine); break;
@@ -91,9 +91,9 @@ const Online = (() => {
       case "heist": Robbery.begin(m); break;
       case "heistpos": Robbery.pos(m); break;
       case "heist_end": Robbery.end(m); break;
-      case "race": Race.onlineState(m); break;
+      case "race": case "derby": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
-      case "end": if ((m.mode === "race" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
+      case "end": if ((m.mode === "race" || m.mode === "derby" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race" || m.mode === "derby") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -111,6 +111,7 @@ const Online = (() => {
     $o("on-coop").disabled = !ready;
     $o("on-naval").disabled = !ready;
     $o("on-brawl").disabled = !ready;
+    $o("on-derby").disabled = !ready;
     $o("on-team2").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
@@ -366,6 +367,7 @@ const Online = (() => {
     $o("on-coop").addEventListener("click", () => queue("coop"));
     $o("on-naval").addEventListener("click", () => queue("naval"));
     $o("on-brawl").addEventListener("click", () => queue("brawl"));
+    $o("on-derby").addEventListener("click", () => queue("derby"));
     $o("on-team2").addEventListener("click", () => queue("team2"));
     $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);

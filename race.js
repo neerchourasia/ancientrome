@@ -35,7 +35,7 @@ const Race = (() => {
   let camMode = 0, keysRef = new Set();
 
   let scene, active = false, state = "idle", t = 0, elapsed = 0, endT = 0, camYaw = 0;
-  let cars = [], me = null, msgTimer, watching = false, entryFee = 0, online = false; // entryFee: what you paid this race (your class can lower it)
+  let cars = [], me = null, msgTimer, watching = false, entryFee = 0, online = false, derby = false; // entryFee: what you paid this race (your class can lower it)
   const el = (id) => document.getElementById(id);
 
   // ---------- track geometry ----------
@@ -153,7 +153,7 @@ const Race = (() => {
 
   function stop(title, text, buttons) {
     if (!active) return;
-    if (online) { online = false; Online.leaveGame(); } // leaving a live race
+    if (online) { online = false; derby = false; Online.leaveGame(); } // leaving a live race
     // Racing wears the horses out, and finishing a race takes even more out of them.
     if (!watching && me) Vitals.horses = Math.max(5, me.horse - (me.finished ? 12 : 0));
     active = false; state = "idle";
@@ -182,7 +182,7 @@ const Race = (() => {
   }
 
   const lapOf = (c) => Math.min(LAPS, Math.floor(c.s / LEN) + 1);
-  const ranking = () => [...cars].sort((a, b) => (a.finished && b.finished ? a.finishT - b.finishT : a.finished ? -1 : b.finished ? 1 : b.s - a.s));
+  const ranking = () => derby ? [...cars].sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.hp - a.hp) : [...cars].sort((a, b) => (a.finished && b.finished ? a.finishT - b.finishT : a.finished ? -1 : b.finished ? 1 : b.s - a.s));
 
   // ---------- physics ----------
 
@@ -221,6 +221,7 @@ const Race = (() => {
   }
 
   function stepCar(c, dt, keys) {
+    if (c.out) { c.v = Math.max(0, c.v - 18 * dt); c.s += c.v * dt; c.phase += c.v * dt * 1.6; return; }   // a wrecked chariot rolls to a stop
     const p = pathAt(c.s, c.d);
     let target = VMAX * c.skill, accel = 9, steer = 0;
 
@@ -330,7 +331,8 @@ const Race = (() => {
           x.v *= x === rear ? 0.6 : 0.8;
           if (x.player) Sfx.play("crash");
           x.slowT = CRASH_T; x.hitCd = 0.9;
-          if (x.player) { x.shake = 0.7; el("flash").style.opacity = 0.35; Vitals.hp = Math.max(0, Vitals.hp - 14); msg("Collision! You lose speed and are bruised", 900); }
+          if (x.player && derby) x.shake = 0.5;     // (the derby counts the damage on the server)
+          else if (x.player) { x.shake = 0.7; el("flash").style.opacity = 0.35; Vitals.hp = Math.max(0, Vitals.hp - 14); msg("Collision! You lose speed and are bruised", 900); }
         }
       }
     }
@@ -377,6 +379,7 @@ const Race = (() => {
       c.yaw += angDiff(c.yaw, pathYaw + lean) * Math.min(1, dt * 10);
       c.model.g.position.set(p.x, 0.05 + Math.sin(c.phase * 2) * 0.02, p.z);
       c.model.g.rotation.y = c.yaw;
+      c.model.g.rotation.z += ((c.out ? 0.5 : 0) - c.model.g.rotation.z) * Math.min(1, dt * 6);   // a wrecked chariot tips over
       for (const w of c.model.wheels) w.rotation.x = c.phase * 1.2;
       c.model.horses.forEach((hs, i) => {
         hs.h.position.y = Math.abs(Math.sin(c.phase * 1.4 + i)) * 0.12 * Math.min(1, c.v / 10);
@@ -423,15 +426,15 @@ const Race = (() => {
   // ---- live races against real people: the other chariots are driven by what the game server tells us ----
   function startOnline(m) {
     if (active) return;
-    watching = false; online = true; LAPS = m.laps || 3;
+    watching = false; online = true; derby = m.mode === "derby"; LAPS = m.laps || 3;
     active = true; mode = "race"; state = "countdown"; t = m.countdown || 4; elapsed = 0;
     for (const c of cars) scene.remove(c.model.g);
     cars = m.players.map((pl, i) => {
       const team = { ...TEAMS[i % TEAMS.length], name: pl.name };
       return {
         skill: 1, restAt: 1e9, resumeAt: 1e9, aggressive: false, team, model: makeChariot(team), player: i === m.you, remote: i !== m.you,
-        s: 0, d: pl.d, v: 0, phase: 0, whip: 0, stam: 100, laneGoal: pl.d, laneT: 2, finished: false, finishT: 0, bump: 0, yaw: 0,
-        slowT: 0, hitCd: 0, shake: 0, pace: 7, horse: 100, tired: false, cruise: false, sv: 0, pd: pl.d, lean: 0, pathYaw: 0, hopTo: null,
+        s: pl.s || 0, d: pl.d, v: 0, phase: 0, whip: 0, stam: 100, laneGoal: pl.d, laneT: 2, finished: false, finishT: 0, bump: 0, yaw: 0,
+        slowT: 0, hitCd: 0, shake: 0, pace: 7, horse: 100, tired: false, cruise: false, sv: 0, pd: pl.d, lean: 0, pathYaw: 0, hopTo: null, hp: 100, out: false,
       };
     });
     me = cars[m.you];
@@ -444,7 +447,7 @@ const Race = (() => {
     Crowd.setCheer(true);
     closePanels();
     updateHud();
-    msg("Racing real people. Ave!", 2000);
+    msg(derby ? "Chariot derby! Ram the others. The last chariot running wins." : "Racing real people. Ave!", 2400);
   }
 
   function stepRemote(c, dt) {
@@ -457,9 +460,15 @@ const Race = (() => {
 
   function onlineState(m) {
     if (!online) return;
-    for (const [i, s, d, v] of m.p) {
-      const c = cars[i];
-      if (c && c.remote) { c.tS = s; c.tD = d; c.tV = v; }
+    for (const row of m.p) {
+      const [i, s, d, v, hp, out] = row, c = cars[i];
+      if (!c) continue;
+      if (c.remote) { c.tS = s; c.tD = d; c.tV = out ? 0 : v; }
+      if (derby && hp !== undefined) {
+        if (c === me && hp < c.hp - 0.5) { c.shake = 0.8; el("flash").style.opacity = 0.4; Sfx.play("crash"); }
+        c.hp = hp;
+        if (out && !c.out) { c.out = true; if (c === me) { msg("Your chariot is wrecked! Stay and watch how it ends.", 3500); Sfx.play("hurt"); } else Sfx.play("crash"); }
+      }
     }
   }
 
@@ -468,6 +477,17 @@ const Race = (() => {
     online = false;
     const idx = cars.indexOf(me), rank = m.order.findIndex((o) => o.i === idx) + 1;
     const ords = ["", "1st", "2nd", "3rd", "4th"];
+    if (derby) {
+      derby = false;
+      const prize = rank === 1 ? 70 : rank === 2 && m.order.length >= 3 ? 25 : 0;
+      Vitals.coins += prize;
+      const why = rank === 1 ? "You are the last chariot running!" : m.reason === "time" ? `Time ran out. You finished ${ords[rank]}.` : `Your chariot was wrecked. You finished ${ords[rank] || "last"}.`;
+      stop(rank === 1 ? "Derby champion!" : `You finished ${ords[rank] || "last"}`, `${why}${prize ? ` Prize: +${prize} denarii.` : ""}`, [
+        { label: "Derby again", fn: () => { closePanels(); Online.openLobby(); } },
+        { label: "Leave the circus", fn: closePanels },
+      ]);
+      return;
+    }
     const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
     const prize = rank === 1 ? 60 : rank === 2 ? 25 : 0;
     Vitals.coins += prize;
@@ -512,13 +532,13 @@ const Race = (() => {
       el("race-horse").style.width = `${me.horse}%`;
       el("race-horse").style.background = me.tired ? "#c0392b" : me.horse < 35 ? "#e2b955" : "#3aa557";
     }
-    el("race-lap").textContent = `Lap ${lapOf(focus)} / ${LAPS}`;
+    el("race-lap").textContent = derby ? `Derby: ${cars.filter((c) => !c.out).length} of ${cars.length} chariots left` : `Lap ${lapOf(focus)} / ${LAPS}`;
     el("race-speed").textContent = `${Math.round(focus.v * 3.6)} km/h`;
     if (me) {
-      el("race-pos").textContent = `${["1st", "2nd", "3rd", "4th"][order.indexOf(me)]} of ${cars.length}`;
+      el("race-pos").textContent = derby ? (me.out ? "WRECKED" : `Chariot ${Math.round(me.hp)}%`) : `${["1st", "2nd", "3rd", "4th"][order.indexOf(me)]} of ${cars.length}`;
       el("race-stam").style.width = `${me.stam}%`;
     } else el("race-pos").textContent = "Spectating";
-    el("race-order").innerHTML = order.map((c, i) => `<li><span class="sw" style="background:#${c.team.color.toString(16).padStart(6, "0")}"></span>${i + 1}. ${c.team.name}${c.player ? " (you)" : ""}${!c.player && c.resting ? " (resting)" : ""}</li>`).join("");
+    el("race-order").innerHTML = order.map((c, i) => `<li><span class="sw" style="background:#${c.team.color.toString(16).padStart(6, "0")}"></span>${i + 1}. ${c.team.name}${c.player ? " (you)" : ""}${!c.player && c.resting ? " (resting)" : ""}${derby ? (c.out ? " (wrecked)" : ` ${Math.round(c.hp)}%`) : ""}</li>`).join("");
   }
 
   return { init, start, startOnline, onlineState, onlineEnd, isOnline: () => online, stop: () => stop(), update, whip, setPace, toggleCruise, hop, cycleCamera, camera: camera_, leader: () => ranking()[0], speed: () => (me ? me.v : 0), get active() { return active; }, debug: () => ({ state, LEN, LAPS, cars }) };
