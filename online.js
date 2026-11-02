@@ -179,11 +179,9 @@ const Online = (() => {
     return city === "cancun" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Math.abs(player.x - (CANCUN_X - 150)) < 14 && Math.abs(player.z + 35) < 36;
   }
   function playBall() {
-    if (typeof Account !== "undefined" && Account.demo) { toast("Playing against other people needs an account: log in first."); return; }
+    if (typeof Account !== "undefined" && Account.demo) { toast("Pok-ta-pok needs the game server, so it needs an account: log in first."); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
-    $o("on-bot").checked = true;
-    queue("ball");
-    toast("Looking for someone to play pok-ta-pok with... a practice bot joins if nobody comes.");
+    send({ t: "queue", mode: "ball", bot: true, practice: true });      // a practice game against a bot at once (play real people from the PvP menu)
   }
 
   function queue(game) {

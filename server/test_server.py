@@ -1042,6 +1042,14 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(a.x, 12.5)
         self.assertLessEqual(a.z, -0.8)
 
+    async def test_practice_game_starts_straight_away_against_a_bot(self):
+        server.CFG["bot_wait"] = 30.0                        # (so a normal queue would wait a long time)
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "ball", "bot": True, "practice": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=2)
+        self.assertEqual((m["mode"], len(m["players"]), m["ranked"]), ("ball", 2, False))
+        self.assertTrue(m["players"][1]["name"].endswith("(practice bot)"))
+
     async def test_city_game_with_bots_and_leaving(self):
         ws, ms, room = await self.start_mini("ball", bots=True)
         self.assertEqual((len(ms[0]["players"]), ms[0]["ranked"]), (2, False))

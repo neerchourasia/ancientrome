@@ -1323,6 +1323,8 @@ class BallRoom(MiniRoom):
         self.send_state({"b": [round(x, 2) for x in self.b], "p": [[round(p.x, 2), round(p.z, 2), round(p.yaw, 2)] for p in self.players]})
 
 
+MINI_ROOMS = {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}
+
 # ---------------------------------------------------------------------------------------------------------------
 # chariot derby: the same Circus track, but nobody has to finish: ram the others. Each chariot has 100 health; a hit from behind hurts the one in front most and
 # the harder, the faster you were going. A wrecked chariot is out. The last chariot running wins. The server decides every hit (the browsers only say where they are).
@@ -3996,6 +3998,10 @@ async def handle_msg(conn, m):
             return conn.send({"t": "error", "code": "busy", "msg": "You are already in a game"})
         if mode == "naval":
             conn.ship = clean_ship(m.get("ship"))
+        if m.get("practice") and mode in MINI_ROOMS and CFG["allow_bots"]:       # F on the ball court (like F in the Colosseum): a practice game against a bot, straight away
+            leave_queue(conn)
+            MINI_ROOMS[mode](mode, [conn], bots=1)
+            return
         return enqueue(conn, mode, m.get("bot"))
     if t == "leave":
         leave_queue(conn)

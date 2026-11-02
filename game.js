@@ -334,10 +334,12 @@ function wireInput(canvas) {
       for (const g of groups) { const h = g.querySelector(".mh"), id = h.textContent; h.classList.toggle("alert", !g.classList.contains("open") && ((id === "Money and work" && gift()) || (id === "People" && msgs()))); }
     }, 1500);
   }
-  $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); toast(Music.on ? "Music on" : "Music off"); });
+  $("#btn-music").addEventListener("click", () => { Sfx.init(); Music.toggle(); refreshMusicButton(); refreshMuteButton(); toast(Music.on ? "Music on" : "Music off"); });
   refreshMusicButton();
   $("#btn-voice").addEventListener("click", toggleVoice);
   refreshVoiceButton();
+  $("#btn-mute").addEventListener("click", toggleMuteAll);
+  refreshMuteButton();
   refreshSoundButton();
   $("#dirs-nearest").addEventListener("click", guideMe);
   $("#dirs-home").addEventListener("click", () => startDirections(LANDMARKS.find((l) => l.home)));
@@ -1100,13 +1102,25 @@ function refreshVoiceButton() { $("#btn-voice").firstChild.textContent = Narrato
 function toggleVoice() {
   if (!Narrator.supported) { toast("This browser can't read text aloud"); return; }
   Narrator.toggle();
-  refreshVoiceButton();
+  refreshVoiceButton(); refreshMuteButton();
   toast(Narrator.on ? "Voice on: captions will be read aloud" : "Voice off");
   if (Narrator.on) Narrator.say("The narrator is on.", { repeat: true });
 }
 function refreshSoundButton() { $("#btn-sound").firstChild.textContent = Sfx.on ? "Sound on " : "Sound off "; }
 function refreshMusicButton() { $("#btn-music").textContent = Music.on ? "Music on" : "Music off"; }
-function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); toast(Sfx.on ? "Sound on" : "Sound off"); }
+// "Mute everything": the sound effects, the music and the voice all go off together; pressed again, they all come back on
+function refreshMuteButton() { const b = $("#btn-mute"); if (b) b.textContent = Sfx.on || Music.on || Narrator.on ? "🔇 Mute everything" : "🔊 Sound back on"; }
+function toggleMuteAll() {
+  Sfx.init();
+  const mute = Sfx.on || Music.on || Narrator.on;
+  if (Sfx.on === mute) Sfx.toggle();
+  if (Music.on === mute) Music.toggle();
+  if (Narrator.on === mute && Narrator.supported) Narrator.toggle();
+  if (mute && typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  refreshSoundButton(); refreshMusicButton(); refreshVoiceButton(); refreshMuteButton();
+  toast(mute ? "Everything is muted: sound, music and voice are all off" : "Sound, music and voice are back on");
+}
+function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); refreshMuteButton(); toast(Sfx.on ? "Sound on" : "Sound off"); }
 
 // ---------- Ancient Rome / Modern Rome ----------
 
@@ -1252,7 +1266,7 @@ function updatePrompt() {
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && mode === "walk") { const sp = shovablePlayer().peer; if (sp) { text = `R: shove ${sp.name}`; p.dataset.kind = "shove"; } }
-    if (!text && Online.atBallCourt()) { text = "F: play pok-ta-pok on the Great Ball Court (against a person or a practice bot)"; p.dataset.kind = "ball"; }
+    if (!text && Online.atBallCourt()) { text = "F: play pok-ta-pok against a practice bot (to play a real person, use the PvP menu)"; p.dataset.kind = "ball"; }
     if (!text && city === "cancun") { const ct = Cancun.promptText(); if (ct) { text = ct; p.dataset.kind = "cancun"; } }
     if (!text && Cage.at(player.x, player.z, player.feet)) { text = "F: open the cage (choose which animal comes with you)"; p.dataset.kind = "cage"; }
     if (!text) { const hb = Harbour.at(player.x, player.z, player.feet); if (hb) { text = hb.text; p.dataset.kind = "harbour"; } }
