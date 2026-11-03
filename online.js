@@ -85,7 +85,8 @@ const Online = (() => {
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "dragon" ? "other crews" : m.mode === "wushu" ? "a wushu opponent" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "watch": Mini.onWatch(m); break;
+      case "match": waiting = false; setMsg(""); if (m.watch) { Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;
@@ -428,6 +429,7 @@ const Online = (() => {
     $o("on-close").addEventListener("click", () => { if (waiting) leaveQueue(); closePanels(); });
     $o("btn-online").addEventListener("click", openLobby);
     $o("btn-chal").addEventListener("click", openChallenge);
+    $o("btn-watchm").addEventListener("click", () => Mini.openWatch());
     setInterval(comeBack, 700);
     $o("ch-refresh").addEventListener("click", () => { if (welcome) send({ t: "challenge", a: "list" }); });
   }

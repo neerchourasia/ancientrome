@@ -1244,6 +1244,42 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"weekly": {"week": 3, "scores": {"not a friend id": {"pts": 99}}, "prizes": {"zz": [1]}}})       # junk is ignored
         self.assertEqual(server.WEEKLY["scores"], {})
 
+    # ---------------------------------------------------------------- watching a match
+
+    async def test_watch_a_match_between_two_people(self):
+        ws, ms, room = await self.start_mini("xiangqi")
+        cy = await self.player("Cy")
+        cy.send({"t": "watch", "a": "list"})
+        lst = (await cy.until(lambda m: m["t"] == "watch" and m["a"] == "list"))["list"]
+        self.assertEqual([(r["kind"], sorted(r["names"]), r["n"]) for r in lst], [("xiangqi", ["Ann", "Ben"], 0)])
+        cy.send({"t": "watch", "a": "join", "room": lst[0]["room"]})
+        joined = await cy.until(lambda m: m["t"] == "match")
+        self.assertTrue(joined["watch"])
+        self.assertEqual([p["name"] for p in joined["players"]], ["Ann", "Ben"])
+        room.send_state(room.state())                                                  # the board is sent to everyone, watchers included
+        got = await cy.until(lambda m: m["t"] == "mini")
+        self.assertEqual((got["k"], got["turn"], got["w"]), ("xiangqi", 0, 1))
+        f, t = next(mv for mv in room.legal if room.board[mv[0]] == "C")
+        cy.send({"t": "move", "f": f, "to": t})                                        # a watcher cannot move
+        await asyncio.sleep(0.2)
+        self.assertEqual(room.moves_n, 0)
+        ws[1].send({"t": "resign"})
+        end = await cy.until(lambda m: m["t"] == "end", timeout=3)                    # and is told how it ended
+        self.assertEqual((end["winner"], end["reason"], end.get("watch")), (0, "resign", True))
+        self.assertEqual(server.watch_list(), [])                                      # a finished match is no longer listed
+
+    async def test_watch_refuses_games_vs_bots_busy_players_and_ended_matches(self):
+        ws, ms, room = await self.start_mini("xiangqi", bots=True)                    # a practice game against a bot: not listed
+        cy = await self.player("Cy")
+        cy.send({"t": "watch", "a": "list"})
+        self.assertEqual((await cy.until(lambda m: m["t"] == "watch"))["list"], [])
+        cy.send({"t": "watch", "a": "join", "room": "nope"})
+        no = await cy.until(lambda m: m["t"] == "watch" and m["a"] == "no")
+        self.assertIn("over", no["msg"])
+        ws[0].send({"t": "watch", "a": "join", "room": room.id})                      # someone in a game cannot watch another
+        no = await ws[0].until(lambda m: m["t"] == "watch" and m["a"] == "no")
+        self.assertIn("own game", no["msg"])
+
     # ---------------------------------------------------------------- xiangqi (Chinese chess)
 
     def xq(self, rows):

@@ -20,6 +20,7 @@ const Mini = (() => {
   let bg = null;      // the 3D ball game: { ball (the mesh), fig (the other player's figure), hud, last (when each player last hit) }
   const send = (o) => Online.navalSend(o);
   const me = () => (m ? m.you : 0), foe = () => 1 - me();
+  const mine = (i) => !!m && !m.watch && i === m.you;                  // (when you are only watching, nobody on the screen is you)
   const nameOf = (i) => (m && m.players[i] ? m.players[i].name : "?");
 
   function build() {
@@ -33,7 +34,7 @@ const Mini = (() => {
   // ------------------------------------------------------------------ starting, keys and the loop
   function start(msg) {
     if (m) return;
-    if (typeof mode === "undefined" || mode !== "walk") { send({ t: "leave" }); return; }
+    if (typeof mode === "undefined" || mode !== "walk") { send(msg.watch ? { t: "watch", a: "leave" } : { t: "leave" }); return; }
     if (msg.mode === "ball") return start3d(msg);
     if (msg.mode === "dragon") return startDragon(msg);
     if (!ov) build();
@@ -41,13 +42,14 @@ const Mini = (() => {
     if (document.pointerLockElement) document.exitPointerLock();
     m = msg; st = null; note = ""; held.clear(); kite = { x: m.you === 0 ? 22 : 78, y: 30 }; hitAt = [0, 0]; pullAt = [0, 0];
     mode = "online";
-    head.textContent = `${TITLES[m.kind || m.mode]}${m.ranked ? " (ranked)" : ""}`;
-    m.kind = m.mode; help.textContent = HELP[m.kind];
+    m.title = m.watch ? `👀 ${m.players.map((p) => p.name).join(" vs ")}` : `${TITLES[m.mode]}${m.ranked ? " (ranked)" : ""}`; head.textContent = m.title;
+    m.kind = m.mode; help.textContent = m.watch ? "You are watching this match. Press Esc or the button to stop." : HELP[m.kind];
+    ov.querySelector("#mini-leave").textContent = m.watch ? "Stop watching" : "Leave the game";
     if (m.kind === "xiangqi") xqSetup();
     ov.classList.add("show");
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
-    Sfx.play("horn");
+    if (!m.watch) Sfx.play("horn");
   }
 
   const GAME_KEYS = new Set(["Space", "KeyA", "KeyD", "KeyW", "KeyS", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Escape"]);
@@ -55,7 +57,7 @@ const Mini = (() => {
     if (!m || !GAME_KEYS.has(e.code)) return;
     e.preventDefault(); e.stopPropagation();
     if (e.code === "Escape") { leave(); return; }
-    if (e.repeat) return;
+    if (e.repeat || m.watch) return;
     held.add(e.code);
     if (e.code === "Space") {
       if (m.kind === "kushti") { if (st && st.ph === "mash") send({ t: "press" }); }
@@ -68,7 +70,7 @@ const Mini = (() => {
   function loop(now) {
     if (!m) return;
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    if (m.kind === "kites") {
+    if (m.kind === "kites" && !m.watch) {
       kite.x = Math.max(2, Math.min(98, kite.x + dir(["KeyA", "ArrowLeft"], ["KeyD", "ArrowRight"]) * 40 * dt));
       kite.y = Math.max(4, Math.min(56, kite.y + dir(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) * 40 * dt));
       sendT -= dt; if (sendT <= 0) { sendT = 0.08; send({ t: "kite", x: +kite.x.toFixed(1), y: +kite.y.toFixed(1) }); }
@@ -81,12 +83,13 @@ const Mini = (() => {
   function on(s) {
     if (!m || s.k !== m.kind) return;
     st = s;
+    if (head && m.title) head.textContent = m.title + (s.w ? ` · 👀 ${s.w} watching` : "");
     for (const e of s.ev || []) {
       if (e[0] === "move") { Sfx.play(e[4] ? "hit" : "clack"); if (e[1] !== me()) setNote(e[4] ? "They took a piece." : ""); }
-      else if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
+      else if (e[0] === "throw") { Sfx.play("hit"); setNote(mine(e[1]) ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
       else if (e[0] === "draw") setNote("A draw: the throw is wrestled again.");
       else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("bounce"); }
-      else if (e[0] === "point") { Sfx.play(e[3] === "ring" ? "ring" : e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${e[1] === me() ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
+      else if (e[0] === "point") { Sfx.play(e[3] === "ring" ? "ring" : e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${mine(e[1]) ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
     }
     if (m.kind === "kites" && s.p) for (let i = 0; i < 2; i++) if (s.p[i][3]) pullAt[i] = performance.now();
   }
@@ -96,7 +99,7 @@ const Mini = (() => {
   const label = (t, x, y, size = 18, color = "#fff3cf", align = "center") => { g.font = `bold ${size}px Georgia, serif`; g.textAlign = align; g.fillStyle = color; g.fillText(t, x, y); };
   function scoreLine() {
     const s = st ? st.s : [0, 0];
-    const col = (i) => (i === me() ? "#9fe0ff" : "#ffb09c");
+    const col = (i) => (i === me() ? "#9fe0ff" : "#ffb09c");          // (when watching, the first player is blue and the second red)
     label(`${nameOf(0)}`, 150, 26, 16, col(0)); label(`${s[0]}`, 280, 30, 26, col(0));
     label("–", 320, 28, 22); label(`${s[1]}`, 360, 30, 26, col(1)); label(`${nameOf(1)}`, 490, 26, 16, col(1));
   }
@@ -127,7 +130,7 @@ const Mini = (() => {
     if (msg) label(msg, W / 2, 112, 30, ph === "mash" ? "#ffe08a" : "#fff3cf");
   }
 
-  function kiteAt(i) { const p = i === me() ? kite : st && st.p ? { x: st.p[i][0], y: st.p[i][1] } : { x: i ? 78 : 22, y: 30 }; return { x: (p.x / 100) * W, y: H - 24 - (p.y / 60) * (H - 70) }; }
+  function kiteAt(i) { const p = mine(i) ? kite : st && st.p ? { x: st.p[i][0], y: st.p[i][1] } : { x: i ? 78 : 22, y: 30 }; return { x: (p.x / 100) * W, y: H - 24 - (p.y / 60) * (H - 70) }; }
   function drawKites(now) {
     const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, "#5f9fe0"); sky.addColorStop(1, "#ffd9a0"); g.fillStyle = sky; g.fillRect(0, 0, W, H);
     g.fillStyle = "#a8523a"; g.fillRect(0, H - 24, W, 24);                                       // the red fort's wall
@@ -145,7 +148,7 @@ const Mini = (() => {
       g.fillStyle = colors[i]; g.beginPath(); g.moveTo(k.x, k.y - 22); g.lineTo(k.x + 15, k.y); g.lineTo(k.x, k.y + 22); g.lineTo(k.x - 15, k.y); g.closePath(); g.fill();
       g.strokeStyle = "#fff"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(k.x, k.y - 22); g.lineTo(k.x, k.y + 22); g.moveTo(k.x - 15, k.y); g.lineTo(k.x + 15, k.y); g.stroke();
       g.strokeStyle = colors[i]; g.beginPath(); g.moveTo(k.x, k.y + 22); for (let t = 1; t <= 4; t++) g.lineTo(k.x + (t % 2 ? -6 : 6), k.y + 22 + t * 7); g.stroke();
-      if (i === me()) label("you", k.x, k.y - 28, 13, "#fff");
+      if (mine(i)) label("you", k.x, k.y - 28, 13, "#fff");
     }
     const a = kiteAt(0), b = kiteAt(1);
     if (Math.abs(a.x - b.x) < 58 && Math.abs(a.y - b.y) < 46) label("⚔ close: pull!", (a.x + b.x) / 2, Math.min(a.y, b.y) - 36, 16, "#fff3a0");
@@ -324,7 +327,7 @@ const Mini = (() => {
   const xqIdx = (r, c) => (me() === 1 ? (9 - r) * 9 + (8 - c) : r * 9 + c);              // the board turns round so your side is always at the bottom
   const xqPos = (i) => { let r = Math.floor(i / 9), c = i % 9; if (me() === 1) { r = 9 - r; c = 8 - c; } return { x: XQ.x0 + c * XQ.cell, y: XQ.y0 + r * XQ.cell }; };
   function xqClick(e) {
-    if (!m || m.kind !== "xiangqi" || !st || st.turn !== me()) return;
+    if (!m || m.watch || m.kind !== "xiangqi" || !st || st.turn !== me()) return;
     const rect = cv.getBoundingClientRect(), k = cv.width / rect.width, x = (e.clientX - rect.left) * k, y = (e.clientY - rect.top) * k;
     const c = Math.round((x - XQ.x0) / XQ.cell), r = Math.round((y - XQ.y0) / XQ.cell);
     if (c < 0 || c > 8 || r < 0 || r > 9 || Math.hypot(x - (XQ.x0 + c * XQ.cell), y - (XQ.y0 + r * XQ.cell)) > XQ.cell * 0.55) return;
@@ -369,11 +372,11 @@ const Mini = (() => {
       g.fillStyle = red ? "#b3262b" : "#1a1a1a"; g.font = "bold 27px serif"; g.fillText(XQ_CH[ch], p.x, p.y + 1);
     }
     if (xqSel !== null) for (const l of st.legal) if (l[0] === xqSel) { const p = xqPos(l[1]); g.beginPath(); g.arc(p.x, p.y, st.b[l[1]] === "." ? 7 : 27, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = "rgba(30,150,70,.9)"; if (st.b[l[1]] === ".") { g.fillStyle = "rgba(30,150,70,.8)"; g.fill(); } else g.stroke(); }
-    const mine = st.turn === me();
+    const mineT = st.turn === me();
     label(`${nameOf(foe())}  ${mmss(st.clk[foe()])}`, 260, 20, 15, st.turn === foe() ? "#ffe08a" : "#4a3418");
-    label(`${nameOf(me())} (you)  ${mmss(st.clk[me()])}`, 260, 568, 15, mine ? "#7a1a10" : "#4a3418");
-    if (st.check) label(mine ? "You are in check!" : "Check!", 260, 290, 22, "#b3262b");
-    label(mine ? "Your move" : "Waiting for their move...", 60, 20, 14, mine ? "#7a1a10" : "#4a3418");
+    label(`${nameOf(me())}${m.watch ? "" : " (you)"}  ${mmss(st.clk[me()])}`, 260, 568, 15, mineT ? "#7a1a10" : "#4a3418");
+    if (st.check) label(mineT && !m.watch ? "You are in check!" : "Check!", 260, 290, 22, "#b3262b");
+    label(m.watch ? `${nameOf(st.turn)} to move` : mineT ? "Your move" : "Waiting for their move...", 60, 20, 14, mineT ? "#7a1a10" : "#4a3418");
   }
 
   // ------------------------------------------------------------------ the end
@@ -387,6 +390,15 @@ const Mini = (() => {
   }
   function end(res) {
     if (!m) return;
+    if (m.watch) {                                                       // a match you watched: no prize and no rating, just who won
+      const names = m.players.map((p) => p.name), draw = res.winner === -1, kind = m.kind;
+      cleanup();
+      showResult(draw ? "A draw" : `${names[res.winner]} won`, `${names[0]} against ${names[1]}: ${res.score && kind !== "xiangqi" ? res.score.join(" to ") : ""}${res.reason ? ` (${res.reason})` : ""}.`.replace(": ()", ""), [
+        { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
+        { label: "Close", fn: closePanels },
+      ]);
+      return kind;
+    }
     const kind = m.kind, won = res.winner === me(), draw = res.winner === -1, ranked = !!res.ranked;
     const prize = won ? (ranked ? 40 : 20) : 0;
     Vitals.coins += prize;
@@ -401,10 +413,36 @@ const Mini = (() => {
   }
   function leave() {
     if (!m) return;
-    send({ t: "leave" });
-    cleanup(); toast("You left the game.");
+    send(m.watch ? { t: "watch", a: "leave" } : { t: "leave" });
+    const was = m.watch; cleanup(); toast(was ? "You stopped watching." : "You left the game.");
   }
   function lost() { if (m) { cleanup(); toast("The connection to the game server was lost."); } }
 
-  return { start, on, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
+  // ------------------------------------------------------------------ the list of matches you can watch (PvP menu: Watch a match)
+  let specTimer = 0;
+  const SPEC_NAMES = { xiangqi: "Xiangqi", kushti: "Kushti", kites: "Kite fight" };
+  function openWatch() {
+    if (!Online.connected) { toast("Watching needs the game server: wait to be connected."); return; }
+    if (typeof mode !== "undefined" && mode !== "walk") return;
+    send({ t: "watch", a: "list" }); renderWatch(null); openPanel("#spec");
+    clearInterval(specTimer); specTimer = setInterval(() => { if (!document.getElementById("spec").classList.contains("show")) { clearInterval(specTimer); return; } send({ t: "watch", a: "list" }); }, 4000);
+  }
+  function renderWatch(list) {
+    const body = document.getElementById("spec-body"); if (!body) return; body.replaceChildren();
+    if (!list) { const p = document.createElement("p"); p.className = "dnote"; p.textContent = "Looking for matches..."; body.append(p); return; }
+    if (!list.length) { const p = document.createElement("p"); p.className = "dnote"; p.textContent = "No match between real people is on right now. Start one in Play online, then others can watch you."; body.append(p); return; }
+    for (const r of list) {
+      const row = document.createElement("div"); row.className = "sp-row";
+      const t = document.createElement("span"); t.textContent = `${SPEC_NAMES[r.kind] || r.kind}: ${r.names.join(" vs ")}  ·  ${Math.floor(r.sec / 60)} min${r.n ? `  ·  👀 ${r.n}` : ""}`;
+      const b = document.createElement("button"); b.type = "button"; b.textContent = "Watch";
+      b.addEventListener("click", () => { closePanels(); send({ t: "watch", a: "join", room: r.room }); });
+      row.append(t, b); body.append(row);
+    }
+  }
+  function onWatch(w) {
+    if (w.a === "list") renderWatch(Array.isArray(w.list) ? w.list : []);
+    else if (w.a === "no") toast(w.msg || "You cannot watch that match.");
+  }
+
+  return { start, on, onWatch, openWatch, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
 })();

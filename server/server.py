@@ -312,6 +312,7 @@ class Conn:
         self.admin = False         # set from the database when they log in with an admin account
         self.vid, self.ua = None, ""   # the visitor id their browser made up (for the admin's visitor list) and the kind of browser they use
         self.wlast, self.fast = None, 0   # where they last said they were (x, z, city, time) and how many updates in a row were impossibly fast
+        self.watching = None       # the match they are watching (a MiniRoom), if any
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
@@ -1069,14 +1070,17 @@ class MiniRoom:
             self.players.append(Contender(None, len(self.players), bot=True))
         self.ranked = sum(1 for p in self.players if p.conn) >= 2
         self.over, self.t0, self.events = False, now(), []
+        self.watchers, self.snap = [], None
         for p in self.players:
             if p.conn:
+                unwatch(p.conn)
                 p.conn.room, p.conn.me, p.conn.queue = self, p, None
         self.setup()
-        roster = [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else ""), "cls": q.cls, "look": q.look} for q in self.players]
+        roster = self.roster = [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else ""), "cls": q.cls, "look": q.look} for q in self.players]
         for p in self.players:
             if p.conn:
                 p.conn.send({"t": "match", "mode": kind, "room": self.id, "you": p.i, "ranked": self.ranked, "players": roster})
+        LIVE_MINI[self.id] = self
         self.task = asyncio.ensure_future(self.run())
 
     def setup(self):
@@ -1115,16 +1119,24 @@ class MiniRoom:
         self.finish(-1 if a.score == b.score else a.i if a.score > b.score else b.i, "time")
 
     def send_state(self, extra):
-        payload = dict({"t": "mini", "k": self.kind, "ev": self.events, "s": [p.score for p in self.players]}, **extra)
+        payload = dict({"t": "mini", "k": self.kind, "ev": self.events, "s": [p.score for p in self.players], "w": len(self.watchers)}, **extra)
         self.events = []
+        self.snap = dict(payload, ev=[])
         for p in self.players:
             if p.conn:
                 p.conn.send(payload)
+        for c in self.watchers:
+            c.send(payload)
 
     def finish(self, winner, reason):
         if self.over:
             return
         self.over = True
+        LIVE_MINI.pop(self.id, None)
+        for c in self.watchers:
+            c.watching = None
+            c.send({"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked, "watch": True})
+        self.watchers = []
         entries = [(p.who, 0 if p.i == winner or winner == -1 else 1) for p in self.players if p.who]
         ranks = rate_placements(entries, self.kind) if self.ranked and reason != "empty" else {}
         for p in self.players:
@@ -1541,6 +1553,46 @@ class XiangqiRoom(MiniRoom):
 
 
 MINI_ROOMS = {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom, "xiangqi": XiangqiRoom}
+LIVE_MINI = {}                                                  # id -> MiniRoom, every game in progress
+WATCHABLE = ("xiangqi", "kushti", "kites")                        # (the ball game and the dragon boat race are 3D and cannot be watched yet)
+MAX_WATCHERS = 20
+
+
+def watch_list():
+    """Matches between real people that someone can sit down and watch, the ones with the most watchers first."""
+    rows = [r for r in LIVE_MINI.values() if not r.over and r.kind in WATCHABLE and sum(1 for p in r.players if p.conn) >= 2]
+    rows.sort(key=lambda r: (-len(r.watchers), r.t0))
+    return [{"room": r.id, "kind": r.kind, "names": [p.name for p in r.players], "n": len(r.watchers), "sec": int(now() - r.t0)} for r in rows[:20]]
+
+
+def unwatch(conn):
+    room = conn.watching
+    conn.watching = None
+    if room and conn in room.watchers:
+        room.watchers.remove(conn)
+
+
+def on_watch(conn, m):
+    a = m.get("a")
+    if a == "list":
+        return conn.send({"t": "watch", "a": "list", "list": watch_list()})
+    if a == "leave":
+        return unwatch(conn)
+    if a != "join":
+        return
+    room = LIVE_MINI.get(m.get("room")) if isinstance(m.get("room"), str) else None
+    if conn.room or conn.queue:
+        return conn.send({"t": "watch", "a": "no", "msg": "Finish or leave your own game first."})
+    if room is None or room.over or room.kind not in WATCHABLE:
+        return conn.send({"t": "watch", "a": "no", "msg": "That match is over."})
+    if len(room.watchers) >= MAX_WATCHERS:
+        return conn.send({"t": "watch", "a": "no", "msg": "Too many people are watching that match."})
+    unwatch(conn)
+    conn.watching = room
+    room.watchers.append(conn)
+    conn.send({"t": "match", "mode": room.kind, "room": room.id, "you": 0, "watch": True, "ranked": room.ranked, "players": room.roster})
+    if room.snap:
+        conn.send(room.snap)
 
 # ---------------------------------------------------------------------------------------------------------------
 # chariot derby: the same Circus track, but nobody has to finish: ram the others. Each chariot has 100 health; a hit from behind hurts the one in front most and
@@ -4491,6 +4543,8 @@ async def handle_msg(conn, m):
         return on_pyr(conn, m)
     if t == "weekly":
         return on_weekly(conn, m)
+    if t == "watch":
+        return on_watch(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":
@@ -4546,6 +4600,7 @@ async def handle_msg(conn, m):
 
 def drop(conn):
     chal_clear(conn, "They left the game.")
+    unwatch(conn)
     social_drop(conn)
     if conn.riders:
         eject_riders(conn, "The driver left the game.")

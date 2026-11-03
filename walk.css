@@ -825,3 +825,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .wk-blurb { margin: 4px 0; font-size: .92rem; line-height: 1.5; }
 .wk-you { margin: 10px 0 4px; font-weight: 700; }
 .wk-top { margin: 6px 0 10px; padding-left: 22px; font-size: .92rem; line-height: 1.6; }
+.sp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: .92rem; }
