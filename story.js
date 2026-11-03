@@ -1,5 +1,5 @@
 "use strict";
-// Story quests: 📖 Story in the menu. Each city has a story told in five chapters: Rome "The Lost Scroll", Old Delhi "The Emperor's Jewel", Cancún "The Serpent's Shadow". Each chapter sends you
+// Story quests: 📖 Story in the menu. Each city has a story told in five chapters: Rome "The Lost Scroll", Old Delhi "The Emperor's Jewel", Cancún "The Serpent's Shadow", Beijing "The Jade Seal". Each chapter sends you
 // to a famous place; when you stand there the next part of the story is told and you are paid. Finishing a story pays a big reward. The 📖 box shows your chapter and can lead you there
 // (the same walking directions as G). Progress is kept in the browser and with your account.
 // Depends on vitals.js, the landmarks of each city (by id) and the globals of game.js (LANDMARKS, city, player, startDirections, Narrator).
@@ -28,9 +28,16 @@ const Story = (() => {
       ["c-cenote", "At the Sacred Cenote a diver's cord tugs; the stone sits at the bottom, wrapped with a jade bead. But the offering must be returned by water: 'Take the bead to the cleanest water, Cenote Azul.'", 80],
       ["c-azul", "In Cenote Azul the water glows turquoise as you drop the jade bead. The serpent's shadow slips back down the great stair, and the whole city cheers your name.", 150],
     ] },
+    beijing: { name: "The Jade Seal", end: 300, ch: [
+      ["b-tiananmen", "At the Gate of Heavenly Peace the guards are whispering: the Emperor's jade seal, without which no edict is valid, has vanished from the palace. A young eunuch was seen hurrying toward the throne hall. Follow him to the Hall of Supreme Harmony.", 40],
+      ["b-harmony", "On the marble terrace an old sweeper leans on his broom. 'The boy ran past me, white as rice. He was heading up Jingshan hill, behind the palace. A strange place to run to.'", 50],
+      ["b-jingshan", "At the top of Coal Hill you find a dropped cap and a scrap of paper: 'I cannot let him use it.' The wind has blown a second scrap down toward the grey lanes. Look for the hutongs.", 60],
+      ["b-hutong", "In a courtyard house a woman admits the boy is her brother. 'He did not steal the seal. He hid it from the minister, who wanted to sign false edicts. Tomorrow at dawn the Emperor prays at the Temple of Heaven. My brother will be there.'", 80],
+      ["b-heaven", "At dawn, in front of the whole court, the young eunuch kneels and hands the seal to the Emperor's steward, and names the minister who plotted to forge the edicts. The minister is led away, and you are thanked in front of everyone.", 150],
+    ] },
   };
-  let prog = { rome: 0, delhi: 0, cancun: 0 };
-  const clean = (raw) => { const o = { rome: 0, delhi: 0, cancun: 0 }; if (raw && typeof raw === "object") for (const c of Object.keys(o)) o[c] = Math.max(0, Math.min(STORIES[c].ch.length, Math.floor(Number(raw[c])) || 0)); return o; };
+  let prog = { rome: 0, delhi: 0, cancun: 0, beijing: 0 };
+  const clean = (raw) => { const o = { rome: 0, delhi: 0, cancun: 0, beijing: 0 }; if (raw && typeof raw === "object") for (const c of Object.keys(o)) o[c] = Math.max(0, Math.min(STORIES[c].ch.length, Math.floor(Number(raw[c])) || 0)); return o; };
   try { prog = clean(JSON.parse(localStorage.getItem(KEY) || "null")); } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prog)); } catch (e) { /* ignore */ } };
   const $s = (id) => document.getElementById(id);

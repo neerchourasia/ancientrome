@@ -76,6 +76,7 @@ const Online = (() => {
       case "stocks": case "stock_fill": case "stock_no": Exchange.on(m); break;
       case "ev_top": Events.on(m); break;
       case "pyr": case "pyr_done": Cancun.pyrOn(m); break;
+      case "weekly": case "weekly_prize": Weekly.on(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }
       case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
       case "ridenote": toast(m.text); break;

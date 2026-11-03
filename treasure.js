@@ -70,7 +70,7 @@ const Treasure = (() => {
   function merge(raw) {
     if (!raw || typeof raw !== "object") return;
     for (const [k, v] of Object.entries(raw)) {
-      if (!/^(found:)?(rome|delhi|cancun)(-(ancient|modern))?-\d+$/.test(k)) continue;
+      if (!/^(found:)?(rome|delhi|cancun|beijing)(-(ancient|modern))?-\d+$/.test(k)) continue;
       if (k.startsWith("found:")) { if (Number.isFinite(v)) got[k] = Math.max(got[k] || 0, Math.min(COUNT, Math.floor(v))); }
       else if (Array.isArray(v)) got[k] = [...new Set([...(got[k] || []), ...v.filter((i) => Number.isInteger(i) && i >= 0 && i < COUNT)])];
     }

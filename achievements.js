@@ -37,7 +37,7 @@ const Achievements = (() => {
     ["fish1", "🎣", "Angler", "Catch a fish.", "", 10, () => typeof Fishing !== "undefined" && Fishing.caught >= 1],
     ["fish2", "🐟", "Master angler", "Catch 100 fish.", "Angler", 200, () => typeof Fishing !== "undefined" && Fishing.caught >= 100],
     ["story1", "📖", "Storyteller", "Finish the story of a city.", "Storyteller", 100, () => typeof Story !== "undefined" && Story.finished >= 1],
-    ["story3", "📚", "Chronicler", "Finish the stories of all three cities.", "Chronicler", 600, () => typeof Story !== "undefined" && Story.finished >= 3],
+    ["story3", "📚", "Chronicler", "Finish the stories of all four cities.", "Chronicler", 600, () => typeof Story !== "undefined" && Story.finished >= 4],
     ["fest1", "🎊", "Festival-goer", "Find all eight festival tokens in one festival hunt.", "Reveller", 100, () => typeof FestHunt !== "undefined" && FestHunt.found >= 1],
     ["thief", "🥷", "Thief taker", "Catch a pickpocket.", "", 20, () => typeof Thieves !== "undefined" && Thieves.caught >= 1],
     ["thief2", "🚔", "Lawman", "Catch 10 pickpockets.", "Lawman", 150, () => typeof Thieves !== "undefined" && Thieves.caught >= 10],

@@ -12,7 +12,7 @@ const Events = (() => {
   const KEY = "rome-events", ALT = 45, MEDALS = [["🥇 Gold", 1, 300], ["🥈 Silver", 1.4, 150], ["🥉 Bronze", 2, 75]];
   const KINDS = { car: { name: "Street race", par: 11, ring: 22 }, air: { name: "Air race", par: 38, ring: 26 }, metro: { name: "Metro trial", par: 16, ring: 0 } };
   let best = {}, tops = {}, active = null;           // best: course id -> { ms, medal (0 = none, 1 gold, 2 silver, 3 bronze) }
-  const clean = (raw) => { const o = {}; if (raw && typeof raw === "object") for (const [k, v] of Object.entries(raw)) if (/^(rome|delhi|cancun)-(car|air|metro)$/.test(k) && v && Number.isFinite(v.ms) && v.ms > 0) o[k] = { ms: Math.round(v.ms), medal: Math.max(0, Math.min(3, Math.floor(Number(v.medal) || 0))) }; return o; };
+  const clean = (raw) => { const o = {}; if (raw && typeof raw === "object") for (const [k, v] of Object.entries(raw)) if (/^(rome|delhi|cancun|beijing)-(car|air|metro)$/.test(k) && v && Number.isFinite(v.ms) && v.ms > 0) o[k] = { ms: Math.round(v.ms), medal: Math.max(0, Math.min(3, Math.floor(Number(v.medal) || 0))) }; return o; };
   try { best = clean(JSON.parse(localStorage.getItem(KEY) || "null")); } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(best)); } catch (e) { /* ignore */ } };
   const $e = (id) => document.getElementById(id);

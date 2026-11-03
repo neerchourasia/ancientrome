@@ -532,7 +532,7 @@ class DuelRoom:
         self.over = True
         msg = {"t": "end", "mode": self.mode, "winner": winner, "reason": reason,
                "hp": [round(p.hp, 1) for p in self.players]}
-        ranks = rate_placements([(p.who, 0 if p.i == winner else 1 if winner != -1 else 0) for p in self.players if p.who]) if self.ranked else {}
+        ranks = rate_placements([(p.who, 0 if p.i == winner else 1 if winner != -1 else 0) for p in self.players if p.who], self.kind) if self.ranked else {}
         for p in self.players:
             if p.conn:
                 out = dict(msg, ranked=self.ranked, rank=ranks.get(id(p.who))) if self.ranked else msg
@@ -723,7 +723,7 @@ class CoopRoom:
         self.over = True
         kills = sum(1 for f in self.fighters if f.team == 1 and f.down)
         msg = {"t": "end", "mode": "coop", "won": won, "reason": reason, "kills": kills, "enemies": ENEMIES}
-        ranks = rate_team([f.who for f in self.fighters if f.who and f.role == "player"], won) if reason != "empty" else {}
+        ranks = rate_team([f.who for f in self.fighters if f.who and f.role == "player"], won, self.kind) if reason != "empty" else {}
         for f in self.fighters:
             if f.conn:
                 f.conn.send(dict(msg, rank=ranks.get(id(f.who))) if ranks.get(id(f.who)) else msg)
@@ -918,7 +918,7 @@ class ArenaRoom:
         self.over = True
         place, winner = self.places()
         humans = [f.who for f in self.fighters if f.who]
-        ranks = rate_placements([(f.who, place[id(f)]) for f in self.fighters if f.who]) if self.ranked and reason != "empty" else {}
+        ranks = rate_placements([(f.who, place[id(f)]) for f in self.fighters if f.who], self.kind) if self.ranked and reason != "empty" else {}
         for f in self.fighters:
             if f.conn:
                 msg = {"t": "end", "mode": self.kind, "reason": reason, "ranked": self.ranked, "winner": winner, "n": len(self.fighters), "place": place[id(f)], "won": place[id(f)] == 0 and winner == f.team,
@@ -1034,7 +1034,7 @@ class RaceRoom:
         order = sorted(self.players, key=lambda p: (p.fin if p.fin is not None else float("inf"), -p.s))
         msg = {"t": "end", "mode": "race", "reason": reason,
                "order": [{"i": p.i, "name": p.name, "time": (round(p.fin, 2) if p.fin not in (None, float("inf")) else None)} for p in order]}
-        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who])
+        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who], self.kind)
         for p in self.players:
             if p.conn:
                 p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
@@ -1126,7 +1126,7 @@ class MiniRoom:
             return
         self.over = True
         entries = [(p.who, 0 if p.i == winner or winner == -1 else 1) for p in self.players if p.who]
-        ranks = rate_placements(entries) if self.ranked and reason != "empty" else {}
+        ranks = rate_placements(entries, self.kind) if self.ranked and reason != "empty" else {}
         for p in self.players:
             if p.conn:
                 msg = {"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked}
@@ -1695,7 +1695,7 @@ class DerbyRoom:
         order = up + list(reversed(self.order))                # first place first
         msg = {"t": "end", "mode": "derby", "reason": reason, "order": [{"i": p.i, "name": p.name, "hp": round(p.hp)} for p in order]}
         humans = [(p.who, k) for k, p in enumerate(order) if p.who]
-        ranks = rate_placements(humans) if reason != "empty" else {}
+        ranks = rate_placements(humans, self.kind) if reason != "empty" else {}
         for p in self.players:
             if p.conn:
                 p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
@@ -1815,7 +1815,7 @@ class DragonRoom:
         order = sorted(self.players, key=lambda p: (p.fin if p.fin is not None else float("inf"), -p.s))
         msg = {"t": "end", "mode": "dragon", "reason": reason,
                "order": [{"i": p.i, "name": p.name, "time": (round(p.fin, 2) if p.fin not in (None, float("inf")) else None), "perfect": p.perfect, "strokes": p.strokes} for p in order]}
-        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who]) if reason != "empty" else {}
+        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who], self.kind) if reason != "empty" else {}
         for p in self.players:
             if p.conn:
                 p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
@@ -2224,9 +2224,9 @@ class NavalRoom:
                "order": [{"i": s.i, "name": s.name, "hp": round(s.hp), "bot": s.bot} for s in order]}
         if self.coop:
             msg["coop"], msg["won"] = True, reason == "cleared"
-            ranks = rate_team([s.who for s in self.ships if s.who], msg["won"]) if reason != "empty" else {}
+            ranks = rate_team([s.who for s in self.ships if s.who], msg["won"], self.kind) if reason != "empty" else {}
         else:
-            ranks = rate_placements([(s.who, k) for k, s in enumerate(order) if s.who])
+            ranks = rate_placements([(s.who, k) for k, s in enumerate(order) if s.who], self.kind)
         for s in self.ships:
             if s.conn:
                 s.conn.send(dict(msg, rank=ranks[id(s.who)]) if id(s.who) in ranks else msg)
@@ -3410,7 +3410,7 @@ def elo_change(ra, rb, score, games):
     return int(round(k * (score - expected)))
 
 
-def rate_placements(entries):
+def rate_placements(entries, kind=None):
     """Updates ratings after any match between real people: entries is [(connection, place)] for the humans in it (a lower place is
     better, equal places are a tie). Each pair of people is scored like a duel and the results are averaged, so the same function does
     duels (two people), races and naval battles (up to four). Returns {id(connection): {r, w, l, d, delta, farm}}. Practice bots do not
@@ -3443,10 +3443,12 @@ def rate_placements(entries):
         rec["w" if better == 0 and worse > 0 else "l" if worse == 0 and better > 0 else "d"] += 1
         rec["name"] = c.name
         out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
+        if not farm:
+            weekly_match(c, kind, better == 0 and worse > 0)
     return out
 
 
-def rate_team(conns, won):
+def rate_team(conns, won, kind=None):
     """A team battle against bots: with at least two real people on the team, a win is worth +8 and a defeat costs 6."""
     conns = [c for c in conns if c]
     if len(conns) < 2:
@@ -3465,6 +3467,8 @@ def rate_team(conns, won):
         rec["w" if won else "l"] += 1
         rec["name"] = c.name
         out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
+        if not farm:
+            weekly_match(c, kind, won)
     return out
 
 
@@ -3876,7 +3880,7 @@ EVENT_LIFE_MAX = 2000      # courses kept at most
 
 def on_event_time(conn, m):
     course = m.get("course")
-    if not isinstance(course, str) or not re.fullmatch(r"(rome|delhi|cancun)-(car|air|metro)", course):
+    if not isinstance(course, str) or not re.fullmatch(r"(rome|delhi|cancun|beijing)-(car|air|metro)", course):
         return
     ms, length = int(num(m.get("ms"), 0, 36e5, 0)), num(m.get("len"), 0, 50000, 0)
     if ms < 10000 or length < 100:
@@ -3944,8 +3948,135 @@ def on_pyr(conn, m):
         PYRAMID["blocks"] = 0
         PYRAMID["who"] = {}
         pyr_broadcast({"t": "pyr_done", "who": builders, "done": PYRAMID["done"]})
+    weekly_block(conn)
     world_soon()
     pyr_broadcast(pyr_view())
+
+
+# ---------------------------------------------------------------- the weekly cup
+# Every Monday (UTC) a new week starts with a theme. Players with an account score points all week: a win in a match against real people is worth 3 points and any other
+# result 1, and games that suit the week's theme count double; laying pyramid blocks adds a few more (a lot more in Pyramid Week, but with a cap). When the week ends the top
+# three are paid 1000, 600 and 300 denarii, and everybody who scored 10 points or more gets 100. A prize waits (and is sent again) until the player's browser confirms it.
+WEEK_LEN = 7 * 86400
+WEEK_THEMES = [
+    {"id": "pyramid", "name": "Pyramid Week", "kinds": (), "blurb": "Build the great pyramid in Cancún together: blocks count for much more this week."},
+    {"id": "dragon", "name": "Dragon Boat Festival", "kinds": ("dragon",), "blurb": "Paddle for glory: dragon boat races against real people count double."},
+    {"id": "arena", "name": "Arena Week", "kinds": ("duel", "brawl", "team2", "coop", "wushu"), "blurb": "Duels, arena brawls, 2 v 2 fights, team battles and wushu bouts count double."},
+    {"id": "mind", "name": "Mind and Ball Week", "kinds": ("xiangqi", "kushti", "kites", "ball"), "blurb": "Xiangqi, kushti, kite fights and pok-ta-pok count double."},
+    {"id": "wheels", "name": "Chariots and Ships Week", "kinds": ("race", "derby", "naval"), "blurb": "Chariot races, derbies and naval battles count double."},
+]
+KIND_NAMES = {"duel": "duels", "coop": "team battles", "race": "chariot races", "naval": "naval battles", "brawl": "arena brawls", "team2": "2 v 2 fights", "derby": "chariot derbies", "kushti": "kushti",
+              "kites": "kite fights", "ball": "pok-ta-pok", "dragon": "dragon boat races", "wushu": "wushu", "xiangqi": "xiangqi"}
+PRIZE_COINS = (1000, 600, 300)
+PRIZE_PART, PRIZE_PART_MIN = 100, 10
+WEEKLY = {"week": -1, "scores": {}, "last": None}        # scores: friend id -> {"name", "pts", "blk" (blocks laid), "bp" (points those paid)}
+PRIZES = {}                                              # friend id -> [{"id", "week", "theme", "rank", "coins", "pts"}] not yet confirmed
+
+
+def week_of(t):
+    return int((t - 4 * 86400) // WEEK_LEN)              # (the week starts on a Monday: day 0 of the clock was a Thursday)
+
+
+def week_theme(week):
+    return WEEK_THEMES[week % len(WEEK_THEMES)]
+
+
+def weekly_roll(t=None):
+    """Starts a new week when the clock has moved on, and turns the old week's board into prizes."""
+    wk = week_of(time.time() if t is None else t)
+    old = WEEKLY["week"]
+    if wk == old:
+        return
+    if old >= 0 and WEEKLY["scores"]:
+        th = week_theme(old)
+        top = []
+        ranked = sorted(WEEKLY["scores"].items(), key=lambda kv: (-kv[1]["pts"], kv[1]["name"]))
+        for i, (fid, r) in enumerate(ranked):
+            if r["pts"] <= 0:
+                break
+            coins = PRIZE_COINS[i] if i < len(PRIZE_COINS) else (PRIZE_PART if r["pts"] >= PRIZE_PART_MIN else 0)
+            if i < 3:
+                top.append([r["name"], r["pts"]])
+            if coins and len(PRIZES.get(fid, [])) < 8:
+                PRIZES.setdefault(fid, []).append({"id": "w%d" % old, "week": old, "theme": th["name"], "rank": i + 1, "coins": coins, "pts": r["pts"]})
+        WEEKLY["last"] = {"week": old, "theme": th["name"], "top": top} if top else WEEKLY["last"]
+    WEEKLY["week"] = wk
+    WEEKLY["scores"] = {}
+    world_soon()
+
+
+def weekly_rec(conn):
+    """The score record of a logged-in player this week (None for guests: prizes need an account)."""
+    if not conn or not getattr(conn, "fid", None):
+        return None
+    weekly_roll()
+    sc = WEEKLY["scores"]
+    if conn.fid not in sc and len(sc) >= 5000:
+        return None
+    r = sc.setdefault(conn.fid, {"name": conn.name, "pts": 0, "blk": 0, "bp": 0})
+    r["name"] = conn.name
+    return r
+
+
+def weekly_match(conn, kind, won):
+    r = weekly_rec(conn)
+    if r is None or not kind:
+        return
+    pts = 3 if won else 1
+    if kind in week_theme(WEEKLY["week"])["kinds"]:
+        pts *= 2
+    r["pts"] += pts
+    world_soon()
+
+
+def weekly_block(conn):
+    r = weekly_rec(conn)
+    if r is None:
+        return
+    feat = week_theme(WEEKLY["week"])["id"] == "pyramid"
+    per, cap = (2, 100) if feat else (4, 25)
+    r["blk"] += 1
+    if r["blk"] % per == 0 and r["bp"] < cap:
+        r["bp"] += 1
+        r["pts"] += 1
+
+
+def weekly_view(conn):
+    weekly_roll()
+    wk = WEEKLY["week"]
+    th = week_theme(wk)
+    ranked = sorted(WEEKLY["scores"].items(), key=lambda kv: (-kv[1]["pts"], kv[1]["name"]))
+    ranked = [(f, r) for f, r in ranked if r["pts"] > 0]
+    you = None
+    if conn.fid:
+        for i, (f, r) in enumerate(ranked):
+            if f == conn.fid:
+                you = {"pts": r["pts"], "rank": i + 1}
+        if you is None:
+            you = {"pts": 0, "rank": 0}
+    ends = (wk + 1) * WEEK_LEN + 4 * 86400 - time.time()
+    return {"t": "weekly", "theme": {"id": th["id"], "name": th["name"], "blurb": th["blurb"], "kinds": [KIND_NAMES.get(k, k) for k in th["kinds"]]}, "ends": max(0, int(ends)),
+            "top": [[r["name"], r["pts"]] for _, r in ranked[:10]], "n": len(ranked), "you": you, "login": bool(conn.fid), "last": WEEKLY["last"],
+            "prizes": list(PRIZE_COINS), "part": [PRIZE_PART, PRIZE_PART_MIN]}
+
+
+def weekly_deliver(conn):
+    """Sends a player the prizes they have not confirmed yet."""
+    weekly_roll()
+    if conn.fid and PRIZES.get(conn.fid):
+        conn.send({"t": "weekly_prize", "prizes": PRIZES[conn.fid]})
+
+
+def on_weekly(conn, m):
+    if m.get("a") == "ack":
+        ids = [i for i in (m.get("ids") if isinstance(m.get("ids"), list) else [])[:8] if isinstance(i, str)]
+        if conn.fid and conn.fid in PRIZES:
+            PRIZES[conn.fid] = [p for p in PRIZES[conn.fid] if p["id"] not in ids]
+            if not PRIZES[conn.fid]:
+                del PRIZES[conn.fid]
+            world_soon()
+        return
+    return conn.send(weekly_view(conn))
 
 
 
@@ -4346,6 +4477,7 @@ async def handle_msg(conn, m):
         conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "admin": conn.admin, "bots": CFG["allow_bots"],
                    "rank": public_rank(rating_of(conn)) if conn.uid else None})
         conn.send({"t": "chat_log", "m": list(CHAT_LOG)})
+        weekly_deliver(conn)
         return send_social(conn)
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
@@ -4357,6 +4489,8 @@ async def handle_msg(conn, m):
         return on_stock(conn, m)
     if t in ("pyr_get", "pyr_add"):
         return on_pyr(conn, m)
+    if t == "weekly":
+        return on_weekly(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":
@@ -4605,7 +4739,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}}
 
 
 def world_apply(rows):
@@ -4634,7 +4768,20 @@ def world_apply(rows):
     ev = rows.get("events")
     if isinstance(ev, dict):
         EVENT_BEST.clear()
-        EVENT_BEST.update({k: v for k, v in ev.items() if isinstance(v, dict) and re.fullmatch(r"(rome|delhi|cancun)-(car|air|metro)", k)})
+        EVENT_BEST.update({k: v for k, v in ev.items() if isinstance(v, dict) and re.fullmatch(r"(rome|delhi|cancun|beijing)-(car|air|metro)", k)})
+    wk = rows.get("weekly")
+    if isinstance(wk, dict) and isinstance(wk.get("scores"), dict):
+        WEEKLY["week"] = int(num(wk.get("week"), -1, 1e6, -1))
+        WEEKLY["scores"] = {f: {"name": str(r.get("name", ""))[:24], "pts": int(num(r.get("pts"), 0, 1e6, 0)), "blk": int(num(r.get("blk"), 0, 1e6, 0)), "bp": int(num(r.get("bp"), 0, 1e6, 0))}
+                            for f, r in list(wk["scores"].items())[:5000] if clean_fid(f) and isinstance(r, dict)}
+        last = wk.get("last")
+        WEEKLY["last"] = last if isinstance(last, dict) and isinstance(last.get("top"), list) else None
+        PRIZES.clear()
+        pz = wk.get("prizes")
+        for f, lst in (list(pz.items())[:5000] if isinstance(pz, dict) else []):
+            if clean_fid(f) and isinstance(lst, list):
+                PRIZES[f] = [{"id": str(p.get("id"))[:12], "week": int(num(p.get("week"), 0, 1e6, 0)), "theme": str(p.get("theme", ""))[:40], "rank": int(num(p.get("rank"), 1, 1e6, 1)),
+                              "coins": int(num(p.get("coins"), 0, 1e6, 0)), "pts": int(num(p.get("pts"), 0, 1e6, 0))} for p in lst[:8] if isinstance(p, dict)]
     py = rows.get("pyramid")
     if isinstance(py, dict):
         PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})
@@ -4652,6 +4799,7 @@ async def world_load():
     world_apply({r["key"]: r["data"] for r in (rows or []) if isinstance(r, dict) and "key" in r})
     for k, v in world_snapshot().items():                     # (what we just loaded is not "changed")
         _world_sig[k] = json.dumps(v, sort_keys=True, default=str)
+    weekly_roll()
     print("  world: loaded %d guild(s), %d leaderboard entries" % (len(GUILDS), len(LEADERS)))
     return True
 

@@ -819,3 +819,9 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #dh-drum { width: 54px; height: 54px; display: grid; place-items: center; }
 #dh-drum i { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle, #ffd36b 0%, #d9341f 70%); box-shadow: 0 0 10px rgba(217,52,31,.8); transition: transform .06s; }
 #mini-resign { font: inherit; }
+
+/* the weekly cup */
+.wk-theme { margin: 4px 0; font: 700 1.1rem Georgia, serif; color: var(--gold); }
+.wk-blurb { margin: 4px 0; font-size: .92rem; line-height: 1.5; }
+.wk-you { margin: 10px 0 4px; font-weight: 700; }
+.wk-top { margin: 6px 0 10px; padding-left: 22px; font-size: .92rem; line-height: 1.6; }

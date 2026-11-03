@@ -20,7 +20,7 @@ const Estate = (() => {
   function sanitize(raw) {
     const out = { owned: {}, paidDay: Number.isFinite(raw && raw.paidDay) ? Math.max(1, Math.floor(raw.paidDay)) : 1, paidAt: Number.isFinite(raw && raw.paidAt) ? raw.paidAt : Date.now() - Payroll.DAY_MS };
     const o = raw && typeof raw.owned === "object" && raw.owned ? raw.owned : {};
-    for (const [id, v] of Object.entries(o)) if (/^(rome|delhi|cancun)-\d{1,2}$/.test(id) && Number(id.split("-")[1]) < PER_CITY) out.owned[id] = { rented: !!(v && v.rented), level: Math.max(0, Math.min(3, Math.floor(Number(v && v.level) || 0))) };
+    for (const [id, v] of Object.entries(o)) if (/^(rome|delhi|cancun|beijing)-\d{1,2}$/.test(id) && Number(id.split("-")[1]) < PER_CITY) out.owned[id] = { rented: !!(v && v.rented), level: Math.max(0, Math.min(3, Math.floor(Number(v && v.level) || 0))) };
     return out;
   }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } };

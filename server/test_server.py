@@ -3,6 +3,7 @@
 Plays the part of real browsers (WebSocket clients), including cheating and abusive ones."""
 import asyncio
 import base64
+import datetime
 import hashlib
 import json
 import math
@@ -12,6 +13,7 @@ import sys
 import time
 import urllib.parse
 import unittest
+from unittest import mock
 import warnings
 
 warnings.simplefilter("ignore", ResourceWarning)  # the test clients' sockets are closed by the process ending
@@ -1123,6 +1125,124 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         v = await a.until(lambda m: m["t"] == "pyr")
         self.assertEqual((v["blocks"], v["done"]), (12, 1))
         server.PYRAMID.update({"blocks": 0, "done": 0, "who": {}})
+
+    # ---------------------------------------------------------------- the weekly cup
+
+    def weekly_fresh(self):
+        server.WEEKLY.update({"week": server.week_of(time.time()), "scores": {}, "last": None})
+        server.PRIZES.clear()
+        self.addCleanup(lambda: (server.WEEKLY.update({"week": -1, "scores": {}, "last": None}), server.PRIZES.clear()))
+
+    class WC:                                                          # a stand-in for a connection with an account
+        def __init__(self, fid, name):
+            self.fid, self.name, self.uid, self.id = fid, name, "u-" + name, "id-" + name
+
+    def test_weekly_weeks_start_on_monday_and_themes_rotate(self):
+        mon = datetime.datetime(2026, 11, 2, tzinfo=datetime.timezone.utc).timestamp()
+        self.assertEqual(server.week_of(mon), server.week_of(mon + 6.9 * 86400))     # all of Monday to Sunday is one week
+        self.assertEqual(server.week_of(mon + 7 * 86400), server.week_of(mon) + 1)
+        self.assertEqual(server.week_of(mon - 1), server.week_of(mon) - 1)           # one second before Monday is last week
+        names = [server.week_theme(w)["name"] for w in range(len(server.WEEK_THEMES))]
+        self.assertEqual(len(set(names)), len(server.WEEK_THEMES))
+        self.assertEqual(server.week_theme(0), server.week_theme(len(server.WEEK_THEMES)))
+
+    def test_weekly_points_wins_featured_games_and_guests(self):
+        self.weekly_fresh()
+        th = server.week_theme(server.WEEKLY["week"])
+        feat = th["kinds"][0] if th["kinds"] else None
+        other = next(k for k in server.KIND_NAMES if k not in th["kinds"])
+        a, b = self.WC("aaaaaaaaaaaa", "Ann"), self.WC("bbbbbbbbbbbb", "Ben")
+        server.weekly_match(a, other, True)
+        server.weekly_match(b, other, False)
+        self.assertEqual((server.WEEKLY["scores"][a.fid]["pts"], server.WEEKLY["scores"][b.fid]["pts"]), (3, 1))      # a win is 3, anything else 1
+        if feat:
+            server.weekly_match(a, feat, True)
+            self.assertEqual(server.WEEKLY["scores"][a.fid]["pts"], 3 + 6)                                              # a game that suits the theme counts double
+        guest = self.WC(None, "Guest")
+        server.weekly_match(guest, other, True)                                                                         # guests have no account: no points
+        self.assertEqual(len(server.WEEKLY["scores"]), 2)
+
+    def test_weekly_pyramid_blocks_pay_a_few_points_and_are_capped(self):
+        self.weekly_fresh()
+        server.WEEKLY["week"] = next(w for w in range(server.WEEKLY["week"], server.WEEKLY["week"] + 10) if server.week_theme(w)["id"] != "pyramid")
+        a = self.WC("aaaaaaaaaaaa", "Ann")
+        with mock.patch.object(server, "week_of", return_value=server.WEEKLY["week"]):
+            for _ in range(400):
+                server.weekly_block(a)
+            self.assertEqual(server.WEEKLY["scores"][a.fid]["pts"], 25)                      # a normal week: one point per four blocks, at most 25
+            server.WEEKLY["week"] = next(w for w in range(2000, 2100) if server.week_theme(w)["id"] == "pyramid")
+        with mock.patch.object(server, "week_of", return_value=server.WEEKLY["week"]):
+            server.WEEKLY["scores"] = {}
+            for _ in range(400):
+                server.weekly_block(a)
+            self.assertEqual(server.WEEKLY["scores"][a.fid]["pts"], 100)                     # Pyramid Week: one point per two blocks, at most 100
+
+    def test_weekly_a_finished_week_pays_prizes_once_confirmed(self):
+        self.weekly_fresh()
+        server.WEEKLY["week"] -= 1
+        fids = ["%012x" % i for i in range(1, 7)]
+        pts = [50, 40, 30, 12, 10, 4]
+        server.WEEKLY["scores"] = {f: {"name": "P%d" % i, "pts": p, "blk": 0, "bp": 0} for i, (f, p) in enumerate(zip(fids, pts))}
+        server.weekly_roll()
+        self.assertEqual(server.WEEKLY["week"], server.week_of(time.time()))
+        self.assertEqual(server.WEEKLY["scores"], {})                                         # a new, empty week
+        self.assertEqual([server.PRIZES[f][0]["coins"] for f in fids[:5]], [1000, 600, 300, 100, 100])
+        self.assertNotIn(fids[5], server.PRIZES)                                               # under 10 points: nothing
+        self.assertEqual([x[1] for x in server.WEEKLY["last"]["top"]], [50, 40, 30])
+        server.weekly_roll()
+        self.assertEqual(len(server.PRIZES[fids[0]]), 1)                                       # rolling twice does not pay twice
+
+    async def test_weekly_view_prize_delivery_and_confirmation(self):
+        self.accounts("ann")
+        self.weekly_fresh()
+        guest = await self.player("Guest")
+        guest.send({"t": "weekly", "a": "get"})
+        v = await guest.until(lambda m: m["t"] == "weekly")
+        self.assertFalse(v["login"])
+        self.assertIsNone(v["you"])
+        self.assertEqual(v["prizes"], [1000, 600, 300])
+        fid = server.fid_of("u-ann")
+        server.PRIZES[fid] = [{"id": "w1", "week": 1, "theme": "Arena Week", "rank": 1, "coins": 1000, "pts": 50}]
+        ann = await self.player("Ann", token="ann")
+        got = await ann.until(lambda m: m["t"] == "weekly_prize")                             # waiting prizes arrive when you come online
+        self.assertEqual(got["prizes"][0]["coins"], 1000)
+        ann.send({"t": "weekly", "a": "ack", "ids": ["w1"]})
+        ann.send({"t": "weekly", "a": "get"})
+        v = await ann.until(lambda m: m["t"] == "weekly")
+        self.assertTrue(v["login"])
+        self.assertEqual(v["you"], {"pts": 0, "rank": 0})
+        self.assertNotIn(fid, server.PRIZES)                                                   # confirmed: it will not be sent again
+        ann.send({"t": "weekly", "a": "ack", "ids": ["w1"]})                                    # (a repeated confirmation is harmless)
+
+    def test_weekly_ranked_matches_score_but_farmed_rematches_and_bot_games_do_not(self):
+        self.weekly_fresh()
+        server.RECENT.clear()
+        a, b = self.WC("aaaaaaaaaaaa", "Ann"), self.WC("bbbbbbbbbbbb", "Ben")
+        server.rate_placements([(a, 0), (b, 1)], "xiangqi")
+        mult = 2 if "xiangqi" in server.week_theme(server.WEEKLY["week"])["kinds"] else 1
+        self.assertEqual((server.WEEKLY["scores"][a.fid]["pts"], server.WEEKLY["scores"][b.fid]["pts"]), (3 * mult, 1 * mult))
+        for _ in range(5):                                                                    # the same two people again and again: only the first few count
+            server.rate_placements([(a, 0), (b, 1)], "xiangqi")
+        self.assertEqual(server.WEEKLY["scores"][a.fid]["pts"], 3 * mult * 3)
+        server.rate_placements([(a, 0)], "xiangqi")                                            # a game against a bot has one human: nothing
+        self.assertEqual(server.WEEKLY["scores"][a.fid]["pts"], 3 * mult * 3)
+        server.RECENT.clear()
+
+    def test_weekly_state_is_saved_and_loaded(self):
+        self.weekly_fresh()
+        f = "abcdef012345"
+        server.WEEKLY["scores"][f] = {"name": "Ann", "pts": 7, "blk": 3, "bp": 0}
+        server.WEEKLY["last"] = {"week": 1, "theme": "Arena Week", "top": [["Bo", 9]]}
+        server.PRIZES[f] = [{"id": "w1", "week": 1, "theme": "Arena Week", "rank": 2, "coins": 600, "pts": 9}]
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.WEEKLY.update({"week": -1, "scores": {}, "last": None})
+        server.PRIZES.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.WEEKLY["scores"][f]["pts"], 7)
+        self.assertEqual(server.PRIZES[f][0]["coins"], 600)
+        self.assertEqual(server.WEEKLY["last"]["top"], [["Bo", 9]])
+        server.world_apply({"weekly": {"week": 3, "scores": {"not a friend id": {"pts": 99}}, "prizes": {"zz": [1]}}})       # junk is ignored
+        self.assertEqual(server.WEEKLY["scores"], {})
 
     # ---------------------------------------------------------------- xiangqi (Chinese chess)
 
