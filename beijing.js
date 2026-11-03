@@ -321,7 +321,10 @@ const Beijing = (() => {
 
   const LAKE = { x: -700, z: -740, a: 190, b: 130 }, ISLAND = { x: -640, z: -760, r: 22 };
   const inEllipse = (x, z) => ((x - X(LAKE.x)) / LAKE.a) ** 2 + ((z - LAKE.z) / LAKE.b) ** 2 < 1;
+  let boating = false;                                           // in a dragon boat: afloat, not swimming
   const inWater = (x, z) => inEllipse(x, z) && groundAt(x, z) < 0.2;
+  const DOCK = { x: -878, z: -680 };                              // the pier where the dragon boat races start (west shore)
+  const COURSE = { x0: -830, x1: -580, lanes: [-695, -685, -675, -665] };   // 250 m east across the lake, four lanes
   function buildLake() {
     const g = root;
     const water = new T.Mesh(new T.CircleGeometry(1, 56), C.water); water.rotation.x = -Math.PI / 2; water.scale.set(LAKE.a, LAKE.b, 1); water.position.set(X(LAKE.x), 0.06, LAKE.z); g.add(water);
@@ -333,6 +336,10 @@ const Beijing = (() => {
     mbox(g, X(-566), 0, ISLAND.z, 110, 0.7, 7, C.marble, { walk: true, map: "#e9e7df" });                // the bridge deck, level with the island
     for (let k = 0; k < 17; k++) for (const sz of [-3.55, 3.55]) mbox(g, X(-616 + k * 6.4), 0, ISLAND.z + sz, 3.6, 0.8, 0.12, C.dark, { cast: false });   // the seventeen arches
     for (let k = 0; k <= 34; k++) for (const sz of [-3.3, 3.3]) mbox(g, X(-620 + k * 3.2), 0.7, ISLAND.z + sz, 0.5, 1.1, 0.5, C.marble, { cast: false });
+    mbox(g, X(DOCK.x + 6), 0, DOCK.z, 24, 0.4, 7, C.wood, { walk: true, cast: false });                    // the pier for the dragon boat races
+    for (let k = 0; k < 4; k++) for (const sz of [-3.3, 3.3]) mbox(g, X(DOCK.x - 4 + k * 7), 0.4, DOCK.z + sz, 0.3, 1.2, 0.3, C.wood, { cast: false });
+    for (const sz of [-1, 1]) { mcyl(g, X(DOCK.x - 8), 0, DOCK.z + sz * 5, 0.25, 7, C.red); mbox(g, X(DOCK.x - 8), 6, DOCK.z + sz * 5, 1.6, 0.4, 1.6, C.gold, { cast: false }); }
+    sign(g, X(DOCK.x - 8), 4.2, DOCK.z, 5.6, 1.5, "龙舟", "dragon boats", -Math.PI / 2);
     // the shore: the Long Corridor along the north bank, the Marble Boat, willows
     hill(-700, -985, 140, 55, 46, lambert(0x4c7a3a));
     const post = new T.InstancedMesh(BOX, C.red, 140), o = new T.Object3D();
@@ -469,13 +476,14 @@ const Beijing = (() => {
     if (Math.abs(px - BX) > 1400) return;
     updatePeople(dt);
   }
-  const swimMul = () => (inWater(player.x, player.z) ? 0.8 : 1);
-  const avatarDrop = () => (inWater(player.x, player.z) ? -0.9 : 0);
-  const camDrop = () => (inWater(player.x, player.z) ? -0.9 : 0);
+  const swimMul = () => (!boating && inWater(player.x, player.z) ? 0.8 : 1);
+  const avatarDrop = () => (!boating && inWater(player.x, player.z) ? -0.9 : 0);
+  const camDrop = () => (!boating && inWater(player.x, player.z) ? -0.9 : 0);
+  const atDock = () => Math.abs(player.x - X(DOCK.x - 4)) < 8 && Math.abs(player.z - DOCK.z) < 6;
 
   return {
     build, show, setEra, update, homeInside, homeSpot, SPAWN, BOUNDS: BOUNDS_B, MAP: MAP_B,
-    inWater, swimMul, avatarDrop, camDrop, X, LAKE, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
+    inWater, swimMul, avatarDrop, camDrop, X, LAKE, DOCK, COURSE, atDock, setBoating: (v) => { boating = !!v; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
     get built() { return built; },
     inHome: (x, z) => Math.abs(x - X(HOME.x)) < 16 && Math.abs(z - HOME.z) < 16,
   };

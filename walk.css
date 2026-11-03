@@ -811,3 +811,9 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #ball-hud small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
 #card { left: 120px; width: min(400px, calc(100vw - 136px)); }   /* (the fireball menu button sits at the far left, so the landmark card moves over) */
 #card { bottom: 118px; }   /* (above the menu bar, which now runs along the bottom-left next to the fireball) */
+#dragon-hud { position: fixed; left: 50%; transform: translateX(-50%); top: 64px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(92vw, 720px); padding: 8px 16px; text-align: center; background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.55); border-radius: 12px; pointer-events: none; }
+#dragon-hud b { font: 700 1.15rem Georgia, serif; color: var(--gold); }
+#dragon-hud span { min-height: 1.2em; font-weight: 700; color: #ffe08a; }
+#dragon-hud small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+#dh-drum { width: 54px; height: 54px; display: grid; place-items: center; }
+#dh-drum i { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle, #ffd36b 0%, #d9341f 70%); box-shadow: 0 0 10px rgba(217,52,31,.8); transition: transform .06s; }

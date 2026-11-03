@@ -15,6 +15,7 @@ const Mini = (() => {
   let ov = null, cv = null, g = null, head = null, help = null, m = null, st = null, raf = 0, last = 0, sendT = 0, note = "", noteT = 0;
   const held = new Set();
   let kite = { x: 22, y: 30 }, hitAt = [0, 0], pullAt = [0, 0];
+  let dg = null;      // the dragon boat race: { boats, hud, t0 (when the drum starts), beat, len, dist (each boat's smoothed distance), best (your last stroke) }
   let bg = null;      // the 3D ball game: { ball (the mesh), fig (the other player's figure), hud, last (when each player last hit) }
   const send = (o) => Online.navalSend(o);
   const me = () => (m ? m.you : 0), foe = () => 1 - me();
@@ -33,6 +34,7 @@ const Mini = (() => {
     if (m) return;
     if (typeof mode === "undefined" || mode !== "walk") { send({ t: "leave" }); return; }
     if (msg.mode === "ball") return start3d(msg);
+    if (msg.mode === "dragon") return startDragon(msg);
     if (!ov) build();
     closePanels(); Vitals.stopRest();
     if (document.pointerLockElement) document.exitPointerLock();
@@ -173,9 +175,10 @@ const Mini = (() => {
     Sfx.play("horn"); toast(`Pok-ta-pok${m.ranked ? " (ranked)" : ""}! Hit the ball with Space, keep it off your half.`);
   }
 
-  function swing() { if (bg && m) { send({ t: "hit", yaw: +player.yaw.toFixed(3) }); } }
+  function swing() { if (bg && m) { send({ t: "hit", yaw: +player.yaw.toFixed(3) }); } else if (dg && m) { send({ t: "stroke" }); } }
 
   function update(dt) {
+    if (dg && m) { updateDragon(dt); return; }
     if (!bg || !m) return;
     updatePlayer(dt);
     const c = court(), lo = me() === 0 ? -HALF_W : 0.8, hi = me() === 0 ? -0.8 : HALF_W;
@@ -204,12 +207,119 @@ const Mini = (() => {
     const c = court(); placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.02;       // back on foot beside the court's south end
   }
 
+  // ------------------------------------------------------------------ the dragon boat race on Kunming Lake (Beijing)
+  // Four dragon boats race 250 m east across the lake. A drum beats every 0.6 s: press Space (or A and D in turn) on each beat. The server keeps the beat and judges every stroke.
+  const BOAT_COLORS = [0xd9341f, 0x2c7fe0, 0x2f8f4a, 0xf2c21b];
+  function makeBoat(color) {
+    const g = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color }), dark = new THREE.MeshLambertMaterial({ color: 0x3a2a1a }), gold = new THREE.MeshLambertMaterial({ color: 0xe2b52a }), skin = new THREE.MeshLambertMaterial({ color: 0xd9a77a });
+    const part = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; g.add(o); return o; };
+    const BOXG = new THREE.BoxGeometry(1, 1, 1), SPH = new THREE.SphereGeometry(1, 10, 8);
+    part(BOXG, mat, 0, 0.35, 0, 15, 0.9, 1.7); part(BOXG, dark, 0, 0.82, 0, 14, 0.12, 1.5);                  // the long hull and its deck
+    part(BOXG, mat, 8.2, 0.7, 0, 1.6, 0.8, 1.2); part(BOXG, mat, -8.3, 0.9, 0, 1.4, 1.0, 1.2);               // the raised bow and stern
+    part(BOXG, mat, 9.4, 1.4, 0, 0.7, 1.8, 0.7);                                                              // the neck of the dragon
+    const head = part(SPH, gold, 10.1, 2.4, 0, 0.9, 0.7, 0.7);                                               // the dragon's head, with horns and a red mouth
+    part(new THREE.ConeGeometry(0.18, 0.9, 6), gold, 9.9, 3.2, 0.3).rotation.z = -0.3; part(new THREE.ConeGeometry(0.18, 0.9, 6), gold, 9.9, 3.2, -0.3).rotation.z = -0.3;
+    part(BOXG, new THREE.MeshLambertMaterial({ color: 0xb02a22 }), 10.7, 2.15, 0, 0.7, 0.2, 0.5);
+    part(new THREE.ConeGeometry(0.3, 1.6, 6), gold, -9.3, 1.9, 0).rotation.z = 0.7;                           // the tail
+    const drum = part(new THREE.CylinderGeometry(0.55, 0.55, 0.7, 12), new THREE.MeshLambertMaterial({ color: 0xa8281f }), 6.4, 1.3, 0); drum.userData.drum = true;
+    const rows = [];                                                                                           // the paddlers, two long rows
+    for (let k = 0; k < 10; k++) for (const sz of [-1, 1]) {
+      const x = 4 - k * 1.3, body = part(BOXG, mat, x, 1.25, sz * 0.55, 0.45, 0.6, 0.4), head2 = part(SPH, skin, x, 1.78, sz * 0.55, 0.2, 0.2, 0.2), pad = part(BOXG, dark, x, 1.0, sz * 1.05, 0.12, 0.12, 1.8);
+      rows.push({ body, head2, pad, k, sz });
+    }
+    g.userData.rows = rows; g.userData.drum = drum;
+    return g;
+  }
+
+  function startDragon(msg) {
+    if (city !== "beijing") { send({ t: "leave" }); toast("The dragon boat race is on Kunming Lake in Beijing."); return; }
+    closePanels(); Vitals.stopRest();
+    m = msg; m.kind = "dragon"; st = null; note = "";
+    const c = { x: BEIJING_X + Beijing.COURSE.x0, lanes: Beijing.COURSE.lanes };
+    const boats = m.players.map((pl, i) => {
+      const g = makeBoat(BOAT_COLORS[i % 4]); g.position.set(c.x, 0.06, c.lanes[i % 4]); scene.add(g);
+      const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
+      x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = i === m.you ? "#9fe0ff" : "#fff3cf"; x.fillText(pl.name.replace(" (practice bot)", ""), 128, 44);
+      const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(4, 1, 1); tag.position.set(0, 5, 0); tag.renderOrder = 10; g.add(tag);
+      return { g, s: 0, v: 0, phase: Math.random() * 6, last: 0 };
+    });
+    const hud = document.createElement("div"); hud.id = "dragon-hud";
+    hud.innerHTML = '<b id="dh-pos"></b><div id="dh-drum"><i></i></div><span id="dh-note"></span><small id="dh-help"></small>'; document.body.append(hud);
+    hud.querySelector("#dh-help").textContent = "Press Space (or A and D in turn) on every beat of the drum. Strokes on the beat drive the boat hard. Esc leaves.";
+    dg = { boats, hud, t0: performance.now() + m.countdown * 1000, beat: m.beat * 1000, len: m.length, last: -1, noteT: 0, cx: c.x };
+    mode = "online"; Beijing.setBoating(true);
+    addEventListener("keydown", onDragonKey, true);
+    player.yaw = -Math.PI / 2; player.pitch = -0.14; player.vx = player.vz = 0;
+    Sfx.play("horn"); toast("Dragon boat race! Paddle on the beat of the drum.");
+  }
+  function onDragonKey(e) {
+    if (!dg || !m) return;
+    if (e.code === "Escape") { e.preventDefault(); e.stopPropagation(); leave(); return; }
+    if (e.code !== "Space" && e.code !== "KeyA" && e.code !== "KeyD" && e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.repeat) return;
+    if (performance.now() < dg.t0 - 300) return;
+    send({ t: "stroke" }); dg.boats[me()].last = performance.now();
+  }
+  function onDragon(s) {
+    if (!dg || s.t !== "dragon") return;
+    st = s;
+    for (const e of s.ev || []) if (e[0] === "stroke" && e[1] === me()) { dg.q = e[2]; dg.qT = performance.now(); }
+  }
+
+  function updateDragon(dt) {
+    const now = performance.now(), tNow = now - dg.t0;
+    // the camera follows your boat
+    const mine = dg.boats[me()];
+    for (let i = 0; i < dg.boats.length; i++) {
+      const b = dg.boats[i], row = st && st.p ? st.p[i] : null;
+      if (row) { b.s += (row[1] - b.s) * Math.min(1, dt * 6); b.v = row[2]; }
+      b.s += b.v * dt * 0.2;
+      b.g.position.x = dg.cx + b.s; b.g.position.y = 0.06 + Math.sin(now / 400 + i) * 0.04;
+      b.g.rotation.z = Math.sin(now / 500 + i * 2) * 0.012;
+      b.phase += dt * (1.5 + b.v * 1.4);
+      for (const r of b.g.userData.rows) { const sw = Math.sin(b.phase + r.k * 0.2 + (r.sz > 0 ? 0 : 0)); r.pad.rotation.z = sw * 0.5; r.pad.position.y = 1.0 + Math.max(0, sw) * 0.35; r.body.rotation.z = sw * 0.12; r.head2.position.x = r.body.position.x + sw * 0.08; }
+      const k = b.g.userData.drum; if (i === me()) k.scale.set(1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140), 1, 1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140));
+    }
+    player.x = mine.g.position.x + 1.5; player.z = mine.g.position.z; player.feet = 1.0; player.y = player.feet + EYE; player.yaw = -Math.PI / 2; player.vx = player.vz = 0;
+    // the drum: a sound on every beat, a circle that pulses, and the countdown before the start
+    const beatNo = Math.floor(tNow / dg.beat);
+    if (tNow >= 0 && beatNo !== dg.last) { dg.last = beatNo; Sfx.play("stone"); }
+    const phase = tNow >= 0 ? ((tNow % dg.beat) + dg.beat) % dg.beat : 0;
+    const ring = dg.hud.querySelector("#dh-drum i"); ring.style.transform = `scale(${1 + 0.6 * Math.max(0, 1 - phase / 160)})`; ring.style.opacity = tNow < 0 ? 0.35 : 1;
+    const order = dg.boats.map((b, i) => [i, b.s]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), place = order.indexOf(me()) + 1;
+    const q = dg.q !== undefined && now - dg.qT < 700 ? (dg.q >= 1 ? "Perfect!" : dg.q >= 0.6 ? "Good" : "Ragged...") : "";
+    dg.hud.querySelector("#dh-pos").textContent = tNow < 0 ? `Get ready... ${Math.ceil(-tNow / 1000)}` : `${["1st", "2nd", "3rd", "4th"][place - 1]} of ${dg.boats.length} · ${Math.min(dg.len, Math.round(mine.s))} / ${Math.round(dg.len)} m · ${Math.round(mine.v * 3.6)} km/h`;
+    dg.hud.querySelector("#dh-note").textContent = tNow < 0 ? "" : q;
+  }
+
+  function endDragon(res) {
+    if (!m || !dg) return;
+    const idx = m.you, rank = res.order.findIndex((o) => o.i === idx) + 1, n = res.order.length;
+    const prize = rank === 1 ? 60 : rank === 2 && n >= 3 ? 25 : 0;
+    Vitals.coins += prize;
+    const me0 = res.order[rank - 1], ords = ["", "1st", "2nd", "3rd", "4th"];
+    const table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  ");
+    cleanup();
+    showResult(rank === 1 ? "You won the dragon boat race!" : `You finished ${ords[rank] || "last"}`, `${table}. ${me0 && me0.strokes ? `${me0.perfect} of your ${me0.strokes} strokes were right on the beat.` : ""}${prize ? ` Prize: +${prize} denarii.` : ""}`, [
+      { label: "Race again", fn: () => { closePanels(); Online.openLobby(); } },
+      { label: "Close", fn: closePanels },
+    ]);
+  }
+  function cleanupDragon() {
+    if (!dg) return;
+    removeEventListener("keydown", onDragonKey, true);
+    for (const b of dg.boats) scene.remove(b.g);
+    dg.hud.remove(); dg = null; Beijing.setBoating(false);
+    placeAt(BEIJING_X + Beijing.DOCK.x - 3, Beijing.DOCK.z, -Math.PI / 2); player.pitch = -0.02;
+  }
+
   // ------------------------------------------------------------------ the end
   function cleanup() {
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); if (ov) ov.classList.remove("show");
-    cleanup3d();
+    cleanup3d(); cleanupDragon();
     m = null; st = null;
     if (mode === "online") mode = "walk";
   }
@@ -234,5 +344,5 @@ const Mini = (() => {
   }
   function lost() { if (m) { cleanup(); toast("The connection to the game server was lost."); } }
 
-  return { start, on, end, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg; } };
+  return { start, on, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
 })();

@@ -1063,6 +1063,79 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)
 
+    # ---------------------------------------------------------------- dragon boat race
+
+    async def start_dragon(self, n=2):
+        server.CFG["race_wait"] = 0.6
+        ws = [await self.player(nm) for nm in ("Ann", "Ben", "Cyd", "Dee")[:n]]
+        for w in ws:
+            w.send({"t": "queue", "mode": "dragon", "bot": False})
+        ms = [await w.until(lambda m: m["t"] == "match", timeout=4) for w in ws]
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()                    # the tests step the room by hand
+        room.start_at = time.monotonic() - 1.0   # (the race is under way, and the beat starts one second ago)
+        return ws, ms, room
+
+    async def test_dragon_strokes_on_the_beat_drive_the_boat_and_ragged_ones_barely_do(self):
+        ws, ms, room = await self.start_dragon(2)
+        self.assertEqual((ms[0]["mode"], ms[0]["length"], ms[0]["beat"]), ("dragon", 250.0, 0.6))
+        a, b = room.players
+        # a stroke exactly on a beat
+        room.start_at = time.monotonic() - 1.2                # 1.2 s = exactly two beats ago
+        ws[0].send({"t": "stroke"})
+        await asyncio.sleep(0.15)
+        good = a.v
+        self.assertGreater(good, 1.8)                         # a perfect stroke adds about 2 m/s
+        ws[0].send({"t": "stroke"})                           # (too soon after the last one: ignored)
+        await asyncio.sleep(0.1)
+        self.assertEqual(a.strokes, 1)
+        room.start_at = time.monotonic() - 1.2 - 0.3          # the middle of a beat: as ragged as it gets
+        ws[1].send({"t": "stroke"})
+        await asyncio.sleep(0.15)
+        self.assertLess(b.v, 0.6)
+
+    async def test_dragon_no_early_start_and_the_water_slows_the_boat(self):
+        ws, ms, room = await self.start_dragon(2)
+        a = room.players[0]
+        room.start_at = time.monotonic() + 3.0                # still counting down
+        ws[0].send({"t": "stroke"})
+        await asyncio.sleep(0.15)
+        self.assertEqual(a.strokes, 0)
+        room.start_at = time.monotonic() - 1.0
+        a.v = 6.0
+        for _ in range(10):
+            room.step(0.1)
+        self.assertLess(a.v, 4.0)
+        self.assertGreater(a.s, 3.0)
+
+    async def test_dragon_finish_order_rewards_the_first_across_the_line(self):
+        ws, ms, room = await self.start_dragon(2)
+        a, b = room.players
+        a.s, b.s, a.v, b.v = 249.0, 240.0, 6.0, 4.0
+        for _ in range(5):
+            room.step(0.1)
+        self.assertIsNotNone(a.fin)
+        self.assertFalse(room.over)                           # Ben is still rowing
+        b.s, b.v = 249.5, 6.0
+        for _ in range(3):
+            room.step(0.1)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["order"][0]["i"], end["order"][1]["i"]), ("dragon", 0, 1))
+        self.assertIn("rank", end)
+
+    async def test_dragon_a_lone_player_gets_three_practice_crews_at_once_with_f(self):
+        server.CFG["bot_wait"] = 30.0
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "dragon", "bot": True, "practice": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=2)
+        self.assertEqual((m["mode"], len(m["players"])), ("dragon", 4))
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.start_at = time.monotonic() - 3.0
+        for _ in range(20):
+            room.step(0.1)
+        self.assertTrue(all(p.s > 0 for p in room.players if p.bot))      # the practice crews paddle themselves
+
     # ---------------------------------------------------------------- chariot derby
 
     async def start_derby(self, n=2):

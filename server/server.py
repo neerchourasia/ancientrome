@@ -1487,6 +1487,126 @@ class DerbyRoom:
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# dragon boat race (Beijing, Kunming Lake): up to four dragon boats race 250 m across the lake. A drum beats every 0.6 s; each press of the key is a paddle stroke, and a stroke on the
+# beat drives the boat hard, one a little off the beat much less, and a ragged one hardly at all. The server keeps the beat and judges every stroke.
+
+DRAGON_LEN = 250.0
+DRAGON_BEAT = 0.6
+DRAGON_COUNTDOWN = 5.0
+DRAGON_KICK = 2.0          # speed (m/s) a perfect stroke adds; the water drags the boat back (v loses half of itself each second), so a crew paddling on the beat settles near 6.7 m/s
+DRAGON_GRACE = 25.0
+
+
+class Rower:
+    def __init__(self, conn, index, bot=False):
+        self.conn, self.i, self.bot, self.who = conn, index, bot, conn
+        self.name = conn.name if conn else "Practice crew %d" % (index + 1)
+        self.cls = conn.cls if conn else "gladiator"
+        self.look = conn.look if conn else clean_look({"toga": index + 1, "sash": index})
+        self.s, self.v, self.fin = 0.0, 0.0, None
+        self.last_stroke, self.nbeat = -9.0, -1
+        self.skill = 0.6 + random.random() * 0.35         # how well a practice crew keeps the beat
+        self.strokes, self.perfect = 0, 0
+
+
+class DragonRoom:
+    kind = "dragon"
+    TICK = 0.1
+
+    def __init__(self, conns, bots=0):
+        self.id = os.urandom(3).hex()
+        self.players = [Rower(c, i) for i, c in enumerate(conns)]
+        for _ in range(bots):
+            self.players.append(Rower(None, len(self.players), bot=True))
+        self.start_at = now() + DRAGON_COUNTDOWN
+        self.over, self.events, self.first_fin = False, [], None
+        for p in self.players:
+            if p.conn:
+                p.conn.room, p.conn.me, p.conn.queue = self, p, None
+        roster = [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look} for q in self.players]
+        for p in self.players:
+            if p.conn:
+                p.conn.send({"t": "match", "mode": "dragon", "room": self.id, "you": p.i, "countdown": DRAGON_COUNTDOWN, "length": DRAGON_LEN, "beat": DRAGON_BEAT, "players": roster})
+        self.task = asyncio.ensure_future(self.run())
+
+    def on_msg(self, conn, m):
+        p = conn.me
+        if self.over or p is None or p.fin is not None or m.get("t") != "stroke":
+            return
+        tm = now()
+        if tm < self.start_at or tm - p.last_stroke < 0.3:             # no early start, and nobody can stroke faster than that
+            return
+        p.last_stroke = tm
+        phase = (tm - self.start_at) % DRAGON_BEAT
+        err = min(phase, DRAGON_BEAT - phase)
+        q = 1.0 if err < 0.15 else 0.6 if err < 0.28 else 0.2
+        p.v = min(9.0, p.v + DRAGON_KICK * q)
+        p.strokes += 1
+        p.perfect += 1 if q == 1.0 else 0
+        self.events.append(["stroke", p.i, q])
+
+    def leave(self, conn):
+        p = conn.me
+        if p is None or self.over:
+            return
+        p.conn, p.fin = None, float("inf")
+        if not any(q.conn for q in self.players):
+            self.finish("empty")
+
+    async def run(self):
+        try:
+            while not self.over:
+                await asyncio.sleep(self.TICK)
+                self.step(self.TICK)
+        except asyncio.CancelledError:
+            pass
+
+    def step(self, dt):
+        t = now()
+        racing = t >= self.start_at
+        if racing:
+            beat = int((t - self.start_at) / DRAGON_BEAT)
+            for p in self.players:
+                if p.bot and p.fin is None and beat > p.nbeat:
+                    p.nbeat = beat
+                    if random.random() < 0.92:
+                        p.v = min(9.0, p.v + DRAGON_KICK * max(0.2, min(1.0, p.skill + random.uniform(-0.08, 0.08))))
+                if p.fin is None:
+                    p.v -= p.v * 0.5 * dt
+                    p.s += p.v * dt
+                    if p.s >= DRAGON_LEN:
+                        p.fin = t - self.start_at
+                        if self.first_fin is None:
+                            self.first_fin = t
+        payload = {"t": "dragon", "p": [[p.i, round(p.s, 1), round(p.v, 2), 1 if p.fin is not None and p.fin != float("inf") else 0] for p in self.players], "ev": self.events}
+        self.events = []
+        for p in self.players:
+            if p.conn:
+                p.conn.send(payload)
+        humans = [p for p in self.players if p.conn]
+        if racing and humans and all(p.fin is not None for p in humans):
+            self.finish("finished")
+        elif self.first_fin and t - self.first_fin > DRAGON_GRACE:
+            self.finish("timeout")
+        elif racing and t - self.start_at > 240:
+            self.finish("timeout")
+
+    def finish(self, reason):
+        if self.over:
+            return
+        self.over = True
+        order = sorted(self.players, key=lambda p: (p.fin if p.fin is not None else float("inf"), -p.s))
+        msg = {"t": "end", "mode": "dragon", "reason": reason,
+               "order": [{"i": p.i, "name": p.name, "time": (round(p.fin, 2) if p.fin not in (None, float("inf")) else None), "perfect": p.perfect, "strokes": p.strokes} for p in order]}
+        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who]) if reason != "empty" else {}
+        for p in self.players:
+            if p.conn:
+                p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
+                p.conn.room = p.conn.me = None
+        self.task.cancel()
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # naval battle: every ship for itself (no teams). Players steer their own galley (the browser sends where it is, as
 # with duels, and the server clamps how fast it can move); the SERVER owns cannonballs, hits, rams, hull and the winner.
 
@@ -1901,7 +2021,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": [], "dragon": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -1944,6 +2064,16 @@ def match_once():
         DerbyRoom(humans, bots=max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0)
     elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DerbyRoom([q.pop(0)], bots=3)
+
+    q = QUEUES["dragon"]
+    q[:] = [c for c in q if not c.closed]
+    if len(q) >= 4:
+        DragonRoom([q.pop(0) for _ in range(4)])
+    elif len(q) >= 2 and t - q[1].queued_at >= CFG["race_wait"]:
+        humans = [q.pop(0) for _ in range(min(4, len(q)))]
+        DragonRoom(humans, bots=max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0)
+    elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        DragonRoom([q.pop(0)], bots=3)
 
     for kind, room_class in (("kushti", KushtiRoom), ("kites", KiteRoom), ("ball", BallRoom)):
         q = QUEUES[kind]
@@ -2111,8 +2241,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún", "beijing": "Beijing"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game", "dragon": "in a dragon boat race"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game", "dragon": "a dragon boat race"}
 
 
 def where_is(c):
@@ -3661,8 +3791,8 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 
 CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
 CHAL_TTL = 45.0
-CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball")      # what the challenger can pick
-CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok"}
+CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon")      # what the challenger can pick
+CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race"}
 
 
 def chal_room(game, a, b):
@@ -3672,6 +3802,8 @@ def chal_room(game, a, b):
         ArenaRoom([(a, 0), (b, 0)], "brawl")
     elif game == "derby":
         DerbyRoom([a, b])
+    elif game == "dragon":
+        DragonRoom([a, b])
     else:
         {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}[game](game, [a, b])
 
@@ -4020,6 +4152,10 @@ async def handle_msg(conn, m):
         if m.get("practice") and mode in MINI_ROOMS and CFG["allow_bots"]:       # F on the ball court (like F in the Colosseum): a practice game against a bot, straight away
             leave_queue(conn)
             MINI_ROOMS[mode](mode, [conn], bots=1)
+            return
+        if m.get("practice") and mode == "dragon" and CFG["allow_bots"]:
+            leave_queue(conn)
+            DragonRoom([conn], bots=3)
             return
         return enqueue(conn, mode, m.get("bot"))
     if t == "leave":
