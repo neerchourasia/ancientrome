@@ -1447,6 +1447,28 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         cy.send({"t": "tourney", "a": "get", "id": "nothere"})
         self.assertIn("over", (await cy.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
 
+    async def test_tourney_the_host_can_start_it_now(self):
+        self.accounts("ann", "ben", "cy")
+        self.tourney_fresh()
+        ann, ben, cy = [await self.player(n.title(), token=n) for n in ("ann", "ben", "cy")]
+        ann.send({"t": "tourney", "a": "create", "kind": "xiangqi", "cap": 8})
+        v = await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        self.assertTrue(v["host"])
+        tid = v["id"]
+        ann.send({"t": "tourney", "a": "start", "id": tid})                               # alone: not enough people
+        self.assertIn("at least", (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+        ben.send({"t": "tourney", "a": "join", "id": tid})
+        v = await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        self.assertFalse(v["host"])
+        ben.send({"t": "tourney", "a": "start", "id": tid})                               # only the host can
+        self.assertIn("Only whoever", (await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+        self.assertEqual(server.TOURNEYS[tid]["state"], "open")
+        ann.send({"t": "tourney", "a": "start", "id": tid})
+        v = await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "view" and m["state"] == "running")
+        self.assertEqual((v["round"], len(v["rounds"][0]["m"])), ("Final", 1))
+        ann.send({"t": "tourney", "a": "start", "id": tid})                               # (already under way)
+        self.assertIn("Only whoever", (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+
     def test_tourney_is_saved_and_a_match_that_was_live_waits_again(self):
         self.tourney_fresh()
         t = self.tourney_pure("xiangqi", 4)

@@ -1,7 +1,7 @@
 "use strict";
 // Tournaments: 🏟️ Tournaments in the menu. Anyone with an account can open one for xiangqi, kushti, kite fights, pok-ta-pok or dragon boats and others sign up for a few minutes. The server
 // draws a bracket (single elimination for two-player games, heats of up to four boats for dragon boats), warns each player 20 seconds before their match and starts it by itself, so stay out
-// of other games until you are called. Every match can be watched from the bracket. With four or more players the top places win 500, 250 and 100 denarii (up to three prizes a day).
+// of other games until you are called (whoever opened it can press Start now once two or more have signed up). Every match can be watched from the bracket. With four or more players the top places win 500, 250 and 100 denarii (up to three prizes a day).
 // Depends on online.js (Online.navalSend, Online.connected), audio.js and the globals of game.js (openPanel, toast).
 
 const Tournament = (() => {
@@ -48,6 +48,7 @@ const Tournament = (() => {
     if (v.state === "open") {
       const row = el("div", undefined, "gd-row");
       if (v.joined) row.append(btn("Leave", () => send({ a: "leave", id: v.id }))); else row.append(btn("Sign up", () => send({ a: "join", id: v.id })));
+      if (v.host) { const go = btn("Start now", () => send({ a: "start", id: v.id }), "tn-start"); go.disabled = v.n < 2; go.title = v.n < 2 ? "You need at least two players" : "Close sign-up and draw the bracket"; row.append(go); }
       body.append(row);
       body.append(el("p", `Players: ${v.players.join(", ") || "nobody yet"}`, "dnote small"));
     }

@@ -4468,7 +4468,7 @@ def tourney_row(t, conn):
 
 def tourney_view(t, conn):
     out = tourney_row(t, conn)
-    out.update({"t": "tourney", "a": "view", "players": [p["name"] for p in sorted(t["players"], key=lambda p: -p["seed"])], "places": [[p[1], p[2]] for p in t["places"]], "prize": len(t["players"]) >= TOURNEY_PRIZE_MIN,
+    out.update({"t": "tourney", "a": "view", "players": [p["name"] for p in sorted(t["players"], key=lambda p: -p["seed"])], "places": [[p[1], p[2]] for p in t["places"]], "prize": len(t["players"]) >= TOURNEY_PRIZE_MIN, "host": bool(conn.fid) and conn.fid == t["by"],
                 "rounds": [{"label": tourney_label(t, i), "m": [{"ps": [tourney_pname(t, f) for f in m["ps"]], "w": [tourney_pname(t, f) for f in m["w"]], "st": m["st"], "room": m["room"], "bye": bool(m.get("bye")),
                                                                  "me": bool(conn.fid) and conn.fid in m["ps"]} for m in rd]} for i, rd in enumerate(t["rounds"])]})
     return out
@@ -4516,6 +4516,15 @@ def on_tourney(conn, m):
         if tourney_active_of(conn.fid):
             return conn.send({"t": "tourney", "a": "no", "msg": "You are in a tournament already."})
         t["players"].append({"f": conn.fid, "name": conn.name, "seed": rating_of(conn)["r"]})
+        world_soon()
+        return conn.send(tourney_view(t, conn))
+    if a == "start":
+        if t["state"] != "open" or t["by"] != conn.fid:
+            return conn.send({"t": "tourney", "a": "no", "msg": "Only whoever opened a tournament can start it, and only during sign-up."})
+        if len(t["players"]) < TOURNEY_MIN:
+            return conn.send({"t": "tourney", "a": "no", "msg": "You need at least %d players to start." % TOURNEY_MIN})
+        t["start_at"] = min(t["start_at"], time.time())
+        tourney_step(t, time.time())
         world_soon()
         return conn.send(tourney_view(t, conn))
     if a == "leave":
