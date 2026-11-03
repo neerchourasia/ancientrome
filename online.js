@@ -81,10 +81,10 @@ const Online = (() => {
       case "ridenote": toast(m.text); break;
       case "adminevents": Admin.showEvents(m.e || []); break;
       case "kicked": noConnectUntil = Date.now() + (m.minutes || 10) * 60000; Chat.add({ sys: 1, text: m.blocked ? "An admin blocked you from the game." : `An admin kicked you for ${m.minutes || 10} minutes.` }); toast(m.blocked ? "You were blocked from the game by an admin." : "An admin kicked you."); break;
-      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "dragon" ? "other crews" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
+      case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "dragon" ? "other crews" : m.mode === "wushu" ? "a wushu opponent" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "dragon") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if (toCity("rome"), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "dragon") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;
@@ -115,7 +115,7 @@ const Online = (() => {
     $o("on-naval").disabled = !ready;
     $o("on-brawl").disabled = !ready;
     $o("on-derby").disabled = !ready;
-    for (const [id, c] of [["on-kushti", "delhi"], ["on-kites", "delhi"], ["on-ball", "cancun"], ["on-dragon", "beijing"]]) { $o(id).hidden = city !== c; $o(id).disabled = !ready; }
+    for (const [id, c] of [["on-kushti", "delhi"], ["on-kites", "delhi"], ["on-ball", "cancun"], ["on-dragon", "beijing"], ["on-wushu", "beijing"]]) { $o(id).hidden = city !== c; $o(id).disabled = !ready; }
     $o("on-team2").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
@@ -181,6 +181,13 @@ const Online = (() => {
   }
   // standing on the pier at Kunming Lake in Beijing: F starts a dragon boat race against three practice crews at once
   const atDock = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atDock();
+  // standing at the gate of the wushu courtyard in Beijing: F starts a bare-handed bout against Master Li at once
+  const atWushu = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atWushu();
+  function playWushu() {
+    if (typeof Account !== "undefined" && Account.demo) { toast("The wushu bout needs the game server, so it needs an account: log in first."); return; }
+    if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
+    send({ t: "queue", mode: "wushu", bot: true, practice: true });
+  }
   function playDragon() {
     if (typeof Account !== "undefined" && Account.demo) { toast("The dragon boat race needs the game server, so it needs an account: log in first."); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
@@ -405,6 +412,7 @@ const Online = (() => {
     $o("on-kites").addEventListener("click", () => queue("kites"));
     $o("on-ball").addEventListener("click", () => queue("ball"));
     $o("on-dragon").addEventListener("click", () => queue("dragon"));
+    $o("on-wushu").addEventListener("click", () => queue("wushu"));
     $o("on-team2").addEventListener("click", () => queue("team2"));
     $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);
@@ -440,12 +448,14 @@ const Online = (() => {
     parts.armL.rotation.x = block ? 1.3 : parts.armL.rotation.x;
   }
 
-  const near = (x, z, r) => Math.hypot(ARENA.cx + x - player.x, ARENA.cz + z - player.z) < r;
+  let C0 = { cx: ARENA.cx, cz: ARENA.cz };      // where the fight is held: the Colosseum arena in Rome, or the wushu courtyard in Beijing
+  const near = (x, z, r) => Math.hypot(C0.cx + x - player.x, C0.cz + z - player.z) < r;
 
   function startFight(m) {
     if (mode !== "walk") return;
     closePanels();
     Vitals.stopRest();
+    C0 = m.mode === "wushu" ? { cx: BEIJING_X + Beijing.WUSHU.x, cz: Beijing.WUSHU.z } : { cx: ARENA.cx, cz: ARENA.cz };
     const me = m.you, coop = m.mode === "coop", arena = m.mode === "brawl" || m.mode === "team2";
     const teamOf = (p) => (p.team !== undefined ? p.team : p.role === "enemy" ? 1 : 0);
     duel = { kind: m.mode, ranked: !!m.ranked, you: me, radius: m.radius, players: m.players, figs: {}, st: {}, block: false, sendT: 0, over: false, rev: {}, enemies: m.enemies || 0, notice: "" };
@@ -457,20 +467,20 @@ const Online = (() => {
       paintFigure(f.mats, p.look);
       applyAccessories(f, p.look.acc);
       Weapons.setFigure(f, p.look.weapon);
-      f.sword.visible = true;
+      f.sword.visible = m.mode !== "wushu";
       f.g.rotation.order = "YXZ";
       f.g.add(label(p.name.replace(" (practice bot)", " (bot)"), arena ? (teamOf(p) === duel.st[me].team && m.mode === "team2" ? "#9fd8a8" : "#ff9d8c") : p.role === "enemy" ? "#ff9d8c" : p.role === "ally" ? "#9fd8a8" : "#fff"));
-      f.g.position.set(ARENA.cx + x, 0, ARENA.cz + z);
+      f.g.position.set(C0.cx + x, 0, C0.cz + z);
       f.g.rotation.y = yaw;
       scene.add(f.g);
       duel.figs[p.i] = f;
     }
     mode = "online";
     Weapons.setFigure(avFig, Market.weapon);
-    avFig.sword.visible = true;
+    avFig.sword.visible = m.mode !== "wushu";
     avatar.rotation.order = "YXZ";
     const mine = duel.st[me];
-    placeAt(ARENA.cx + mine.x, ARENA.cz + mine.z, mine.yaw);
+    placeAt(C0.cx + mine.x, C0.cz + mine.z, mine.yaw);
     player.pitch = -0.05;
     Crowd.setCheer(true);
     $o("online-hud").classList.add("show");
@@ -510,8 +520,8 @@ const Online = (() => {
       Object.assign(s, { x, z, yaw, hp, st, swing: sw, block: bl, down: down || 0 });
       if (team !== undefined) s.team = team;
       if (i === duel.you && !s.down) {
-        const dx = ARENA.cx + x - player.x, dz = ARENA.cz + z - player.z;
-        if (Math.hypot(dx, dz) > 2.2) { player.x = ARENA.cx + x; player.z = ARENA.cz + z; } // the server moved you back
+        const dx = C0.cx + x - player.x, dz = C0.cz + z - player.z;
+        if (Math.hypot(dx, dz) > 2.2) { player.x = C0.cx + x; player.z = C0.cz + z; } // the server moved you back
       }
     }
     duel.rev = Object.fromEntries(m.rev || []);
@@ -535,17 +545,17 @@ const Online = (() => {
     const me = duel.st[duel.you];
     if (!me.down) {
       updatePlayer(dt);
-      const lx = player.x - ARENA.cx, lz = player.z - ARENA.cz, r = Math.hypot(lx, lz), max = duel.radius - 0.9;
-      if (r > max) { player.x = ARENA.cx + (lx * max) / r; player.z = ARENA.cz + (lz * max) / r; }
+      const lx = player.x - C0.cx, lz = player.z - C0.cz, r = Math.hypot(lx, lz), max = duel.radius - 0.9;
+      if (r > max) { player.x = C0.cx + (lx * max) / r; player.z = C0.cz + (lz * max) / r; }
       const blocking = keys.has("ShiftLeft") || keys.has("ShiftRight");
       if (blocking !== duel.block) { duel.block = blocking; send({ t: "block", on: blocking }); }
       duel.sendT -= dt;
-      if (duel.sendT <= 0) { duel.sendT = 0.066; send({ t: "pos", x: +(player.x - ARENA.cx).toFixed(2), z: +(player.z - ARENA.cz).toFixed(2), yaw: +player.yaw.toFixed(3) }); }
+      if (duel.sendT <= 0) { duel.sendT = 0.066; send({ t: "pos", x: +(player.x - C0.cx).toFixed(2), z: +(player.z - C0.cz).toFixed(2), yaw: +player.yaw.toFixed(3) }); }
     } else { player.vx = player.vz = 0; duel.block = false; }
     const k = Math.min(1, dt * 12);
     for (const i of Object.keys(duel.figs)) {
       const f = duel.figs[i], s = duel.st[i];
-      const tx = ARENA.cx + s.x, tz = ARENA.cz + s.z, px = f.g.position.x, pz = f.g.position.z;
+      const tx = C0.cx + s.x, tz = C0.cz + s.z, px = f.g.position.x, pz = f.g.position.z;
       f.g.position.x += (tx - px) * k; f.g.position.z += (tz - pz) * k;
       f.g.position.y += ((s.down ? groundAt(tx, tz) + 0.3 : groundAt(tx, tz)) - f.g.position.y) * k;
       let dy = s.yaw - f.g.rotation.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
@@ -645,7 +655,7 @@ const Online = (() => {
     avatar.rotation.x = 0; avatar.rotation.order = "XYZ";
     Crowd.setCheer(false);
     mode = "walk";
-    placeAt(ARENA.cx - 16, ARENA.cz, -Math.PI / 2);
+    placeAt(C0.cx - (kind === "wushu" ? 29 : 16), C0.cz, -Math.PI / 2);
     showResult(title, text, [
       { label: kind !== "duel" ? "Fight again" : ranked ? "Ranked again" : "Duel again", fn: () => { closePanels(); openLobby(); } },
       { label: "Leave the arena", fn: closePanels },
@@ -671,5 +681,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, atBallCourt, playBall, atDock, playDragon, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

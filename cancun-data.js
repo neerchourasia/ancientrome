@@ -25,8 +25,8 @@ const CANCUN_LANDMARKS = [
   cn({
     id: "c-ballcourt", name: "The Great Ball Court", sub: "The largest ball court in Mesoamerica",
     x: -150, z: -35, r: 50, stand: [-100, 20],
-    text: "Two long parallel walls, 8 metres high, enclose a playing alley 70 metres long. High on each wall is a stone ring. Teams played a heavy rubber ball, using hips, knees and elbows, and the ring was the hardest target of all.",
-    fact: "A whisper at one end of the court can be heard clearly at the other, 135 metres away.",
+    text: "The largest and best-preserved ball court in Mesoamerica: about 168 metres long and 70 metres wide, with two long parallel walls 8 metres high on either side of the playing alley. High on each wall is a stone ring carved with entwined serpents. Players struck a heavy rubber ball with their hips, knees and elbows, never their hands or feet, and sending it through a ring was the hardest feat of all: it could win the whole match at once.",
+    fact: "A whisper at one end of the court can be heard clearly at the other, well over 100 metres away. The game, called pitz in Maya, was played for over 3,000 years. The solid rubber ball weighed 3 to 4.5 kilograms, so players wore heavy padding and hip guards, and its path across the court was a picture of the sun and moon crossing the sky. Carvings link it with the Hero Twins of the Popol Vuh, who beat the Lords of Death at ball.",
   }),
   cn({
     id: "c-warriors", name: "Temple of the Warriors", sub: "A stepped temple with carved columns",

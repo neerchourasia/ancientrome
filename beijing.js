@@ -386,6 +386,92 @@ const Beijing = (() => {
     function k2(x) { return x % 2 ? C.glass : C.glassDark; }
   }
 
+
+  // ---------- the courtyard house grows: six upgrades from the builder in the market, each added on top of the last (see market.js: HOUSES_B). The first brings a garden and a garage. ----------
+  const hT = [null];
+  let hTier = 0, hPending = 0;
+  function buildHouseTiers() {
+    const x0 = HOME.x, z0 = HOME.z;
+    for (let t = 1; t <= 6; t++) { const g = new T.Group(); g.visible = false; root.add(g); hT[t] = { g, blockers: [] }; }
+    const tb = (t, cx, y0, cz, w, h, d, m, solid = true) => { const me = mbox(hT[t].g, X(cx), y0, cz, w, h, d, m); if (solid) hT[t].blockers.push(addBlockerBox(X(cx) - w / 2, X(cx) + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h)); return me; };
+    const tc = (t, cx, y0, cz, r, h, m, solid = true) => { const me = mcyl(hT[t].g, X(cx), y0, cz, r, h, m); if (solid) hT[t].blockers.push(addBlockerCircle(X(cx), cz, r, y0, y0 + h)); return me; };
+    const tcone = (t, cx, y0, cz, r, h, m) => { const me = new T.Mesh(treeCone, m); me.scale.set(r, h, r); me.position.set(X(cx), y0 + h / 2, cz); me.castShadow = true; hT[t].g.add(me); return me; };
+    const tball = (t, cx, y, cz, r, m) => { const me = new T.Mesh(treeBall, m); me.scale.set(r, r, r); me.position.set(X(cx), y, cz); me.castShadow = true; hT[t].g.add(me); return me; };
+    const troof = (t, cx, y, cz, w, d, h, m) => roof(hT[t].g, X(cx), y, cz, w, d, h, m);
+    const pine = (t, cx, cz, h = 5) => { tc(t, cx, 0, cz, 0.25, h * 0.45, C.wood, false); tcone(t, cx, h * 0.3, cz, 1.1, h, C.leaf); };
+    const pond = (t, cx, cz, w, d) => { tb(t, cx, -0.02, cz, w + 1.2, 0.3, d + 1.2, C.stone, false); tb(t, cx, 0.26, cz, w, 0.05, d, C.water, false); };
+    const fountain = (t, cx, cz) => { tc(t, cx, 0, cz, 1.7, 0.55, C.stone); tc(t, cx, 0.5, cz, 1.35, 0.1, C.water, false); tc(t, cx, 0.5, cz, 0.25, 1.3, C.stone, false); tball(t, cx, 1.9, cz, 0.35, C.water); };
+    const gate = (t, cx, cz, w, h, roofCol) => { for (const sx of [-1, 1]) tb(t, cx + sx * (w / 2 - 0.4), 0, cz, 0.8, h, 1.2, C.red); tb(t, cx, h - 0.4, cz, w, 0.8, 1.4, C.redDark, false); troof(t, cx, h + 0.4, cz, w, 1.4, 1.6, roofCol); };
+    // 1: a walled garden in front of the house with a moon gate, pines and a fountain, and a garage to the east (open to the west: stand at its front and press F)
+    for (const [cx, cz, w, d] of [[x0 - 13, z0 + 14, 0.5, 24], [x0 + 13, z0 + 14, 0.5, 24]]) tb(1, cx, 0, cz, w, 1.2, d, C.brick, false);
+    tb(1, x0 - 7.5, 0, z0 + 26, 11, 1.4, 0.5, C.brick, false); tb(1, x0 + 7.5, 0, z0 + 26, 11, 1.4, 0.5, C.brick, false);
+    tb(1, x0, 0, z0 + 26, 4, 0.12, 0.5, C.stone, false);
+    for (const [px, pz] of [[x0 - 10, z0 + 8], [x0 + 10, z0 + 8], [x0 - 10, z0 + 22], [x0 + 10, z0 + 22]]) pine(1, px, pz);
+    fountain(1, x0, z0 + 15);
+    const gm = { wall: C.brick, roof: C.redDark, dark: C.dark, door: C.wood };
+    for (const p of Garage.parts(x0 + 22, z0, "w")) tb(1, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], !!p.solid);
+    Garage.register("beijing", hT[1].g, X(x0 + 22), z0, "w", () => hTier);
+    // 2: a second courtyard to the west: a gate tower and rooms round a yard
+    tb(2, x0 - 27, 0, z0 - 6, 22, 0.15, 20, C.stone, false);
+    tb(2, x0 - 27, 0, z0 - 14, 20, 3.3, 5, C.redDark); troof(2, x0 - 27, 3.3, z0 - 14, 20, 5, 2.4, C.tile);
+    for (const sx of [-1, 1]) { tb(2, x0 - 27 + sx * 9, 0, z0 - 4, 4, 3, 14, C.redDark); troof(2, x0 - 27 + sx * 9, 3, z0 - 4, 4, 14, 1.8, C.tile); }
+    gate(2, x0 - 27, z0 + 5, 7, 4.2, C.gold); tb(2, x0 - 34, 0, z0 + 5, 5, 3.2, 0.8, C.brick); tb(2, x0 - 20, 0, z0 + 5, 5, 3.2, 0.8, C.brick);
+    pine(2, x0 - 27, z0 - 4, 6);
+    // 3: a pavilion by a pond with a stone bridge, a rockery and a screen wall behind
+    pond(3, x0 - 27, z0 + 20, 14, 9);
+    tb(3, x0 - 27, 0, z0 + 20, 3, 0.5, 11, C.marble, false);
+    tb(3, x0 - 36, 0, z0 + 20, 3.4, 3.2, 3.4, C.red); troof(3, x0 - 36, 3.2, z0 + 20, 3.4, 3.4, 2.4, C.blue);
+    for (let k = 0; k < 4; k++) tball(3, x0 - 19 + (k % 2) * 1.4, 0.9 + k * 0.5, z0 + 24 - k * 1.6, 1.3 - k * 0.15, C.stone);
+    tb(3, x0, 0, z0 - 12, 30, 2.6, 0.6, C.brick); tb(3, x0, 2.6, z0 - 12, 31, 0.4, 1, C.tile, false);
+    // 4: the scholar's garden: a pavilion on the water, a zigzag bridge, bamboo and a long covered walk
+    pond(4, x0 + 28, z0 + 16, 18, 14);
+    tb(4, x0 + 28, 0, z0 + 16, 4.4, 0.7, 4.4, C.stone, false); tb(4, x0 + 28, 0.7, z0 + 16, 3, 3, 3, C.red); troof(4, x0 + 28, 3.7, z0 + 16, 3.2, 3.2, 2.6, C.blue);
+    for (let k = 0; k < 4; k++) tb(4, x0 + 21 + k * 1.8, 0.05, z0 + 12 + (k % 2) * 3, 2.4, 0.3, 2, C.marble, false);
+    for (let k = 0; k < 8; k++) tc(4, x0 + 24 + k * 1.1, 0, z0 + 28 + (k % 3) * 0.6, 0.12, 4.6 + (k % 2), C.leaf, false);
+    for (let k = 0; k < 6; k++) tc(4, x0 + 18 + k * 4, 0, z0 - 2, 0.25, 3.2, C.red, false);
+    tb(4, x0 + 28, 3.2, z0 - 2, 22, 0.5, 3, C.tile, false);
+    // 5: red walls and gold roofs, stone lions at a great gate, and a hall on a marble terrace behind the house
+    tb(5, x0, 0, z0 - 12, 30, 4.4, 0.8, C.red, false);
+    tb(5, x0, 0, z0 + 29, 3, 0.1, 6, C.marble, false);
+    gate(5, x0, z0 + 29, 12, 5.6, C.gold);
+    for (const sx of [-1, 1]) { tb(5, x0 + sx * 8, 0, z0 + 31, 2.2, 2, 3, C.stone); tball(5, x0 + sx * 8, 2.4, z0 + 31, 0.9, C.stone); }
+    tb(5, x0, 0, z0 - 26, 26, 1.2, 14, C.marble, false); tb(5, x0, 1.2, z0 - 26, 18, 6, 9, C.red); troof(5, x0, 7.2, z0 - 26, 18, 9, 5, C.gold);
+    for (let k = 0; k < 6; k++) tc(5, x0 - 7 + k * 2.8, 1.2, z0 - 21, 0.4, 6, C.redDark, false);
+    // 6: the imperial palace: a double golden roof on a three-tier terrace, a dragon screen wall, a marble bridge and lanterns
+    tb(6, x0, 1.2, z0 - 26, 30, 0.5, 18, C.marble, false); tb(6, x0, 1.7, z0 - 26, 24, 0.5, 14, C.marble, false);
+    troof(6, x0, 12.4, z0 - 26, 11, 6, 3.2, C.gold);
+    tb(6, x0 - 9, 0, z0 + 14, 0.8, 4.2, 8, C.red); tb(6, x0 - 9, 4.2, z0 + 14, 1.2, 0.4, 9, C.gold, false);
+    for (let k = 0; k < 4; k++) tb(6, x0 - 9.5, 0.8 + (k % 2) * 1.4, z0 + 11 + k * 2, 0.15, 0.7, 1.4, k % 2 ? C.gold : C.blue, false);                                         // the dragon on the screen wall
+    for (let k = 0; k < 8; k++) { tc(6, x0 - 11 + k * 3.1, 0, z0 + 8, 0.07, 2.6, C.wood, false); tball(6, x0 - 11 + k * 3.1, 2.7, z0 + 8, 0.35, C.redDark); }                  // lanterns
+    tb(6, x0 - 36, 0, z0 + 4, 6, 0.45, 2.6, C.marble, false);
+    hT.forEach((t) => { if (t) t.g.visible = false; });
+    setHouseTier(hPending);
+  }
+  function setHouseTier(t) {
+    hPending = t; hTier = t;
+    for (let i = 1; i <= 6; i++) if (hT[i]) { hT[i].g.visible = t >= i; hT[i].blockers.forEach((b) => { b.off = t < i; }); }
+  }
+
+  // ---------- the wushu courtyard: a round tiled floor with a ring of red posts, for martial-arts bouts (see online.js) ----------
+  const WUSHU = { x: 330, z: -250 };
+  function buildWushu() {
+    const g = root, wx = X(WUSHU.x), wz = WUSHU.z;
+    const disc = new T.Mesh(new T.CircleGeometry(24, 40), new T.MeshLambertMaterial({ map: tileTex("#b8504a", "#6a2a26", 4, 4) })); disc.rotation.x = -Math.PI / 2; disc.position.set(wx, 0.05, wz); disc.receiveShadow = true; g.add(disc);
+    const inner = new T.Mesh(new T.CircleGeometry(21, 40), new T.MeshLambertMaterial({ map: tileTex("#d9c9a0", "#8a7a50", 4, 4) })); inner.rotation.x = -Math.PI / 2; inner.position.set(wx, 0.07, wz); inner.receiveShadow = true; g.add(inner);
+    MAP_SHAPES.push({ k: "e", cx: wx, cz: wz, ax: 24, az: 24, c: "#c9a060" });
+    for (let k = 0; k < 20; k++) {                                                                              // a ring of red posts with gold caps and lanterns, with the entrance gap to the west
+      const a = (k / 20) * Math.PI * 2;
+      if (Math.abs(((a - Math.PI + Math.PI * 2) % (Math.PI * 2)) - Math.PI) < 0.32) continue;
+      const px = wx + Math.cos(a) * 25.5, pz = wz + Math.sin(a) * 25.5;
+      mcyl(g, px, 0, pz, 0.35, 3.4, C.red, { solid: true }); mcyl(g, px, 3.4, pz, 0.45, 0.3, C.gold); mcyl(g, px, 3.9, pz, 0.28, 0.5, C.redDark, {});
+    }
+    for (const sz of [-1, 1]) { mbox(g, wx + 30, 0, wz + sz * 7, 0.6, 1.8, 6, C.wood, { solid: true }); for (let k = 0; k < 4; k++) mbox(g, wx + 29.6, 0.7 + (k % 2) * 0.4, wz + sz * 7 + (k - 1.5) * 1.4, 0.2, 0.15, 1.2, C.dark, { cast: false }); }   // weapon racks beside it
+    mbox(g, wx - 31, 0, wz, 0.4, 0.2, 0.4, C.stone, { cast: false });
+    for (const sz of [-1, 1]) mcyl(g, wx - 28, 0, wz + sz * 5.5, 0.3, 5.2, C.red, { solid: true });
+    mbox(g, wx - 28, 5.2, wz, 0.5, 0.5, 12, C.gold); sign(g, wx - 28, 4.2, wz, 8, 1.6, "武术", "wushu courtyard", Math.PI / 2);
+  }
+  const atWushu = () => Math.abs(player.x - X(WUSHU.x - 29)) < 7 && Math.abs(player.z - WUSHU.z) < 8;
+
   // ---------- the people ----------
 
   const people = { list: [], body: null, head: null, hat: null };
@@ -452,7 +538,9 @@ const Beijing = (() => {
     buildTemple();
     buildTowers();
     buildHutong();
+    buildHouseTiers();
     buildLake();
+    buildWushu();
     buildWall();
     buildCBD();
     buildPeople();
@@ -482,8 +570,8 @@ const Beijing = (() => {
   const atDock = () => Math.abs(player.x - X(DOCK.x - 4)) < 8 && Math.abs(player.z - DOCK.z) < 6;
 
   return {
-    build, show, setEra, update, homeInside, homeSpot, SPAWN, BOUNDS: BOUNDS_B, MAP: MAP_B,
-    inWater, swimMul, avatarDrop, camDrop, X, LAKE, DOCK, COURSE, atDock, setBoating: (v) => { boating = !!v; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
+    build, show, setEra, update, homeInside, setTier: setHouseTier, get tier() { return hTier; }, homeSpot, SPAWN, BOUNDS: BOUNDS_B, MAP: MAP_B,
+    inWater, swimMul, avatarDrop, camDrop, X, LAKE, DOCK, COURSE, atDock, WUSHU, atWushu, setBoating: (v) => { boating = !!v; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
     get built() { return built; },
     inHome: (x, z) => Math.abs(x - X(HOME.x)) < 16 && Math.abs(z - HOME.z) < 16,
   };

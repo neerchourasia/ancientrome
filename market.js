@@ -36,12 +36,18 @@ const Market = (() => {
     { name: "Palace of the Sun", price: 14000, rest: 6, rent: 420, perk: "A small stepped pyramid crowns the palace, with a gold sun disc, torches and a long reflecting pool. Resting heals 6 times faster, and rent is 420 denarii each morning." },
     { name: "Palace of Kukulcán", price: 30000, rest: 7, rent: 900, perk: "The finest house in Cancún: a feathered-serpent palace of white stone with gold domes, gardens and fountains. Resting heals 7 times faster, and rent is 900 denarii each morning." },
   ];
-  // Your home in Beijing: one courtyard house in the hutong (the builder has nothing bigger to sell you there yet)
+  // Your home in Beijing: a courtyard house in the hutong that the builder grows in six steps, from a little siheyuan to an imperial palace
   const HOUSES_B = [
     { name: "Courtyard house", price: 0, rest: 1, rent: 0, perk: "A small grey-brick courtyard house in a lane west of the great square. Sleep here after dark." },
+    { name: "House with a garden", price: 150, rest: 1.5, rent: 0, perk: "A walled garden with a moon gate, pines and a fountain, and a garage beside the house (press F at its open front). Resting at home heals 1.5 times faster." },
+    { name: "Great courtyard house", price: 400, rest: 2, rent: 15, perk: "A second courtyard to the west with a gate tower and rooms round it. Resting heals twice as fast, and your tenants pay you 15 denarii each morning." },
+    { name: "Merchant's mansion", price: 1000, rest: 3, rent: 40, perk: "A pavilion by a pond with a stone bridge and a rockery behind a screen wall. Resting heals 3 times faster, and rent is 40 denarii each morning." },
+    { name: "Scholar's garden", price: 2500, rest: 4, rent: 90, perk: "A garden in the old southern style: a pavilion on the water, a zigzag bridge, bamboo and a long covered walk. Resting heals 4 times faster, and rent is 90 denarii each morning." },
+    { name: "Prince's mansion", price: 6000, rest: 5, rent: 200, perk: "Red walls and gold-tiled roofs, stone lions at a great gate and a hall on a marble terrace. Resting heals 5 times faster, and rent is 200 denarii each morning." },
+    { name: "Imperial palace", price: 14000, rest: 6, rent: 420, perk: "The finest house in Beijing: a throne hall with a double golden roof on a three-tier marble terrace, a dragon screen wall, a marble bridge and lanterns. Resting heals 6 times faster, and rent is 420 denarii each morning." },
   ];
   const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : typeof city !== "undefined" && city === "cancun" ? HOUSES_C : typeof city !== "undefined" && city === "beijing" ? HOUSES_B : HOUSES);
-  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : typeof city !== "undefined" && city === "cancun" ? s.chouse : typeof city !== "undefined" && city === "beijing" ? 0 : s.house);
+  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : typeof city !== "undefined" && city === "cancun" ? s.chouse : typeof city !== "undefined" && city === "beijing" ? s.bhouse : s.house);
 
   // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
   // supply (used up at once) or perk (a permanent bonus in single-player games).
@@ -264,7 +270,7 @@ const Market = (() => {
     axles: { racespeed: 1.05 }, plating: { hull: 1.15 }, fletching: { arrow: 1.15 }, scribe: { tax: 0.8 }, contract: { navalpurse: 1.2 },
   };
 
-  let s = { house: 0, dhouse: 0, chouse: 0, items: [], worn: [], paint: {} };
+  let s = { house: 0, dhouse: 0, chouse: 0, bhouse: 0, items: [], worn: [], paint: {} };
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw) s = sanitize(raw);
@@ -272,10 +278,11 @@ const Market = (() => {
 
   // Anything odd in saved data (edited, or from an older version) is dropped.
   function sanitize(raw) {
-    const out = { house: 0, dhouse: 0, chouse: 0, items: [], worn: [], paint: {} };
+    const out = { house: 0, dhouse: 0, chouse: 0, bhouse: 0, items: [], worn: [], paint: {} };
     if (raw && Number.isInteger(raw.house) && raw.house >= 0 && raw.house < HOUSES.length) out.house = raw.house;
     if (raw && Number.isInteger(raw.dhouse) && raw.dhouse >= 0 && raw.dhouse < HOUSES_D.length) out.dhouse = raw.dhouse;
     if (raw && Number.isInteger(raw.chouse) && raw.chouse >= 0 && raw.chouse < HOUSES_C.length) out.chouse = raw.chouse;
+    if (raw && Number.isInteger(raw.bhouse) && raw.bhouse >= 0 && raw.bhouse < HOUSES_B.length) out.bhouse = raw.bhouse;
     const items = Array.isArray(raw && raw.items) ? raw.items : [], worn = Array.isArray(raw && raw.worn) ? raw.worn : [];
     out.items = [...new Set(items.filter((id) => typeof id === "string" && Object.prototype.hasOwnProperty.call(ITEMS, id) && ITEMS[id].type !== "supply" && ITEMS[id].type !== "food"))];
     // the paint scheme of each aircraft you own (an unknown aircraft or paint scheme is dropped)
@@ -301,6 +308,7 @@ const Market = (() => {
     Home.setTier(s.house);
     Delhi.setTier(s.dhouse);
     Cancun.setTier(s.chouse);
+    if (typeof Beijing !== "undefined") Beijing.setTier(s.bhouse);
     Home.setDecor({ banners: s.items.includes("banners"), mosaic: s.items.includes("mosaic"), urns: s.items.includes("urns"), torches: s.items.includes("torches"), statue: s.items.includes("statue") });
     if (avFig) applyAccessories(avFig, s.worn.filter((id) => ITEMS[id].type === "wear"));
     Pets.set(s.worn.find((id) => ITEMS[id].type === "pet"));
@@ -313,9 +321,9 @@ const Market = (() => {
     if (!next) return;
     if (Vitals.coins < mark(next.price)) { toast(`You need ${mark(next.price)} denarii for the ${next.name.toLowerCase()} (you have ${Vitals.coins}).`); return; }
     Vitals.coins -= mark(next.price);
-    if (homes() === HOUSES_D) s.dhouse += 1; else if (homes() === HOUSES_C) s.chouse += 1; else s.house += 1;
+    if (homes() === HOUSES_D) s.dhouse += 1; else if (homes() === HOUSES_C) s.chouse += 1; else if (homes() === HOUSES_B) s.bhouse += 1; else s.house += 1;
     save(); applyAll(); Sfx.play("coin");
-    toast(homes() === HOUSES_D ? `You bought the ${next.name.toLowerCase()}! It stands on your plot off Chandni Chowk.` : homes() === HOUSES_C ? `You bought the ${next.name.toLowerCase()}! It stands west of the great plaza.` : `You bought the ${next.name.toLowerCase()}! Go and see it near the Colosseum road.`);
+    toast(homes() === HOUSES_D ? `You bought the ${next.name.toLowerCase()}! It stands on your plot off Chandni Chowk.` : homes() === HOUSES_C ? `You bought the ${next.name.toLowerCase()}! It stands west of the great plaza.` : homes() === HOUSES_B ? `You bought the ${next.name.toLowerCase()}! It stands in the hutong west of the great square.` : `You bought the ${next.name.toLowerCase()}! Go and see it near the Colosseum road.`);
     Narrator.say(`You bought the ${next.name}.`, { interrupt: true });
   }
 
@@ -385,7 +393,7 @@ const Market = (() => {
       $m("mk-house-next").textContent = `Next: ${next.name}. ${next.perk}`;
       $m("mk-house-buy").textContent = `Buy for ${mark(next.price)} denarii`;
       $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
-    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : homes() === HOUSES_C ? " It is the finest house in Cancún." : homes() === HOUSES_B ? " It is the only house for sale in Beijing so far." : " It is the finest house in Rome.";
+    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : homes() === HOUSES_C ? " It is the finest house in Cancún." : homes() === HOUSES_B ? " It is the finest house in Beijing." : " It is the finest house in Rome.";
 
     const intro = def.note ? [Object.assign(document.createElement("p"), { className: "mk-note", textContent: def.note })] : [];
     $m("mk-sections").replaceChildren(...intro, ...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {
@@ -483,7 +491,7 @@ const Market = (() => {
     relics: RELICS,
     typeOf: (id) => (ITEMS[id] ? ITEMS[id].type : ""), priceOf: (id) => (ITEMS[id] ? ITEMS[id].price : 0),
     take(id) { if (!s.items.includes(id)) return false; s.items = s.items.filter((x) => x !== id); save(); applyAll(); return true; },     // used up or sold (relics.js)
-    snapshot: () => ({ house: s.house, dhouse: s.dhouse, chouse: s.chouse, items: s.items.slice(), worn: s.worn.slice(), paint: { ...s.paint } }),
+    snapshot: () => ({ house: s.house, dhouse: s.dhouse, chouse: s.chouse, bhouse: s.bhouse, items: s.items.slice(), worn: s.worn.slice(), paint: { ...s.paint } }),
     livery: (id) => LIVERIES.find((l) => l.id === s.paint[id]) || null,
     setLivery(id, lid) {
       if (!s.items.includes(id) || !paintable(AIRCRAFT[id]) || !LIVERIES.some((l) => l.id === lid)) return;

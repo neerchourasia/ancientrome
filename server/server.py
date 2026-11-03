@@ -406,12 +406,17 @@ class DuelRoom:
     kind = "duel"
     TICK = 0.05
 
-    def __init__(self, conns, with_bot=False, ranked=False):
+    def __init__(self, conns, with_bot=False, ranked=False, mode="duel"):
         self.id = os.urandom(3).hex()
+        self.mode = self.kind = mode               # "duel" (sword fight in the Colosseum) or "wushu" (bare-handed martial arts in Beijing)
         self.ranked = ranked and not with_bot       # a practice match against a bot does not count
         self.players = [Duelist(c, i) for i, c in enumerate(conns)]
         if with_bot:
-            self.players.append(Duelist(None, 1, bot=True))
+            self.players.append(Duelist(None, 1, bot=True, name="Master Li" if mode == "wushu" else None))
+        if mode == "wushu":                          # no weapons: quick bare-handed strikes with a short reach, whatever you have equipped
+            for p in self.players:
+                p.wdmg, p.reach, p.wtime, wcost = 0.9, 2.0, 0.8, 0.8
+                p.hit_at, p.end_at, p.swing_cost = SWING_HIT_AT * p.wtime, SWING_END * p.wtime, SWING_COST * wcost
         self.t0 = now()
         self.over = False
         self.events = []
@@ -420,7 +425,7 @@ class DuelRoom:
                 p.conn.room, p.conn.me, p.conn.queue = self, p, None
         for p in self.players:
             if p.conn:
-                p.conn.send({"t": "match", "mode": "duel", "room": self.id, "you": p.i, "radius": ARENA_R, "ranked": self.ranked,
+                p.conn.send({"t": "match", "mode": self.mode, "room": self.id, "you": p.i, "radius": ARENA_R, "ranked": self.ranked,
                              "players": [{"i": q.i, "name": q.name + (" (practice bot)" if q.bot else "") + (" (%d)" % rating_of(q.conn)["r"] if self.ranked and q.conn and q.conn.uid else ""), "cls": q.cls, "look": q.look} for q in self.players]})
         self.task = asyncio.ensure_future(self.run())
 
@@ -523,7 +528,7 @@ class DuelRoom:
         if self.over:
             return
         self.over = True
-        msg = {"t": "end", "mode": "duel", "winner": winner, "reason": reason,
+        msg = {"t": "end", "mode": self.mode, "winner": winner, "reason": reason,
                "hp": [round(p.hp, 1) for p in self.players]}
         ranks = rate_placements([(p.who, 0 if p.i == winner else 1 if winner != -1 else 0) for p in self.players if p.who]) if self.ranked else {}
         for p in self.players:
@@ -1228,8 +1233,8 @@ class KiteRoom(MiniRoom):
 
 class BallRoom(MiniRoom):
     """Pok-ta-pok on the Great Ball Court at Chichén Itzá, one against one, a little like volleyball: each player has their half of the alley (north and south of the middle line) and
-    must keep the ball from landing on it. The ball scores 1 for the other player where it lands, and 3 for whoever hit it last when it flies through one of the two stone rings high
-    on the long walls. First to 5. The positions are in metres from the middle of the court: u across (the two long walls are at 13 to 15 m each side), w along it (the temples
+    must keep the ball from landing on it. The ball scores 1 for the other player where it lands, and a ball that flies through one of the two stone rings high on the long walls wins the
+    whole match at once for whoever hit it last (as in the real game). First to 5 otherwise. The positions are in metres from the middle of the court: u across (the two long walls are at 13 to 15 m each side), w along it (the temples
     are at the two ends, 35 m away) and y up."""
     TICK = 0.05
     TIME_LIMIT = 180.0
@@ -1314,7 +1319,9 @@ class BallRoom(MiniRoom):
                 b[0], v[0] = math.copysign(self.WALL_LOW, b[0]), -v[0] * 0.6
             elif abs(b[0]) > self.WALL_HIGH:                              # the walls, with a stone ring high on each
                 if self.last is not None and abs(b[2]) < self.RING_R and abs(b[1] - self.RING_Y) < self.RING_R:
-                    return self.point(self.last, 3, "ring")
+                    self.players[self.last].score += 3                    # as in the real game, the ball through a ring wins the whole match at once
+                    self.events.append(["point", self.last, 3, "ring"])
+                    return self.finish(self.last, "ring")
                 b[0], v[0] = math.copysign(self.WALL_HIGH, b[0]), -v[0] * 0.6
             if abs(b[2]) > 35.0:                                          # the temples at the two ends
                 b[2], v[2] = math.copysign(35.0, b[2]), -v[2] * 0.6
@@ -2021,7 +2028,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": [], "dragon": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": [], "dragon": [], "wushu": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -2064,6 +2071,13 @@ def match_once():
         DerbyRoom(humans, bots=max(0, 3 - len(humans)) if any(c.want_bot for c in humans) else 0)
     elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DerbyRoom([q.pop(0)], bots=3)
+
+    q = QUEUES["wushu"]
+    q[:] = [c for c in q if not c.closed]
+    while len(q) >= 2:
+        DuelRoom([q.pop(0), q.pop(0)], ranked=True, mode="wushu")
+    if len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
+        DuelRoom([q.pop(0)], with_bot=True, mode="wushu")
 
     q = QUEUES["dragon"]
     q[:] = [c for c in q if not c.closed]
@@ -2241,8 +2255,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún", "beijing": "Beijing"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game", "dragon": "in a dragon boat race"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game", "dragon": "a dragon boat race"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game", "dragon": "in a dragon boat race", "wushu": "in a wushu bout"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game", "dragon": "a dragon boat race", "wushu": "a wushu bout"}
 
 
 def where_is(c):
@@ -3791,8 +3805,8 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 
 CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
 CHAL_TTL = 45.0
-CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon")      # what the challenger can pick
-CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race"}
+CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon", "wushu")      # what the challenger can pick
+CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race", "wushu": "a wushu bout"}
 
 
 def chal_room(game, a, b):
@@ -3804,6 +3818,8 @@ def chal_room(game, a, b):
         DerbyRoom([a, b])
     elif game == "dragon":
         DragonRoom([a, b])
+    elif game == "wushu":
+        DuelRoom([a, b], ranked=True, mode="wushu")
     else:
         {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}[game](game, [a, b])
 
@@ -4152,6 +4168,10 @@ async def handle_msg(conn, m):
         if m.get("practice") and mode in MINI_ROOMS and CFG["allow_bots"]:       # F on the ball court (like F in the Colosseum): a practice game against a bot, straight away
             leave_queue(conn)
             MINI_ROOMS[mode](mode, [conn], bots=1)
+            return
+        if m.get("practice") and mode == "wushu" and CFG["allow_bots"]:
+            leave_queue(conn)
+            DuelRoom([conn], with_bot=True, mode="wushu")
             return
         if m.get("practice") and mode == "dragon" and CFG["allow_bots"]:
             leave_queue(conn)

@@ -22,7 +22,7 @@ const Achievements = (() => {
     ["land2", "🏘", "Property baron", "Own 5 rental houses.", "Landlord", 250, () => typeof Estate !== "undefined" && Estate.count >= 5],
     ["biz1", "🏢", "Businessperson", "Buy a business.", "", 25, () => typeof Ventures !== "undefined" && Ventures.count >= 1],
     ["biz2", "🏭", "Entrepreneur", "Own 3 businesses or museums.", "Entrepreneur", 250, () => typeof Ventures !== "undefined" && Ventures.count >= 3],
-    ["home3", "🏡", "Moving up", "Upgrade a house three times.", "", 40, () => { const o = Market.snapshot(); return Math.max(o.house, o.dhouse, o.chouse || 0) >= 3; }],
+    ["home3", "🏡", "Moving up", "Upgrade a house three times.", "", 40, () => { const o = Market.snapshot(); return Math.max(o.house, o.dhouse, o.chouse || 0, o.bhouse || 0) >= 3; }],
     ["home7", "🏰", "A palace", "Own the finest house in Cancún.", "Palace Owner", 500, () => (Market.snapshot().chouse || 0) >= 7],
     ["share", "📈", "Shareholder", "Buy shares on the exchange.", "", 20, () => typeof Exchange !== "undefined" && Exchange.count > 0],
     ["gold1", "🥇", "On the podium", "Win a gold medal in a race event.", "", 50, () => medals(1) >= 1],

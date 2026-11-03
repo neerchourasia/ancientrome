@@ -10,7 +10,7 @@ const Mini = (() => {
   const HELP = {
     kushti: "Wait for GO, then press Space as fast as you can. More presses than your opponent wins the throw. First to two throws wins.",
     kites: "A D W S (or the arrow keys) fly your kite. Get close to the other kite and press Space to pull: their string frays. First string cut loses. Esc leaves.",
-    ball: "WASD walk, Space hits the ball when it is close, towards the way you face. Don't let it land on your half (the other player scores 1); it scores 3 for the one who hit it last through a stone ring on the long walls. First to 5. Esc leaves.",
+    ball: "WASD walk, Space strikes the ball with your hip when it is close (as in the real game, never with the hands or feet), towards the way you face. Don't let it land on your half (the other player scores 1). Send it through a stone ring on a long wall and you win the whole match at once. First to 5. Esc leaves.",
   };
   let ov = null, cv = null, g = null, head = null, help = null, m = null, st = null, raf = 0, last = 0, sendT = 0, note = "", noteT = 0;
   const held = new Set();
@@ -83,7 +83,7 @@ const Mini = (() => {
       if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
       else if (e[0] === "draw") setNote("A draw: the throw is wrestled again.");
       else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("stone"); }
-      else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(`${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}${e[3] === "ring" ? " with the ring!" : ""}`); }
+      else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${e[1] === me() ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
     }
     if (m.kind === "kites" && s.p) for (let i = 0; i < 2; i++) if (s.p[i][3]) pullAt[i] = performance.now();
   }
@@ -328,7 +328,7 @@ const Mini = (() => {
     const kind = m.kind, won = res.winner === me(), draw = res.winner === -1, ranked = !!res.ranked;
     const prize = won ? (ranked ? 40 : 20) : 0;
     Vitals.coins += prize;
-    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached five points first." : "They reached five points first.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
+    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached five points first." : "They reached five points first.", ring: won ? "You sent the ball through the ring: you win the match at once!" : "They sent the ball through the ring and won the match at once.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
     const ladder = ranked && res.rank && typeof Online !== "undefined" ? Online.ladderText(res.rank) : "";
     cleanup();
     showResult(draw ? "A draw" : won ? "Victory!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, [

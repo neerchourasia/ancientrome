@@ -847,7 +847,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(p["name"].split(" ")[0] for p in ma["players"]), ["Ann", "Ben"])
 
     async def test_challenge_lets_the_challenger_pick_the_game(self):
-        for game, mode in (("kushti", "kushti"), ("kites", "kites"), ("ball", "ball"), ("derby", "derby"), ("brawl", "brawl"), ("nonsense", "duel")):
+        for game, mode in (("kushti", "kushti"), ("kites", "kites"), ("ball", "ball"), ("derby", "derby"), ("brawl", "brawl"), ("wushu", "wushu"), ("nonsense", "duel")):
             a, b = await self.player("Ann"), await self.player("Ben")
             ben = next(c for c in server.CONNS if c.name == "Ben")
             a.send({"t": "challenge", "a": "send", "id": ben.id, "game": game})
@@ -1000,22 +1000,28 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         room.step(0.05)
         self.assertEqual((a.score, b.score), (1, 0))
         room.hold = 0.0
-        room.last = 1                                                   # Ben hit it last and it flies through the ring on the left wall: Ben scores 3
-        room.b, room.v = [14.6, 6.4, 0.0], [20.0, 0.0, 0.0]
-        room.step(0.05)
-        self.assertEqual((a.score, b.score), (1, 3))
-        room.hold = 0.0
         room.last = 1                                                   # an inch outside the ring is only a bounce
         room.b, room.v = [14.6, 6.4, 4.0], [20.0, 0.0, 0.0]
         room.step(0.05)
-        self.assertEqual((a.score, b.score), (1, 3))
+        self.assertEqual((a.score, b.score), (1, 0))
         self.assertLess(room.v[0], 0.0)
+        self.assertFalse(room.over)
         a.score = 4
         room.hold = 0.0
         room.b, room.v = [0.0, 0.4, 10.0], [0.0, -10.0, 0.0]
         room.step(0.05)
         end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
-        self.assertEqual((end["mode"], end["winner"], end["score"]), ("ball", 0, [5, 3]))
+        self.assertEqual((end["mode"], end["winner"], end["score"]), ("ball", 0, [5, 0]))
+
+    async def test_ball_through_the_ring_wins_the_whole_match_at_once(self):
+        ws, ms, room = await self.start_mini("ball")
+        a, b = room.players
+        room.hold = 0.0
+        room.last = 1                                                   # Ben hit it last and it flies through the ring on the left wall
+        room.b, room.v = [14.6, 6.4, 0.0], [20.0, 0.0, 0.0]
+        room.step(0.05)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["reason"]), ("ball", 1, "ring"))
 
     async def test_ball_hits_need_you_near_and_go_where_you_face(self):
         ws, ms, room = await self.start_mini("ball")
@@ -1062,6 +1068,37 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ws[0].w.close()
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)
+
+    # ---------------------------------------------------------------- wushu duel (Beijing)
+
+    async def test_wushu_two_people_are_matched_bare_handed_and_ranked(self):
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "queue", "mode": "wushu"})
+        b.send({"t": "queue", "mode": "wushu"})
+        ma = await a.until(lambda m: m["t"] == "match", timeout=4)
+        mb = await b.until(lambda m: m["t"] == "match", timeout=4)
+        self.assertEqual((ma["mode"], ma["ranked"], mb["mode"]), ("wushu", True, "wushu"))
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        self.assertEqual(room.players[0].reach, 2.0)                       # no weapon: a short bare-handed reach
+        room.players[1].hp = 1.0
+        room.players[0].x, room.players[0].z, room.players[0].yaw = 0.0, 0.0, -math.pi / 2
+        room.players[1].x, room.players[1].z = 1.6, 0.0
+        a.send({"t": "swing"})
+        await asyncio.sleep(0.2)
+        for _ in range(8):
+            room.step(0.05)
+        end = await a.until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["reason"]), ("wushu", 0, "ko"))
+        self.assertIn("rank", end)
+
+    async def test_wushu_practice_bout_starts_at_once_against_master_li(self):
+        server.CFG["bot_wait"] = 30.0
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "wushu", "bot": True, "practice": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=2)
+        self.assertEqual((m["mode"], m["ranked"]), ("wushu", False))
+        self.assertTrue(m["players"][1]["name"].startswith("Master Li"))
 
     # ---------------------------------------------------------------- dragon boat race
 

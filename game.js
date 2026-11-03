@@ -189,6 +189,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Relics.at()) Relics.open();
       else if (k === "KeyF" && Online.atBallCourt()) Online.playBall();
       else if (k === "KeyF" && Online.atDock()) Online.playDragon();
+      else if (k === "KeyF" && Online.atWushu()) Online.playWushu();
       else if (k === "KeyF" && Fishing.at()) Fishing.act();
       else if (k === "KeyF" && TreasureMaps.at()) TreasureMaps.act();
       else if (k === "KeyF" && Quests.at()) Quests.open();
@@ -265,6 +266,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "relic") { Relics.open(); return; }
     if ($("#prompt").dataset.kind === "ball") { Online.playBall(); return; }
     if ($("#prompt").dataset.kind === "dragon") { Online.playDragon(); return; }
+    if ($("#prompt").dataset.kind === "wushu") { Online.playWushu(); return; }
     if ($("#prompt").dataset.kind === "fish") { Fishing.act(); return; }
     if ($("#prompt").dataset.kind === "dig") { TreasureMaps.act(); return; }
     if ($("#prompt").dataset.kind === "quest") { Quests.open(); return; }
@@ -1275,6 +1277,7 @@ function updatePrompt() {
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && mode === "walk") { const sp = shovablePlayer().peer; if (sp) { text = `R: shove ${sp.name}`; p.dataset.kind = "shove"; } }
+    if (!text && Online.atWushu()) { text = "F: a wushu bout against Master Li (to fight a real person, use the PvP menu)"; p.dataset.kind = "wushu"; }
     if (!text && Online.atDock()) { text = "F: race a dragon boat on Kunming Lake against three practice crews (to race real people, use the PvP menu)"; p.dataset.kind = "dragon"; }
     if (!text && Online.atBallCourt()) { text = "F: play pok-ta-pok against a practice bot (to play a real person, use the PvP menu)"; p.dataset.kind = "ball"; }
     if (!text && city === "cancun") { const ct = Cancun.promptText(); if (ct) { text = ct; p.dataset.kind = "cancun"; } }
