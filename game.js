@@ -62,6 +62,7 @@ function init() {
   Online.bind();
   Journey.bind();
   Controller.bind();
+  Pad.bind();
   Estate.bind();
   Relics.bind();
   Quests.bind();
