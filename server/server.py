@@ -44,8 +44,8 @@ def load_config():
     return {
         "port": int(e("PORT", "8765")),
         "supabase_url": supa,
-        "anon_key": e("SUPABASE_ANON_KEY", ""),
-        "service_key": e("SUPABASE_SERVICE_KEY", ""),   # lets the server keep the world (guilds, prices, boards) between restarts: see supabase-world.sql
+        "anon_key": "".join(e("SUPABASE_ANON_KEY", "").split()),                  # (a key never has spaces or line breaks in it, so any that came with a paste are dropped)
+        "service_key": "".join(e("SUPABASE_SERVICE_KEY", "").split()),   # lets the server keep the world (guilds, prices, boards) between restarts: see supabase-world.sql
         "allow_bots": e("ALLOW_BOTS", "1") == "1",
         "bot_wait": float(e("BOT_WAIT", "6")),        # seconds alone in the queue before a practice bot joins
         "race_wait": float(e("RACE_WAIT", "6")),      # seconds to wait for more racers once two are queued

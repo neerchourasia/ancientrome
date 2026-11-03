@@ -1071,6 +1071,17 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     # ---------------------------------------------------------------- the world key
 
+    def test_a_key_pasted_with_a_line_break_is_cleaned_up(self):
+        saved = os.environ.get("SUPABASE_SERVICE_KEY")
+        os.environ["SUPABASE_SERVICE_KEY"] = "  sb_secret_abc\ndefghijk \n"
+        try:
+            self.assertEqual(server.load_config()["service_key"], "sb_secret_abcdefghijk")
+        finally:
+            if saved is None:
+                del os.environ["SUPABASE_SERVICE_KEY"]
+            else:
+                os.environ["SUPABASE_SERVICE_KEY"] = saved
+
     def test_a_service_key_copied_with_dots_is_refused_and_explained(self):
         saved = dict(server.CFG)
         try:
