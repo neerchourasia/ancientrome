@@ -1,7 +1,7 @@
 "use strict";
 // Tournaments: 🏟️ Tournaments in the menu. Anyone with an account can open one for xiangqi, kushti, kite fights, pok-ta-pok or dragon boats and others sign up for a few minutes. The server
 // draws a bracket (single elimination for two-player games, heats of up to four boats for dragon boats), warns each player 20 seconds before their match and starts it by itself, so stay out
-// of other games until you are called (whoever opened it can press Start now once two or more have signed up). Every match can be watched from the bracket. With four or more players the top places win 500, 250 and 100 denarii (up to three prizes a day).
+// of other games until you are called (the server also opens a Saturday tournament by itself every week: double prizes) (whoever opened it can press Start now once two or more have signed up). Every match can be watched from the bracket. With four or more players the top places win 500, 250 and 100 denarii (up to three prizes a day).
 // Depends on online.js (Online.navalSend, Online.connected), audio.js and the globals of game.js (openPanel, toast).
 
 const Tournament = (() => {
@@ -20,7 +20,7 @@ const Tournament = (() => {
     for (const t of list.list) {
       const row = el("div", undefined, "sp-row");
       const when = t.state === "open" ? `signing up · ${t.n}/${t.cap} · starts in ${mmss(t.in)}` : t.state === "running" ? `${t.round || "under way"} · ${t.n} players` : `won by ${t.champ || "nobody"}`;
-      row.append(el("span", `${t.state === "done" ? "🏆 " : t.state === "running" ? "▶ " : "🟢 "}${t.name}: ${when}${t.joined ? "  ·  you are in" : ""}`));
+      row.append(el("span", `${t.auto ? "📅 " : ""}${t.state === "done" ? "🏆 " : t.state === "running" ? "▶ " : "🟢 "}${t.name}: ${when}${t.joined ? "  ·  you are in" : ""}`));
       const b = btn("Bracket", () => { open_ = t.id; send({ a: "get", id: t.id }); });
       row.append(b);
       if (t.state === "open" && !t.joined && list.login) row.append(btn("Sign up", () => send({ a: "join", id: t.id })));
@@ -36,7 +36,7 @@ const Tournament = (() => {
       f.append(sel, cap, btn("Open a tournament", () => send({ a: "create", kind: form.kind, cap: form.cap })));
       body.append(f);
     }
-    body.append(el("p", `With ${list.min} or more players the winner takes ${list.prize[0]} denarii, second ${list.prize[1]} and third ${list.prize[2]}. Wins here count in the weekly cup and your profile too.`, "dnote small"));
+    body.append(el("p", `With ${list.min} or more players the winner takes ${list.prize[0]} denarii, second ${list.prize[1]} and third ${list.prize[2]}. The Saturday tournament, which the server opens by itself every week (sign-up from 16:00 UTC, first match at 18:00), pays double. Wins here count in the weekly cup and your profile too.`, "dnote small"));
   }
 
   function renderView(body) {

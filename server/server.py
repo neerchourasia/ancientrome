@@ -4221,6 +4221,8 @@ TOURNEY_MIN, TOURNEY_PRIZE_MIN, TOURNEY_CAPS, TOURNEY_PRIZES = 2, 4, (8, 16), (5
 TOURNEY_KEEP, TOURNEY_ACTIVE, TOURNEY_DAILY = 8, 8, 3     # finished ones remembered, open or running at once, prizes one account can win in a day
 TOURNEY_WON = collections.defaultdict(list)           # fid -> when its prizes were won (not saved)
 TOURNEY_MADE = {}                         # fid -> when it last opened one
+TOURNEY_AUTO = {"week": -1}               # the week the Saturday tournament was last opened for (saved)
+TOURNEY_SAT_OPEN, TOURNEY_SAT_START, TOURNEY_SAT_REMIND = 16 * 3600, 18 * 3600, 15 * 60      # Saturday (UTC): sign-up opens at 16:00, the first match is at 18:00
 
 
 def tourney_say(text):
@@ -4230,7 +4232,27 @@ def tourney_say(text):
 
 
 def tourney_name(t):
-    return {"xiangqi": "Xiangqi", "kushti": "Kushti", "kites": "Kite fight", "ball": "Pok-ta-pok", "dragon": "Dragon boat"}[t["kind"]] + " tournament"
+    return ("Saturday " if t.get("auto") else "") + {"xiangqi": "Xiangqi", "kushti": "Kushti", "kites": "Kite fight", "ball": "Pok-ta-pok", "dragon": "Dragon boat"}[t["kind"]] + " tournament"
+
+
+def tourney_auto_tick(tn):
+    """Every Saturday the server opens a tournament by itself (a different game each week, up to 16 players, double prizes): sign-up from 16:00 to 18:00 UTC."""
+    wk = week_of(tn)
+    sat = wk * WEEK_LEN + 4 * 86400 + 5 * 86400
+    start = sat + TOURNEY_SAT_START
+    if TOURNEY_AUTO["week"] != wk and sat + TOURNEY_SAT_OPEN <= tn < start:
+        TOURNEY_AUTO["week"] = wk
+        kind = TOURNEY_KINDS[wk % len(TOURNEY_KINDS)]
+        if any(x["kind"] == kind and x["state"] == "open" for x in TOURNEYS.values()) or sum(1 for x in TOURNEYS.values() if x["state"] in ("open", "running")) >= TOURNEY_ACTIVE:
+            return world_soon()
+        t = {"id": os.urandom(3).hex(), "kind": kind, "by": "", "auto": 1, "state": "open", "created": tn, "start_at": start, "cap": 16, "players": [], "rounds": [], "out": {}, "ended": 0, "champ": "", "places": []}
+        TOURNEYS[t["id"]] = t
+        tourney_say("🏟️ The Saturday %s is open for up to 16 players, with double prizes! Sign up under 🏟️ Tournaments in the menu: it starts at 18:00 UTC (in %d minutes)." % (tourney_name(t).lower().replace("saturday ", ""), int((start - tn) // 60)))
+        world_soon()
+    for t in list(TOURNEYS.values()):
+        if t.get("auto") and t["state"] == "open" and not t.get("rem") and 0 < t["start_at"] - tn <= TOURNEY_SAT_REMIND:
+            t["rem"] = 1
+            tourney_say("🏟️ The %s starts in %d minutes: %d player(s) so far. Sign up under 🏟️ Tournaments!" % (tourney_name(t).lower(), max(1, int((t["start_at"] - tn) // 60)), len(t["players"])))
 
 
 def tourney_seed_order(p):
@@ -4394,7 +4416,7 @@ def tourney_end(t):
             if len(TOURNEY_WON[fid]) >= TOURNEY_DAILY or len(PRIZES.get(fid, [])) >= 8:
                 continue
             TOURNEY_WON[fid].append(time.time())
-            PRIZES.setdefault(fid, []).append({"id": "t" + t["id"], "week": 0, "theme": tourney_name(t), "rank": rank, "coins": TOURNEY_PRIZES[rank - 1], "pts": 0, "tour": 1})
+            PRIZES.setdefault(fid, []).append({"id": "t" + t["id"], "week": 0, "theme": tourney_name(t), "rank": rank, "coins": TOURNEY_PRIZES[rank - 1] * (2 if t.get("auto") else 1), "pts": 0, "tour": 1})
             for c in conns_of(fid):
                 c.send({"t": "weekly_prize", "prizes": PRIZES[fid]})
     done = sorted([x for x in TOURNEYS.values() if x["state"] in ("done", "cancelled")], key=lambda x: x["ended"])
@@ -4454,6 +4476,10 @@ def tourney_step(t, tn):
 
 def tourney_tick():
     tn = time.time()
+    try:
+        tourney_auto_tick(tn)
+    except Exception as e:
+        print("tournament error:", repr(e))
     for t in list(TOURNEYS.values()):
         try:
             tourney_step(t, tn)
@@ -4463,7 +4489,7 @@ def tourney_tick():
 
 def tourney_row(t, conn):
     return {"id": t["id"], "kind": t["kind"], "name": tourney_name(t), "state": t["state"], "n": len(t["players"]), "cap": t["cap"], "in": max(0, int(t["start_at"] - time.time())) if t["state"] == "open" else 0,
-            "round": tourney_label(t, len(t["rounds"]) - 1) if t["rounds"] and t["state"] == "running" else "", "joined": bool(conn.fid and tourney_player(t, conn.fid)), "champ": t["champ"]}
+            "auto": bool(t.get("auto")), "round": tourney_label(t, len(t["rounds"]) - 1) if t["rounds"] and t["state"] == "running" else "", "joined": bool(conn.fid and tourney_player(t, conn.fid)), "champ": t["champ"]}
 
 
 def tourney_view(t, conn):
@@ -4554,7 +4580,7 @@ def clean_tourney(t):
                 nm.update({"st": "done" if m.get("st") == "done" else "wait", "order": [f for f in m.get("order", []) if f in fids][:4], "w": [f for f in m.get("w", []) if f in fids][:4], "tries": int(num(m.get("tries"), 0, 9, 0)), "bye": bool(m.get("bye"))})
                 ms.append(nm)
             rounds.append(ms)
-        return {"id": t["id"][:12], "kind": t["kind"], "by": str(t.get("by", ""))[:40], "state": t["state"], "created": float(num(t.get("created"), 0, 4e9, 0)), "start_at": float(num(t.get("start_at"), 0, 4e9, 0)),
+        return {"id": t["id"][:12], "kind": t["kind"], "by": str(t.get("by", ""))[:40], "state": t["state"], "auto": 1 if t.get("auto") else 0, "rem": 1 if t.get("rem") else 0, "created": float(num(t.get("created"), 0, 4e9, 0)), "start_at": float(num(t.get("start_at"), 0, 4e9, 0)),
                 "cap": 16 if t.get("cap") == 16 else 8, "players": players, "rounds": rounds, "out": {f: int(num(r, 0, 8, 0)) for f, r in (t.get("out") or {}).items() if f in fids}, "ended": float(num(t.get("ended"), 0, 4e9, 0)),
                 "champ": str(t.get("champ", ""))[:24], "places": [[p[0], str(p[1])[:24], int(num(p[2], 1, 3, 1))] for p in t.get("places", [])[:6] if isinstance(p, list) and len(p) == 3]}
     except Exception:
@@ -5386,7 +5412,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO}
 
 
 def world_apply(rows):
@@ -5452,6 +5478,9 @@ def world_apply(rows):
             if c in NOTICE_CITIES and isinstance(lst, list):
                 NOTICES[c] = [{"id": str(n.get("id"))[:12], "fid": n.get("fid") if clean_fid(n.get("fid")) else "", "name": str(n.get("name", ""))[:24], "text": str(n.get("text", ""))[:NOTICE_LEN], "t": float(num(n.get("t"), 0, 4e9, 0))}
                               for n in lst[-NOTICE_MAX:] if isinstance(n, dict)]
+    ta = rows.get("tourney_auto")
+    if isinstance(ta, dict):
+        TOURNEY_AUTO["week"] = int(num(ta.get("week"), -1, 1e6, -1))
     tn = rows.get("tourneys")
     if isinstance(tn, dict):
         TOURNEYS.clear()

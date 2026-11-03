@@ -1469,6 +1469,50 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ann.send({"t": "tourney", "a": "start", "id": tid})                               # (already under way)
         self.assertIn("Only whoever", (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
 
+    async def test_tourney_the_server_opens_a_saturday_tournament_with_double_prizes(self):
+        self.accounts("ann", "ben", "cy", "dee")
+        self.tourney_fresh()
+        server.TOURNEY_AUTO["week"] = -1
+        self.addCleanup(lambda: server.TOURNEY_AUTO.update(week=-1))
+        sat = datetime.datetime(2026, 11, 7, tzinfo=datetime.timezone.utc).timestamp()          # a Saturday
+        wk = server.week_of(sat)
+        with mock.patch.object(server.time, "time", return_value=sat + 15 * 3600):               # 15:00: not yet
+            server.tourney_tick()
+        self.assertEqual(server.TOURNEYS, {})
+        with mock.patch.object(server.time, "time", return_value=sat + 16 * 3600 + 5):           # 16:00: sign-up opens
+            server.tourney_tick()
+            server.tourney_tick()                                                                # (only once a week)
+        self.assertEqual(len(server.TOURNEYS), 1)
+        t = next(iter(server.TOURNEYS.values()))
+        self.assertEqual((t["kind"], t["cap"], t["state"], t["start_at"], bool(t["auto"])), (server.TOURNEY_KINDS[wk % 5], 16, "open", sat + 18 * 3600, True))
+        self.assertIn("Saturday", server.tourney_name(t))
+        self.assertEqual(server.CHAT_LOG[-1]["text"].count("Saturday"), 1)
+        before = len(server.CHAT_LOG)
+        with mock.patch.object(server.time, "time", return_value=sat + 17 * 3600 + 50 * 60):    # 17:50: a reminder, once
+            server.tourney_tick()
+            server.tourney_tick()
+        self.assertEqual(len(server.CHAT_LOG), before + 1)
+        ps = [await self.player(n.title(), token=n) for n in ("ann", "ben", "cy", "dee")]
+        for w in ps:
+            w.send({"t": "tourney", "a": "join", "id": t["id"]})
+            await w.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        ps[0].send({"t": "tourney", "a": "start", "id": t["id"]})                               # nobody hosts it: no Start now
+        self.assertIn("Only whoever", (await ps[0].until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+        with mock.patch.object(server.time, "time", return_value=sat + 18 * 3600 + 1):
+            server.tourney_tick()
+        self.assertEqual((t["state"], len(t["players"])), ("running", 4))
+        for rd in (0, 1):                                                                        # two semifinals, then the final: the first of each match wins
+            for m in t["rounds"][rd]:
+                server.tourney_settle(t, m, list(m["ps"]))
+            server.tourney_round_done(t)
+        champ = t["rounds"][1][0]["ps"][0]
+        self.assertEqual(t["state"], "done")
+        self.assertEqual(server.PRIZES[champ][0]["coins"], 1000)                                 # double the usual 500
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.TOURNEY_AUTO["week"] = -1
+        server.world_apply(snap)
+        self.assertEqual(server.TOURNEY_AUTO["week"], wk)
+
     def test_tourney_is_saved_and_a_match_that_was_live_waits_again(self):
         self.tourney_fresh()
         t = self.tourney_pure("xiangqi", 4)
