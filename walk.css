@@ -890,3 +890,10 @@ body.touch .dpanel button, body.touch .dpanel select { min-height: 40px; }
 .pf-seg.w { background: #4f9f5e; } .pf-seg.d { background: #c9b458; } .pf-seg.l { background: #b3453d; }
 .pf-bp { text-align: right; color: var(--muted); font-size: .8rem; }
 .pf-spark { width: 100%; max-width: 360px; height: 70px; background: rgba(255,255,255,.05); border-radius: 8px; }
+
+/* languages */
+.lang-select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+.lang-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; }
+.in-lang { margin-right: 10px; }
+html[lang="hi"] body, html[lang="hi"] button, html[lang="hi"] select, html[lang="hi"] input { font-family: system-ui, -apple-system, "Kohinoor Devanagari", "Noto Sans Devanagari", "Devanagari Sangam MN", sans-serif; }
+html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang="zh"] input { font-family: system-ui, -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; }
