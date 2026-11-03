@@ -179,6 +179,8 @@ const Sfx = (() => {
     ka: () => { tone(1568, 0.07, "square", 0.08); tone(2093, 0.22, "sine", 0.16, null, null, 0.06); puff(0.08, 5200, 2, 0.12); },   // a trade on the exchange
     news: () => { tone(740, 0.16, "sine", 0.14); tone(554, 0.3, "sine", 0.14, null, null, 0.17); },
     unlock: () => { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.7, "sine", 0.15, null, null, i * 0.12)); tone(392, 1.1, "triangle", 0.12); },
+    jet: () => { puff(4, 420, 0.6, 0.32, null, "lowpass", 0.7); tone(90, 3.6, "sawtooth", 0.06, 170); puff(2.6, 2400, 0.5, 0.06, null, "bandpass", 0.9); },        // the travel clip: an airliner
+    sail: () => { puff(4.2, 650, 0.5, 0.22, null, "bandpass", 0.9); tone(170, 0.5, "triangle", 0.05, 130, null, 1.2); tone(150, 0.5, "triangle", 0.05, 120, null, 2.6); },   // ... and a ship on the sea
     clack: () => { puff(0.05, 2400, 2, 0.4); tone(1500, 0.08, "triangle", 0.2, 900); },                            // a xiangqi piece set down on the board
     drum: () => { tone(95, 0.28, "sine", 0.6, 55); puff(0.1, 260, 0.8, 0.4); },                                    // a dragon boat drum
     bounce: () => { tone(220, 0.14, "sine", 0.45, 110); puff(0.07, 700, 1, 0.3); },                                 // the rubber ball hit

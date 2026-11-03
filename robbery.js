@@ -314,7 +314,7 @@ const Robbery = (() => {
       const row = list.find((r) => r[2] === name);
       if (!row) return false;
       const p = plotAt(row[0]), go = () => placeAt(p.door[0], p.door[1] + (p.face > 0 ? 4 : -4), p.face > 0 ? 0 : Math.PI);
-      if (city === "rome") go(); else { travel("rome"); setTimeout(go, 1500); }
+      if (city === "rome") go(); else travel("rome", null, go);
       return true;
     },
     setHouses, at, act, begin, pos, end, update, guardsCaught,

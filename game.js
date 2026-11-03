@@ -1225,19 +1225,17 @@ function showArrivals(c) {
   for (const p of document.querySelectorAll("#travel .dnote")) p.hidden = true;
 }
 
-function travel(to, lm) {
+function travel(to, lm, then) {
   if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
   if (to === city || travelBusy) return;
   travelBusy = true;
   Vitals.stopRest(); Nav.clear();
+  const land = () => { try { arriveIn(to, lm); } catch (err) { console.error(err); toast("Could not travel"); } };
+  if (typeof TravelClip !== "undefined" && TravelClip.play({ from: city, to, era, at: land, done: () => { travelBusy = false; if (then) then(); } })) return;   // a plane or a ship crosses the screen while the city is built
   $("#sleep").classList.add("on");
-  setTimeout(() => {
-    try { arriveIn(to, lm); } catch (err) { console.error(err); toast("Could not travel"); }
-    $("#sleep").classList.remove("on");
-    travelBusy = false;
-  }, 900);
+  setTimeout(() => { land(); $("#sleep").classList.remove("on"); travelBusy = false; if (then) then(); }, 900);
 }
 
 function arriveIn(to, lm) {

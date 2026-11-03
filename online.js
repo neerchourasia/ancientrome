@@ -172,7 +172,7 @@ const Online = (() => {
     if (city === name) return;
     if (!sentFrom) sentFrom = { city, x: player.x, z: player.z, yaw: player.yaw };
     arriveIn(name);
-    toast(`You are taken to ${name === "rome" ? "Rome" : "Cancún"} for the match, and brought back afterwards.`);
+    toast(`You are taken to ${{ rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" }[name] || name} for the match, and brought back afterwards.`);
   }
   function comeBack() {
     if (!sentFrom || mode !== "walk" || panelOpen || duel || waiting || (typeof Race !== "undefined" && Race.active) || (typeof Mini !== "undefined" && Mini.active)) return;
