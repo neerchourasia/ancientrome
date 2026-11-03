@@ -1280,6 +1280,56 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         no = await ws[0].until(lambda m: m["t"] == "watch" and m["a"] == "no")
         self.assertIn("own game", no["msg"])
 
+    # ---------------------------------------------------------------- profiles and replays
+
+    def test_profile_collects_results_history_and_cups(self):
+        self.weekly_fresh()
+        server.STATS.clear(); server.REPLAYS.clear(); server.RECENT.clear()
+        self.addCleanup(lambda: (server.STATS.clear(), server.REPLAYS.clear()))
+        a, b = self.WC("aaaaaaaaaaaa", "Ann"), self.WC("bbbbbbbbbbbb", "Ben")
+        server.rate_placements([(a, 0), (b, 1)], "duel")
+        server.rate_placements([(a, 1), (b, 0)], "duel")
+        server.rate_placements([(a, 0), (b, 1)], "xiangqi", "rp123456")
+        v = server.profile_view(a.fid)
+        self.assertEqual((v["name"], v["w"], v["l"], v["d"]), ("Ann", 2, 1, 0))
+        self.assertEqual(v["games"], {"duel": [1, 1, 0], "xiangqi": [1, 0, 0]})
+        self.assertEqual(v["fav"], "duel")
+        self.assertEqual([(h["k"], h["r"], h["vs"]) for h in v["hist"]], [("xiangqi", "w", ["Ben"]), ("duel", "l", ["Ben"]), ("duel", "w", ["Ben"])])   # newest first
+        self.assertIsNone(v["hist"][0]["rp"])                                                  # (no such replay is kept, so no replay link)
+        self.assertEqual(server.profile_view("cccccccccccc"), {"t": "profile", "fid": "cccccccccccc", "none": True})
+        for i in range(20):
+            server.RECENT.clear()
+            server.rate_placements([(a, 0), (b, 1)], "kites")
+        self.assertEqual(len(server.profile_view(a.fid)["hist"]), 12)                          # only the last twelve are kept
+        server.WEEKLY["week"] -= 1
+        server.WEEKLY["scores"] = {a.fid: {"name": "Ann", "pts": 9, "blk": 0, "bp": 0}, b.fid: {"name": "Ben", "pts": 5, "blk": 0, "bp": 0}}
+        server.weekly_roll()
+        self.assertEqual(server.profile_view(a.fid)["cups"], [1, 0, 0])
+        self.assertEqual(server.profile_view(b.fid)["cups"], [0, 1, 0])
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.STATS.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.profile_view(a.fid)["cups"], [1, 0, 0])
+        self.assertEqual(len(server.STATS[a.fid]["hist"]), 12)
+
+    async def test_xiangqi_replay_is_kept_and_can_be_fetched(self):
+        server.REPLAYS.clear()
+        self.addCleanup(server.REPLAYS.clear)
+        ws, ms, room = await self.start_mini("xiangqi")
+        f, t = next(mv for mv in room.legal if room.board[mv[0]] == "C")
+        ws[0].send({"t": "move", "f": f, "to": t})
+        await asyncio.sleep(0.2)
+        ws[1].send({"t": "resign"})
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual(len(end["rp"]), 8)
+        ws[1].send({"t": "replay", "id": end["rp"]})
+        got = await ws[1].until(lambda m: m["t"] == "replay")
+        self.assertEqual((got["rp"]["names"], got["rp"]["w"], got["rp"]["mv"]), (["Ann", "Ben"], 0, [[f, t]]))
+        ws[1].send({"t": "replay", "id": "nope"})
+        self.assertTrue((await ws[1].until(lambda m: m["t"] == "replay"))["none"])
+        ws[1].send({"t": "profile"})                                                           # a guest has no profile of their own
+        self.assertTrue((await ws[1].until(lambda m: m["t"] == "profile"))["none"])
+
     # ---------------------------------------------------------------- xiangqi (Chinese chess)
 
     def xq(self, rows):

@@ -57,6 +57,7 @@ const Mini = (() => {
     if (!m || !GAME_KEYS.has(e.code)) return;
     e.preventDefault(); e.stopPropagation();
     if (e.code === "Escape") { leave(); return; }
+    if (m.replay) { if (e.repeat) return; if (e.code === "ArrowRight" || e.code === "KeyD") rpStep(1); else if (e.code === "ArrowLeft" || e.code === "KeyA") rpStep(-1); else if (e.code === "Space") { m.replay.auto = !m.replay.auto; m.replay.t = 0; } return; }
     if (e.repeat || m.watch) return;
     held.add(e.code);
     if (e.code === "Space") {
@@ -75,6 +76,7 @@ const Mini = (() => {
       kite.y = Math.max(4, Math.min(56, kite.y + dir(["KeyS", "ArrowDown"], ["KeyW", "ArrowUp"]) * 40 * dt));
       sendT -= dt; if (sendT <= 0) { sendT = 0.08; send({ t: "kite", x: +kite.x.toFixed(1), y: +kite.y.toFixed(1) }); }
     }
+    if (m.replay && m.replay.auto) { m.replay.t -= dt; if (m.replay.t <= 0) { m.replay.t = 1.1; if (!rpStep(1)) m.replay.auto = false; } }
     noteT -= dt; if (noteT <= 0) note = "";
     draw(now);
     raf = requestAnimationFrame(loop);
@@ -340,7 +342,7 @@ const Mini = (() => {
     cv.width = 520; cv.height = 580; cv.style.aspectRatio = "520 / 580"; cv.style.width = "min(94vw, 62vh)";
     cv.addEventListener("click", xqClick);
     const b = ov.querySelector("#mini-resign") || Object.assign(document.createElement("button"), { id: "mini-resign", type: "button", textContent: "Resign" });
-    b.onclick = xqResign; b.hidden = false; ov.insertBefore(b, ov.querySelector("#mini-leave"));
+    b.onclick = xqResign; b.hidden = !!m.watch; ov.insertBefore(b, ov.querySelector("#mini-leave"));
     xqSel = null;
   }
   function xqCleanup() {
@@ -373,10 +375,11 @@ const Mini = (() => {
     }
     if (xqSel !== null) for (const l of st.legal) if (l[0] === xqSel) { const p = xqPos(l[1]); g.beginPath(); g.arc(p.x, p.y, st.b[l[1]] === "." ? 7 : 27, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = "rgba(30,150,70,.9)"; if (st.b[l[1]] === ".") { g.fillStyle = "rgba(30,150,70,.8)"; g.fill(); } else g.stroke(); }
     const mineT = st.turn === me();
-    label(`${nameOf(foe())}  ${mmss(st.clk[foe()])}`, 260, 20, 15, st.turn === foe() ? "#ffe08a" : "#4a3418");
-    label(`${nameOf(me())}${m.watch ? "" : " (you)"}  ${mmss(st.clk[me()])}`, 260, 568, 15, mineT ? "#7a1a10" : "#4a3418");
+    const clk = (i) => (m.replay ? "" : `  ${mmss(st.clk[i])}`);
+    label(`${nameOf(foe())}${clk(foe())}`, 260, 20, 15, st.turn === foe() ? "#ffe08a" : "#4a3418");
+    label(`${nameOf(me())}${m.watch ? "" : " (you)"}${clk(me())}`, 260, 568, 15, mineT ? "#7a1a10" : "#4a3418");
     if (st.check) label(mineT && !m.watch ? "You are in check!" : "Check!", 260, 290, 22, "#b3262b");
-    label(m.watch ? `${nameOf(st.turn)} to move` : mineT ? "Your move" : "Waiting for their move...", 60, 20, 14, mineT ? "#7a1a10" : "#4a3418");
+    label(m.replay ? `Move ${m.replay.i} of ${m.replay.mv.length}` : m.watch ? `${nameOf(st.turn)} to move` : mineT ? "Your move" : "Waiting for their move...", 60, 20, 14, mineT ? "#7a1a10" : "#4a3418");
   }
 
   // ------------------------------------------------------------------ the end
@@ -385,6 +388,7 @@ const Mini = (() => {
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); if (ov) ov.classList.remove("show");
     xqCleanup(); cleanup3d(); cleanupDragon();
+    const rpBar = document.getElementById("mini-rp"); if (rpBar) rpBar.remove();
     m = null; st = null;
     if (mode === "online") mode = "walk";
   }
@@ -406,6 +410,7 @@ const Mini = (() => {
     const ladder = ranked && res.rank && typeof Online !== "undefined" ? Online.ladderText(res.rank) : "";
     cleanup();
     showResult(draw ? "A draw" : won ? "Victory!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, [
+      ...(res.rp ? [{ label: "Watch the replay", fn: () => { closePanels(); send({ t: "replay", id: res.rp }); } }] : []),
       { label: "Play again", fn: () => { closePanels(); Online.openLobby(); } },
       { label: "Close", fn: closePanels },
     ]);
@@ -413,10 +418,48 @@ const Mini = (() => {
   }
   function leave() {
     if (!m) return;
+    if (m.replay) { cleanup(); return; }
     send(m.watch ? { t: "watch", a: "leave" } : { t: "leave" });
     const was = m.watch; cleanup(); toast(was ? "You stopped watching." : "You left the game.");
   }
   function lost() { if (m) { cleanup(); toast("The connection to the game server was lost."); } }
+
+  // ------------------------------------------------------------------ replaying a finished xiangqi game (from a profile, or from the end of your own game)
+  function rpBoard(rp, n) {
+    const b = rp.b0.split("");
+    for (let i = 0; i < n; i++) { const [f, t] = rp.mv[i]; b[t] = b[f]; b[f] = "."; }
+    return b.join("");
+  }
+  function rpStep(d) {
+    const r = m && m.replay; if (!r) return false;
+    const n = Math.max(0, Math.min(r.mv.length, r.i + d)); if (n === r.i) return false;
+    r.i = n;
+    st = { k: "xiangqi", b: rpBoard(r, n), turn: n % 2, legal: [], last: n ? r.mv[n - 1] : null, check: false, clk: [0, 0], s: [0, 0], ev: [] };
+    if (d > 0) Sfx.play("clack");
+    return true;
+  }
+  function replay(msg) {
+    if (!msg.rp || typeof msg.b0 !== "string") { toast("That replay is no longer kept."); return; }
+    if (m || typeof mode === "undefined" || mode !== "walk") return;
+    if (!ov) build();
+    closePanels(); Vitals.stopRest();
+    if (document.pointerLockElement) document.exitPointerLock();
+    const rp = msg.rp;
+    m = { kind: "xiangqi", mode: "xiangqi", watch: true, you: 0, players: rp.names.map((n) => ({ name: n })), replay: { mv: rp.mv, b0: msg.b0, i: 0, auto: false, t: 0 } };
+    m.title = `▶ ${rp.names[0]} vs ${rp.names[1]}${rp.w === -1 ? " (draw)" : ` (${rp.names[rp.w]} won)`}`;
+    note = ""; held.clear(); mode = "online"; head.textContent = m.title;
+    help.textContent = "Replay: Left and Right arrows step through the moves, Space plays them on. Esc closes.";
+    ov.querySelector("#mini-leave").textContent = "Close the replay";
+    xqSetup(); rpStep(0); st = { k: "xiangqi", b: msg.b0, turn: 0, legal: [], last: null, check: false, clk: [0, 0], s: [0, 0], ev: [] };
+    const bar = document.createElement("div"); bar.id = "mini-rp";
+    for (const [label, fn] of [["◀ Back", () => rpStep(-1)], ["▶ Play / pause", () => { m.replay.auto = !m.replay.auto; m.replay.t = 0; }], ["Next ▶", () => rpStep(1)]]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.addEventListener("click", fn); bar.append(b);
+    }
+    ov.insertBefore(bar, ov.querySelector("#mini-leave"));
+    ov.classList.add("show");
+    addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
+    last = performance.now(); raf = requestAnimationFrame(loop);
+  }
 
   // ------------------------------------------------------------------ the list of matches you can watch (PvP menu: Watch a match)
   let specTimer = 0;
@@ -444,5 +487,5 @@ const Mini = (() => {
     else if (w.a === "no") toast(w.msg || "You cannot watch that match.");
   }
 
-  return { start, on, onWatch, openWatch, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
+  return { start, on, onWatch, openWatch, replay, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
 })();

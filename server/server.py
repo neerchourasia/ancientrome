@@ -1138,12 +1138,15 @@ class MiniRoom:
             c.send({"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked, "watch": True})
         self.watchers = []
         entries = [(p.who, 0 if p.i == winner or winner == -1 else 1) for p in self.players if p.who]
-        ranks = rate_placements(entries, self.kind) if self.ranked and reason != "empty" else {}
+        rp = replay_add(self.kind, [p.name for p in self.players], winner, getattr(self, "record", [])) if self.ranked and reason != "empty" else None
+        ranks = rate_placements(entries, self.kind, rp) if self.ranked and reason != "empty" else {}
         for p in self.players:
             if p.conn:
                 msg = {"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked}
                 if id(p.who) in ranks:
                     msg["rank"] = ranks[id(p.who)]
+                if rp:
+                    msg["rp"] = rp
                 p.conn.send(msg)
                 p.conn.room = p.conn.me = None
         self.task.cancel()
@@ -1494,7 +1497,7 @@ class XiangqiRoom(MiniRoom):
         self.clk, self.moves_n, self.quiet, self.seen = [self.CLOCK, self.CLOCK], 0, 0, {}
         self.legal = xq_legal(self.board, 0)
         self.t_turn, self.bot_at = now(), now() + 1.2
-        self.sent_clk = -1
+        self.sent_clk, self.record = -1, []
 
     def state(self):
         mine = [[f, t] for f, t in self.legal]
@@ -1520,6 +1523,7 @@ class XiangqiRoom(MiniRoom):
         cap = self.board[mv[1]] != "."
         self.board = xq_apply(self.board, mv)
         self.last, self.moves_n = mv, self.moves_n + 1
+        self.record.append(mv)
         self.quiet = 0 if cap else self.quiet + 1
         self.events.append(["move", self.turn, mv[0], mv[1], 1 if cap else 0])
         self.turn = 1 - self.turn
@@ -3462,7 +3466,7 @@ def elo_change(ra, rb, score, games):
     return int(round(k * (score - expected)))
 
 
-def rate_placements(entries, kind=None):
+def rate_placements(entries, kind=None, extra=None):
     """Updates ratings after any match between real people: entries is [(connection, place)] for the humans in it (a lower place is
     better, equal places are a tie). Each pair of people is scored like a duel and the results are averaged, so the same function does
     duels (two people), races and naval battles (up to four). Returns {id(connection): {r, w, l, d, delta, farm}}. Practice bots do not
@@ -3497,6 +3501,7 @@ def rate_placements(entries, kind=None):
         out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
         if not farm:
             weekly_match(c, kind, better == 0 and worse > 0)
+        stats_add(c, kind, "w" if better == 0 and worse > 0 else "l" if worse == 0 and better > 0 else "d", [o.name for o, _ in entries if o is not c], extra)
     return out
 
 
@@ -3521,6 +3526,7 @@ def rate_team(conns, won, kind=None):
         out[id(c)] = dict(public_rank(rec), delta=delta, farm=farm)
         if not farm:
             weekly_match(c, kind, won)
+        stats_add(c, kind, "w" if won else "l", [o.name for o in conns if o is not c])
     return out
 
 
@@ -4049,6 +4055,9 @@ def weekly_roll(t=None):
             coins = PRIZE_COINS[i] if i < len(PRIZE_COINS) else (PRIZE_PART if r["pts"] >= PRIZE_PART_MIN else 0)
             if i < 3:
                 top.append([r["name"], r["pts"]])
+                cups = stats_rec(fid, r["name"])
+                if cups is not None:
+                    cups["cups"][i] += 1
             if coins and len(PRIZES.get(fid, [])) < 8:
                 PRIZES.setdefault(fid, []).append({"id": "w%d" % old, "week": old, "theme": th["name"], "rank": i + 1, "coins": coins, "pts": r["pts"]})
         WEEKLY["last"] = {"week": old, "theme": th["name"], "top": top} if top else WEEKLY["last"]
@@ -4129,6 +4138,75 @@ def on_weekly(conn, m):
             world_soon()
         return
     return conn.send(weekly_view(conn))
+
+
+# ---------------------------------------------------------------- profiles and replays
+# Every match between real people (see rate_placements) is added to the account's profile: results for each game, the last twelve matches and the cups won. The last 100 xiangqi
+# games are kept as move lists, so anyone can replay them. Profiles are public (a name and some numbers), and only for players with an account.
+STATS = {}                 # friend id -> {"name", "r" (rating), "g": {kind: [wins, losses, draws]}, "cups": [gold, silver, bronze], "hist": [{"k", "r", "vs", "t", "rp"}]}
+REPLAYS = []               # [{"id", "k", "names", "w" (winner, -1 draw), "mv" [[from, to], ...], "t"}], newest last
+STATS_MAX, REPLAYS_MAX, HIST_MAX = 5000, 100, 12
+
+
+def stats_rec(fid, name):
+    if fid not in STATS:
+        if len(STATS) >= STATS_MAX:
+            return None
+        STATS[fid] = {"name": name, "r": START_RATING, "g": {}, "cups": [0, 0, 0], "hist": []}
+    STATS[fid]["name"] = name
+    return STATS[fid]
+
+
+def stats_add(conn, kind, result, vs, rp=None):
+    """result is "w", "l" or "d"; vs the names of the other people in the match."""
+    fid = getattr(conn, "fid", None)
+    if not fid or not kind:
+        return
+    rec = stats_rec(fid, conn.name)
+    if rec is None:
+        return
+    g = rec["g"].setdefault(kind, [0, 0, 0])
+    g["wld".index(result)] += 1
+    rec["r"] = rating_of(conn)["r"]
+    row = {"k": kind, "r": result, "vs": vs[:3], "t": int(time.time())}
+    if rp:
+        row["rp"] = rp
+    rec["hist"] = (rec["hist"] + [row])[-HIST_MAX:]
+    world_soon()
+
+
+def replay_add(kind, names, winner, moves):
+    """Keeps a finished xiangqi game; returns its id."""
+    if kind != "xiangqi" or not moves:
+        return None
+    rid = os.urandom(4).hex()
+    REPLAYS.append({"id": rid, "k": kind, "names": [n[:24] for n in names], "w": winner, "mv": [list(m) for m in moves][:300], "t": int(time.time())})
+    del REPLAYS[:-REPLAYS_MAX]
+    world_soon()
+    return rid
+
+
+def profile_view(fid):
+    rec = STATS.get(fid) if isinstance(fid, str) else None
+    if rec is None:
+        return {"t": "profile", "fid": fid, "none": True}
+    games = {k: list(v) for k, v in rec["g"].items()}
+    fav = max(games, key=lambda k: sum(games[k])) if games else None
+    w, l, d = (sum(v[i] for v in games.values()) for i in range(3))
+    have = {r["id"] for r in REPLAYS}
+    hist = [dict(h, rp=h["rp"] if h.get("rp") in have else None) for h in rec["hist"]]
+    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "hist": hist[::-1], "online": bool(conns_of(fid))}
+
+
+def on_profile(conn, m):
+    fid = m.get("fid") if isinstance(m.get("fid"), str) and clean_fid(m.get("fid")) else conn.fid
+    conn.send(profile_view(fid))
+
+
+def on_replay(conn, m):
+    rid = m.get("id")
+    rp = next((r for r in REPLAYS if r["id"] == rid), None) if isinstance(rid, str) else None
+    conn.send({"t": "replay", "rp": rp, "b0": "".join(xq_parse(XQ_START))} if rp else {"t": "replay", "none": True})
 
 
 
@@ -4545,6 +4623,10 @@ async def handle_msg(conn, m):
         return on_weekly(conn, m)
     if t == "watch":
         return on_watch(conn, m)
+    if t == "profile":
+        return on_profile(conn, m)
+    if t == "replay":
+        return on_replay(conn, m)
     if t == "board":
         return on_board(conn, m)
     if t == "unboard":
@@ -4794,7 +4876,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}}
 
 
 def world_apply(rows):
@@ -4837,6 +4919,20 @@ def world_apply(rows):
             if clean_fid(f) and isinstance(lst, list):
                 PRIZES[f] = [{"id": str(p.get("id"))[:12], "week": int(num(p.get("week"), 0, 1e6, 0)), "theme": str(p.get("theme", ""))[:40], "rank": int(num(p.get("rank"), 1, 1e6, 1)),
                               "coins": int(num(p.get("coins"), 0, 1e6, 0)), "pts": int(num(p.get("pts"), 0, 1e6, 0))} for p in lst[:8] if isinstance(p, dict)]
+    sp = rows.get("stats")
+    if isinstance(sp, dict):
+        STATS.clear()
+        for f, r in list((sp.get("p") or {}).items())[:STATS_MAX] if isinstance(sp.get("p"), dict) else []:
+            if clean_fid(f) and isinstance(r, dict) and isinstance(r.get("g"), dict):
+                STATS[f] = {"name": str(r.get("name", ""))[:24], "r": int(num(r.get("r"), 0, 4000, START_RATING)),
+                            "g": {str(k)[:12]: [int(num(x, 0, 1e6, 0)) for x in (v + [0, 0, 0])[:3]] for k, v in list(r["g"].items())[:20] if isinstance(v, list)},
+                            "cups": [int(num(x, 0, 1e6, 0)) for x in ((r.get("cups") if isinstance(r.get("cups"), list) else []) + [0, 0, 0])[:3]],
+                            "hist": [{"k": str(h.get("k"))[:12], "r": h.get("r") if h.get("r") in ("w", "l", "d") else "d", "vs": [str(n)[:24] for n in (h.get("vs") or [])[:3]], "t": int(num(h.get("t"), 0, 4e9, 0)), "rp": h.get("rp") if isinstance(h.get("rp"), str) else None}
+                                     for h in (r.get("hist") if isinstance(r.get("hist"), list) else [])[-HIST_MAX:] if isinstance(h, dict)]}
+        REPLAYS.clear()
+        for r in (sp.get("replays") if isinstance(sp.get("replays"), list) else [])[-REPLAYS_MAX:]:
+            if isinstance(r, dict) and isinstance(r.get("id"), str) and isinstance(r.get("mv"), list) and isinstance(r.get("names"), list):
+                REPLAYS.append({"id": r["id"][:12], "k": "xiangqi", "names": [str(n)[:24] for n in r["names"][:2]], "w": int(num(r.get("w"), -1, 1, -1)), "mv": [[int(num(a, 0, 89, 0)), int(num(b, 0, 89, 0))] for a, b in [m for m in r["mv"][:300] if isinstance(m, list) and len(m) == 2]], "t": int(num(r.get("t"), 0, 4e9, 0))})
     py = rows.get("pyramid")
     if isinstance(py, dict):
         PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})
