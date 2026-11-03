@@ -27,7 +27,9 @@ import math
 import os
 import random
 import re
+import signal
 import struct
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -3914,8 +3916,18 @@ def pyr_broadcast(msg):
             c.send(msg)
 
 
+PYR_CLAIMED = [False]
+
+
 def on_pyr(conn, m):
     if m.get("t") == "pyr_get":
+        # A server that has just started with nothing saved takes the progress a visitor's browser remembers (once), so a pyramid is never lost to a restart.
+        if not PYR_CLAIMED[0]:
+            PYR_CLAIMED[0] = True
+            if PYRAMID["blocks"] == 0 and PYRAMID["done"] == 0 and not PYRAMID["who"]:
+                PYRAMID["blocks"], PYRAMID["done"] = int(num(m.get("blocks"), 0, PYR_NEED - 1, 0)), int(num(m.get("done"), 0, 50, 0))
+                if PYRAMID["blocks"] or PYRAMID["done"]:
+                    world_soon()
         return conn.send(pyr_view())
     t = now()
     last = getattr(conn, "pyr_t", None)
@@ -3931,6 +3943,7 @@ def on_pyr(conn, m):
         PYRAMID["blocks"] = 0
         PYRAMID["who"] = {}
         pyr_broadcast({"t": "pyr_done", "who": builders, "done": PYRAMID["done"]})
+    world_soon()
     pyr_broadcast(pyr_view())
 
 
@@ -4552,7 +4565,7 @@ async def ws_session(reader, writer, ip, ua=""):
 # Keeping the world between restarts. With SUPABASE_URL and SUPABASE_SERVICE_KEY set, the server saves guilds, share prices, the leaderboards, the race times and the pyramid to the
 # world_state table (supabase-world.sql) once a minute (when something changed) and loads them when it starts. Without them it works as before, in memory only.
 
-WORLD_SAVE_EVERY = 60.0
+WORLD_SAVE_EVERY = 10.0
 _world_sig = {}
 
 
@@ -4641,6 +4654,35 @@ async def world_save():
     return len(changed)
 
 
+_world_soon = [False]
+
+
+def world_soon():
+    """Something important changed (a block of the pyramid, ...): save it in a couple of seconds, not at the next regular save."""
+    if not world_on() or _world_soon[0]:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    _world_soon[0] = True
+
+    def go():
+        _world_soon[0] = False
+        asyncio.ensure_future(world_save())
+    loop.call_later(2.0, go)
+
+
+async def world_shutdown():
+    """The host is stopping the server (a new version is going live): save what has changed first."""
+    try:
+        await asyncio.wait_for(world_save(), 8)
+    except Exception as err:
+        print("  world: final save failed (%s)" % err)
+    print("  world: stopped")
+    os._exit(0)
+
+
 async def world_save_loop():
     while True:
         await asyncio.sleep(WORLD_SAVE_EVERY)
@@ -4658,6 +4700,14 @@ async def serve(host="0.0.0.0", port=None):
 
 
 async def main():
+    try:
+        sys.stdout.reconfigure(line_buffering=True)        # so the host's log shows each line as it happens
+    except Exception:
+        pass
+    try:
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, lambda: asyncio.ensure_future(world_shutdown()))
+    except (NotImplementedError, RuntimeError, ValueError):
+        pass
     srv = await serve()
     port = srv.sockets[0].getsockname()[1]
     print("Time Machine game server on port %d" % port)

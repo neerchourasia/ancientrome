@@ -767,7 +767,7 @@ const Cancun = (() => {
     lastDt = dt;
     updatePeople(dt);
     if (carrying && carryMesh) carryMesh.position.set(player.x, player.feet + 2.25, player.z);
-    pyrAsk += dt; if (pyrAsk > 25) { pyrAsk = 0; if (typeof Online !== "undefined" && Online.connected && Math.abs(px - X(PYR.x)) < 600) Online.navalSend({ t: "pyr_get" }); }
+    pyrAsk += dt; if (pyrAsk > 25) { pyrAsk = 0; if (typeof Online !== "undefined" && Online.connected && Math.abs(px - X(PYR.x)) < 600) Online.navalSend({ t: "pyr_get", blocks: pyr.blocks, done: pyr.done }); }
     for (const c of chests) if (c.g.visible) { const k = 2.6 + Math.sin(clock * 3 + c.i) * 0.5; c.glow.scale.set(k, k, 1); }
     if (px > CX + 700 || Math.hypot(px - X(POND.x), pz - POND.z) < 120) placeFish();
     if (snorkeling) { if (!inWater(px, pz)) setSnorkel(false); else spot(); }

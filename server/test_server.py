@@ -1069,6 +1069,28 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)
 
+    # ---------------------------------------------------------------- the pyramid is kept
+
+    async def test_pyramid_a_fresh_server_takes_what_a_browser_remembers_once(self):
+        server.PYRAMID.update({"blocks": 0, "done": 0, "who": {}})
+        server.PYR_CLAIMED[0] = False
+        a, b = await self.player("Ann"), await self.player("Ben")
+        a.send({"t": "pyr_get", "blocks": 37, "done": 2})
+        v = await a.until(lambda m: m["t"] == "pyr")
+        self.assertEqual((v["blocks"], v["done"]), (37, 2))
+        b.send({"t": "pyr_get", "blocks": 99999, "done": 99})          # a second claim changes nothing
+        v = await b.until(lambda m: m["t"] == "pyr")
+        self.assertEqual((v["blocks"], v["done"]), (37, 2))
+
+    async def test_pyramid_saved_progress_is_never_overwritten_by_a_browser(self):
+        server.PYRAMID.update({"blocks": 12, "done": 1, "who": {"Ann": 12}})
+        server.PYR_CLAIMED[0] = False
+        a = await self.player("Ann")
+        a.send({"t": "pyr_get", "blocks": 3, "done": 0})
+        v = await a.until(lambda m: m["t"] == "pyr")
+        self.assertEqual((v["blocks"], v["done"]), (12, 1))
+        server.PYRAMID.update({"blocks": 0, "done": 0, "who": {}})
+
     # ---------------------------------------------------------------- xiangqi (Chinese chess)
 
     def xq(self, rows):
