@@ -100,6 +100,12 @@ const BEIJING_LANDMARKS = [
     fact: "Beijing grew from about 2 million people in 1950 to over 21 million today.",
   }),
   bj({
+    id: "b-xiangqi", game: true, name: "The Xiangqi Pavilion", sub: "Chinese chess under a little blue roof",
+    x: -170, z: 215, r: 14, stand: [-170, 232],
+    text: "A stone table with a board carved on it, two stools and a small pavilion roof. Press F to play xiangqi, Chinese chess, against a practice bot, or use Play online in the PvP menu to play a real person. A general sits in a palace at each end of the board, and a river runs across the middle.",
+    fact: "Xiangqi is more than a thousand years old and is played by hundreds of millions of people. In the hutongs and parks of Beijing you can still see old men playing it on little tables, with a crowd watching and advising.",
+  }),
+  bj({
     id: "b-market", game: true, name: "The Market", sub: "Food, clothes, rides, a builder and a healer",
     x: 250, z: 110, r: 26, stand: [250, 88],
     text: "A paved square east of the great square with a well in the middle and five stalls along its south side: a food stall, a clothier, animals and rides, a builder and a healer. Walk up to a stall and press F to buy.",

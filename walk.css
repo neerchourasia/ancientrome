@@ -817,3 +817,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #dragon-hud small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
 #dh-drum { width: 54px; height: 54px; display: grid; place-items: center; }
 #dh-drum i { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle, #ffd36b 0%, #d9341f 70%); box-shadow: 0 0 10px rgba(217,52,31,.8); transition: transform .06s; }
+#mini-resign { font: inherit; }

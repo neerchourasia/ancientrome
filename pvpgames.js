@@ -6,8 +6,9 @@
 
 const Mini = (() => {
   const W = 640, H = 360;
-  const TITLES = { kushti: "🤼 Kushti wrestling in the akhara", kites: "🪁 Kite fight over Old Delhi", ball: "⚽ Pok-ta-pok on the Great Ball Court" };
+  const TITLES = { xiangqi: "♟ Xiangqi (Chinese chess)", kushti: "🤼 Kushti wrestling in the akhara", kites: "🪁 Kite fight over Old Delhi", ball: "⚽ Pok-ta-pok on the Great Ball Court" };
   const HELP = {
+    xiangqi: "Click one of your pieces, then where it should go (green marks show where it may move). Red moves first. A side with no legal move loses. You have 10 minutes on your clock. Esc leaves (and loses).",
     kushti: "Wait for GO, then press Space as fast as you can. More presses than your opponent wins the throw. First to two throws wins.",
     kites: "A D W S (or the arrow keys) fly your kite. Get close to the other kite and press Space to pull: their string frays. First string cut loses. Esc leaves.",
     ball: "WASD walk, Space strikes the ball with your hip when it is close (as in the real game, never with the hands or feet), towards the way you face. Don't let it land on your half (the other player scores 1). Send it through a stone ring on a long wall and you win the whole match at once. First to 5. Esc leaves.",
@@ -42,6 +43,7 @@ const Mini = (() => {
     mode = "online";
     head.textContent = `${TITLES[m.kind || m.mode]}${m.ranked ? " (ranked)" : ""}`;
     m.kind = m.mode; help.textContent = HELP[m.kind];
+    if (m.kind === "xiangqi") xqSetup();
     ov.classList.add("show");
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
@@ -80,7 +82,8 @@ const Mini = (() => {
     if (!m || s.k !== m.kind) return;
     st = s;
     for (const e of s.ev || []) {
-      if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
+      if (e[0] === "move") { Sfx.play(e[4] ? "hit" : "stone"); if (e[1] !== me()) setNote(e[4] ? "They took a piece." : ""); }
+      else if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
       else if (e[0] === "draw") setNote("A draw: the throw is wrestled again.");
       else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("stone"); }
       else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${e[1] === me() ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
@@ -99,7 +102,7 @@ const Mini = (() => {
   }
   function draw(now) {
     g.clearRect(0, 0, W, H);
-    if (m.kind === "kushti") drawKushti(now); else drawKites(now);
+    if (m.kind === "kushti") drawKushti(now); else if (m.kind === "xiangqi") drawXq(); else drawKites(now);
     if (note) label(note, W / 2, H - 14, 20, "#ffe08a");
   }
 
@@ -314,12 +317,71 @@ const Mini = (() => {
     placeAt(BEIJING_X + Beijing.DOCK.x - 3, Beijing.DOCK.z, -Math.PI / 2); player.pitch = -0.02;
   }
 
+  // ------------------------------------------------------------------ xiangqi (Chinese chess): the board is drawn here, every rule is the server's
+  const XQ_CH = { R: "俥", H: "傌", E: "相", A: "仕", G: "帥", C: "炮", P: "兵", r: "車", h: "馬", e: "象", a: "士", g: "將", c: "砲", p: "卒" };
+  const XQ = { x0: 36, y0: 36, cell: 56 };
+  let xqSel = null;
+  const xqIdx = (r, c) => (me() === 1 ? (9 - r) * 9 + (8 - c) : r * 9 + c);              // the board turns round so your side is always at the bottom
+  const xqPos = (i) => { let r = Math.floor(i / 9), c = i % 9; if (me() === 1) { r = 9 - r; c = 8 - c; } return { x: XQ.x0 + c * XQ.cell, y: XQ.y0 + r * XQ.cell }; };
+  function xqClick(e) {
+    if (!m || m.kind !== "xiangqi" || !st || st.turn !== me()) return;
+    const rect = cv.getBoundingClientRect(), k = cv.width / rect.width, x = (e.clientX - rect.left) * k, y = (e.clientY - rect.top) * k;
+    const c = Math.round((x - XQ.x0) / XQ.cell), r = Math.round((y - XQ.y0) / XQ.cell);
+    if (c < 0 || c > 8 || r < 0 || r > 9 || Math.hypot(x - (XQ.x0 + c * XQ.cell), y - (XQ.y0 + r * XQ.cell)) > XQ.cell * 0.55) return;
+    const i = xqIdx(r, c), own = (ch) => ch !== "." && (ch === ch.toUpperCase()) === (me() === 0);
+    if (xqSel !== null && st.legal.some((l) => l[0] === xqSel && l[1] === i)) { send({ t: "move", f: xqSel, to: i }); xqSel = null; return; }
+    xqSel = own(st.b[i]) && st.legal.some((l) => l[0] === i) ? i : null;
+  }
+  function xqResign() { Dialog.confirm("Resign this game?").then((yes) => { if (yes && m && m.kind === "xiangqi") send({ t: "resign" }); }); }
+  function xqSetup() {
+    cv.width = 520; cv.height = 580; cv.style.aspectRatio = "520 / 580"; cv.style.width = "min(94vw, 62vh)";
+    cv.addEventListener("click", xqClick);
+    const b = ov.querySelector("#mini-resign") || Object.assign(document.createElement("button"), { id: "mini-resign", type: "button", textContent: "Resign" });
+    b.onclick = xqResign; b.hidden = false; ov.insertBefore(b, ov.querySelector("#mini-leave"));
+    xqSel = null;
+  }
+  function xqCleanup() {
+    if (!cv || !cv.style.aspectRatio) return;
+    cv.removeEventListener("click", xqClick); cv.width = 640; cv.height = 360; cv.style.aspectRatio = ""; cv.style.width = "";
+    const b = ov.querySelector("#mini-resign"); if (b) b.hidden = true;
+  }
+  const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  function drawXq() {
+    const { x0, y0, cell } = XQ;
+    g.fillStyle = "#c9a265"; g.fillRect(0, 0, 520, 580);
+    g.strokeStyle = "#4a3418"; g.lineWidth = 2; g.strokeRect(x0 - 8, y0 - 8, 8 * cell + 16, 9 * cell + 16);
+    g.lineWidth = 1.4;
+    for (let r = 0; r < 10; r++) { g.beginPath(); g.moveTo(x0, y0 + r * cell); g.lineTo(x0 + 8 * cell, y0 + r * cell); g.stroke(); }
+    for (let c = 0; c < 9; c++) {
+      g.beginPath(); g.moveTo(x0 + c * cell, y0); g.lineTo(x0 + c * cell, y0 + 4 * cell); g.moveTo(x0 + c * cell, y0 + 5 * cell); g.lineTo(x0 + c * cell, y0 + 9 * cell); g.stroke();
+      if (c === 0 || c === 8) { g.beginPath(); g.moveTo(x0 + c * cell, y0 + 4 * cell); g.lineTo(x0 + c * cell, y0 + 5 * cell); g.stroke(); }
+    }
+    for (const r0 of [0, 7]) for (const s of [[3, 5], [5, 3]]) { g.beginPath(); g.moveTo(x0 + s[0] * cell, y0 + r0 * cell); g.lineTo(x0 + s[1] * cell, y0 + (r0 + 2) * cell); g.stroke(); }    // the two palaces
+    g.fillStyle = "#6a4a20"; g.font = "bold 24px serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("楚 河", x0 + 2 * cell, y0 + 4.5 * cell); g.fillText("漢 界", x0 + 6 * cell, y0 + 4.5 * cell);
+    if (!st) { label("Setting up the board...", 260, 290, 20); return; }
+    if (st.last) for (const i of st.last) { const p = xqPos(i); g.fillStyle = "rgba(120,190,255,.45)"; g.fillRect(p.x - cell / 2 + 3, p.y - cell / 2 + 3, cell - 6, cell - 6); }
+    for (let i = 0; i < 90; i++) {
+      const ch = st.b[i]; if (ch === ".") continue;
+      const p = xqPos(i), red = ch === ch.toUpperCase();
+      g.beginPath(); g.arc(p.x, p.y, 24, 0, Math.PI * 2); g.fillStyle = "#f4e3b8"; g.fill(); g.lineWidth = i === xqSel ? 4 : 2; g.strokeStyle = i === xqSel ? "#ffb400" : red ? "#b3262b" : "#222"; g.stroke();
+      g.beginPath(); g.arc(p.x, p.y, 19, 0, Math.PI * 2); g.lineWidth = 1; g.stroke();
+      g.fillStyle = red ? "#b3262b" : "#1a1a1a"; g.font = "bold 27px serif"; g.fillText(XQ_CH[ch], p.x, p.y + 1);
+    }
+    if (xqSel !== null) for (const l of st.legal) if (l[0] === xqSel) { const p = xqPos(l[1]); g.beginPath(); g.arc(p.x, p.y, st.b[l[1]] === "." ? 7 : 27, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = "rgba(30,150,70,.9)"; if (st.b[l[1]] === ".") { g.fillStyle = "rgba(30,150,70,.8)"; g.fill(); } else g.stroke(); }
+    const mine = st.turn === me();
+    label(`${nameOf(foe())}  ${mmss(st.clk[foe()])}`, 260, 20, 15, st.turn === foe() ? "#ffe08a" : "#4a3418");
+    label(`${nameOf(me())} (you)  ${mmss(st.clk[me()])}`, 260, 568, 15, mine ? "#7a1a10" : "#4a3418");
+    if (st.check) label(mine ? "You are in check!" : "Check!", 260, 290, 22, "#b3262b");
+    label(mine ? "Your move" : "Waiting for their move...", 60, 20, 14, mine ? "#7a1a10" : "#4a3418");
+  }
+
   // ------------------------------------------------------------------ the end
   function cleanup() {
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); if (ov) ov.classList.remove("show");
-    cleanup3d(); cleanupDragon();
+    xqCleanup(); cleanup3d(); cleanupDragon();
     m = null; st = null;
     if (mode === "online") mode = "walk";
   }
@@ -328,7 +390,7 @@ const Mini = (() => {
     const kind = m.kind, won = res.winner === me(), draw = res.winner === -1, ranked = !!res.ranked;
     const prize = won ? (ranked ? 40 : 20) : 0;
     Vitals.coins += prize;
-    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached five points first." : "They reached five points first.", ring: won ? "You sent the ball through the ring: you win the match at once!" : "They sent the ball through the ring and won the match at once.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
+    const why = { throws: won ? "You won two throws." : "Two throws went against you.", cut: won ? "You cut their string!" : "Your string was cut.", score: won ? "You reached five points first." : "They reached five points first.", ring: won ? "You sent the ball through the ring: you win the match at once!" : "They sent the ball through the ring and won the match at once.", checkmate: won ? "Checkmate! Their general has no escape." : "Checkmate: your general has no escape.", stalemate: won ? "They have no legal move left: in xiangqi that loses." : "You have no legal move left: in xiangqi that loses.", resign: won ? "They resigned." : "You resigned.", repetition: "The same position came up three times: a draw.", draw: "No piece was taken for 60 moves each: a draw.", time: draw ? "Time ran out with the score level." : won ? "Time ran out and you were ahead." : "Time ran out and they were ahead.", left: won ? "Your opponent left the game." : "You left.", empty: "Everyone left." }[res.reason] || "";
     const ladder = ranked && res.rank && typeof Online !== "undefined" ? Online.ladderText(res.rank) : "";
     cleanup();
     showResult(draw ? "A draw" : won ? "Victory!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, [

@@ -1330,7 +1330,215 @@ class BallRoom(MiniRoom):
         self.send_state({"b": [round(x, 2) for x in self.b], "p": [[round(p.x, 2), round(p.z, 2), round(p.yaw, 2)] for p in self.players]})
 
 
-MINI_ROOMS = {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}
+# ---------------------------------------------------------------------------------------------------------------
+# xiangqi (Chinese chess), in Beijing: the board is 9 files by 10 ranks, kept as 90 characters (row 0 is the black side at the top, row 9 the red side at the bottom; red is a capital letter,
+# black a small one; . is empty): R/r chariot, H/h horse, E/e elephant, A/a advisor, G/g general, C/c cannon, P/p soldier. The server knows every rule (the horse's leg, the elephant's eye, the
+# cannon's screen, the palaces, the river, the generals never facing each other) and judges every move; a side with no legal move loses, whether it is mate or not.
+
+XQ_START = "rheagaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RHEAGAEHR"
+XQ_VALUE = {"R": 90, "H": 40, "E": 20, "A": 20, "G": 10000, "C": 45, "P": 10}
+
+
+def xq_parse(fen):
+    b = []
+    for ch in fen:
+        if ch == "/":
+            continue
+        b.extend("." * int(ch) if ch.isdigit() else ch)
+    return b
+
+
+def xq_side(p):
+    return 0 if p.isupper() else 1
+
+
+def xq_pseudo(b, side):
+    out = []
+    ok = lambda r, c: 0 <= r < 10 and 0 <= c < 9
+
+    def palace(r, c):
+        return 3 <= c <= 5 and (7 <= r <= 9 if side == 0 else 0 <= r <= 2)
+
+    for i, p in enumerate(b):
+        if p == "." or xq_side(p) != side:
+            continue
+        k, (r, c) = p.upper(), divmod(i, 9)
+
+        def add(r2, c2):
+            if ok(r2, c2):
+                q = b[r2 * 9 + c2]
+                if q == "." or xq_side(q) != side:
+                    out.append((i, r2 * 9 + c2))
+        if k == "R" or k == "C":
+            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                r2, c2, screen = r + dr, c + dc, False
+                while ok(r2, c2):
+                    q = b[r2 * 9 + c2]
+                    if k == "R":
+                        if q == ".":
+                            out.append((i, r2 * 9 + c2))
+                        else:
+                            if xq_side(q) != side:
+                                out.append((i, r2 * 9 + c2))
+                            break
+                    elif not screen:
+                        if q == ".":
+                            out.append((i, r2 * 9 + c2))
+                        else:
+                            screen = True
+                    elif q != ".":
+                        if xq_side(q) != side:
+                            out.append((i, r2 * 9 + c2))
+                        break
+                    r2, c2 = r2 + dr, c2 + dc
+        elif k == "H":
+            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                if ok(r + dr, c + dc) and b[(r + dr) * 9 + c + dc] == ".":              # the horse's leg must be free
+                    if dr:
+                        add(r + 2 * dr, c - 1); add(r + 2 * dr, c + 1)
+                    else:
+                        add(r - 1, c + 2 * dc); add(r + 1, c + 2 * dc)
+        elif k == "E":
+            for dr, dc in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+                tr, tc = r + 2 * dr, c + 2 * dc
+                if ok(tr, tc) and b[(r + dr) * 9 + c + dc] == "." and (tr >= 5 if side == 0 else tr <= 4):   # the elephant's eye must be free, and it never crosses the river
+                    add(tr, tc)
+        elif k == "A":
+            for dr, dc in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+                if palace(r + dr, c + dc):
+                    add(r + dr, c + dc)
+        elif k == "G":
+            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                if palace(r + dr, c + dc):
+                    add(r + dr, c + dc)
+        elif k == "P":
+            fwd = -1 if side == 0 else 1
+            add(r + fwd, c)
+            if (r <= 4 if side == 0 else r >= 5):                                         # across the river a soldier may also step sideways
+                add(r, c - 1); add(r, c + 1)
+    return out
+
+
+def xq_in_check(b, side):
+    """Is this side's general under attack (or facing the other general with nothing between)?"""
+    try:
+        g = b.index("G" if side == 0 else "g")
+    except ValueError:
+        return True
+    og = "g" if side == 0 else "G"
+    if og in b:
+        o = b.index(og)
+        if o % 9 == g % 9 and all(b[x] == "." for x in range(min(g, o) + 9, max(g, o), 9)):
+            return True
+    return any(t == g for _, t in xq_pseudo(b, 1 - side))
+
+
+def xq_apply(b, mv):
+    nb = list(b)
+    nb[mv[1]], nb[mv[0]] = nb[mv[0]], "."
+    return nb
+
+
+def xq_legal(b, side):
+    return [mv for mv in xq_pseudo(b, side) if not xq_in_check(xq_apply(b, mv), side)]
+
+
+def xq_eval(b, side):
+    return sum((XQ_VALUE[p.upper()] if xq_side(p) == side else -XQ_VALUE[p.upper()]) for p in b if p != ".")
+
+
+def xq_best(b, side, depth=2):
+    """A practice bot: picks a legal move by looking at the best answer to each (so it takes free pieces and does not leave its own hanging), with a little randomness."""
+    def search(bd, sd, d, alpha, beta):
+        if d == 0:
+            return xq_eval(bd, sd)
+        moves = xq_pseudo(bd, sd)
+        if not moves:
+            return -99999
+        best = -10 ** 9
+        for mv in sorted(moves, key=lambda m: -XQ_VALUE.get(bd[m[1]].upper(), 0)):
+            if bd[mv[1]] in "Gg":                                   # it can take the general: that is the end
+                return 100000 + d
+            v = -search(xq_apply(bd, mv), 1 - sd, d - 1, -beta, -alpha)
+            best = max(best, v)
+            alpha = max(alpha, v)
+            if alpha >= beta:
+                break
+        return best
+    moves = xq_legal(b, side)
+    scored = [(-search(xq_apply(b, mv), 1 - side, depth - 1, -10 ** 9, 10 ** 9) + random.random() * 6, mv) for mv in moves]
+    return max(scored)[1] if scored else None
+
+
+class XiangqiRoom(MiniRoom):
+    TICK = 0.5
+    TIME_LIMIT = 1e9
+    CLOCK = 600.0
+
+    def setup(self):
+        self.board, self.turn, self.last, self.check = xq_parse(XQ_START), 0, None, False
+        self.clk, self.moves_n, self.quiet, self.seen = [self.CLOCK, self.CLOCK], 0, 0, {}
+        self.legal = xq_legal(self.board, 0)
+        self.t_turn, self.bot_at = now(), now() + 1.2
+        self.sent_clk = -1
+
+    def state(self):
+        mine = [[f, t] for f, t in self.legal]
+        return {"b": "".join(self.board), "turn": self.turn, "legal": mine, "last": list(self.last) if self.last else None, "check": self.check, "clk": [round(x) for x in self.clk]}
+
+    def msg(self, p, m):
+        t = m.get("t")
+        if t == "resign":
+            return self.finish(1 - p.i, "resign")
+        if t != "move" or p.i != self.turn:
+            return
+        try:
+            mv = (int(m.get("f")), int(m.get("to")))
+        except (TypeError, ValueError):
+            return
+        if mv in self.legal:
+            self.play(mv)
+
+    def play(self, mv):
+        t = now()
+        self.clk[self.turn] = max(0.0, self.clk[self.turn] - (t - self.t_turn))
+        self.t_turn = t
+        cap = self.board[mv[1]] != "."
+        self.board = xq_apply(self.board, mv)
+        self.last, self.moves_n = mv, self.moves_n + 1
+        self.quiet = 0 if cap else self.quiet + 1
+        self.events.append(["move", self.turn, mv[0], mv[1], 1 if cap else 0])
+        self.turn = 1 - self.turn
+        self.legal = xq_legal(self.board, self.turn)
+        self.check = xq_in_check(self.board, self.turn)
+        self.bot_at = now() + 0.9 + random.random() * 1.2
+        key = ("".join(self.board), self.turn)
+        self.seen[key] = self.seen.get(key, 0) + 1
+        self.send_state(self.state())
+        if not self.legal:
+            return self.finish(1 - self.turn, "checkmate" if self.check else "stalemate")           # (in xiangqi being stalemated loses too)
+        if self.seen[key] >= 3:
+            return self.finish(-1, "repetition")
+        if self.quiet >= 120:
+            return self.finish(-1, "draw")
+
+    def step(self, dt):
+        t = now()
+        self.clk[self.turn] = max(0.0, self.clk[self.turn] - (t - self.t_turn))
+        self.t_turn = t
+        if self.clk[self.turn] <= 0:
+            return self.finish(1 - self.turn, "time")
+        cur = self.players[self.turn]
+        if cur.bot and t >= self.bot_at and self.legal:
+            mv = xq_best(self.board, self.turn)
+            if mv:
+                return self.play(mv)
+        if int(t) != self.sent_clk:
+            self.sent_clk = int(t)
+            self.send_state(self.state())
+
+
+MINI_ROOMS = {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom, "xiangqi": XiangqiRoom}
 
 # ---------------------------------------------------------------------------------------------------------------
 # chariot derby: the same Circus track, but nobody has to finish: ram the others. Each chariot has 100 health; a hit from behind hurts the one in front most and
@@ -2028,7 +2236,7 @@ class NavalRoom:
 # matchmaking
 
 CONNS = set()
-QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": [], "dragon": [], "wushu": []}
+QUEUES = {"duel": [], "race": [], "coop": [], "naval": [], "brawl": [], "team2": [], "derby": [], "kushti": [], "kites": [], "ball": [], "dragon": [], "wushu": [], "xiangqi": []}
 
 
 def enqueue(conn, mode, want_bot):
@@ -2089,7 +2297,7 @@ def match_once():
     elif len(q) == 1 and q[0].want_bot and t - q[0].queued_at >= CFG["bot_wait"]:
         DragonRoom([q.pop(0)], bots=3)
 
-    for kind, room_class in (("kushti", KushtiRoom), ("kites", KiteRoom), ("ball", BallRoom)):
+    for kind, room_class in (("kushti", KushtiRoom), ("kites", KiteRoom), ("ball", BallRoom), ("xiangqi", XiangqiRoom)):
         q = QUEUES[kind]
         q[:] = [c for c in q if not c.closed]
         while len(q) >= 2:
@@ -2255,8 +2463,8 @@ PLACES = {
 ],
 }
 CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún", "beijing": "Beijing"}
-ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game", "dragon": "in a dragon boat race", "wushu": "in a wushu bout"}
-QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game", "dragon": "a dragon boat race", "wushu": "a wushu bout"}
+ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game", "dragon": "in a dragon boat race", "wushu": "in a wushu bout", "xiangqi": "in a game of xiangqi"}
+QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game", "dragon": "a dragon boat race", "wushu": "a wushu bout", "xiangqi": "a game of xiangqi"}
 
 
 def where_is(c):
@@ -3805,8 +4013,8 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 
 CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
 CHAL_TTL = 45.0
-CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon", "wushu")      # what the challenger can pick
-CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race", "wushu": "a wushu bout"}
+CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon", "wushu", "xiangqi")      # what the challenger can pick
+CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race", "wushu": "a wushu bout", "xiangqi": "a game of xiangqi (Chinese chess)"}
 
 
 def chal_room(game, a, b):
@@ -3821,7 +4029,7 @@ def chal_room(game, a, b):
     elif game == "wushu":
         DuelRoom([a, b], ranked=True, mode="wushu")
     else:
-        {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom}[game](game, [a, b])
+        {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom, "xiangqi": XiangqiRoom}[game](game, [a, b])
 
 
 def conn_by_id(cid):

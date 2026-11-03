@@ -470,6 +470,21 @@ const Beijing = (() => {
     for (const sz of [-1, 1]) mcyl(g, wx - 28, 0, wz + sz * 5.5, 0.3, 5.2, C.red, { solid: true });
     mbox(g, wx - 28, 5.2, wz, 0.5, 0.5, 12, C.gold); sign(g, wx - 28, 4.2, wz, 8, 1.6, "武术", "wushu courtyard", Math.PI / 2);
   }
+  // ---------- the xiangqi pavilion: a stone table with a board, two stools and a little blue roof, west of the great square ----------
+  const XQP = { x: -170, z: 215 };
+  function buildXiangqiPavilion() {
+    const g = root, px = X(XQP.x), pz = XQP.z;
+    mbox(g, px, 0, pz, 12, 0.5, 10, C.stone, { cast: false });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) mcyl(g, px + sx * 5, 0.5, pz + sz * 4, 0.3, 4.2, C.red, { solid: true });
+    roof(g, px, 4.7, pz, 11, 9, 2.8, C.blue);
+    mbox(g, px, 0.5, pz, 3, 1.1, 3, C.stone, { solid: true });
+    const board = canvasTex(128, 128, (c, w, h) => { c.fillStyle = "#c9a265"; c.fillRect(0, 0, w, h); c.strokeStyle = "#4a3418"; c.lineWidth = 2; for (let k = 0; k < 9; k++) { c.beginPath(); c.moveTo(14 + k * 12, 10); c.lineTo(14 + k * 12, 118); c.stroke(); } for (let k = 0; k < 10; k++) { c.beginPath(); c.moveTo(14, 10 + k * 12); c.lineTo(110, 10 + k * 12); c.stroke(); } });
+    const top = new T.Mesh(new T.PlaneGeometry(2.6, 2.6), new T.MeshLambertMaterial({ map: board })); top.rotation.x = -Math.PI / 2; top.position.set(px, 1.62, pz); g.add(top);
+    for (const sz of [-1, 1]) mcyl(g, px, 0.5, pz + sz * 3.4, 0.45, 0.6, C.wood, { cast: false });
+    sign(g, px, 3.6, pz + 5.2, 5, 1.3, "象棋", "xiangqi", 0);
+    MAP_SHAPES.push({ k: "r", x0: px - 6, x1: px + 6, z0: pz - 5, z1: pz + 5, c: "#4a7ab0" });
+  }
+  const atXiangqi = () => Math.abs(player.x - X(XQP.x)) < 8 && Math.abs(player.z - (XQP.z + 5.5)) < 5;
   const atWushu = () => Math.abs(player.x - X(WUSHU.x - 29)) < 7 && Math.abs(player.z - WUSHU.z) < 8;
 
   // ---------- the people ----------
@@ -541,6 +556,7 @@ const Beijing = (() => {
     buildHouseTiers();
     buildLake();
     buildWushu();
+    buildXiangqiPavilion();
     buildWall();
     buildCBD();
     buildPeople();
@@ -571,7 +587,7 @@ const Beijing = (() => {
 
   return {
     build, show, setEra, update, homeInside, setTier: setHouseTier, get tier() { return hTier; }, homeSpot, SPAWN, BOUNDS: BOUNDS_B, MAP: MAP_B,
-    inWater, swimMul, avatarDrop, camDrop, X, LAKE, DOCK, COURSE, atDock, WUSHU, atWushu, setBoating: (v) => { boating = !!v; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
+    inWater, swimMul, avatarDrop, camDrop, X, LAKE, DOCK, COURSE, atDock, WUSHU, atWushu, atXiangqi, setBoating: (v) => { boating = !!v; }, hits: () => null, people: () => people.list, peopleMesh: () => people.body,
     get built() { return built; },
     inHome: (x, z) => Math.abs(x - X(HOME.x)) < 16 && Math.abs(z - HOME.z) < 16,
   };

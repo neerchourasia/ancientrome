@@ -84,7 +84,7 @@ const Online = (() => {
       case "queued": waiting = true; setMsg(`Looking for ${m.mode === "duel" ? "an opponent of your level" : m.mode === "coop" ? "teammates" : m.mode === "naval" ? "other captains" : m.mode === "brawl" ? "other brawlers" : m.mode === "derby" ? "other drivers" : m.mode === "kushti" || m.mode === "kites" || m.mode === "ball" ? "an opponent" : m.mode === "dragon" ? "other crews" : m.mode === "wushu" ? "a wushu opponent" : m.mode === "team2" ? "a partner and opponents" : "racers"}... (${m.waiting} waiting)`); break;
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
-      case "match": waiting = false; setMsg(""); if (m.mode === "dragon") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;
@@ -96,7 +96,7 @@ const Online = (() => {
       case "heist_end": Robbery.end(m); break;
       case "race": case "derby": Race.onlineState(m); break;
       case "naval": Naval.onlineState(m); break;
-      case "end": if (m.mode === "dragon") { if (m.rank && Account.loggedIn) rankNote(m.rank); Mini.endDragon(m); break; } if (m.mode === "kushti" || m.mode === "kites" || m.mode === "ball") { Mini.end(m); break; } if ((m.mode === "race" || m.mode === "derby" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race" || m.mode === "derby") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
+      case "end": if (m.mode === "xiangqi") { Mini.end(m); break; } if (m.mode === "dragon") { if (m.rank && Account.loggedIn) rankNote(m.rank); Mini.endDragon(m); break; } if (m.mode === "kushti" || m.mode === "kites" || m.mode === "ball") { Mini.end(m); break; } if ((m.mode === "race" || m.mode === "derby" || (m.mode === "naval" && !m.coop) || (m.mode === "duel" && !duel)) && m.rank && Account.loggedIn) rankNote(m.rank); if (m.mode === "duel" && !duel) break; if (m.mode === "race" || m.mode === "derby") Race.onlineEnd(m); else if (m.mode === "naval") Naval.onlineEnd(m); else onFightEnd(m); break;
       default: break;
     }
   }
@@ -115,7 +115,7 @@ const Online = (() => {
     $o("on-naval").disabled = !ready;
     $o("on-brawl").disabled = !ready;
     $o("on-derby").disabled = !ready;
-    for (const [id, c] of [["on-kushti", "delhi"], ["on-kites", "delhi"], ["on-ball", "cancun"], ["on-dragon", "beijing"], ["on-wushu", "beijing"]]) { $o(id).hidden = city !== c; $o(id).disabled = !ready; }
+    for (const [id, c] of [["on-kushti", "delhi"], ["on-kites", "delhi"], ["on-ball", "cancun"], ["on-dragon", "beijing"], ["on-wushu", "beijing"], ["on-xiangqi", "beijing"]]) { $o(id).hidden = city !== c; $o(id).disabled = !ready; }
     $o("on-team2").disabled = !ready;
     $o("on-cancel").hidden = !waiting;
     $o("on-botrow").hidden = !(welcome && welcome.bots);
@@ -183,6 +183,13 @@ const Online = (() => {
   const atDock = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atDock();
   // standing at the gate of the wushu courtyard in Beijing: F starts a bare-handed bout against Master Li at once
   const atWushu = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atWushu();
+  // standing at the xiangqi pavilion in Beijing: F starts a game against a practice bot at once
+  const atXiangqi = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atXiangqi();
+  function playXiangqi() {
+    if (typeof Account !== "undefined" && Account.demo) { toast("Xiangqi against others (or the bot) needs the game server, so it needs an account: log in first."); return; }
+    if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
+    send({ t: "queue", mode: "xiangqi", bot: true, practice: true });
+  }
   function playWushu() {
     if (typeof Account !== "undefined" && Account.demo) { toast("The wushu bout needs the game server, so it needs an account: log in first."); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
@@ -413,6 +420,7 @@ const Online = (() => {
     $o("on-ball").addEventListener("click", () => queue("ball"));
     $o("on-dragon").addEventListener("click", () => queue("dragon"));
     $o("on-wushu").addEventListener("click", () => queue("wushu"));
+    $o("on-xiangqi").addEventListener("click", () => queue("xiangqi"));
     $o("on-team2").addEventListener("click", () => queue("team2"));
     $o("on-ship").addEventListener("change", () => Shipyard.choose(Number($o("on-ship").value)));
     $o("on-cancel").addEventListener("click", leaveQueue);
@@ -681,5 +689,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

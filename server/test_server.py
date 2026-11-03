@@ -1069,6 +1069,93 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)
 
+    # ---------------------------------------------------------------- xiangqi (Chinese chess)
+
+    def xq(self, rows):
+        """A board from ten strings of nine characters (row 0 first)."""
+        self.assertEqual(len(rows), 10)
+        return [ch for r in rows for ch in r]
+
+    def test_xiangqi_the_opening_position_has_44_legal_moves_each(self):
+        b = server.xq_parse(server.XQ_START)
+        self.assertEqual(len(b), 90)
+        self.assertEqual(len(server.xq_legal(b, 0)), 44)
+        self.assertEqual(len(server.xq_legal(b, 1)), 44)
+
+    def test_xiangqi_pieces_move_by_the_rules(self):
+        E = "........."
+        # a horse with its leg blocked, an elephant that cannot cross the river or jump a blocked eye, a cannon that needs a screen
+        b = self.xq([".....g...", E, E, E, E, E, E, "........H", E, "....G...."])
+        b[6 * 9 + 8] = "."
+        b[7 * 9 + 4] = "H"
+        b[7 * 9 + 5] = "P"                                                  # a friendly piece on the horse's right leg
+        moves = {(f, t) for f, t in server.xq_legal(b, 0) if f == 7 * 9 + 4}
+        self.assertNotIn((7 * 9 + 4, 6 * 9 + 6), moves)                      # blocked on that side
+        self.assertIn((7 * 9 + 4, 5 * 9 + 3), moves)                         # but the upward jumps work
+        b = self.xq([".....g...", E, E, E, E, E, "..E......", E, E, "....G...."])
+        e = {t for f, t in server.xq_legal(b, 0) if f == 6 * 9 + 2}
+        self.assertNotIn(4 * 9 + 0, e)                                       # never across the river
+        self.assertNotIn(4 * 9 + 4, e)
+        self.assertIn(8 * 9 + 0, e)
+        b = self.xq([".....g...", E, "c........", E, E, E, E, E, E, "....G...."])   # a black cannon with nothing to jump
+        self.assertTrue(all(t % 9 == 0 or t // 9 == 2 for f, t in server.xq_pseudo(b, 1) if f == 2 * 9))
+
+    def test_xiangqi_the_generals_may_not_face_each_other(self):
+        E = "........."
+        b = self.xq(["....g....", E, E, E, E, E, E, E, E, "....G...."])
+        self.assertTrue(server.xq_in_check(b, 0))                            # nothing between them: illegal position
+        b[4 * 9 + 4] = "P"
+        self.assertFalse(server.xq_in_check(b, 0))
+        # a pinned piece cannot leave the file (that would open the face-off)
+        moves = server.xq_legal(b, 0)
+        self.assertFalse(any(f == 4 * 9 + 4 and t % 9 != 4 for f, t in moves))
+
+    def test_xiangqi_checkmate_leaves_no_legal_move(self):
+        E = "........."
+        # two chariots on the back two ranks: the black general at the top has no escape
+        b = self.xq(["R...g....", "........R", E, E, E, E, E, E, E, "...G....."])
+        self.assertTrue(server.xq_in_check(b, 1))
+        self.assertEqual(server.xq_legal(b, 1), [])
+        b[17] = "."                                                           # take the second chariot away and the general can step down
+        self.assertTrue(len(server.xq_legal(b, 1)) > 0)
+
+    async def test_xiangqi_a_game_between_two_people(self):
+        ws, ms, room = await self.start_mini("xiangqi")
+        self.assertEqual((ms[0]["mode"], ms[0]["ranked"], ms[0]["you"], ms[1]["you"]), ("xiangqi", True, 0, 1))
+        room.task.cancel()
+        ws[1].send({"t": "move", "f": 12, "to": 21})                          # Ben moves out of turn: ignored
+        await asyncio.sleep(0.15)
+        self.assertEqual(room.moves_n, 0)
+        ws[0].send({"t": "move", "f": 0, "to": 80})                           # an illegal move: ignored
+        await asyncio.sleep(0.15)
+        self.assertEqual(room.moves_n, 0)
+        f, t = next(mv for mv in room.legal if room.board[mv[0]] == "C")      # a cannon move
+        ws[0].send({"t": "move", "f": f, "to": t})
+        await asyncio.sleep(0.2)
+        self.assertEqual((room.moves_n, room.turn), (1, 1))
+        ws[1].send({"t": "resign"})
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end["winner"], end["reason"]), ("xiangqi", 0, "resign"))
+        self.assertIn("rank", end)
+
+    async def test_xiangqi_practice_bot_answers_and_the_clock_loses_the_game(self):
+        server.CFG["bot_wait"] = 30.0
+        a = await self.player("Solo")
+        a.send({"t": "queue", "mode": "xiangqi", "bot": True, "practice": True})
+        m = await a.until(lambda m: m["t"] == "match", timeout=2)
+        self.assertFalse(m["ranked"])
+        room = next(c.room for c in server.CONNS if c.room)
+        room.task.cancel()
+        room.play(room.legal[0])                                              # you move ...
+        room.bot_at = 0.0
+        room.step(0.5)                                                        # ... and the bot answers
+        self.assertEqual((room.moves_n, room.turn), (2, 0))
+        room.clk[0] = 0.2
+        room.t_turn = time.monotonic() - 1.0
+        room.step(0.5)
+        end = await a.until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["winner"], end["reason"]), (1, "time"))
+
     # ---------------------------------------------------------------- wushu duel (Beijing)
 
     async def test_wushu_two_people_are_matched_bare_handed_and_ranked(self):

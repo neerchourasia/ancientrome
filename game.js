@@ -190,6 +190,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Online.atBallCourt()) Online.playBall();
       else if (k === "KeyF" && Online.atDock()) Online.playDragon();
       else if (k === "KeyF" && Online.atWushu()) Online.playWushu();
+      else if (k === "KeyF" && Online.atXiangqi()) Online.playXiangqi();
       else if (k === "KeyF" && Fishing.at()) Fishing.act();
       else if (k === "KeyF" && TreasureMaps.at()) TreasureMaps.act();
       else if (k === "KeyF" && Quests.at()) Quests.open();
@@ -267,6 +268,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "ball") { Online.playBall(); return; }
     if ($("#prompt").dataset.kind === "dragon") { Online.playDragon(); return; }
     if ($("#prompt").dataset.kind === "wushu") { Online.playWushu(); return; }
+    if ($("#prompt").dataset.kind === "xiangqi") { Online.playXiangqi(); return; }
     if ($("#prompt").dataset.kind === "fish") { Fishing.act(); return; }
     if ($("#prompt").dataset.kind === "dig") { TreasureMaps.act(); return; }
     if ($("#prompt").dataset.kind === "quest") { Quests.open(); return; }
@@ -306,7 +308,8 @@ function wireInput(canvas) {
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);
-  for (const b of document.querySelectorAll("#travel .tv-list button")) b.addEventListener("click", () => { closePanels(); travel(b.dataset.city); });
+  for (const b of document.querySelectorAll("#tv-cities button")) b.addEventListener("click", () => showArrivals(b.dataset.city));
+  $("#tv-back").addEventListener("click", showCities);
   $("#btn-map").addEventListener("click", toggleBigMap);
   $("#btn-places").addEventListener("click", togglePlaces);
   $("#btn-dirs").addEventListener("click", toggleDirections);
@@ -1193,10 +1196,35 @@ function openTravel() {
   if ($("#travel").classList.contains("show")) { closePanels(); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
   for (const b of document.querySelectorAll("#travel .tv-list button")) { b.disabled = b.dataset.city === city; b.classList.toggle("here", b.dataset.city === city); }
+  showCities();
   openPanel("#travel");
 }
 
-function travel(to) {
+// When you go to a city you choose where you arrive: the usual arrival point, or any of its places (your house, a landmark, the market...)
+const CITY_LIST = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún and Chichén Itzá", beijing: "Beijing" };
+function showCities() {
+  $("#tv-cities").hidden = false; $("#tv-places").hidden = true; $("#tv-sea").hidden = false;
+  for (const p of document.querySelectorAll("#travel .dnote")) p.hidden = false;
+}
+function showArrivals(c) {
+  const src = c === "delhi" ? DELHI_LANDMARKS : c === "cancun" ? CANCUN_LANDMARKS : c === "beijing" ? BEIJING_LANDMARKS : ROME_LANDMARKS;
+  const places = src.filter((l) => Array.isArray(l.stand) && l.name && !String(l.id).startsWith("e-") && (!l.only || l.only === era)).sort((a, b) => (b.home ? 1 : 0) - (a.home ? 1 : 0));
+  const list = $("#tv-places-list"); list.replaceChildren();
+  const mk = (icon, name, sub, lm) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.innerHTML = `<span class="tv-icon">${icon}</span><span><strong></strong><small></small></span>`;
+    b.querySelector("strong").textContent = name; b.querySelector("small").textContent = sub;
+    b.addEventListener("click", () => { closePanels(); travel(c, lm); });
+    list.append(b);
+  };
+  mk("✨", "The usual arrival point", "Where most visitors arrive", null);
+  for (const l of places) mk(l.home ? "🏠" : l.game ? "🎮" : "📍", l.name, l.sub || "", l);
+  $("#tv-places-title").textContent = `Where in ${CITY_LIST[c] || c}?`;
+  $("#tv-cities").hidden = true; $("#tv-places").hidden = false; $("#tv-sea").hidden = true;
+  for (const p of document.querySelectorAll("#travel .dnote")) p.hidden = true;
+}
+
+function travel(to, lm) {
   if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }
@@ -1205,13 +1233,13 @@ function travel(to) {
   Vitals.stopRest(); Nav.clear();
   $("#sleep").classList.add("on");
   setTimeout(() => {
-    try { arriveIn(to); } catch (err) { console.error(err); toast("Could not travel"); }
+    try { arriveIn(to, lm); } catch (err) { console.error(err); toast("Could not travel"); }
     $("#sleep").classList.remove("on");
     travelBusy = false;
   }, 900);
 }
 
-function arriveIn(to) {
+function arriveIn(to, lm) {
   city = to;
   if (to === "delhi") {
     Delhi.build(scene);
@@ -1232,9 +1260,10 @@ function arriveIn(to) {
   else if (to === "cancun") placeAt(Cancun.SPAWN.x, Cancun.SPAWN.z, Cancun.SPAWN.yaw);
   else if (to === "beijing") placeAt(Beijing.SPAWN.x, Beijing.SPAWN.z, Beijing.SPAWN.yaw);
   else placeAt(165, 6, Math.PI / 2);
+  if (lm && Array.isArray(lm.stand)) placeAt(lm.stand[0], lm.stand[1], yawToward(lm.stand[0], lm.stand[1], lm.x, lm.z));   // the place you chose
   player.pitch = -0.02;
   const modern = era === "modern";
-  const msg = to === "beijing" ? `Beijing: ${modern ? "the old capital and the new city today" : "the Ming capital, c. 1420"}. Walk north through the Gate of Heavenly Peace to the Forbidden City. The market stalls are east of the great square (press G, then The Market, for directions).` : to === "cancun" ? `Cancún and Chichén Itzá: ${modern ? "the ruins today, and the Hotel Zone on the coast" : "the Maya city around 1000 AD, and the coast"}. Climb El Castillo, the big pyramid in front of you. The market stalls are south of the plaza (press G, then The Market, for directions).` : to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort. The market stalls are in the square south of the Lahori Gate (press G, then The Market, for directions).` : "Back in Rome. The market square is south of the Forum (press G, then The Market).";
+  const msg = lm ? `You arrive at ${lm.name}.` : to === "beijing" ? `Beijing: ${modern ? "the old capital and the new city today" : "the Ming capital, c. 1420"}. Walk north through the Gate of Heavenly Peace to the Forbidden City. The market stalls are east of the great square (press G, then The Market, for directions).` : to === "cancun" ? `Cancún and Chichén Itzá: ${modern ? "the ruins today, and the Hotel Zone on the coast" : "the Maya city around 1000 AD, and the coast"}. Climb El Castillo, the big pyramid in front of you. The market stalls are south of the plaza (press G, then The Market, for directions).` : to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort. The market stalls are in the square south of the Lahori Gate (press G, then The Market, for directions).` : "Back in Rome. The market square is south of the Forum (press G, then The Market).";
   toast(msg);
   Narrator.say(to === "beijing" ? (modern ? "Welcome to Beijing, the old capital and the new city. Tiananmen Square is around you." : "Welcome to Beijing, the capital of the Ming emperor Yongle, around 1420. The Gate of Heavenly Peace is ahead of you.") : to === "cancun" ? (modern ? "Welcome to Cancún. The ruins of Chichén Itzá are around you, and the Caribbean coast is to the east." : "Welcome to Chichén Itzá, the great Maya city, around the year 1000. The pyramid of Kukulcán is in front of you.") : to === "delhi" ? (modern ? "Welcome to Old Delhi, as it stands today. The Red Fort is at the end of Chandni Chowk." : "Welcome to Shahjahanabad, the walled capital of the Mughal emperor Shah Jahan, around 1650. The Red Fort is at the end of Chandni Chowk.") : "Back in Rome.", { interrupt: true });
 }
@@ -1277,6 +1306,7 @@ function updatePrompt() {
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
     if (!text && Dresser.at(player.x, player.z, player.feet)) { text = "F: open your dresser (see what you can wear)"; p.dataset.kind = "dresser"; }
     if (!text && mode === "walk") { const sp = shovablePlayer().peer; if (sp) { text = `R: shove ${sp.name}`; p.dataset.kind = "shove"; } }
+    if (!text && Online.atXiangqi()) { text = "F: a game of xiangqi (Chinese chess) against a practice bot (to play a real person, use the PvP menu)"; p.dataset.kind = "xiangqi"; }
     if (!text && Online.atWushu()) { text = "F: a wushu bout against Master Li (to fight a real person, use the PvP menu)"; p.dataset.kind = "wushu"; }
     if (!text && Online.atDock()) { text = "F: race a dragon boat on Kunming Lake against three practice crews (to race real people, use the PvP menu)"; p.dataset.kind = "dragon"; }
     if (!text && Online.atBallCourt()) { text = "F: play pok-ta-pok against a practice bot (to play a real person, use the PvP menu)"; p.dataset.kind = "ball"; }
