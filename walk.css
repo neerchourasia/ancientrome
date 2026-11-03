@@ -146,6 +146,7 @@ body.photo > *:not(#view):not(#photo-bar):not(#dialog):not(script) { display: no
 .in-players b { color: var(--ink); }
 .in-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; font-size: 1.4rem; background: rgba(226,185,85,.14); border: 1px solid rgba(226,185,85,.35); }
 .in-icon.sm { margin-bottom: 8px; }
+.in-players > .in-icon { background: #000; border-color: #fff; }   /* (the For players icon: a white person in a black square with a white border) */
 .in-do { text-align: center; padding: 44px 0 10px; }
 .in-do h3 { margin: 0 0 22px; color: var(--gold); letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
 .in-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
