@@ -1244,6 +1244,223 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"weekly": {"week": 3, "scores": {"not a friend id": {"pts": 99}}, "prizes": {"zz": [1]}}})       # junk is ignored
         self.assertEqual(server.WEEKLY["scores"], {})
 
+    # ---------------------------------------------------------------- tournaments
+
+    def tourney_fresh(self):
+        server.TOURNEYS.clear(); server.TOURNEY_WON.clear(); server.TOURNEY_MADE.clear(); server.PRIZES.clear(); server.STATS.clear()
+        saved = (server.TOURNEY_GAP, server.TOURNEY_GRACE, server.TOURNEY_REMATCH)
+        server.TOURNEY_GAP = server.TOURNEY_REMATCH = 0.0
+        self.addCleanup(lambda: (setattr(server, "TOURNEY_GAP", saved[0]), setattr(server, "TOURNEY_GRACE", saved[1]), setattr(server, "TOURNEY_REMATCH", saved[2]),
+                                 server.TOURNEYS.clear(), server.TOURNEY_WON.clear(), server.TOURNEY_MADE.clear(), server.PRIZES.clear(), server.STATS.clear()))
+
+    def tourney_pure(self, kind, n):
+        """A running tournament of n people (nobody is online), the best seed first: fids 000000000001, 000000000002, ..."""
+        t = {"id": "t1", "kind": kind, "by": "", "state": "running", "created": 0, "start_at": 0, "cap": 16, "rounds": [], "out": {}, "ended": 0, "champ": "", "places": [],
+             "players": [{"f": "%012x" % i, "name": "P%d" % i, "seed": 1000 + 10 * (n - i)} for i in range(1, n + 1)]}
+        t["rounds"] = [server.tourney_deal(t, [p["f"] for p in t["players"]], True)]
+        server.TOURNEYS["t1"] = t
+        return t
+
+    def test_tourney_bracket_seeds_and_byes(self):
+        self.tourney_fresh()
+        self.assertEqual(server.tourney_seed_order(8), [1, 8, 4, 5, 2, 7, 3, 6])
+        t = self.tourney_pure("xiangqi", 6)                                              # 6 people: seeds 1 and 2 have byes
+        f = lambda i: "%012x" % i
+        self.assertEqual([m["ps"] for m in t["rounds"][0]], [[f(1)], [f(4), f(5)], [f(2)], [f(3), f(6)]])
+        self.assertEqual([m["st"] for m in t["rounds"][0]], ["done", "wait", "done", "wait"])
+        self.assertEqual([server.tourney_label(t, 0)], ["Quarterfinal"])
+
+    def test_tourney_two_player_rounds_go_on_and_the_final_gives_places_and_prizes(self):
+        self.tourney_fresh()
+        t = self.tourney_pure("kushti", 4)
+        f = lambda i: "%012x" % i
+        for m, win in zip(t["rounds"][0], (f(1), f(2))):                                  # semifinals: 1 v 4 and 2 v 3
+            server.tourney_settle(t, m, [win] + [x for x in m["ps"] if x != win])
+        server.tourney_round_done(t)
+        self.assertEqual([m["ps"] for m in t["rounds"][1]], [[f(1), f(2)]])
+        self.assertEqual(server.tourney_label(t, 1), "Final")
+        server.tourney_settle(t, t["rounds"][1][0], [f(2), f(1)])
+        server.tourney_round_done(t)
+        self.assertEqual((t["state"], t["champ"]), ("done", "P2"))
+        ranks = {p[1]: p[2] for p in t["places"]}
+        self.assertEqual((ranks["P2"], ranks["P1"]), (1, 2))
+        self.assertEqual({n for n, r in ranks.items() if r == 3}, {"P3", "P4"})
+        self.assertEqual([p["coins"] for p in server.PRIZES[f(2)]], [500])                # four or more people: there are prizes
+        self.assertEqual(server.PRIZES[f(3)][0]["rank"], 3)
+        self.assertEqual(server.STATS[f(2)]["tw"], 1)
+
+    def test_tourney_without_four_people_has_no_prizes_and_prizes_are_limited_each_day(self):
+        self.tourney_fresh()
+        t = self.tourney_pure("ball", 2)
+        server.tourney_settle(t, t["rounds"][0][0], ["%012x" % 1, "%012x" % 2])
+        server.tourney_round_done(t)
+        self.assertEqual((t["state"], server.PRIZES), ("done", {}))
+        for i in range(5):                                                               # one account winning again and again: three prizes a day
+            t = self.tourney_pure("ball", 4)
+            t["id"] = "t%d" % (i + 2)
+            for m in t["rounds"][0]:
+                server.tourney_settle(t, m, [m["ps"][0], m["ps"][1]])
+            server.tourney_round_done(t)
+            server.tourney_settle(t, t["rounds"][1][0], ["%012x" % 1, "%012x" % 2])
+            server.tourney_round_done(t)
+        self.assertEqual(len(server.PRIZES["%012x" % 1]), 3)
+
+    def test_tourney_dragon_boats_race_in_heats_and_half_of_each_go_on(self):
+        self.tourney_fresh()
+        t = self.tourney_pure("dragon", 5)
+        f = lambda i: "%012x" % i
+        self.assertEqual(sorted(len(m["ps"]) for m in t["rounds"][0]), [2, 3])            # heats of 3 and 2, seeds dealt like a snake
+        self.assertEqual(sorted(m["adv"] for m in t["rounds"][0]), [1, 2])
+        for m in t["rounds"][0]:
+            server.tourney_settle(t, m, list(m["ps"]))
+        server.tourney_round_done(t)
+        self.assertEqual((len(t["rounds"][1]), len(t["rounds"][1][0]["ps"]), t["rounds"][1][0]["adv"]), (1, 3, 3))
+        self.assertEqual(server.tourney_label(t, 1), "Final")
+        server.tourney_settle(t, t["rounds"][1][0], list(reversed(t["rounds"][1][0]["ps"])))
+        server.tourney_round_done(t)
+        self.assertEqual([p[2] for p in t["places"]], [1, 2, 3])
+        self.assertEqual(t["state"], "done")
+        t = self.tourney_pure("dragon", 16)                                              # sixteen boats: four heats, then two, then the final
+        self.assertEqual([len(m["ps"]) for m in t["rounds"][0]], [4, 4, 4, 4])
+        for m in t["rounds"][0]:
+            server.tourney_settle(t, m, list(m["ps"]))
+        server.tourney_round_done(t)
+        self.assertEqual([len(m["ps"]) for m in t["rounds"][1]], [4, 4])
+
+    def test_tourney_draws_are_replayed_and_the_third_draw_goes_to_the_better_seed(self):
+        self.tourney_fresh()
+        t = self.tourney_pure("xiangqi", 2)
+        m = t["rounds"][0][0]
+        for n in (1, 2):
+            m["st"], m["room"] = "live", "r%d" % n
+            server.tourney_done(("t1", 0, 0, "r%d" % n), [])
+            self.assertEqual((m["st"], m["tries"]), ("wait", n))
+        m["st"], m["room"] = "live", "r3"
+        server.tourney_done(("t1", 0, 0, "r3"), [])
+        self.assertEqual((m["st"], m["w"]), ("done", ["%012x" % 1]))
+        server.tourney_done(("t1", 0, 0, "r3"), ["%012x" % 2])                          # (a late or repeated report changes nothing)
+        self.assertEqual(m["w"], ["%012x" % 1])
+
+    async def test_tourney_sign_up_play_a_real_xiangqi_bracket_and_a_missing_player_is_out(self):
+        self.accounts("ann", "ben", "cy", "dee")
+        self.tourney_fresh()
+        server.TOURNEY_GRACE = 0.0
+        guest = await self.player("Guest")
+        guest.send({"t": "tourney", "a": "create", "kind": "xiangqi", "cap": 8})
+        self.assertIn("Log in", (await guest.until(lambda m: m["t"] == "tourney"))["msg"])
+        ann, ben, cy, dee = [await self.player(n.title(), token=n) for n in ("ann", "ben", "cy", "dee")]
+        ann.send({"t": "tourney", "a": "create", "kind": "xiangqi", "cap": 9})                # (only 8 or 16)
+        await asyncio.sleep(0.2)
+        self.assertEqual(server.TOURNEYS, {})
+        ann.send({"t": "tourney", "a": "create", "kind": "xiangqi", "cap": 8})
+        v = await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        self.assertEqual((v["state"], v["players"], v["joined"]), ("open", ["Ann"], True))
+        tid = v["id"]
+        ben.send({"t": "tourney", "a": "create", "kind": "xiangqi", "cap": 8})                # one open sign-up for each game
+        self.assertIn("already one open", (await ben.until(lambda m: m["t"] == "tourney"))["msg"])
+        for w in (ben, cy, dee):
+            w.send({"t": "tourney", "a": "join", "id": tid})
+            await w.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        ben.send({"t": "tourney", "a": "list"})
+        row = (await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "list"))["list"][0]
+        self.assertEqual((row["n"], row["state"], row["joined"]), (4, "open", True))
+        dee.w.close()                                                                      # Dee goes offline before the start: dropped
+        await asyncio.sleep(0.2)
+        server.TOURNEYS[tid]["start_at"] = 0
+        server.tourney_tick()
+        t = server.TOURNEYS[tid]
+        self.assertEqual((t["state"], len(t["players"])), ("running", 3))
+        names = {p["f"]: p["name"] for p in t["players"]}
+        ws = {f: next(w for w in (ann, ben, cy) if w is not None and names[f] == {ann: "Ann", ben: "Ben", cy: "Cy"}[w]) for f in names}
+        # three people: one has a bye, the other two play the first match
+        match = next(m for m in t["rounds"][0] if len(m["ps"]) == 2)
+        server.tourney_tick()                                                            # the call goes out...
+        call = await ws[match["ps"][0]].until(lambda m: m["t"] == "tourney" and m["a"] == "call")
+        self.assertEqual((call["kind"], call["label"]), ("xiangqi", "Semifinal"))
+        server.tourney_tick()                                                            # ...and then the match starts by itself
+        for f in match["ps"]:
+            await ws[f].until(lambda m: m["t"] == "match" and m["mode"] == "xiangqi")
+        self.assertEqual(match["st"], "live")
+        self.assertEqual([(r["tour"]) for r in server.watch_list()], [True])               # it can be watched, and is marked
+        loser = match["ps"][1]
+        ws[loser].send({"t": "resign"})
+        await ws[match["ps"][0]].until(lambda m: m["t"] == "end")
+        server.tourney_tick()
+        self.assertEqual(match["w"], [match["ps"][0]])
+        final = t["rounds"][1][0]
+        self.assertEqual(sorted(final["ps"]), sorted([match["ps"][0], next(f for f in names if f not in match["ps"])]))
+        server.tourney_tick()
+        server.tourney_tick()
+        for f in final["ps"]:
+            await ws[f].until(lambda m: m["t"] == "match" and m["mode"] == "xiangqi")
+        ws[final["ps"][1]].send({"t": "resign"})
+        await ws[final["ps"][0]].until(lambda m: m["t"] == "end")
+        server.tourney_tick()
+        self.assertEqual((t["state"], t["champ"]), ("done", names[final["ps"][0]]))
+        self.assertEqual(server.PRIZES, {})                                              # (three people: no prizes)
+
+    async def test_tourney_a_player_who_does_not_turn_up_loses_by_walkover(self):
+        self.accounts("ann", "ben")
+        self.tourney_fresh()
+        server.TOURNEY_GRACE = 0.0
+        ann, ben = await self.player("Ann", token="ann"), await self.player("Ben", token="ben")
+        ann.send({"t": "tourney", "a": "create", "kind": "kites", "cap": 8})
+        tid = (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "view"))["id"]
+        ben.send({"t": "tourney", "a": "join", "id": tid})
+        await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        server.TOURNEY_GAP = 100.0
+        server.TOURNEYS[tid]["start_at"] = 0
+        server.tourney_tick()                                                            # the tournament starts
+        server.tourney_tick()                                                            # the call goes out: the match is in 100 seconds
+        t = server.TOURNEYS[tid]
+        m = t["rounds"][0][0]
+        self.assertEqual(m["st"], "wait")
+        ben.send({"t": "queue", "mode": "xiangqi", "bot": True})                          # Ben is busy in a game of his own
+        await ben.until(lambda m: m["t"] == "match", timeout=4)
+        m["call"] = 0.0
+        server.tourney_tick()                                                            # the time has come and a minute (here none) of grace is up
+        self.assertEqual((m["st"], m["order"][0]), ("done", next(p["f"] for p in t["players"] if p["name"] == "Ann")))
+        server.tourney_tick()
+        self.assertEqual((t["state"], t["champ"]), ("done", "Ann"))
+
+    async def test_tourney_rules_one_at_a_time_full_and_leaving(self):
+        self.accounts("ann", "ben", "cy")
+        self.tourney_fresh()
+        ann, ben, cy = [await self.player(n.title(), token=n) for n in ("ann", "ben", "cy")]
+        ann.send({"t": "tourney", "a": "create", "kind": "ball", "cap": 8})
+        tid = (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "view"))["id"]
+        ann.send({"t": "tourney", "a": "create", "kind": "dragon", "cap": 8})             # already in one
+        self.assertIn("already", (await ann.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+        server.TOURNEYS[tid]["cap"] = 2
+        ben.send({"t": "tourney", "a": "join", "id": tid})
+        await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "view")
+        cy.send({"t": "tourney", "a": "join", "id": tid})
+        self.assertIn("full", (await cy.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+        server.tourney_tick()                                                            # a full tournament starts soon, not in four minutes
+        self.assertLess(server.TOURNEYS[tid]["start_at"] - time.time(), server.TOURNEY_FULL + 1)
+        ben.send({"t": "tourney", "a": "leave", "id": tid})
+        await ben.until(lambda m: m["t"] == "tourney" and m["a"] == "left")
+        self.assertEqual([p["name"] for p in server.TOURNEYS[tid]["players"]], ["Ann"])
+        server.TOURNEYS[tid]["start_at"] = 0
+        server.tourney_tick()                                                            # one person is not a tournament
+        self.assertEqual(server.TOURNEYS[tid]["state"], "cancelled")
+        cy.send({"t": "tourney", "a": "get", "id": "nothere"})
+        self.assertIn("over", (await cy.until(lambda m: m["t"] == "tourney" and m["a"] == "no"))["msg"])
+
+    def test_tourney_is_saved_and_a_match_that_was_live_waits_again(self):
+        self.tourney_fresh()
+        t = self.tourney_pure("xiangqi", 4)
+        m = t["rounds"][0][0]
+        m["st"], m["room"], m["call"] = "live", "abc", 5.0
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.TOURNEYS.clear()
+        server.world_apply(snap)
+        t2 = server.TOURNEYS["t1"]
+        self.assertEqual((t2["state"], len(t2["players"]), len(t2["rounds"][0])), ("running", 4, 2))
+        self.assertEqual((t2["rounds"][0][0]["st"], t2["rounds"][0][0]["room"], t2["rounds"][0][0]["call"]), ("wait", None, None))
+        server.world_apply({"tourneys": {"x": {"id": "x", "kind": "chess", "state": "open"}, "y": 5}})              # junk is ignored
+        self.assertEqual(server.TOURNEYS, {})
+
     # ---------------------------------------------------------------- watching a match
 
     async def test_watch_a_match_between_two_people(self):

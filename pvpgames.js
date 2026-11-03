@@ -553,7 +553,7 @@ const Mini = (() => {
     if (!list.length) { const p = document.createElement("p"); p.className = "dnote"; p.textContent = "No match between real people is on right now. Start one in Play online, then others can watch you."; body.append(p); return; }
     for (const r of list) {
       const row = document.createElement("div"); row.className = "sp-row";
-      const t = document.createElement("span"); t.textContent = `${SPEC_NAMES[r.kind] || r.kind}: ${r.names.join(" vs ")}  ·  ${Math.floor(r.sec / 60)} min${r.n ? `  ·  👀 ${r.n}` : ""}`;
+      const t = document.createElement("span"); t.textContent = `${r.tour ? "🏟️ " : ""}${SPEC_NAMES[r.kind] || r.kind}: ${r.names.join(" vs ")}  ·  ${Math.floor(r.sec / 60)} min${r.n ? `  ·  👀 ${r.n}` : ""}`;
       const b = document.createElement("button"); b.type = "button"; b.textContent = "Watch";
       b.addEventListener("click", () => { closePanels(); send({ t: "watch", a: "join", room: r.room }); });
       row.append(t, b); body.append(row);

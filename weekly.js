@@ -41,7 +41,7 @@ const Weekly = (() => {
       Vitals.coins += coins; paid.push(p.id); paid = paid.slice(-50);
       try { localStorage.setItem(KEY, JSON.stringify(paid)); } catch (e) { /* ignore */ }
       Sfx.play("medal");
-      toast(`🏆 ${p.theme}: you finished number ${p.rank} with ${p.pts} points! +${coins} denarii.`);
+      toast(p.tour ? `🏟️ ${p.theme}: you finished number ${p.rank}! +${coins} denarii.` : `🏆 ${p.theme}: you finished number ${p.rank} with ${p.pts} points! +${coins} denarii.`);
     }
     if (ids.length) send({ a: "ack", ids });
   }

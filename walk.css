@@ -852,3 +852,9 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #tclip-text b { display: block; font: 700 clamp(1.6rem, 4.5vw, 3rem) Georgia, serif; }
 #tclip-text small { display: block; margin-top: 6px; font-size: clamp(.9rem, 2vw, 1.2rem); opacity: .9; }
 #tclip-skip { position: absolute; right: 18px; bottom: 16px; padding: 6px 14px; font-size: .9rem; background: rgba(0,0,0,.45); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 999px; cursor: pointer; }
+
+/* tournaments */
+.tn-back { margin-bottom: 6px; }
+.tn-round { margin: 12px 0 2px; font: 700 .95rem Georgia, serif; color: var(--gold); }
+.sp-row.tn-me { background: rgba(255, 210, 120, .08); border-radius: 6px; padding-left: 6px; }
+#tn-body .gd-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
