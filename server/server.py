@@ -3747,7 +3747,7 @@ def guild_of(conn):
 def guild_state(g, conn=None):
     mem = [{"fid": f, "name": n, "online": bool(conns_of(f)), "leader": f == g["leader"]} for f, n in g["members"].items()]
     mem.sort(key=lambda r: (not r["leader"], not r["online"], r["name"].lower()))
-    return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX}}
+    return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX, "motd": g.get("motd", "")}}
 
 
 def guild_push(g):
@@ -3822,6 +3822,14 @@ def on_guild(conn, a, m):
         conn.ctok -= 1
         g["chat"].append({"name": conn.name, "text": text, "ts": int(time.time())})
         del g["chat"][:-40]
+        return guild_push(g)
+    if a == "g_motd":
+        if g["leader"] != conn.fid:
+            return social_msg(conn, "Only the guild leader can do that.")
+        g["motd"] = clean_chat(m.get("text"))[:140]
+        if g["motd"]:
+            guild_say(g, "The leader's message: " + g["motd"])
+        world_soon()
         return guild_push(g)
     if a == "g_dep":
         n = int(num(m.get("n"), 0, GUILD_DEP_MAX, 0))
@@ -4203,6 +4211,66 @@ def on_profile(conn, m):
     conn.send(profile_view(fid))
 
 
+# ---------------------------------------------------------------- the bulletin board of each city
+# A notice board in each city (menu: People, Bulletin board): players with an account can pin a short notice (120 letters) for a week. Up to 20 notices a city, one new notice from a person
+# every ten minutes, and you can take your own down. Notices are saved with the rest of the world.
+NOTICES = {}               # city -> [{"id", "fid", "name", "text", "t"}], oldest first
+NOTICE_CITIES = ("rome", "delhi", "cancun", "beijing")
+NOTICE_MAX, NOTICE_LIFE, NOTICE_GAP, NOTICE_LEN = 20, 7 * 86400, 600.0, 120
+NOTICE_LAST = {}           # friend id -> when they last pinned one
+
+
+def notices_live(city):
+    t = time.time()
+    rows = [n for n in NOTICES.get(city, []) if t - n["t"] < NOTICE_LIFE]
+    if rows:
+        NOTICES[city] = rows
+    else:
+        NOTICES.pop(city, None)
+    return rows
+
+
+def notice_view(conn, city):
+    return {"t": "notice", "a": "list", "c": city, "posts": [{"id": n["id"], "name": n["name"], "text": n["text"], "t": int(n["t"]), "mine": bool(conn.fid) and n["fid"] == conn.fid} for n in reversed(notices_live(city))]}
+
+
+def on_notice(conn, m):
+    city = m.get("c")
+    if city not in NOTICE_CITIES:
+        return
+    a = m.get("a")
+    if a == "get":
+        return conn.send(notice_view(conn, city))
+    if not conn.fid:
+        return conn.send({"t": "notice", "a": "no", "msg": "Log in to your account to use the notice board."})
+    if a == "del":
+        before = len(NOTICES.get(city, []))
+        NOTICES[city] = [n for n in NOTICES.get(city, []) if not (n["id"] == m.get("id") and (n["fid"] == conn.fid or conn.admin))]
+        if len(NOTICES[city]) != before:
+            world_soon()
+        return conn.send(notice_view(conn, city))
+    if a != "post":
+        return
+    t = time.time()
+    if t < conn.muted_until:
+        return conn.send({"t": "notice", "a": "no", "msg": "You are muted for a while."})
+    wait = NOTICE_GAP - (t - NOTICE_LAST.get(conn.fid, 0.0))
+    if wait > 0:
+        return conn.send({"t": "notice", "a": "no", "msg": "You can pin another notice in %d minute(s)." % (int(wait / 60) + 1)})
+    raw = str(m.get("text") or "")
+    text = clean_chat(raw)[:NOTICE_LEN]
+    if len(text) < 3:
+        return conn.send({"t": "notice", "a": "no", "msg": "A notice needs a few words."})
+    if BAD_WORDS.search(raw):
+        flag("swearing on a notice board", text[:100], "low", conn=conn, gap=120)
+    NOTICE_LAST[conn.fid] = t
+    rows = notices_live(city)
+    rows.append({"id": os.urandom(3).hex(), "fid": conn.fid, "name": conn.name, "text": text, "t": t})
+    NOTICES[city] = rows[-NOTICE_MAX:]
+    world_soon()
+    conn.send(notice_view(conn, city))
+
+
 def on_replay(conn, m):
     rid = m.get("id")
     rp = next((r for r in REPLAYS if r["id"] == rid), None) if isinstance(rid, str) else None
@@ -4413,7 +4481,7 @@ def on_social(conn, m):
         return on_event_time(conn, m)
     if a == "ev_top":
         return on_event_top(conn, m)
-    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick"):
+    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd"):
         return on_guild(conn, a, m)
     if a == "leaders":
         return conn.send(dict(top_boards(), t="leaders"))
@@ -4625,6 +4693,8 @@ async def handle_msg(conn, m):
         return on_watch(conn, m)
     if t == "profile":
         return on_profile(conn, m)
+    if t == "notice":
+        return on_notice(conn, m)
     if t == "replay":
         return on_replay(conn, m)
     if t == "board":
@@ -4876,7 +4946,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES}
 
 
 def world_apply(rows):
@@ -4889,6 +4959,7 @@ def world_apply(rows):
             if isinstance(v, dict) and isinstance(v.get("members"), dict) and v.get("leader") in v["members"] and isinstance(v.get("chat"), list):
                 v["chat"] = v["chat"][-40:]
                 v["treasury"] = int(num(v.get("treasury"), 0, 1e12, 0))
+                v["motd"] = str(v.get("motd", ""))[:140]
                 v["paid"] = v["paid"] if isinstance(v.get("paid"), list) and len(v["paid"]) == 2 else [0.0, 0]
                 GUILDS[k] = v
         for f, k in g["of"].items():
@@ -4933,6 +5004,13 @@ def world_apply(rows):
         for r in (sp.get("replays") if isinstance(sp.get("replays"), list) else [])[-REPLAYS_MAX:]:
             if isinstance(r, dict) and isinstance(r.get("id"), str) and isinstance(r.get("mv"), list) and isinstance(r.get("names"), list):
                 REPLAYS.append({"id": r["id"][:12], "k": "xiangqi", "names": [str(n)[:24] for n in r["names"][:2]], "w": int(num(r.get("w"), -1, 1, -1)), "mv": [[int(num(a, 0, 89, 0)), int(num(b, 0, 89, 0))] for a, b in [m for m in r["mv"][:300] if isinstance(m, list) and len(m) == 2]], "t": int(num(r.get("t"), 0, 4e9, 0))})
+    nt = rows.get("notices")
+    if isinstance(nt, dict):
+        NOTICES.clear()
+        for c, lst in nt.items():
+            if c in NOTICE_CITIES and isinstance(lst, list):
+                NOTICES[c] = [{"id": str(n.get("id"))[:12], "fid": n.get("fid") if clean_fid(n.get("fid")) else "", "name": str(n.get("name", ""))[:24], "text": str(n.get("text", ""))[:NOTICE_LEN], "t": float(num(n.get("t"), 0, 4e9, 0))}
+                              for n in lst[-NOTICE_MAX:] if isinstance(n, dict)]
     py = rows.get("pyramid")
     if isinstance(py, dict):
         PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})

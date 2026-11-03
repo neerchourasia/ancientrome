@@ -1280,6 +1280,65 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         no = await ws[0].until(lambda m: m["t"] == "watch" and m["a"] == "no")
         self.assertIn("own game", no["msg"])
 
+    async def test_guild_leader_sets_a_message_of_the_day(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear()
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear()))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["members"]) == 2)
+        bob.send({"t": "social", "a": "g_motd", "text": "Bob is the boss now"})                  # only the leader can
+        self.assertIn("leader", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_motd", "text": "Meet at the Colosseum at dusk"})
+        st = await bob.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["motd"])
+        self.assertEqual(st["g"]["motd"], "Meet at the Colosseum at dusk")
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.GUILDS.clear(); server.GUILD_OF.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.GUILDS["red eagles"]["motd"], "Meet at the Colosseum at dusk")      # and it is saved
+
+    # ---------------------------------------------------------------- the bulletin boards
+
+    async def test_notice_board_post_list_delete_and_limits(self):
+        server.NOTICES.clear(); server.NOTICE_LAST.clear()
+        self.addCleanup(lambda: (server.NOTICES.clear(), server.NOTICE_LAST.clear()))
+        self.accounts("ann", "bob")
+        ann, bob, guest = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Guest")
+        guest.send({"t": "notice", "a": "post", "c": "rome", "text": "hello from a guest"})
+        self.assertIn("Log in", (await guest.until(lambda m: m["t"] == "notice" and m["a"] == "no"))["msg"])      # guests can read but not write
+        ann.send({"t": "notice", "a": "post", "c": "rome", "text": "Selling a mule, ask at the Forum"})
+        v = await ann.until(lambda m: m["t"] == "notice" and m["a"] == "list")
+        self.assertEqual([(p["name"], p["text"], p["mine"]) for p in v["posts"]], [("Ann", "Selling a mule, ask at the Forum", True)])
+        ann.send({"t": "notice", "a": "post", "c": "rome", "text": "a second one straight away"})              # one every ten minutes
+        self.assertIn("minute", (await ann.until(lambda m: m["t"] == "notice" and m["a"] == "no"))["msg"])
+        guest.send({"t": "notice", "a": "get", "c": "rome"})
+        seen = await guest.until(lambda m: m["t"] == "notice" and m["a"] == "list")
+        self.assertEqual((len(seen["posts"]), seen["posts"][0]["mine"]), (1, False))
+        guest.send({"t": "notice", "a": "get", "c": "delhi"})                                                  # each city has its own board
+        self.assertEqual((await guest.until(lambda m: m["t"] == "notice" and m["a"] == "list" and m["c"] == "delhi"))["posts"], [])
+        bob.send({"t": "notice", "a": "del", "c": "rome", "id": seen["posts"][0]["id"]})                       # you cannot take down someone else's
+        after = await bob.until(lambda m: m["t"] == "notice" and m["a"] == "list")
+        self.assertEqual(len(after["posts"]), 1)
+        ann.send({"t": "notice", "a": "del", "c": "rome", "id": seen["posts"][0]["id"]})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "notice" and m["a"] == "list" and not m["posts"]))["posts"], [])
+        bob.send({"t": "notice", "a": "post", "c": "atlantis", "text": "no such city"})                         # an unknown city is ignored
+        bob.send({"t": "notice", "a": "post", "c": "beijing", "text": "x"})                                    # too short
+        self.assertIn("few words", (await bob.until(lambda m: m["t"] == "notice" and m["a"] == "no"))["msg"])
+
+    def test_notice_board_old_notices_expire_and_are_saved(self):
+        server.NOTICES.clear()
+        self.addCleanup(server.NOTICES.clear)
+        now = time.time()
+        server.NOTICES["cancun"] = [{"id": "old", "fid": "aaaaaaaaaaaa", "name": "Ann", "text": "ancient news", "t": now - 8 * 86400},
+                                    {"id": "new", "fid": "aaaaaaaaaaaa", "name": "Ann", "text": "fresh news", "t": now - 3600}]
+        self.assertEqual([n["id"] for n in server.notices_live("cancun")], ["new"])                          # a week old: gone
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.NOTICES.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.NOTICES["cancun"][0]["text"], "fresh news")
+
     # ---------------------------------------------------------------- profiles and replays
 
     def test_profile_collects_results_history_and_cups(self):

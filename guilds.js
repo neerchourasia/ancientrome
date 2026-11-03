@@ -1,7 +1,7 @@
 "use strict";
 // Guilds: a small club of players (with accounts) with a name, a tag, a chat of their own and a shared treasury. 🛡 Guild in the menu: found one (500 denarii) or join
 // one from the list; members chat, put denarii in the treasury and the leader can pay members out of it (up to 3,000 an hour) or send someone away.
-// The guild's tag shows before your name in the main chat. The server keeps guilds in memory only, and the numbers come from each player's own game.
+// The guild's tag shows before your name in the main chat. The game server keeps guilds and saves them when it restarts. The leader can pin a message of the day. The numbers come from each player's own game.
 // Depends on online.js (Online.navalSend, Online.connected), vitals.js, dialog.js and the globals of game.js.
 
 const Guilds = (() => {
@@ -19,6 +19,7 @@ const Guilds = (() => {
       $g("gd-money").textContent = `Treasury: ${mine.treasury.toLocaleString()} denarii · ${mine.members.length} of ${mine.max} members`;
       const ul = $g("gd-members"); ul.replaceChildren();
       const lead = mine.me && mine.members.some((m) => m.fid === mine.me && m.leader);
+      $g("gd-motd").hidden = !mine.motd; $g("gd-motd").textContent = mine.motd ? `📜 ${mine.motd}` : ""; $g("gd-setmotd").hidden = !lead;
       for (const m of mine.members) {
         const li = el("li", `${m.online ? "● " : "○ "}${m.name}${m.leader ? " 👑" : ""}`);
         if (lead && m.fid !== mine.me) {
@@ -72,6 +73,7 @@ const Guilds = (() => {
       if (n > Vitals.coins) { toast("You do not have that much."); return; }
       send({ a: "g_dep", n });
     }));
+    $g("gd-setmotd").addEventListener("click", () => Dialog.ask("A message for your guild (up to 140 letters; leave it empty to clear it)", mine && mine.motd || "").then((raw) => { if (raw !== null) send({ a: "g_motd", text: raw }); }));
     $g("gd-leave").addEventListener("click", () => Dialog.confirm("Leave your guild?").then((yes) => { if (yes) send({ a: "g_leave" }); }));
   }
   return { bind, on, open, get inGuild() { return !!mine; } };

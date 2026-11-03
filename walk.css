@@ -834,3 +834,7 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .pf-hist { margin: 4px 0 12px; padding-left: 0; list-style: none; font-size: .88rem; }
 .pf-hist li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 #mini-rp { display: flex; gap: 8px; }
+/* the bulletin board and the guild's message of the day */
+.bb-list { margin: 8px 0; padding-left: 0; list-style: none; font-size: .92rem; line-height: 1.45; }
+.bb-list li { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.gd-motd { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--gold); font-size: .9rem; }
