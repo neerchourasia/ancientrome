@@ -92,7 +92,7 @@ header small { font: 400 .8rem system-ui; color: var(--muted); margin-left: .5em
 #dialog .dbtns { display: flex; gap: 8px; justify-content: flex-end; }
 #dialog button { font: inherit; font-weight: 700; cursor: pointer; padding: 7px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); color: var(--ink); background: var(--panel); }
 #dialog #dlg-ok { color: #2a2118; background: var(--gold); border-color: var(--gold); }
-body.photo > *:not(#view):not(#photo-bar):not(#dialog):not(script) { display: none !important; }
+body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(script) { display: none !important; }
 #photo-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: rgba(28,22,16,.85); border: 1px solid rgba(226,185,85,.5); border-radius: 999px; font-size: .8rem; color: var(--muted); }
 #photo-bar[hidden] { display: none; }
 #photo-bar button { font: inherit; font-weight: 700; cursor: pointer; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); color: var(--ink); background: var(--panel); }
@@ -858,3 +858,13 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .tn-round { margin: 12px 0 2px; font: 700 .95rem Georgia, serif; color: var(--gold); }
 .sp-row.tn-me { background: rgba(255, 210, 120, .08); border-radius: 6px; padding-left: 6px; }
 #tn-body .gd-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+/* photo mode: looks, the shutter flash, and a bar that wraps on a phone */
+#photo-bar { flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); border-radius: 18px; }
+#photo-looks { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+#photo-bar #photo-looks button { padding: 4px 10px; font-size: .78rem; }
+#photo-bar #photo-looks button.on { color: #2a2118; background: #e8d9a8; border-color: #e8d9a8; }
+#photo-bar > span { flex-basis: 100%; text-align: center; }
+#photo-flash { position: fixed; inset: 0; z-index: 41; background: #fff; opacity: 0; pointer-events: none; }
+#photo-flash.go { animation: photoflash .35s ease-out; }
+@keyframes photoflash { 0% { opacity: .85; } 100% { opacity: 0; } }

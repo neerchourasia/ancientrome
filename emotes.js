@@ -2,7 +2,8 @@
 // Emotes and photo mode.
 // EMOTES: 😀 Emotes in the menu: wave, dance, bow, cheer, clap or laugh. Your character does it for three seconds (moving stops it) and the other players near you see it too.
 // PHOTO MODE: 📷 Photo in the menu hides everything except the world: turn and zoom the camera as usual (C changes the view), press Take photo to save a picture
-//   (a PNG with a small "Time Machine" caption), and Esc or Exit to come back. Depends on game.js (avatar parts, renderer, scene, camera) and online.js.
+//   (a PNG with a small "Time Machine" caption; Enter does the same), choose a look (sepia, black and white, vivid or a postcard with a white border), Share it where the browser can
+//   (phones), and Esc or Exit to come back. Depends on game.js (avatar parts, renderer, scene, camera) and online.js.
 
 const Emotes = (() => {
   const LIST = [["wave", "👋 Wave"], ["dance", "💃 Dance"], ["bow", "🙇 Bow"], ["cheer", "🙌 Cheer"], ["clap", "👏 Clap"], ["laugh", "😂 Laugh"]];
@@ -55,32 +56,76 @@ const Emotes = (() => {
 })();
 
 const Photo = (() => {
-  let on = false;
+  let on = false, look = "none";
   const bar = () => document.getElementById("photo-bar");
+  const LOOKS = { none: "Normal", sepia: "Sepia", bw: "Black & white", vivid: "Vivid", card: "Postcard" };
+  const PREVIEW = { none: "", sepia: "sepia(.85) contrast(1.05)", bw: "grayscale(1) contrast(1.1)", vivid: "saturate(1.45) contrast(1.08)", card: "sepia(.25) saturate(1.1)" };
   function enter() {
     if (mode !== "walk" && mode !== "drive") { toast("Photo mode works while you are walking or driving."); return; }
-    closePanels(); on = true; document.body.classList.add("photo"); bar().hidden = false;
+    closePanels(); on = true; document.body.classList.add("photo"); bar().hidden = false; setLook(look);
     addEventListener("keydown", onKey, true);
   }
-  function exit() { on = false; document.body.classList.remove("photo"); bar().hidden = true; removeEventListener("keydown", onKey, true); }
-  function onKey(e) { if (e.code === "Escape") { e.preventDefault(); e.stopPropagation(); exit(); } }
+  function exit() { on = false; document.body.classList.remove("photo"); bar().hidden = true; renderer.domElement.style.filter = ""; removeEventListener("keydown", onKey, true); }
+  function onKey(e) { if (e.code === "Escape") { e.preventDefault(); e.stopPropagation(); exit(); } else if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); e.stopPropagation(); take(); } }
+  function setLook(k) {
+    look = LOOKS[k] ? k : "none"; renderer.domElement.style.filter = PREVIEW[look];
+    for (const b of document.querySelectorAll("#photo-looks button")) b.classList.toggle("on", b.dataset.look === look);
+  }
 
-  // save what the camera sees as a PNG, with a small caption in the corner
-  function take() {
+  // the colour change is done on the pixels (the CSS filter on the page does not reach a saved picture)
+  function grade(g, w, h) {
+    if (look === "none") return;
+    const img = g.getImageData(0, 0, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], gg = d[i + 1], b = d[i + 2], y = 0.299 * r + 0.587 * gg + 0.114 * b;
+      if (look === "bw") { const v = Math.max(0, Math.min(255, (y - 128) * 1.1 + 128)); d[i] = d[i + 1] = d[i + 2] = v; }
+      else if (look === "sepia" || look === "card") {
+        const k = look === "sepia" ? 1 : 0.35, sr = 0.393 * r + 0.769 * gg + 0.189 * b, sg = 0.349 * r + 0.686 * gg + 0.168 * b, sb = 0.272 * r + 0.534 * gg + 0.131 * b;
+        d[i] = Math.min(255, r + (sr - r) * k); d[i + 1] = Math.min(255, gg + (sg - gg) * k); d[i + 2] = Math.min(255, b + (sb - b) * k);
+      } else if (look === "vivid") {
+        const c = (v) => Math.max(0, Math.min(255, (v - 128) * 1.08 + 128));
+        d[i] = c(y + (r - y) * 1.45); d[i + 1] = c(y + (gg - y) * 1.45); d[i + 2] = c(y + (b - y) * 1.45);
+      }
+    }
+    g.putImageData(img, 0, 0);
+  }
+
+  // what the camera sees as a PNG, with a small caption in the corner (a postcard look adds a white border and a bigger caption)
+  function picture(done) {
     renderer.render(scene, camera);                                         // (drawn and read in the same moment, so the picture is not empty)
-    const src = renderer.domElement, c = document.createElement("canvas");
-    c.width = src.width; c.height = src.height;
-    const g = c.getContext("2d"); g.drawImage(src, 0, 0);
-    const s = Math.max(14, Math.round(c.height / 40));
-    g.font = `bold ${s}px Georgia, serif`; g.textAlign = "right"; g.fillStyle = "rgba(0,0,0,.55)"; g.fillText(`Time Machine · ${typeof ERA_NAMES !== "undefined" && ERA_NAMES[city] ? ERA_NAMES[city][era === "modern" ? 1 : 0] : city}`, c.width - s + 2, c.height - s + 2);
-    g.fillStyle = "#fff"; g.fillText(`Time Machine · ${typeof ERA_NAMES !== "undefined" && ERA_NAMES[city] ? ERA_NAMES[city][era === "modern" ? 1 : 0] : city}`, c.width - s, c.height - s);
-    c.toBlob((blob) => {
+    const src = renderer.domElement, caption = `Time Machine · ${typeof ERA_NAMES !== "undefined" && ERA_NAMES[city] ? ERA_NAMES[city][era === "modern" ? 1 : 0] : city}`;
+    const w = src.width, h = src.height, c = document.createElement("canvas"), g0 = c.getContext("2d");
+    const s = Math.max(14, Math.round(h / 40)), card = look === "card", pad = card ? Math.round(h / 22) : 0, foot = card ? Math.round(h / 12) : 0;
+    c.width = w + pad * 2; c.height = h + pad * 2 + foot;
+    if (card) { g0.fillStyle = "#f6f0e2"; g0.fillRect(0, 0, c.width, c.height); }
+    const tmp = document.createElement("canvas"); tmp.width = w; tmp.height = h; const tg = tmp.getContext("2d"); tg.drawImage(src, 0, 0); grade(tg, w, h); g0.drawImage(tmp, pad, pad);
+    if (card) { g0.font = `italic ${Math.round(s * 1.3)}px Georgia, serif`; g0.textAlign = "center"; g0.fillStyle = "#4a3b26"; g0.fillText(caption, c.width / 2, c.height - foot / 2 + s * 0.4); }
+    else { g0.font = `bold ${s}px Georgia, serif`; g0.textAlign = "right"; g0.fillStyle = "rgba(0,0,0,.55)"; g0.fillText(caption, c.width - s + 2, c.height - s + 2); g0.fillStyle = "#fff"; g0.fillText(caption, c.width - s, c.height - s); }
+    c.toBlob(done, "image/png");
+  }
+  function flash() { const f = document.getElementById("photo-flash"); if (!f) return; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
+  function take() {
+    flash();
+    picture((blob) => {
       if (!blob) { toast("The picture could not be saved."); return; }
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `time-machine-${Date.now()}.png`; document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       toast("Photo saved to your downloads.");
-    }, "image/png");
+    });
   }
-  function bind() { const t = document.getElementById("photo-take"), x = document.getElementById("photo-exit"); if (t) t.addEventListener("click", take); if (x) x.addEventListener("click", exit); }
-  return { enter, exit, take, bind, get on() { return on; } };
+  function share() {
+    flash();
+    picture(async (blob) => {
+      if (!blob) { toast("The picture could not be saved."); return; }
+      const file = new File([blob], "time-machine.png", { type: "image/png" });
+      try { await navigator.share({ files: [file], title: "Time Machine", text: "A photo from Time Machine" }); } catch (e) { if (e && e.name !== "AbortError") toast("Sharing did not work here: use Take photo to save it instead."); }
+    });
+  }
+  function bind() {
+    const t = document.getElementById("photo-take"), x = document.getElementById("photo-exit"), sh = document.getElementById("photo-share");
+    if (t) t.addEventListener("click", take); if (x) x.addEventListener("click", exit);
+    if (sh) { const ok = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([""], "a.png", { type: "image/png" })] })); sh.hidden = !ok; if (ok) sh.addEventListener("click", share); }
+    for (const b of document.querySelectorAll("#photo-looks button")) b.addEventListener("click", () => setLook(b.dataset.look));
+  }
+  return { enter, exit, take, picture, bind, setLook, get on() { return on; }, get look() { return look; } };
 })();
