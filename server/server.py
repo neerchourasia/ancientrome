@@ -4112,6 +4112,8 @@ def weekly_roll(t=None):
             if coins and len(PRIZES.get(fid, [])) < 8:
                 PRIZES.setdefault(fid, []).append({"id": "w%d" % old, "week": old, "theme": th["name"], "rank": i + 1, "coins": coins, "pts": r["pts"]})
         WEEKLY["last"] = {"week": old, "theme": th["name"], "top": top} if top else WEEKLY["last"]
+        if top:
+            hall_add("weekly", {"week": old, "theme": th["name"], "top": top, "t": int(time.time())})
         weekly_announce(th, top, wk)
     elif old >= 0:
         weekly_announce(week_theme(old), [], wk)
@@ -4403,6 +4405,8 @@ def tourney_end(t):
         places += [[f, tourney_pname(t, f), 3] for f, r in t["out"].items() if r == semi and f not in order]
     t["state"], t["ended"], t["places"] = "done", time.time(), places
     t["champ"] = places[0][1] if places else ""
+    if places:
+        hall_add("tourneys", {"k": t["kind"], "champ": t["champ"], "n": len(t["players"]), "auto": 1 if t.get("auto") else 0, "t": int(time.time())})
     medals = ("🥇", "🥈", "🥉")
     if places:
         tourney_say("🏟️ The %s is over! %s" % (tourney_name(t).lower(), "  ".join("%s %s" % (medals[p[2] - 1], p[1]) for p in places[:3])))
@@ -4654,6 +4658,38 @@ def on_souv(conn, m):
     if rec.get("sv") != mine:
         rec["sv"] = mine
         world_soon()
+
+
+# ---------------------------------------------------------------- the hall of fame
+# Past tournament winners, the last weeks' cup podiums, and the best players: most wins in each game, the highest ratings, most tournaments won and most weekly cups won. Everything but the
+# two history lists is worked out from the profiles when someone asks; the history lists are saved with the world (`hall`).
+HALL = {"tourneys": [], "weekly": []}           # tourneys: [{"k", "champ", "n", "auto", "t"}], weekly: [{"week", "theme", "top": [[name, points]], "t"}], newest last
+HALL_KEEP = {"tourneys": 20, "weekly": 12}
+HALL_GAMES = ("xiangqi", "kushti", "kites", "ball", "dragon", "duel", "wushu")
+
+
+def hall_add(key, row):
+    HALL[key] = (HALL[key] + [row])[-HALL_KEEP[key]:]
+    world_soon()
+
+
+def hall_view():
+    rows = list(STATS.values())
+    best = {}
+    for kind in HALL_GAMES:
+        got = [(r["name"], g[0], g[1], g[2]) for r in rows for g in [r["g"].get(kind)] if g and sum(g) >= 3 and g[0] > 0]
+        got.sort(key=lambda x: (-x[1], x[2], x[0]))
+        if got:
+            best[kind] = [list(x) for x in got[:5]]
+    games = lambda r: sum(sum(g) for g in r["g"].values())
+    return {"t": "hall", "tourneys": HALL["tourneys"][::-1], "weekly": HALL["weekly"][::-1], "best": best,
+            "rating": [[r["name"], r["r"]] for r in sorted((r for r in rows if games(r) >= 5), key=lambda r: (-r["r"], r["name"]))[:10]],
+            "tw": [[r["name"], r["tw"]] for r in sorted((r for r in rows if r.get("tw")), key=lambda r: (-r["tw"], r["name"]))[:5]],
+            "cups": [[r["name"], r["cups"][0]] for r in sorted((r for r in rows if r["cups"][0]), key=lambda r: (-r["cups"][0], r["name"]))[:5]]}
+
+
+def on_hall(conn, m):
+    conn.send(hall_view())
 
 
 def profile_view(fid):
@@ -5157,6 +5193,8 @@ async def handle_msg(conn, m):
         return on_tourney(conn, m)
     if t == "souv":
         return on_souv(conn, m)
+    if t == "hall":
+        return on_hall(conn, m)
     if t == "profile":
         return on_profile(conn, m)
     if t == "notice":
@@ -5412,7 +5450,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL}
 
 
 def world_apply(rows):
@@ -5478,6 +5516,13 @@ def world_apply(rows):
             if c in NOTICE_CITIES and isinstance(lst, list):
                 NOTICES[c] = [{"id": str(n.get("id"))[:12], "fid": n.get("fid") if clean_fid(n.get("fid")) else "", "name": str(n.get("name", ""))[:24], "text": str(n.get("text", ""))[:NOTICE_LEN], "t": float(num(n.get("t"), 0, 4e9, 0))}
                               for n in lst[-NOTICE_MAX:] if isinstance(n, dict)]
+    hl = rows.get("hall")
+    if isinstance(hl, dict):
+        HALL["tourneys"] = [{"k": r["k"], "champ": str(r.get("champ", ""))[:24], "n": int(num(r.get("n"), 0, 99, 0)), "auto": 1 if r.get("auto") else 0, "t": int(num(r.get("t"), 0, 4e9, 0))}
+                            for r in (hl.get("tourneys") if isinstance(hl.get("tourneys"), list) else [])[-HALL_KEEP["tourneys"]:] if isinstance(r, dict) and r.get("k") in TOURNEY_KINDS]
+        HALL["weekly"] = [{"week": int(num(r.get("week"), 0, 1e6, 0)), "theme": str(r.get("theme", ""))[:40], "t": int(num(r.get("t"), 0, 4e9, 0)),
+                           "top": [[str(x[0])[:24], int(num(x[1], 0, 1e6, 0))] for x in (r.get("top") if isinstance(r.get("top"), list) else [])[:3] if isinstance(x, list) and len(x) == 2]}
+                          for r in (hl.get("weekly") if isinstance(hl.get("weekly"), list) else [])[-HALL_KEEP["weekly"]:] if isinstance(r, dict)]
     ta = rows.get("tourney_auto")
     if isinstance(ta, dict):
         TOURNEY_AUTO["week"] = int(num(ta.get("week"), -1, 1e6, -1))

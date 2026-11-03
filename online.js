@@ -78,6 +78,7 @@ const Online = (() => {
       case "pyr": case "pyr_done": Cancun.pyrOn(m); break;
       case "weekly": case "weekly_prize": Weekly.on(m); break;
       case "tourney": Tournament.on(m); break;
+      case "hall": Hall.on(m); break;
       case "profile": case "replay": Profile.on(m); break;
       case "notice": Bulletin.on(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }

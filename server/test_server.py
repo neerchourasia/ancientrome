@@ -1513,6 +1513,41 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply(snap)
         self.assertEqual(server.TOURNEY_AUTO["week"], wk)
 
+    async def test_hall_of_fame_lists_winners_and_the_best_players(self):
+        self.tourney_fresh()
+        server.HALL.update(tourneys=[], weekly=[])
+        self.addCleanup(lambda: server.HALL.update(tourneys=[], weekly=[]))
+        f = lambda i: "%012x" % i
+        server.STATS[f(1)] = {"name": "Ann", "r": 1210, "g": {"xiangqi": [6, 1, 0], "kushti": [1, 0, 0]}, "cups": [2, 0, 0], "hist": [], "tw": 3}
+        server.STATS[f(2)] = {"name": "Ben", "r": 1105, "g": {"xiangqi": [4, 3, 0]}, "cups": [0, 1, 0], "hist": []}
+        server.STATS[f(3)] = {"name": "Cy", "r": 990, "g": {"xiangqi": [0, 2, 0]}, "cups": [0, 0, 0], "hist": []}
+        t = self.tourney_pure("kushti", 4)                                                   # a finished tournament goes into the hall
+        for m in t["rounds"][0]:
+            server.tourney_settle(t, m, list(m["ps"]))
+        server.tourney_round_done(t)
+        server.tourney_settle(t, t["rounds"][1][0], list(t["rounds"][1][0]["ps"]))
+        server.tourney_round_done(t)
+        self.assertEqual([(r["k"], r["n"]) for r in server.HALL["tourneys"]], [("kushti", 4)])
+        server.weekly_roll(time.time())                                                      # (the week is -1 at first: nothing to record)
+        server.WEEKLY.update(week=server.week_of(time.time()) - 1, scores={f(1): {"name": "Ann", "pts": 12, "blk": 0, "bp": 0}})
+        server.weekly_roll(time.time())
+        self.assertEqual([(r["top"]) for r in server.HALL["weekly"]], [[["Ann", 12]]])
+        v = server.hall_view()
+        self.assertEqual(v["best"]["xiangqi"], [["Ann", 6, 1, 0], ["Ben", 4, 3, 0]])         # Cy has no wins: not listed; kushti has too few games
+        self.assertNotIn("kushti", v["best"])
+        self.assertEqual([r[0] for r in v["rating"]], ["Ann", "Ben"])                         # (Cy has played fewer than five games)
+        self.assertEqual((v["tw"], v["cups"][0]), ([["Ann", 4]], ["Ann", 3]))                 # (she won the tournament above, and the week that was just recorded)
+        ws = await self.player("Zed")
+        ws.send({"t": "hall", "a": "get"})
+        got = await ws.until(lambda m: m["t"] == "hall")
+        self.assertEqual(got["tourneys"][0]["champ"], t["champ"])
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.HALL.update(tourneys=[], weekly=[])
+        server.world_apply(snap)
+        self.assertEqual((len(server.HALL["tourneys"]), len(server.HALL["weekly"])), (1, 1))
+        server.world_apply({"hall": {"tourneys": [{"k": "chess"}, 5], "weekly": "x"}})      # junk is ignored
+        self.assertEqual((server.HALL["tourneys"], server.HALL["weekly"]), ([], []))
+
     def test_tourney_is_saved_and_a_match_that_was_live_waits_again(self):
         self.tourney_fresh()
         t = self.tourney_pure("xiangqi", 4)

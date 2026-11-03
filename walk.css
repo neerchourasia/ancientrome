@@ -881,3 +881,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #mini-touch .mt-dpad button { border-radius: 14px; padding: 0; }
 #mini-touch .mt-dpad .u { grid-area: 1 / 2; } #mini-touch .mt-dpad .l { grid-area: 2 / 1; } #mini-touch .mt-dpad .r { grid-area: 2 / 3; } #mini-touch .mt-dpad .d { grid-area: 3 / 2; }
 body.touch .dpanel button, body.touch .dpanel select { min-height: 40px; }
+.hf-row { margin: 4px 0; font-size: .92rem; line-height: 1.45; }
