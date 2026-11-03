@@ -31,6 +31,29 @@ const Mini = (() => {
     ov.querySelector("#mini-leave").addEventListener("click", leave);
   }
 
+  // ------------------------------------------------------------------ phones: no keyboard, so these games get buttons that press the same keys
+  // (kushti: pull; kite fights: a D-pad and pull; pok-ta-pok: hit, and the main screen's stick walks; dragon boats: row on the beat)
+  let tp = null;
+  function touchOn(kind) {
+    if (typeof isTouch === "undefined" || !isTouch || tp || !m || m.watch) return;
+    tp = document.createElement("div"); tp.id = "mini-touch"; tp.dataset.kind = kind;
+    const key = (label, code, cls) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.className = cls || ""; let down = false;
+      const press = (on) => { if (on === down) return; down = on; b.classList.toggle("active", on); dispatchEvent(new KeyboardEvent(on ? "keydown" : "keyup", { code })); };
+      b.addEventListener("pointerdown", (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ } press(true); });
+      for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(ev, () => press(false));
+      b.addEventListener("contextmenu", (e) => e.preventDefault());
+      return b;
+    };
+    if (kind === "kites") {
+      const pad = document.createElement("div"); pad.className = "mt-dpad";
+      pad.append(key("▲", "KeyW", "u"), key("◀", "KeyA", "l"), key("▶", "KeyD", "r"), key("▼", "KeyS", "d"));
+      tp.append(pad, key("Pull", "Space", "big"));
+    } else tp.append(key(kind === "kushti" ? "PULL!" : kind === "dragon" ? "ROW" : "HIT", "Space", "big"));
+    document.body.append(tp);
+  }
+  function touchOff() { if (tp) { tp.remove(); tp = null; } }
+
   // ------------------------------------------------------------------ starting, keys and the loop
   function start(msg) {
     if (m) return;
@@ -47,6 +70,7 @@ const Mini = (() => {
     ov.querySelector("#mini-leave").textContent = m.watch ? "Stop watching" : "Leave the game";
     if (m.kind === "xiangqi") xqSetup();
     ov.classList.add("show");
+    if (m.kind === "kushti" || m.kind === "kites") touchOn(m.kind);
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
     if (!m.watch) Sfx.play("horn"); else cheerBar(true);
@@ -219,7 +243,7 @@ const Mini = (() => {
     const hud = document.createElement("div"); hud.id = "ball-hud"; hud.innerHTML = '<b id="bh-score"></b><span id="bh-note"></span><small id="bh-help"></small>'; document.body.append(hud);
     hud.querySelector("#bh-help").textContent = HELP.ball;
     bg = { ball, fig, hud, last: [0, 0], tx: c.x, tz: c.z + (me0 ? 12 : -12), tyaw: me0 ? 0 : Math.PI, phase: 0, prev: null };
-    mode = "online";
+    mode = "online"; touchOn("ball");
     placeAt(c.x, c.z + (me0 ? -12 : 12), me0 ? Math.PI : 0); player.pitch = -0.12;
     Sfx.play("horn"); toast(`Pok-ta-pok${m.ranked ? " (ranked)" : ""}! Hit the ball with Space, keep it off your half.`);
   }
@@ -298,6 +322,7 @@ const Mini = (() => {
     hud.querySelector("#dh-help").textContent = m.watch ? "You are watching: the camera follows the leading boat. 1 2 3 4 cheer. Esc stops watching." : "Press Space (or A and D in turn) on every beat of the drum. Strokes on the beat drive the boat hard. Esc leaves.";
     dg = { boats, hud, t0: performance.now() + m.countdown * 1000, beat: m.beat * 1000, len: m.length, last: -1, noteT: 0, cx: c.x };
     mode = "online"; Beijing.setBoating(true);
+    touchOn("dragon");
     addEventListener("keydown", onDragonKey, true);
     player.yaw = -Math.PI / 2; player.pitch = -0.14; player.vx = player.vz = 0;
     if (m.watch) { cheerBar(true); toast(`Watching the dragon boat race: ${m.players.map((p) => p.name).join(", ")}.`); }
@@ -441,7 +466,7 @@ const Mini = (() => {
   function cleanup() {
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
-    held.clear(); if (ov) ov.classList.remove("show");
+    held.clear(); touchOff(); if (ov) ov.classList.remove("show");
     xqCleanup(); cleanup3d(); cleanupDragon();
     const rpBar = document.getElementById("mini-rp"); if (rpBar) rpBar.remove();
     cheerBar(false);

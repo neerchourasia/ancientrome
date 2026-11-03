@@ -869,3 +869,15 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #photo-flash.go { animation: photoflash .35s ease-out; }
 @keyframes photoflash { 0% { opacity: .85; } 100% { opacity: 0; } }
 .sv-lock { opacity: .55; }
+
+/* phones: buttons for the games that need a keyboard (see pvpgames.js) */
+#mini-touch { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 9; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 22px; pointer-events: none; }
+#mini-touch[data-kind="kushti"], #mini-touch[data-kind="dragon"] { justify-content: center; }
+#mini-touch[data-kind="ball"] { justify-content: flex-end; }
+#mini-touch button { pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; font: 800 1.1rem Georgia, serif; color: #fff; background: rgba(40,32,22,.7); border: 2px solid rgba(255,255,255,.5); text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+#mini-touch button.active { background: rgba(226,185,85,.85); color: #2a2118; }
+#mini-touch .big { width: 120px; height: 120px; border-radius: 50%; font-size: 1.3rem; }
+#mini-touch .mt-dpad { display: grid; grid-template: repeat(3, 56px) / repeat(3, 56px); gap: 4px; }
+#mini-touch .mt-dpad button { border-radius: 14px; padding: 0; }
+#mini-touch .mt-dpad .u { grid-area: 1 / 2; } #mini-touch .mt-dpad .l { grid-area: 2 / 1; } #mini-touch .mt-dpad .r { grid-area: 2 / 3; } #mini-touch .mt-dpad .d { grid-area: 3 / 2; }
+body.touch .dpanel button, body.touch .dpanel select { min-height: 40px; }
