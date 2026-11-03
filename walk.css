@@ -868,3 +868,4 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #photo-flash { position: fixed; inset: 0; z-index: 41; background: #fff; opacity: 0; pointer-events: none; }
 #photo-flash.go { animation: photoflash .35s ease-out; }
 @keyframes photoflash { 0% { opacity: .85; } 100% { opacity: 0; } }
+.sv-lock { opacity: .55; }

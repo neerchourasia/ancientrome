@@ -314,6 +314,7 @@ class Conn:
         self.wlast, self.fast = None, 0   # where they last said they were (x, z, city, time) and how many updates in a row were impossibly fast
         self.watching = None       # the match they are watching (a MiniRoom or DragonRoom), if any
         self.cheer_t = 0.0         # when they last cheered
+        self.souv_t = -99.0        # when they last told us which souvenirs they have
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
@@ -4597,6 +4598,29 @@ def replay_add(kind, names, winner, moves):
     return rid
 
 
+SOUVENIRS = ("rome-denarius", "rome-rudis", "rome-pantheon", "rome-wheel", "delhi-gate", "delhi-diya", "delhi-feather", "delhi-spice",
+             "cancun-castillo", "cancun-ball", "cancun-jade", "cancun-conch", "beijing-lantern", "beijing-brick", "beijing-seal", "beijing-heaven")       # (what the browser can show on a profile: see souvenirs.js)
+SOUV_GAP = 5.0
+
+
+def on_souv(conn, m):
+    """A browser says which souvenirs its player has found (they come from discovering sights, and are kept in the saved game); the profile shows them."""
+    t = now()
+    if not conn.hello or not conn.fid or t - conn.souv_t < SOUV_GAP:
+        return
+    ids = m.get("ids")
+    if not isinstance(ids, list):
+        return
+    conn.souv_t = t
+    rec = stats_rec(conn.fid, conn.name)
+    if rec is None:
+        return
+    mine = [i for i in SOUVENIRS if i in ids]
+    if rec.get("sv") != mine:
+        rec["sv"] = mine
+        world_soon()
+
+
 def profile_view(fid):
     rec = STATS.get(fid) if isinstance(fid, str) else None
     if rec is None:
@@ -4606,7 +4630,7 @@ def profile_view(fid):
     w, l, d = (sum(v[i] for v in games.values()) for i in range(3))
     have = {r["id"] for r in REPLAYS}
     hist = [dict(h, rp=h["rp"] if h.get("rp") in have else None) for h in rec["hist"]]
-    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "hist": hist[::-1], "online": bool(conns_of(fid))}
+    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "hist": hist[::-1], "online": bool(conns_of(fid))}
 
 
 def on_profile(conn, m):
@@ -5096,6 +5120,8 @@ async def handle_msg(conn, m):
         return on_watch(conn, m)
     if t == "tourney":
         return on_tourney(conn, m)
+    if t == "souv":
+        return on_souv(conn, m)
     if t == "profile":
         return on_profile(conn, m)
     if t == "notice":
@@ -5402,7 +5428,7 @@ def world_apply(rows):
             if clean_fid(f) and isinstance(r, dict) and isinstance(r.get("g"), dict):
                 STATS[f] = {"name": str(r.get("name", ""))[:24], "r": int(num(r.get("r"), 0, 4000, START_RATING)),
                             "g": {str(k)[:12]: [int(num(x, 0, 1e6, 0)) for x in (v + [0, 0, 0])[:3]] for k, v in list(r["g"].items())[:20] if isinstance(v, list)},
-                            "tw": int(num(r.get("tw"), 0, 1e6, 0)),
+                            "tw": int(num(r.get("tw"), 0, 1e6, 0)), "sv": [i for i in SOUVENIRS if i in (r.get("sv") if isinstance(r.get("sv"), list) else [])],
                             "cups": [int(num(x, 0, 1e6, 0)) for x in ((r.get("cups") if isinstance(r.get("cups"), list) else []) + [0, 0, 0])[:3]],
                             "hist": [{"k": str(h.get("k"))[:12], "r": h.get("r") if h.get("r") in ("w", "l", "d") else "d", "vs": [str(n)[:24] for n in (h.get("vs") or [])[:3]], "t": int(num(h.get("t"), 0, 4e9, 0)), "rp": h.get("rp") if isinstance(h.get("rp"), str) else None}
                                      for h in (r.get("hist") if isinstance(r.get("hist"), list) else [])[-HIST_MAX:] if isinstance(h, dict)]}

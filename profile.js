@@ -20,6 +20,7 @@ const Profile = (() => {
     body.append(el("p", `Rating ${cur.r} · ${cur.w} won, ${cur.l} lost, ${cur.d} drawn${cur.fav ? ` · favourite: ${GAMES[cur.fav] || cur.fav}` : ""}`, "pf-sum"));
     const c = cur.cups || [0, 0, 0];
     if (c[0] || c[1] || c[2]) body.append(el("p", `Weekly cup: 🥇 ${c[0]}  🥈 ${c[1]}  🥉 ${c[2]}`, "pf-sum"));
+    if (cur.sv && cur.sv.length) body.append(el("p", `🏺 Souvenirs ${cur.sv.length}/16: ${cur.sv.map((id) => (Souvenirs.list.find((s) => s[0] === id) || [0, 0, ""])[2]).join(" ")}`, "pf-sum"));
     if (cur.tw) body.append(el("p", `🏟️ Tournaments won: ${cur.tw}`, "pf-sum"));
     const kinds = Object.keys(cur.games || {}).sort((a, b) => cur.games[b].reduce((x, y) => x + y, 0) - cur.games[a].reduce((x, y) => x + y, 0));
     if (kinds.length) {

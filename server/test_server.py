@@ -1461,6 +1461,28 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"tourneys": {"x": {"id": "x", "kind": "chess", "state": "open"}, "y": 5}})              # junk is ignored
         self.assertEqual(server.TOURNEYS, {})
 
+    async def test_souvenirs_are_listed_on_a_profile_and_junk_is_ignored(self):
+        self.accounts("ann")
+        server.STATS.clear()
+        ann = await self.player("Ann", token="ann")
+        ann.send({"t": "souv", "ids": ["rome-pantheon", "beijing-seal", "nonsense", 7, "rome-pantheon"]})
+        await asyncio.sleep(0.3)
+        fid = server.fid_of("u-ann")
+        self.assertEqual(server.STATS[fid]["sv"], ["rome-pantheon", "beijing-seal"])
+        ann.send({"t": "souv", "ids": ["delhi-diya"]})                                      # (too soon after the last one)
+        await asyncio.sleep(0.2)
+        self.assertEqual(server.STATS[fid]["sv"], ["rome-pantheon", "beijing-seal"])
+        self.assertEqual(server.profile_view(fid)["sv"], ["rome-pantheon", "beijing-seal"])
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.STATS.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.STATS[fid]["sv"], ["rome-pantheon", "beijing-seal"])
+        guest = await self.player("Guest")
+        guest.send({"t": "souv", "ids": ["rome-pantheon"]})                                 # a guest has no profile
+        await asyncio.sleep(0.2)
+        self.assertEqual(list(server.STATS), [fid])
+        server.STATS.clear()
+
     # ---------------------------------------------------------------- watching a match
 
     async def test_watch_a_match_between_two_people(self):

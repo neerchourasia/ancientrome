@@ -50,6 +50,7 @@ function init() {
   Jail.bind();
   Harbour.build(scene);
   Home.build();
+  Souvenirs.build(worldScene);
   buildInsulae(scene);
   Jail.buildRome(scene);
   Stalls.street(scene, "rome", [["Colosseum", 305, 66], ["Via Sacra", 110, 16], ["Forum", 50, 42], ["Capitoline", -235, 8], ["Pantheon", -455, -440], ["Trajan's Forum", -150, -210], ["Circus", -190, 132], ["Harbour", 74, 80], ["Forum Boarium", -405, 55], ["Theatre of Pompey", -655, -50], ["Via Domus", 150, -44]]);
@@ -69,7 +70,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Tournament.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Tournament.bind(); Souvenirs.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -1037,6 +1038,7 @@ function checkLandmarks(t) {
     showCard(best);
     if (best && !best.home && !best.game && !discovered.has(best.id)) {
       discovered.add(best.id);
+      Souvenirs.found(best.id);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
       Vitals.coins += Math.round(DISCOVER_REWARD * Character.mod("explore")); // every new sight pays 50 denarii, once (more for an explorator)
