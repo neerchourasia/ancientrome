@@ -1078,8 +1078,14 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             server._world_err[0] = ""
             self.assertFalse(server.world_on())
             self.assertIn("copy the whole key again", server._world_err[0])
+            server.CFG["service_key"] = "sb_secret_abc\ndefghijk"                 # a line break in the middle (copied across two lines)
+            self.assertFalse(server.world_on())
             server.CFG["service_key"] = "sb_secret_abcdefghijk"
             self.assertTrue(server.world_on())
+            # an error message that contains the key never reaches the health page
+            err = ValueError("Invalid header value b'sb_secret_abcdefghijk'")
+            self.assertNotIn("abcdefghijk", server.safe_err(err))
+            self.assertEqual(server.safe_err(urllib.error.HTTPError("u", 401, "x", {}, None)), "HTTP 401")
         finally:
             server.CFG.clear()
             server.CFG.update(saved)

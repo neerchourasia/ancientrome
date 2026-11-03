@@ -4574,12 +4574,22 @@ _world_err = [""]          # the last thing that went wrong with saving or loadi
 
 def world_key_ok():
     k = CFG.get("service_key") or ""
-    return bool(k) and k.isascii() and k == k.strip() and " " not in k
+    return bool(k) and k.isascii() and not any(c.isspace() for c in k)
+
+
+def safe_err(err):
+    """What went wrong, for the health page and the log, with nothing secret in it (an error message can contain the key it was sent with)."""
+    if isinstance(err, urllib.error.HTTPError):
+        return "HTTP %d" % err.code
+    msg, key = str(err), CFG.get("service_key") or ""
+    if key and any(key[i:i + 6] in msg for i in range(0, max(1, len(key) - 5))):
+        return type(err).__name__ + " (details hidden: they contained the key)"
+    return (type(err).__name__ + ": " + msg)[:120]
 
 
 def world_on():
     if CFG.get("supabase_url") and CFG.get("service_key") and not world_key_ok():
-        _world_err[0] = "SUPABASE_SERVICE_KEY has characters a key cannot have (dots, spaces or line breaks): copy the whole key again with its copy button"
+        _world_err[0] = "SUPABASE_SERVICE_KEY has characters a key cannot have (dots, spaces or a line break in the middle): copy the whole key again with its copy button, as one line"
         return False
     return bool(CFG.get("supabase_url") and CFG.get("service_key"))
 
@@ -4635,8 +4645,8 @@ async def world_load():
     try:
         rows = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state?select=key,data", world_headers())
     except Exception as err:
-        _world_err[0] = "load: %s" % str(err)[:160]
-        print("  world: could not load (%s)" % err)
+        _world_err[0] = "load: %s" % safe_err(err)
+        print("  world: could not load (%s)" % safe_err(err))
         return False
     world_apply({r["key"]: r["data"] for r in (rows or []) if isinstance(r, dict) and "key" in r})
     for k, v in world_snapshot().items():                     # (what we just loaded is not "changed")
@@ -4659,8 +4669,8 @@ async def world_save():
     try:
         await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state", world_headers({"Prefer": "resolution=merge-duplicates"}), json.loads(json.dumps(body, default=str)), "POST")
     except Exception as err:
-        _world_err[0] = "save: %s" % str(err)[:160]
-        print("  world: could not save (%s)" % err)
+        _world_err[0] = "save: %s" % safe_err(err)
+        print("  world: could not save (%s)" % safe_err(err))
         return 0
     _world_err[0] = ""
     for k, v, sig in changed:
@@ -4692,7 +4702,7 @@ async def world_shutdown():
     try:
         await asyncio.wait_for(world_save(), 8)
     except Exception as err:
-        print("  world: final save failed (%s)" % err)
+        print("  world: final save failed (%s)" % safe_err(err))
     print("  world: stopped")
     os._exit(0)
 
