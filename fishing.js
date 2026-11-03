@@ -16,6 +16,7 @@ const Fishing = (() => {
     { id: "portus", city: "rome", name: "the quay at Portus", x: 50, z: 196, wx: 0, wz: -1 },
     { id: "yamuna", city: "delhi", name: "the Yamuna bank", x: DELHI_X + 314, z: -30, wx: 1, wz: 0 },
     { id: "beach", city: "cancun", name: "the beach", x: CANCUN_X + 904, z: 40, wx: 1, wz: 0 },
+    { id: "kunming", city: "beijing", name: "Kunming Lake", x: BEIJING_X - 514, z: -700, wx: -1, wz: 0 },
     { id: "cenote", city: "cancun", name: "Cenote Azul", x: CANCUN_X - 330 + 18, z: 215, wx: -1, wz: 0 },
   ];
   let spots = null, inv = { raw: {}, cooked: {}, caught: 0 }, cast = { phase: "idle", t: 0, spot: null }, built = false;

@@ -27,11 +27,12 @@ const Estate = (() => {
 
   // ---------------------------------------------------------------- the houses (the same list every time, so a saved game always means the same houses)
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-  const STREETS = { rome: ["Via Sacra", "Via Appia", "Via Lata", "Via Nova", "Vicus Tuscus", "Via Flaminia"], delhi: ["Chandni Chowk", "Kinari Bazaar", "Dariba Kalan", "Nai Sarak", "Khari Baoli", "Ballimaran"], cancun: ["Avenida Tulum", "Calle Gladiolas", "Avenida Bonampak", "Calle Tulipanes", "Avenida Kukulcán", "Calle Orquídeas"] };
+  const STREETS = { rome: ["Via Sacra", "Via Appia", "Via Lata", "Via Nova", "Vicus Tuscus", "Via Flaminia"], delhi: ["Chandni Chowk", "Kinari Bazaar", "Dariba Kalan", "Nai Sarak", "Khari Baoli", "Ballimaran"], beijing: ["Chang'an Avenue", "Wangfujing", "Nanluoguxiang", "Dongsi", "Xidan", "Qianmen"], cancun: ["Avenida Tulum", "Calle Gladiolas", "Avenida Bonampak", "Calle Tulipanes", "Avenida Kukulcán", "Calle Orquídeas"] };
   const KINDS = ["Corner house", "Garden house", "Courtyard house", "Little house", "Terrace house", "Family house"];
   const FAMILIES = {
     rome: ["Marcus", "Lucia", "Gaius", "Julia", "Titus", "Cornelia", "Quintus", "Livia"], delhi: ["Aarav", "Priya", "Rohan", "Meera", "Kabir", "Anaya", "Vikram", "Sana"],
     cancun: ["Mateo", "Sofía", "Diego", "Valentina", "Santiago", "Camila", "Emilio", "Lucía"],
+    beijing: ["Wei", "Li", "Zhang", "Wang", "Chen", "Liu", "Zhao", "Yang"],
   };
   const specs = {};
   function catalog(c) {
@@ -52,7 +53,7 @@ const Estate = (() => {
   const upCost = (h) => (levelOf(h) < 3 ? Math.round(h.price * UP[levelOf(h)].cost) : 0);
   const invested = (h) => h.price + UP.slice(0, levelOf(h)).reduce((t, u) => t + Math.round(h.price * u.cost), 0);
   const find = (id) => { const c = String(id).split("-")[0]; return (LINESET.includes(c) ? catalog(c) : []).find((h) => h.id === id) || null; };
-  const LINESET = ["rome", "delhi", "cancun"];
+  const LINESET = ["rome", "delhi", "cancun", "beijing"];
   const rentTotal = () => LINESET.reduce((sum, c) => sum + catalog(c).reduce((s, h) => s + (state.owned[h.id] && state.owned[h.id].rented ? rentOf(h) : 0), 0), 0);
 
   // ---------------------------------------------------------------- building them in the world
@@ -129,7 +130,7 @@ const Estate = (() => {
     h.lm.sub = own ? `Level ${lv} · ${own.rented ? "rented, +" + rentOf(h) + " a day" : "not rented"}` : `${h.price} denarii · press F at the sign`;
   }
   function addPlace(h) {
-    const src = city === "delhi" ? DELHI_LANDMARKS : city === "cancun" ? CANCUN_LANDMARKS : ROME_LANDMARKS;
+    const src = city === "delhi" ? DELHI_LANDMARKS : city === "cancun" ? CANCUN_LANDMARKS : city === "beijing" ? BEIJING_LANDMARKS : ROME_LANDMARKS;
     h.lm = { id: "e-" + h.id, game: true, name: "", sub: "", x: h.x, z: h.z, r: 10, stand: [h.x, h.z + h.d / 2 + 4],
       text: "A house you can buy and rent out. Walk up to its sign and press F: Buy it, then press Rent so tenants move in and pay you every morning, and Upgrade it for more rent.",
       fact: "Rent is paid every game morning: 4% of the price a day, more after each upgrade." };

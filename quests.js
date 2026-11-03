@@ -11,6 +11,7 @@ const Quests = (() => {
   const NAMES = {
     rome: ["Marcus", "Lucia", "Gaius", "Julia", "Titus", "Cornelia", "Quintus", "Livia", "Decimus", "Flavia"], delhi: ["Aarav", "Priya", "Rohan", "Meera", "Kabir", "Anaya", "Vikram", "Sana", "Arjun", "Zoya"],
     cancun: ["Mateo", "Sofía", "Diego", "Valentina", "Santiago", "Camila", "Emilio", "Lucía", "Andrés", "Ximena"],
+    beijing: ["Wei", "Mei", "Jun", "Lan", "Hao", "Ying", "Tao", "Xiu", "Bo", "Fang"],
   };
   const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } let a = h >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const nameOf = (i) => { const l = NAMES[city] || NAMES.rome; return l[i % l.length]; };

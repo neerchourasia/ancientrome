@@ -107,7 +107,7 @@ const Guards = (() => {
     Sfx.play("oof");
     setTimeout(() => {
       const c = typeof city !== "undefined" ? city : "rome";
-      if (c === "delhi") placeAt(DELHI_X - 40, 6, -Math.PI / 2); else if (c === "cancun") placeAt(Cancun.SPAWN.x, Cancun.SPAWN.z, 0); else placeAt(40, -12, Math.PI / 2);   // let out at the guardhouse by the Forum / the Lahori Gate / the plaza at Chichén Itzá
+      if (c === "delhi") placeAt(DELHI_X - 40, 6, -Math.PI / 2); else if (c === "cancun") placeAt(Cancun.SPAWN.x, Cancun.SPAWN.z, 0); else if (c === "beijing") placeAt(Beijing.SPAWN.x, Beijing.SPAWN.z, 0); else placeAt(40, -12, Math.PI / 2);   // let out at the guardhouse by the Forum / the Lahori Gate / the plaza at Chichén Itzá
       $g("sleep").classList.remove("on");
       for (const g of guards) g.state = "walk";
       toast("You are let out. Behave yourself!"); render();

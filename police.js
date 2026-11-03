@@ -37,6 +37,7 @@ const Police = (() => {
     const y = groundAt(x, z);
     for (const [dx, dz] of [[0, 0], [2.4, 0], [-2.4, 0], [0, 2.8], [0, -2.8]]) if (blockedAt(x + dx, z + dz, y) || Math.abs(groundAt(x + dx, z + dz) - y) > 0.6) return false;
     if (typeof Cancun !== "undefined" && city === "cancun" && Cancun.inWater(x, z)) return false;
+    if (typeof Beijing !== "undefined" && city === "beijing" && Beijing.inWater(x, z)) return false;
     return true;
   };
 

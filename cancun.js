@@ -795,14 +795,15 @@ const Cancun = (() => {
 })();
 
 // The people, the moving things that can hit you and the home of the city you are in (Rome, Old Delhi or Cancún): the other modules ask these.
-function peopleHere() { return city === "delhi" ? Delhi.people() : city === "cancun" ? Cancun.people() : CITIZENS.list; }
-function hitsHere(x, z) { return city === "delhi" ? Delhi.hits(x, z) : city === "cancun" ? null : Modern.hits(x, z); }
-const CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún" };
+function peopleHere() { return city === "delhi" ? Delhi.people() : city === "cancun" ? Cancun.people() : city === "beijing" ? Beijing.people() : CITIZENS.list; }
+function hitsHere(x, z) { return city === "delhi" ? Delhi.hits(x, z) : city === "cancun" || city === "beijing" ? null : Modern.hits(x, z); }
+const CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
 
 // Are you under a roof? (Rome: your house or the job hall; Delhi: the bedroom; Cancún: the casita.) The weather asks, so no rain, leaves or wind blow in.
 function indoorsNow() {
   if (typeof started === "undefined" || !started) return false;
   if (city === "delhi") return Delhi.built && Delhi.homeInside(player.x, player.z);
+  if (city === "beijing") return Beijing.built && Beijing.homeInside(player.x, player.z);
   if (city === "cancun") return Cancun.built && (Cancun.homeInside(player.x, player.z) || Cancun.snorkeling);   // (with your face in the water you feel no rain or wind either)
   return Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z));
 }

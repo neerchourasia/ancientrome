@@ -29,6 +29,7 @@ const Voyage = (() => {
   }
 
   async function sail(to) {
+    if (typeof city !== "undefined" && city === "beijing") { toast("Beijing is far from the sea: use the Travel button (B) to leave."); return; }
     if (!NAMES[to] || to === city) { toast("You are already there."); return; }
     if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
     if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }

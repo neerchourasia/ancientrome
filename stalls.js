@@ -14,14 +14,15 @@ const Stalls = (() => {
     rome: { x: 170, z: 62 },
     delhi: { x: 6000 - 50, z: 60 },
     cancun: { x: 12000, z: 150 },
+    beijing: { x: 18000 + 250, z: 110 },
   };
 
   // what each stall is called, what the vendor shouts, the colour of its awning, and the goods on its counter
   const DEFS = [
     { id: "food", sign: "FOOD", sub: "hot and fresh", color: ["#b3262b", "#f1ead8"], robe: 0xb3262b, goods: [0xd9a05b, 0xe8c27a, 0x8a5a2b, 0xc9743a],
-      say: { rome: ["Fresh bread! Hot from the oven!", "Honey cakes, three for a denarius!"], delhi: ["Garam garam! Come and taste!", "Fresh jalebi, hot hot!"], cancun: ["¡Tacos, tamales, ceviche!", "Fresh from the fire! ¡Pruébalo!"] } },
+      say: { rome: ["Fresh bread! Hot from the oven!", "Honey cakes, three for a denarius!"], delhi: ["Garam garam! Come and taste!", "Fresh jalebi, hot hot!"], cancun: ["¡Tacos, tamales, ceviche!", "Fresh from the fire! ¡Pruébalo!"], beijing: ["Hot dumplings! Come and eat!", "Roast duck, crisp and golden!"] } },
     { id: "clothes", sign: "CLOTHES", sub: "to wear", color: ["#2f6b8f", "#f1ead8"], robe: 0x2f6b8f, goods: [0xb3262b, 0x6a2c8a, 0xd9b640, 0x2f8f4a],
-      say: { rome: ["Cloaks and crowns fit for a senator!", "Look at this purple, friend!"], delhi: ["Silk and gold, come and see!", "Best cloth in Chandni Chowk!"], cancun: ["Embroidered huipiles, fine cotton!", "Hats for the sun, amigo!"] } },
+      say: { rome: ["Cloaks and crowns fit for a senator!", "Look at this purple, friend!"], delhi: ["Silk and gold, come and see!", "Best cloth in Chandni Chowk!"], cancun: ["Embroidered huipiles, fine cotton!", "Hats for the sun, amigo!"], beijing: ["Silk robes for the court!", "Fine cloth, best prices in the city!"] } },
     { id: "pets", sign: "ANIMALS", sub: "and rides", color: ["#2f8f4a", "#f1ead8"], robe: 0x2f8f4a, goods: [0x8a6a3a, 0xa88858, 0x6a4c2a],
       say: { rome: ["Hounds, eagles and carts for sale!", "A loyal friend for the road!"], delhi: ["Elephants and carts, finest in Delhi!", "Come, look at my animals!"], cancun: ["Parrots, monkeys and good dogs!", "A friend for the jungle road!"] } },
     { id: "builder", sign: "BUILDER", sub: "houses and decor", color: ["#d9791f", "#f1ead8"], robe: 0xd9791f, goods: [0xb86a4a, 0xa0a0a0, 0xc9b27a, 0x8a5a2b],
@@ -87,7 +88,7 @@ const Stalls = (() => {
   function build(parent, cx, cz, where) {
     const g = new T.Group(); parent.add(g);
     const delhi = where === "delhi", cancun = where === "cancun";
-    const paving = new T.Mesh(new T.PlaneGeometry(62, 26), lam(delhi ? 0xc2a77a : cancun ? 0xe4dcc3 : 0xb7a98b));
+    const paving = new T.Mesh(new T.PlaneGeometry(62, 26), lam(delhi ? 0xc2a77a : cancun ? 0xe4dcc3 : where === "beijing" ? 0xb9b6ac : 0xb7a98b));
     paving.rotation.x = -Math.PI / 2; paving.position.set(cx, 0.06, cz); paving.receiveShadow = true; g.add(paving);
     if (typeof MAP_SHAPES !== "undefined") MAP_SHAPES.push({ k: "r", x0: cx - 31, x1: cx + 31, z0: cz - 13, z1: cz + 13, c: "#d9b46a" });
     // the well, with a little roof on two posts

@@ -174,4 +174,4 @@ const DELHI_LANDMARKS = [
   }),
 ];
 
-const ALL_LANDMARKS = [...LANDMARKS, ...DELHI_LANDMARKS, ...(typeof CANCUN_LANDMARKS !== "undefined" ? CANCUN_LANDMARKS : [])];
+const ALL_LANDMARKS = [...LANDMARKS, ...DELHI_LANDMARKS, ...(typeof CANCUN_LANDMARKS !== "undefined" ? CANCUN_LANDMARKS : []), ...(typeof BEIJING_LANDMARKS !== "undefined" ? BEIJING_LANDMARKS : [])];

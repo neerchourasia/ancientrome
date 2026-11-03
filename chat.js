@@ -213,7 +213,7 @@ const Admin = (() => {
   }
 
   // the User journey tab: a list of visitors, and each visit of the one you pick as a timeline
-  const CITY = { rome: "Rome", delhi: "Delhi", cancun: "Cancún" };
+  const CITY = { rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" };
   const MODE = { fight: "Started a gladiator fight", race: "Started a chariot race", naval: "Started a naval battle", online: "Went into online play", dgame: "Played a game in Delhi", watch: "Watched a show" };
   const up = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
   function say(kind, d) {

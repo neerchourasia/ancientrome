@@ -5,8 +5,8 @@ const $ = (s) => document.querySelector(s);
 const EYE = 1.7;
 const MAP = { x0: -800, x1: 700, z0: -700, z1: 850 }; // the map of whichever city you are in (Delhi swaps in its own)
 const ROME_MAP = { ...MAP }, ROME_BOUNDS = { ...BOUNDS };
-let city = "rome"; // "rome", "delhi" or "cancun": press B (or the Travel button) to go to the next one
-const NEXT_CITY = { rome: "delhi", delhi: "cancun", cancun: "rome" };
+let city = "rome"; // "rome", "delhi", "cancun" or "beijing": press B (or the Travel button) to go to the next one
+const NEXT_CITY = { rome: "delhi", delhi: "cancun", cancun: "beijing", beijing: "rome" };
 
 const player = { x: 165, z: 6, yaw: Math.PI / 2, pitch: -0.02, feet: 0, y: EYE, vx: 0, vz: 0, bob: 0, airY: 0, vy: 0 };
 const GRAVITY = 22, JUMP_SPEED = 7.2;
@@ -138,7 +138,7 @@ function leaveMode() {
 
 // Hotkeys that start or stop things are ignored for a moment after leaving, so a held key can't restart them.
 let startLockUntil = 0;
-const homeHere = (x, z) => (city === "delhi" ? Delhi.homeInside(x, z) : city === "cancun" ? Cancun.homeInside(x, z) : Home.inside(x, z)); // your bed: the house in Rome, the haveli in Delhi
+const homeHere = (x, z) => (city === "delhi" ? Delhi.homeInside(x, z) : city === "cancun" ? Cancun.homeInside(x, z) : city === "beijing" ? Beijing.homeInside(x, z) : Home.inside(x, z)); // your bed: the house in Rome, the haveli in Delhi
 const canStart = () => performance.now() > startLockUntil && !panelOpen && deathT === 0;
 
 function wireInput(canvas) {
@@ -649,7 +649,7 @@ function updatePlayer(dt) {
   if (keys.has("KeyE")) turn -= 1;
   player.yaw += turn * 1.9 * dt * Controller.turnMul;
 
-  const speed = Controller.walkMul * (mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul * Robbery.chaseBoost * Character.mod("walk"), walkSpeed()) : walkSpeed()) * (city === "cancun" ? Cancun.swimMul() : 1) * Weather.wade(player.feet); // in a duel everyone is the same speed (Shift blocks); swimming is slower
+  const speed = Controller.walkMul * (mode === "online" ? 5.5 : keys.has("ShiftLeft") || keys.has("ShiftRight") ? Math.max(13 * Disease.speedMul * Robbery.chaseBoost * Character.mod("walk"), walkSpeed()) : walkSpeed()) * (city === "cancun" ? Cancun.swimMul() : city === "beijing" ? Beijing.swimMul() : 1) * Weather.wade(player.feet); // in a duel everyone is the same speed (Shift blocks); swimming is slower
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   const rx = -fz, rz = fx;
   let tx = fx * fwd + rx * side, tz = fz * fwd + rz * side;
@@ -866,7 +866,7 @@ function buildAvatar() {
 function updateAvatar(dt) {
   avatar.visible = ((viewId() !== "first" || creatorOpen) && mode === "walk") || mode === "online" || mode === "chute";
   if (!avatar.visible) return;
-  avatar.position.set(player.x, player.feet + player.airY + (city === "cancun" ? Cancun.avatarDrop() : 0), player.z);   // swimming: in the water up to your chest
+  avatar.position.set(player.x, player.feet + player.airY + (city === "cancun" ? Cancun.avatarDrop() : city === "beijing" ? Beijing.avatarDrop() : 0), player.z);   // swimming: in the water up to your chest
   avatar.rotation.y = player.yaw;
   const pace = Math.hypot(player.vx, player.vz);
   if (pace > 0.3) avPhase += dt * (pace / 5.5) * 6.2;
@@ -901,7 +901,7 @@ function chaseCamera() {
   let d = dist;
   for (; d > 0.9; d -= 0.25) if (!blockedAt(player.x + dx * d, player.z + dz * d, player.feet + 1.0)) break;
   const cx = player.x + dx * d, cz = player.z + dz * d;
-  const wd = city === "cancun" ? Cancun.camDrop() : 0;                                                    // in the water the camera sinks with you (and goes under the surface when you snorkel)
+  const wd = city === "cancun" ? Cancun.camDrop() : city === "beijing" ? Beijing.camDrop() : 0;                                                    // in the water the camera sinks with you (and goes under the surface when you snorkel)
   const cy = wd ? player.y + wd + up - Math.sin(player.pitch) * d * tilt : Math.max(groundAt(cx, cz) + 0.5, player.y + up - Math.sin(player.pitch) * d * tilt);
   camera.position.set(cx, cy, cz);
   camera.rotation.set(pitch, yaw, 0);
@@ -1032,7 +1032,7 @@ function checkLandmarks(t) {
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }
       updateProgress();
       Vitals.coins += Math.round(DISCOVER_REWARD * Character.mod("explore")); // every new sight pays 50 denarii, once (more for an explorator)
-      toast(seenCount() === DISCOVERABLE.length ? (city === "delhi" ? "You have discovered all of Old Delhi. Wah!" : city === "cancun" ? "You have discovered all of Cancún and Chichén Itzá. ¡Increíble!" : "You have discovered all of Rome. Ave!") + ` (+${DISCOVER_REWARD} denarii)` : `Discovered: ${best.name} (+${DISCOVER_REWARD} denarii)`);
+      toast(seenCount() === DISCOVERABLE.length ? (city === "delhi" ? "You have discovered all of Old Delhi. Wah!" : city === "cancun" ? "You have discovered all of Cancún and Chichén Itzá. ¡Increíble!" : city === "beijing" ? "You have discovered all of Beijing. Hǎo!" : "You have discovered all of Rome. Ave!") + ` (+${DISCOVER_REWARD} denarii)` : `Discovered: ${best.name} (+${DISCOVER_REWARD} denarii)`);
       Sfx.play("discover");
     }
   }
@@ -1124,11 +1124,11 @@ function toggleSound() { Sfx.init(); Sfx.toggle(); refreshSoundButton(); refresh
 
 // ---------- Ancient Rome / Modern Rome ----------
 
-const ERA_NAMES = { rome: ["Ancient Rome", "Modern Rome"], delhi: ["Mughal Delhi", "Modern Delhi"], cancun: ["Maya Chichén Itzá", "Modern Cancún"] };
+const ERA_NAMES = { rome: ["Ancient Rome", "Modern Rome"], delhi: ["Mughal Delhi", "Modern Delhi"], cancun: ["Maya Chichén Itzá", "Modern Cancún"], beijing: ["Ming Beijing", "Modern Beijing"] };
 
 // The places you can see in this city and era (Delhi's Metro station only exists today).
 function refreshLandmarks() {
-  const list = (city === "delhi" ? DELHI_LANDMARKS : city === "cancun" ? CANCUN_LANDMARKS : ROME_LANDMARKS).filter((l) => !l.only || l.only === era);
+  const list = (city === "delhi" ? DELHI_LANDMARKS : city === "cancun" ? CANCUN_LANDMARKS : city === "beijing" ? BEIJING_LANDMARKS : ROME_LANDMARKS).filter((l) => !l.only || l.only === era);
   LANDMARKS.splice(0, LANDMARKS.length, ...list);
   DISCOVERABLE = LANDMARKS.filter((l) => !l.home && !l.game);
   currentLm = null;
@@ -1144,6 +1144,7 @@ function applyEra() {
   Modern.apply(modern);
   if (Delhi.built) Delhi.setEra(modern);
   if (Cancun.built) Cancun.setEra(modern);
+  if (Beijing.built) Beijing.setEra(modern);
   Car.onEra(modern); // cars and rickshaws only exist today, carts and elephants only in the ancient cities
   Crowd.setVisible(!modern);
   Jobs.setEra(modern);
@@ -1154,9 +1155,9 @@ function applyEra() {
   $("#btn-era").innerHTML = modern ? `${oldName} <kbd>K</kbd>` : `${newName} <kbd>K</kbd>`;
   $("#btn-city").innerHTML = "✈ Travel <kbd>B</kbd>";
   for (const b of document.querySelectorAll("#travel .tv-list button")) { b.disabled = b.dataset.city === city; b.classList.toggle("here", b.dataset.city === city); }
-  $("#hud .top-left h1").innerHTML = city === "rome" ? (modern ? "Time Machine <small>Modern Rome · today</small>" : "Time Machine <small>Ancient Rome · c. 128 AD</small>") : city === "cancun" ? (modern ? "Time Machine <small>Cancún · today</small>" : "Time Machine <small>Chichén Itzá · c. 1000 AD</small>") : (modern ? "Time Machine <small>Modern Delhi · today</small>" : "Time Machine <small>Mughal Delhi · c. 1650</small>");
+  $("#hud .top-left h1").innerHTML = city === "rome" ? (modern ? "Time Machine <small>Modern Rome · today</small>" : "Time Machine <small>Ancient Rome · c. 128 AD</small>") : city === "beijing" ? (modern ? "Time Machine <small>Beijing · today</small>" : "Time Machine <small>Ming Beijing · c. 1420</small>") : city === "cancun" ? (modern ? "Time Machine <small>Cancún · today</small>" : "Time Machine <small>Chichén Itzá · c. 1000 AD</small>") : (modern ? "Time Machine <small>Modern Delhi · today</small>" : "Time Machine <small>Mughal Delhi · c. 1650</small>");
   $("#btn-dgames").hidden = city !== "delhi";
-  $("#map-title").textContent = city === "rome" ? "Map of Rome" : city === "cancun" ? "Map of Cancún and Chichén Itzá" : "Map of Old Delhi";
+  $("#map-title").textContent = city === "rome" ? "Map of Rome" : city === "cancun" ? "Map of Cancún and Chichén Itzá" : city === "beijing" ? "Map of Beijing" : "Map of Old Delhi";
   refreshLandmarks();
 }
 
@@ -1171,10 +1172,11 @@ function toggleEra() {
   const modern = era === "modern";
   const say = city === "delhi"
     ? (modern ? "Modern Delhi: the old city as it stands today" : "Mughal Delhi, around 1650, under the emperor Shah Jahan")
+    : city === "beijing" ? (modern ? "Modern Beijing: the old capital and the new city as they stand today" : "Ming Beijing, around 1420: the capital of the Yongle Emperor")
     : city === "cancun" ? (modern ? "Cancún today: the ruins of Chichén Itzá, and the Hotel Zone on the coast" : "Chichén Itzá and the Maya coast, around 1000 AD")
     : (modern ? "Modern Rome: the city as it stands today" : "Ancient Rome, c. 128 AD");
   toast(say);
-  Narrator.say(city === "delhi" ? (modern ? "Modern Delhi. The old city as it stands today." : "Mughal Delhi, around 1650, under the emperor Shah Jahan.") : city === "cancun" ? (modern ? "Cancún today. The ruins of Chichén Itzá, and the Hotel Zone on the Caribbean coast." : "Chichén Itzá, around the year 1000, at the height of the Maya city.") : (modern ? "Modern Rome. The city as it stands today." : "Ancient Rome, around 128 AD, under the emperor Hadrian."), { interrupt: true });
+  Narrator.say(city === "delhi" ? (modern ? "Modern Delhi. The old city as it stands today." : "Mughal Delhi, around 1650, under the emperor Shah Jahan.") : city === "beijing" ? (modern ? "Modern Beijing. The old capital and the new city as they stand today." : "Ming Beijing, around 1420, the capital of the Yongle Emperor.") : city === "cancun" ? (modern ? "Cancún today. The ruins of Chichén Itzá, and the Hotel Zone on the Caribbean coast." : "Chichén Itzá, around the year 1000, at the height of the Maya city.") : (modern ? "Modern Rome. The city as it stands today." : "Ancient Rome, around 128 AD, under the emperor Hadrian."), { interrupt: true });
   if (currentLm) showCard(currentLm); // refresh the open card's "today" note
 }
 
@@ -1213,19 +1215,24 @@ function arriveIn(to) {
   } else if (to === "cancun") {
     Cancun.build(scene);
     Object.assign(BOUNDS, Cancun.BOUNDS); Object.assign(MAP, Cancun.MAP);
+  } else if (to === "beijing") {
+    Beijing.build(scene);
+    Object.assign(BOUNDS, Beijing.BOUNDS); Object.assign(MAP, Beijing.MAP);
   } else { Object.assign(BOUNDS, ROME_BOUNDS); Object.assign(MAP, ROME_MAP); }
   Delhi.show(to === "delhi");
   Cancun.show(to === "cancun");
+  Beijing.show(to === "beijing");
   if (!mapCache[to]) { buildBaseMap(); mapCache[to] = baseMap; } else baseMap = mapCache[to];
   applyEra();
   if (to === "delhi") placeAt(Delhi.SPAWN.x, Delhi.SPAWN.z, Delhi.SPAWN.yaw);
   else if (to === "cancun") placeAt(Cancun.SPAWN.x, Cancun.SPAWN.z, Cancun.SPAWN.yaw);
+  else if (to === "beijing") placeAt(Beijing.SPAWN.x, Beijing.SPAWN.z, Beijing.SPAWN.yaw);
   else placeAt(165, 6, Math.PI / 2);
   player.pitch = -0.02;
   const modern = era === "modern";
-  const msg = to === "cancun" ? `Cancún and Chichén Itzá: ${modern ? "the ruins today, and the Hotel Zone on the coast" : "the Maya city around 1000 AD, and the coast"}. Climb El Castillo, the big pyramid in front of you. The market stalls are south of the plaza (press G, then The Market, for directions).` : to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort. The market stalls are in the square south of the Lahori Gate (press G, then The Market, for directions).` : "Back in Rome. The market square is south of the Forum (press G, then The Market).";
+  const msg = to === "beijing" ? `Beijing: ${modern ? "the old capital and the new city today" : "the Ming capital, c. 1420"}. Walk north through the Gate of Heavenly Peace to the Forbidden City. The market stalls are east of the great square (press G, then The Market, for directions).` : to === "cancun" ? `Cancún and Chichén Itzá: ${modern ? "the ruins today, and the Hotel Zone on the coast" : "the Maya city around 1000 AD, and the coast"}. Climb El Castillo, the big pyramid in front of you. The market stalls are south of the plaza (press G, then The Market, for directions).` : to === "delhi" ? `Delhi: ${modern ? "the old city today" : "Shahjahanabad, c. 1650"}. Walk down Chandni Chowk to the Red Fort. The market stalls are in the square south of the Lahori Gate (press G, then The Market, for directions).` : "Back in Rome. The market square is south of the Forum (press G, then The Market).";
   toast(msg);
-  Narrator.say(to === "cancun" ? (modern ? "Welcome to Cancún. The ruins of Chichén Itzá are around you, and the Caribbean coast is to the east." : "Welcome to Chichén Itzá, the great Maya city, around the year 1000. The pyramid of Kukulcán is in front of you.") : to === "delhi" ? (modern ? "Welcome to Old Delhi, as it stands today. The Red Fort is at the end of Chandni Chowk." : "Welcome to Shahjahanabad, the walled capital of the Mughal emperor Shah Jahan, around 1650. The Red Fort is at the end of Chandni Chowk.") : "Back in Rome.", { interrupt: true });
+  Narrator.say(to === "beijing" ? (modern ? "Welcome to Beijing, the old capital and the new city. Tiananmen Square is around you." : "Welcome to Beijing, the capital of the Ming emperor Yongle, around 1420. The Gate of Heavenly Peace is ahead of you.") : to === "cancun" ? (modern ? "Welcome to Cancún. The ruins of Chichén Itzá are around you, and the Caribbean coast is to the east." : "Welcome to Chichén Itzá, the great Maya city, around the year 1000. The pyramid of Kukulcán is in front of you.") : to === "delhi" ? (modern ? "Welcome to Old Delhi, as it stands today. The Red Fort is at the end of Chandni Chowk." : "Welcome to Shahjahanabad, the walled capital of the Mughal emperor Shah Jahan, around 1650. The Red Fort is at the end of Chandni Chowk.") : "Back in Rome.", { interrupt: true });
 }
 
 function toggleDirections() { if ($("#places").classList.contains("show") && placesMode === "dirs") closePanels(); else openPlaces("dirs"); }
@@ -1604,7 +1611,7 @@ function updateDeath(dt) {
   const BLACK = 2.2, LAPSE = 7;
   if (deathT >= 1.4 && !deathFrom.moved) {
     deathFrom.moved = true;
-    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0);
+    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "beijing") { const h = Beijing.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0);
     player.pitch = -0.02;
   }
   if (deathT > BLACK) { // the day passes: the sky runs through a whole day and night
@@ -1647,7 +1654,7 @@ function wakeUp() {
     const lost = Math.min(Vitals.coins, 15);
     Vitals.coins = Vitals.coins - lost;
     Vitals.hp = 60;
-    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0); // you are carried home
+    if (city === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else if (city === "beijing") { const h = Beijing.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0); // you are carried home
     toast(`Day ${Time.day}: you woke in your bed. You collapsed in the street and a thief took ${lost} denarii`);
     Narrator.say(`Day ${Time.day}. You collapsed from tiredness, and were carried home. Next time, sleep in your bed at night.`, { interrupt: true });
   } else {
@@ -1706,7 +1713,7 @@ function tick(dt) {
   Weather.update(dt);
   Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Ventures.update(dt); Events.update(dt); Thieves.update(dt); PetPerks.update(dt); Fishing.update(dt); TreasureMaps.update(); Story.update(); FestHunt.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
-  Vitals.update(dt, { mode, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
+  Vitals.update(dt, { mode, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : city === "beijing" ? (Beijing.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
@@ -1742,7 +1749,7 @@ function tick(dt) {
   else {
     if ((mode === "walk" && (viewId() !== "first" || creatorOpen)) || mode === "online") chaseCamera();
     else {
-      camera.position.set(player.x, player.y + (city === "cancun" ? Cancun.camDrop() : 0), player.z);
+      camera.position.set(player.x, player.y + (city === "cancun" ? Cancun.camDrop() : city === "beijing" ? Beijing.camDrop() : 0), player.z);
       camera.rotation.set(player.pitch, player.yaw, 0);
     }
     if (player.shake > 0) { // shake after a crash
@@ -1759,6 +1766,7 @@ function tick(dt) {
   Online.walkTick(dt); Online.peersUpdate(dt);
   if (city === "delhi") Delhi.update(dt, player.x, player.z);
   if (city === "cancun") Cancun.update(dt, player.x, player.z);
+  if (city === "beijing") Beijing.update(dt, player.x, player.z);
   DGames.tickRun(dt);
   updateAvatar(dt);
   Pets.update(dt);

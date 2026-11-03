@@ -12,7 +12,7 @@ const TreasureMaps = (() => {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(m ? { ...m, at: lastBuy } : { at: lastBuy })); } catch (e) { /* ignore */ } };
   const DIRS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
   const dirName = (dx, dz) => DIRS[((Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) % 8) + 8) % 8];
-  const okSpot = (x, z) => x > BOUNDS.minX + 15 && x < BOUNDS.maxX - 15 && z > BOUNDS.minZ + 15 && z < BOUNDS.maxZ - 15 && !blockedAt(x, z, groundAt(x, z)) && groundAt(x, z) > -0.2 && !(city === "cancun" && Cancun.inWater(x, z)) && Math.abs(groundAt(x, z)) < 4;
+  const okSpot = (x, z) => x > BOUNDS.minX + 15 && x < BOUNDS.maxX - 15 && z > BOUNDS.minZ + 15 && z < BOUNDS.maxZ - 15 && !blockedAt(x, z, groundAt(x, z)) && groundAt(x, z) > -0.2 && !(city === "cancun" && Cancun.inWater(x, z)) && !(city === "beijing" && Beijing.inWater(x, z)) && Math.abs(groundAt(x, z)) < 4;
 
   function buy() {
     if (typeof started === "undefined" || !started) return;

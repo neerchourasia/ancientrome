@@ -2046,6 +2046,25 @@ PLACES = {
     ('The Pantheon', -480, -380, 55),
     ('the Armourer in the arena', 430, 46.5, 8),
 ],
+    "beijing": [
+        ("a player's courtyard house", 17750.0, 85.0, 14.0),
+        ("Tiananmen, the Gate of Heavenly Peace", 18000.0, -62.0, 62.0),
+        ("Tiananmen Square", 18000.0, 110.0, 100.0),
+        ("The Meridian Gate", 18000.0, -168.0, 50.0),
+        ("The Hall of Supreme Harmony", 18000.0, -290.0, 60.0),
+        ("The Forbidden City", 18000.0, -350.0, 140.0),
+        ("Jingshan Hill", 18000.0, -660.0, 80.0),
+        ("The Temple of Heaven", 18000.0, 560.0, 80.0),
+        ("The Drum Tower", 18000.0, -800.0, 40.0),
+        ("The Bell Tower", 18000.0, -865.0, 36.0),
+        ("The Hutongs", 17720.0, -320.0, 70.0),
+        ("The Summer Palace", 17240.0, -880.0, 90.0),
+        ("Kunming Lake", 17300.0, -740.0, 100.0),
+        ("The Seventeen-Arch Bridge", 17480.0, -760.0, 50.0),
+        ("The Great Wall at Badaling", 18080.0, -1140.0, 110.0),
+        ("The CBD towers", 18560.0, 250.0, 110.0),
+        ("The Market", 18250.0, 110.0, 26.0),
+    ],
     "cancun": [
         ("a player's casita", 11930.0, 95.0, 14.0),
         ('El Castillo (Temple of Kukulcán)', 12000.0, 0.0, 62.0),
@@ -2091,7 +2110,7 @@ PLACES = {
     ('The Chaat Stall', 5785, 13, 8),
 ],
 }
-CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún"}
+CITY_NAMES = {"rome": "Rome", "delhi": "Old Delhi", "cancun": "Cancún", "beijing": "Beijing"}
 ROOM_WORDS = {"duel": "in a duel", "race": "in a chariot race", "coop": "in a team battle", "naval": "in a naval battle", "brawl": "in an arena brawl", "team2": "in a 2v2", "derby": "in a chariot derby", "kushti": "in a kushti bout", "kites": "in a kite fight", "ball": "in a ball game"}
 QUEUE_WORDS = {"duel": "a duel", "race": "a race", "coop": "a team battle", "naval": "a naval battle", "brawl": "an arena brawl", "team2": "a 2v2", "derby": "a chariot derby", "kushti": "a kushti bout", "kites": "a kite fight", "ball": "a ball game"}
 
@@ -2120,7 +2139,7 @@ def where_is(c):
         place = ("at " if best and best[0] <= 0 else "near ") + best[1] if best else "out in the streets"
     elif c.room:
         place = "in the arena"
-    x, z = round(c.px - {"delhi": 6000, "cancun": 12000}.get(c.city, 0)), round(c.pz)
+    x, z = round(c.px - {"delhi": 6000, "cancun": 12000, "beijing": 18000}.get(c.city, 0)), round(c.pz)
     return {"city": CITY_NAMES.get(c.city, "-"), "place": place, "doing": what, "xz": ("%d, %d" % (x, z)) if c.city and not c.room else ""}
 
 
@@ -2130,7 +2149,7 @@ def where_is(c):
 WORLD_RANGE = 260.0     # metres: you see people this close
 AIR_RANGE = 900.0       # and when either of you is up in an aircraft, this far (you can see a plane from a long way off)
 WORLD_MAX = 30          # and at most this many at once (the nearest)
-WORLD_CITIES = ("rome", "delhi", "cancun")
+WORLD_CITIES = ("rome", "delhi", "cancun", "beijing")
 
 
 def on_walk(conn, m):

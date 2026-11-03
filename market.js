@@ -36,8 +36,12 @@ const Market = (() => {
     { name: "Palace of the Sun", price: 14000, rest: 6, rent: 420, perk: "A small stepped pyramid crowns the palace, with a gold sun disc, torches and a long reflecting pool. Resting heals 6 times faster, and rent is 420 denarii each morning." },
     { name: "Palace of Kukulcán", price: 30000, rest: 7, rent: 900, perk: "The finest house in Cancún: a feathered-serpent palace of white stone with gold domes, gardens and fountains. Resting heals 7 times faster, and rent is 900 denarii each morning." },
   ];
-  const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : typeof city !== "undefined" && city === "cancun" ? HOUSES_C : HOUSES);
-  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : typeof city !== "undefined" && city === "cancun" ? s.chouse : s.house);
+  // Your home in Beijing: one courtyard house in the hutong (the builder has nothing bigger to sell you there yet)
+  const HOUSES_B = [
+    { name: "Courtyard house", price: 0, rest: 1, rent: 0, perk: "A small grey-brick courtyard house in a lane west of the great square. Sleep here after dark." },
+  ];
+  const homes = () => (typeof city !== "undefined" && city === "delhi" ? HOUSES_D : typeof city !== "undefined" && city === "cancun" ? HOUSES_C : typeof city !== "undefined" && city === "beijing" ? HOUSES_B : HOUSES);
+  const tier = () => (typeof city !== "undefined" && city === "delhi" ? s.dhouse : typeof city !== "undefined" && city === "cancun" ? s.chouse : typeof city !== "undefined" && city === "beijing" ? 0 : s.house);
 
   // type: wear (worn on your character, one per slot), pet (a companion, one at a time), decor (decorates your house),
   // supply (used up at once) or perk (a permanent bonus in single-player games).
@@ -198,6 +202,9 @@ const Market = (() => {
     c_tea: { type: "cure", name: "Hot honey and herb drink", price: 10, note: "Cures a cold.", cures: ["cold"], where: ["rome"] },
     c_tonic: { type: "cure", name: "Bitter bark tonic", price: 40, note: "Cures marsh fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["rome"] },
     c_theriac: { type: "cure", name: "Theriac", price: 130, note: "The great antidote of Rome: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["rome"] },
+    c_ginger: { type: "cure", name: "Ginger and jujube tea", price: 10, note: "A hot sweet tea that cures a cold.", cures: ["cold"], where: ["beijing"] },
+    c_herbal: { type: "cure", name: "Herbal decoction", price: 40, note: "A bitter brew from the physician's shop. Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["beijing"] },
+    c_ginseng: { type: "cure", name: "Ginseng and lingzhi", price: 130, note: "The strongest remedy of the imperial physicians: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["beijing"] },
     c_lime: { type: "cure", name: "Honey and lime tea", price: 10, note: "A hot tea of lime leaves and honey that cures a cold.", cures: ["cold"], where: ["cancun"] },
     c_soursop: { type: "cure", name: "Soursop leaf tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["cancun"] },
     c_chilam: { type: "cure", name: "The h-men's great remedy", price: 130, note: "The strongest cure of the Maya healers: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["cancun"] },
@@ -218,6 +225,18 @@ const Market = (() => {
     f_ramon: F("Ramón nuts", 6, 9, "Nutty seeds of the breadnut tree, roasted over a fire.", ["cancun", "ancient"]),
     f_quesadilla: F("Quesadilla", 12, 18, "A folded tortilla full of melted cheese.", ["cancun", "modern"]),
     f_paleta: F("Fruit paleta", 5, 7, "A frozen fruit ice on a stick.", ["cancun", "modern"]),
+    f_mantou: F("Steamed bun (mantou)", 5, 9, "A soft white steamed bun, hot from the basket.", ["beijing", "ancient"]),
+    f_jiaozi: F("Boiled dumplings (jiaozi)", 14, 22, "Pork and cabbage dumplings with vinegar and ginger.", ["beijing", "ancient"]),
+    f_noodle: F("Hand-pulled noodles", 12, 18, "Long noodles in a hot broth, with a little mutton.", ["beijing", "ancient"]),
+    f_duckm: F("Roast duck", 36, 44, "Duck roasted in a closed oven until the skin is crisp, the dish of the Ming court.", ["beijing", "ancient"]),
+    f_tanghulu: F("Candied haws (tanghulu)", 6, 8, "Hawthorn berries on a stick in a shell of hard sugar.", ["beijing", "ancient"]),
+    f_teaegg: F("Tea eggs", 4, 7, "Eggs simmered in tea, soy and spice until the shell crazes.", ["beijing", "ancient"]),
+    f_duck: F("Peking duck", 40, 46, "Crisp roast duck carved at the table, with pancakes, spring onion and sweet sauce.", ["beijing", "modern"]),
+    f_jianbing: F("Jianbing", 8, 13, "A thin crêpe with egg, crisp wafer, sauce and coriander, made on a griddle in the street.", ["beijing", "modern"]),
+    f_zhajiang: F("Zhajiangmian", 14, 22, "Noodles with a thick sauce of fried soybean paste and minced pork.", ["beijing", "modern"]),
+    f_baozi: F("Baozi", 6, 10, "A steamed bun stuffed with pork and chive.", ["beijing", "modern"]),
+    f_soy: F("Hot soy milk and youtiao", 7, 11, "Warm soy milk with a long golden fried dough stick.", ["beijing", "modern"]),
+    f_tanghulu_m: F("Candied haws (tanghulu)", 6, 8, "Hawthorn berries on a stick in a shell of hard sugar.", ["beijing", "modern"]),
   });
   Object.assign(ITEMS, CURES);
   Object.assign(ITEMS, FOODS);
@@ -366,7 +385,7 @@ const Market = (() => {
       $m("mk-house-next").textContent = `Next: ${next.name}. ${next.perk}`;
       $m("mk-house-buy").textContent = `Buy for ${mark(next.price)} denarii`;
       $m("mk-house-buy").disabled = Vitals.coins < mark(next.price);
-    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : homes() === HOUSES_C ? " It is the finest house in Cancún." : " It is the finest house in Rome.";
+    } else $m("mk-house-perk").textContent += homes() === HOUSES_D ? " It is the finest house in Old Delhi." : homes() === HOUSES_C ? " It is the finest house in Cancún." : homes() === HOUSES_B ? " It is the only house for sale in Beijing so far." : " It is the finest house in Rome.";
 
     const intro = def.note ? [Object.assign(document.createElement("p"), { className: "mk-note", textContent: def.note })] : [];
     $m("mk-sections").replaceChildren(...intro, ...SECTIONS.filter(([, type]) => def.types.includes(type)).flatMap(([title, type]) => {

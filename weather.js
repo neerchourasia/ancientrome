@@ -11,6 +11,7 @@ const Weather = (() => {
     rome: ["Spring", "Summer", "Autumn", "Winter"],
     delhi: ["Spring", "Summer", "Monsoon", "Winter"],
     cancun: ["Dry season", "Hot season", "Hurricane season", "Cooler season"],
+    beijing: ["Spring", "Summer rains", "Autumn", "Cold winter"],
   };
   const TYPES = ["clear", "partly", "cloudy", "windy", "drizzle", "rain", "storm", "fog", "mist", "snow", "hail", "blizzard", "tornado", "cyclone"];
   // the chance of each kind of weather in each season (they are scaled to add up to one)
@@ -20,6 +21,12 @@ const Weather = (() => {
       { clear: 0.50, partly: 0.22, cloudy: 0.05, windy: 0.08, drizzle: 0.02, rain: 0.04, storm: 0.06, fog: 0.01, mist: 0.02, hail: 0.025, tornado: 0.008 },
       { clear: 0.16, partly: 0.14, cloudy: 0.14, windy: 0.12, drizzle: 0.12, rain: 0.17, storm: 0.05, fog: 0.04, mist: 0.06, hail: 0.01, cyclone: 0.02 },
       { clear: 0.14, partly: 0.10, cloudy: 0.16, windy: 0.08, drizzle: 0.08, rain: 0.14, storm: 0.02, fog: 0.12, mist: 0.08, snow: 0.08, blizzard: 0.02 },
+    ],
+    beijing: [   // dusty windy springs, hot summers with heavy rain, clear autumns and cold dry winters with snow (never cyclones)
+      { clear: 0.35, partly: 0.20, cloudy: 0.08, windy: 0.18, drizzle: 0.05, rain: 0.05, storm: 0.02, fog: 0.02, mist: 0.03, hail: 0.01, tornado: 0.003 },
+      { clear: 0.25, partly: 0.20, cloudy: 0.10, windy: 0.05, drizzle: 0.08, rain: 0.17, storm: 0.10, fog: 0.01, mist: 0.03, hail: 0.02, tornado: 0.004 },
+      { clear: 0.50, partly: 0.20, cloudy: 0.08, windy: 0.08, drizzle: 0.03, rain: 0.04, storm: 0.01, fog: 0.03, mist: 0.03 },
+      { clear: 0.35, partly: 0.15, cloudy: 0.12, windy: 0.10, drizzle: 0.02, fog: 0.06, mist: 0.06, snow: 0.12, blizzard: 0.02 },
     ],
     cancun: [   // tropical: warm all year, a dry season, a hot humid one, and hurricanes in the autumn (never snow, hail or fog)
       { clear: 0.45, partly: 0.25, cloudy: 0.08, windy: 0.10, drizzle: 0.04, rain: 0.05, storm: 0.02, mist: 0.01 },
@@ -75,8 +82,9 @@ const Weather = (() => {
     rome: [{ hail: 0.07, tornado: 0.04 }, { hail: 0.09, tornado: 0.05 }, { cyclone: 0.12, hail: 0.05, tornado: 0.02 }, { blizzard: 0.13, hail: 0.03 }],
     delhi: [{ hail: 0.07, tornado: 0.04 }, { tornado: 0.05, hail: 0.05 }, { cyclone: 0.16, hail: 0.04 }, { hail: 0.03, tornado: 0.01 }],
     cancun: [{ tornado: 0.01 }, { tornado: 0.01, cyclone: 0.02 }, { cyclone: 0.22 }, { cyclone: 0.03 }],
+    beijing: [{ hail: 0.04, tornado: 0.01 }, { hail: 0.06, tornado: 0.02 }, { hail: 0.02 }, { blizzard: 0.06 }],
   };
-  const SEED = { rome: [15485863, 1299709], delhi: [7919, 104729], cancun: [32452843, 7368787] };   // what makes each city's weather its own
+  const SEED = { rome: [15485863, 1299709], delhi: [7919, 104729], cancun: [32452843, 7368787], beijing: [49979687, 15485867] };   // what makes each city's weather its own
 
   const seasonOf = (c, day) => Math.floor(((day - 1) % 28 + 28) % 28 / 7);   // the same season in every city at the same time (spring, summer, autumn or the monsoon, winter); only the weather differs
 
@@ -116,6 +124,7 @@ const Weather = (() => {
   const GROUP = { clear: "dry", partly: "dry", windy: "dry", cloudy: "grey", mist: "grey", fog: "grey", drizzle: "wet", rain: "wet", storm: "wet", hail: "wet", cyclone: "wet", snow: "snow", blizzard: "snow", tornado: "tornado" };
   function forecast(c, day, hour) {
     if (c === "cancun") return roll("cancun", day, hour, 0);
+    if (c === "beijing") return roll("beijing", day, hour, 0);
     if (c !== "delhi") return roll("rome", day, hour, 0);
     const other = GROUP[roll("rome", day, hour, 0).kind];
     let w = roll("delhi", day, hour, 0);

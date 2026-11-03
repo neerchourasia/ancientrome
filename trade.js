@@ -8,12 +8,12 @@
 const Trade = (() => {
   const KEY = "rome-hold";
   const GOODS = [
-    { id: "spices", name: "Spices", icon: "🌶", base: { rome: 90, delhi: 40, cancun: 70 } },
-    { id: "silk", name: "Silk", icon: "🧵", base: { rome: 110, delhi: 60, cancun: 120 } },
-    { id: "oil", name: "Olive oil", icon: "🫒", base: { rome: 35, delhi: 70, cancun: 65 } },
-    { id: "tea", name: "Tea", icon: "🍵", base: { rome: 60, delhi: 25, cancun: 55 } },
-    { id: "cacao", name: "Cacao", icon: "🍫", base: { rome: 75, delhi: 85, cancun: 30 } },
-    { id: "jade", name: "Jade", icon: "💎", base: { rome: 160, delhi: 170, cancun: 100 } },
+    { id: "spices", name: "Spices", icon: "🌶", base: { rome: 90, delhi: 40, cancun: 70, beijing: 80 } },
+    { id: "silk", name: "Silk", icon: "🧵", base: { rome: 110, delhi: 60, cancun: 120, beijing: 40 } },
+    { id: "oil", name: "Olive oil", icon: "🫒", base: { rome: 35, delhi: 70, cancun: 65, beijing: 90 } },
+    { id: "tea", name: "Tea", icon: "🍵", base: { rome: 60, delhi: 25, cancun: 55, beijing: 20 } },
+    { id: "cacao", name: "Cacao", icon: "🍫", base: { rome: 75, delhi: 85, cancun: 30, beijing: 110 } },
+    { id: "jade", name: "Jade", icon: "💎", base: { rome: 160, delhi: 170, cancun: 100, beijing: 85 } },
   ];
   // crates each vehicle can carry
   const CAP = { bicycle: 1, scooter: 2, motorcycle: 3, rickshaw: 3, sportscar: 2, citycar: 6, taxi: 6, suv: 12, truck: 40, bus: 30, plane: 12, gyro: 3, glider: 0, balloon: 8, helicopter: 14, tiltrotor: 24,
@@ -43,7 +43,7 @@ const Trade = (() => {
     if (impact.day !== day()) impact = { day: day(), map: {} };
     return gd.base[c] * (0.88 + 0.24 * rnd(`${c}-${gd.id}-${day()}`)) * (1 + (impact.map[`${c}-${gd.id}`] || 0));
   }
-  const avg = (gd) => (gd.base.rome + gd.base.delhi + gd.base.cancun) / 3;
+  const avg = (gd) => (gd.base.rome + gd.base.delhi + gd.base.cancun + gd.base.beijing) / 4;
   const nearDepot = () => {
     const s = typeof Stalls !== "undefined" ? Stalls.SITES[where()] : null, st = Car.state();
     return !!s && !!st && Math.hypot(st.x - s.x, st.z - s.z) < ZONE;
@@ -100,7 +100,7 @@ const Trade = (() => {
   function render() {
     if (!el) return;
     const vid = Car.current, M = Car.MODELS[vid], cap = CAP[vid] || 0, here = where();
-    el.querySelector("#tr-title").textContent = `Trading depot · ${{ rome: "Rome", delhi: "Delhi", cancun: "Cancún" }[here] || here}`;
+    el.querySelector("#tr-title").textContent = `Trading depot · ${{ rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" }[here] || here}`;
     el.querySelector("#tr-purse").innerHTML = `Your purse: <b>${Vitals.coins}</b> denarii.`;
     el.querySelector("#tr-hold").textContent = `Your ${M ? M.name.toLowerCase() : "vehicle"} holds ${used(vid)} of ${cap} crates.`;
     const ul = el.querySelector("#tr-list"); ul.replaceChildren();
