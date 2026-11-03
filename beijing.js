@@ -315,6 +315,7 @@ const Beijing = (() => {
     for (const sx of [-1, 1]) mbox(g, X(x + sx * 11), 0, z + 9, 0.6, 3.4, 18, C.brick, { solid: true });                                           // the little yard's walls
     mbox(g, X(x - 11), 0, z + 18, 11, 3.4, 0.6, C.brick, { solid: true }); mbox(g, X(x + 11), 0, z + 18, 11, 3.4, 0.6, C.brick, { solid: true });
     sign(g, X(x), 4.5, z + HOME.hd + 0.4, 3.2, 0.9, "我家", "your home", Math.PI);
+    if (typeof Souvenirs !== "undefined") Souvenirs.addShelf(g, { x: X(-244.3), z: 85.5, face: "w", floor: 0.15 });     // the souvenir shelf, on the east wall
   }
 
   // ---------- Kunming Lake and the Summer Palace ----------

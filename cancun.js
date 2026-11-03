@@ -299,6 +299,7 @@ const Cancun = (() => {
     for (const sx of [-1, 1]) mcyl(g, X(x + sx * 1.8), 0, z - HOME.hd + 0.6, 0.14, 1.6, C.wood);                      // the posts of the hammock
     mbox(g, X(x), 0.9, z - HOME.hd + 0.6, 3.4, 0.14, 0.9, C.red, { cast: false });                                        // the hammock
     sign(g, X(x), 3.7, z + HOME.hd + 0.3, 2.6, 0.8, "CASITA", "your home", Math.PI);
+    if (typeof Souvenirs !== "undefined") Souvenirs.addShelf(g, { x: X(-66.85), z: 95.5, face: "w", floor: 0.15 });      // the souvenir shelf, on the east wall
   }
 
 

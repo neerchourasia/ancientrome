@@ -1,7 +1,7 @@
 "use strict";
 // Souvenirs: 🏺 Souvenirs in the menu. Four small keepsakes for every city, each one yours the first time you discover a particular sight (a coin from the Forum, a rubber ball from the
 // Great Ball Court, a red lantern from Tiananmen...). Nothing needs saving of its own: they come from the sights you have discovered, which are kept with your account. The ones you have
-// stand on the shelf on the west wall of your house in Rome, and the trophy room shows all sixteen (and what to do to find the missing ones). The game server is told which you have, so they
+// stand on a shelf in your house (the west wall in Rome, the east wall in Cancún and Beijing, a wall of the bedroom in each house in Old Delhi), and the trophy room shows all sixteen (and what to do to find the missing ones). The game server is told which you have, so they
 // show on your profile. Depends on game.js (discovered, ALL_LANDMARKS, worldScene, toast, openPanel), home.js and online.js.
 
 const Souvenirs = (() => {
@@ -30,9 +30,10 @@ const Souvenirs = (() => {
   const sig = () => have().map((s) => s[0]).join(",");
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
 
-  // ---------------------------------------------------------------- the shelf in the house in Rome (the west wall, between the door and the chest)
-  const SHELF = { x: 249.72, z: 50.0, len: 3.0, floor: 0.15, rows: [0.85, 1.4, 1.95] };
-  const props = {};                                    // id -> mesh
+  // ---------------------------------------------------------------- the shelves (one in each home: Rome, Cancún, Beijing and every size of house in Old Delhi)
+  // addShelf(parent, { x, z, face, floor }): a three-board shelf against a wall, centred on x, z (world coordinates), its front facing "e" (+x), "w" (-x), "n" (-z) or "s" (+z); floor is the height of the floor.
+  const ROWS = [0.85, 1.4, 1.95], LEN = 3.0;
+  const shelves = [];                                  // each: { props: id -> mesh }
   function make(id) {
     const T = THREE, g = new T.Group(), add = (geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m; };
     const gold = lambert(0xd9b44a, { emissive: 0x2a2005 }), wood = lambert(0x8a5a2b), stone = lambert(0xb9b2a0), red = lambert(0xb3262b), bronze = lambert(0xb08d3e), jade = lambert(0x3fa575), blue = lambert(0x2f5fa8), cream = lambert(0xefe6cf);
@@ -57,32 +58,32 @@ const Souvenirs = (() => {
     g.traverse((m) => { if (m.isMesh) { m.castShadow = true; } });
     return g;
   }
-  let built = false, last = "";
-  function build(scene) {
-    if (built || !scene) return; built = true;
-    const T = THREE, wood = lambert(0x6b4a2b);
-    const box = (w, h, d, x, y, z) => { const m = shadowed(new T.Mesh(BOX, wood)); m.scale.set(w, h, d); m.position.set(x, y, z); scene.add(m); };
-    for (const y of SHELF.rows) box(0.36, 0.05, SHELF.len, SHELF.x, SHELF.floor + y - 0.025, SHELF.z);            // the boards
-    for (const dz of [-1, 1]) box(0.34, SHELF.rows[2] + 0.1, 0.06, SHELF.x, SHELF.floor + (SHELF.rows[2] + 0.1) / 2, SHELF.z + dz * (SHELF.len / 2 - 0.03));   // the two ends
-    const per = Math.ceil(LIST.length / SHELF.rows.length);
-    LIST.forEach((s, i) => {                                           // each keepsake has its own place on the shelf, kept in the order of the list
-      const row = Math.floor(i / per), col = i % per, m = make(s[0]);
-      m.position.set(SHELF.x + 0.02, SHELF.floor + SHELF.rows[row], SHELF.z - SHELF.len / 2 + 0.3 + col * ((SHELF.len - 0.6) / Math.max(1, per - 1)));
-      m.rotation.y = Math.PI / 2;
-      m.visible = false; scene.add(m); props[s[0]] = m;
+  function addShelf(parent, cfg) {
+    if (!parent) return;
+    const T = THREE, wood = lambert(0x6b4a2b), face = cfg.face || "e", alongX = face === "n" || face === "s", fl = cfg.floor == null ? 0.15 : cfg.floor;
+    const box = (along, h, y, a, n) => { const m = shadowed(new T.Mesh(BOX, wood)); m.scale.set(alongX ? along : n, h, alongX ? n : along); m.position.set(cfg.x + (alongX ? a : 0), fl + y, cfg.z + (alongX ? 0 : a)); parent.add(m); };
+    for (const y of ROWS) box(LEN, 0.05, y - 0.025, 0, 0.36);                                               // the boards
+    for (const d of [-1, 1]) box(0.06, ROWS[2] + 0.1, (ROWS[2] + 0.1) / 2, d * (LEN / 2 - 0.03), 0.34);       // the two ends
+    const per = Math.ceil(LIST.length / ROWS.length), shelf = { props: {} }, turn = { e: Math.PI / 2, w: -Math.PI / 2, n: Math.PI, s: 0 }[face];
+    LIST.forEach((s, i) => {                                                                                  // each keepsake has its own place, kept in the order of the list
+      const row = Math.floor(i / per), col = i % per, p = make(s[0]), a = -LEN / 2 + 0.3 + col * ((LEN - 0.6) / Math.max(1, per - 1));
+      p.position.set(cfg.x + (alongX ? a : 0.02 * (face === "e" ? 1 : -1)), fl + ROWS[row], cfg.z + (alongX ? 0.02 * (face === "s" ? 1 : -1) : a));
+      p.rotation.y = turn; p.visible = false; parent.add(p); shelf.props[s[0]] = p;
     });
-    refresh();
+    shelves.push(shelf); refresh();
   }
+  let last = "";
+  function build(scene) { addShelf(scene, { x: 249.72, z: 50.0, face: "e", floor: 0.15 }); }                  // Rome: the west wall of the house, between the door and the chest
   function refresh() {
     const got = new Set(have().map((s) => s[0]));
-    for (const id of Object.keys(props)) props[id].visible = got.has(id);
+    for (const sh of shelves) for (const id of Object.keys(sh.props)) sh.props[id].visible = got.has(id);
   }
 
   // ---------------------------------------------------------------- the trophy room
   function render() {
     const body = document.getElementById("sv-body"); if (!body) return; body.replaceChildren();
     const got = new Set(have().map((s) => s[0]));
-    body.append(el("p", `${got.size} of ${LIST.length} souvenirs. Each one is yours the first time you discover a particular sight. They stand on the shelf in your house in Rome, and show on your profile.`, "dnote"));
+    body.append(el("p", `${got.size} of ${LIST.length} souvenirs. Each one is yours the first time you discover a particular sight. They stand on the shelf in your house (every city has one), and show on your profile.`, "dnote"));
     for (const [c, name] of Object.entries(CITIES)) {
       body.append(el("h4", name, "tn-round"));
       for (const s of LIST.filter((x) => x[1] === c)) {
@@ -110,5 +111,5 @@ const Souvenirs = (() => {
     const b = document.getElementById("btn-souv"); if (b) b.addEventListener("click", open);
     setInterval(() => { const now = sig(); if (now !== last) { last = now; refresh(); } tell(); }, 3000);            // (the saved game can arrive after the page has started)
   }
-  return { bind, build, refresh, found, open, list: LIST, have };
+  return { bind, build, addShelf, refresh, found, open, list: LIST, have };
 })();

@@ -543,6 +543,7 @@ const Delhi = (() => {
       for (const p of Dresser.parts(dx, dz, f)) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, dm2[p.mat], p.solid);
       Dresser.register("delhi", X(dx), dz, f, () => houseTier === t);
     });
+    if (typeof Souvenirs !== "undefined") for (const [t, sx, sz, f] of [[0, -96.3, -33, "w"], [1, -92.8, -43.5, "w"], [2, -76.7, -69.2, "w"], [3, -76.7, -69.2, "w"], [4, -76.7, -69.2, "w"], [5, -76.7, -69.2, "w"]]) Souvenirs.addShelf(houses[t].g, { x: X(sx), z: sz, face: f, floor: 0.02 });    // the souvenir shelf in every size of house
     // a garage for every upgrade (not the small house), by the east wall of the plot, open to the west
     const gm = { wall: D.cream, roof: D.redDark, dark: lambert(0x6a625a), door: D.wood };
     for (let t = 1; t <= 5; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);
