@@ -4514,7 +4514,7 @@ async def handle_http(reader, writer):
         cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
         return await reply(writer, 200, json.dumps({"ok": ok, "reason": why, "name": nm}).encode(), "application/json", cors)
     if path == "/health":
-        return await reply(writer, 200, json.dumps({"ok": True, "world": world_on(), "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
+        return await reply(writer, 200, json.dumps({"ok": True, "world": world_on(), "world_error": _world_err[0], "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
 
     if path == "/play" and hdr.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in hdr:
         if not origin_ok(hdr.get("origin")):
@@ -4569,7 +4569,18 @@ WORLD_SAVE_EVERY = 10.0
 _world_sig = {}
 
 
+_world_err = [""]          # the last thing that went wrong with saving or loading the world (shown on /health, so you can see it without the logs)
+
+
+def world_key_ok():
+    k = CFG.get("service_key") or ""
+    return bool(k) and k.isascii() and k == k.strip() and " " not in k
+
+
 def world_on():
+    if CFG.get("supabase_url") and CFG.get("service_key") and not world_key_ok():
+        _world_err[0] = "SUPABASE_SERVICE_KEY has characters a key cannot have (dots, spaces or line breaks): copy the whole key again with its copy button"
+        return False
     return bool(CFG.get("supabase_url") and CFG.get("service_key"))
 
 
@@ -4624,6 +4635,7 @@ async def world_load():
     try:
         rows = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state?select=key,data", world_headers())
     except Exception as err:
+        _world_err[0] = "load: %s" % str(err)[:160]
         print("  world: could not load (%s)" % err)
         return False
     world_apply({r["key"]: r["data"] for r in (rows or []) if isinstance(r, dict) and "key" in r})
@@ -4647,8 +4659,10 @@ async def world_save():
     try:
         await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/rest/v1/world_state", world_headers({"Prefer": "resolution=merge-duplicates"}), json.loads(json.dumps(body, default=str)), "POST")
     except Exception as err:
+        _world_err[0] = "save: %s" % str(err)[:160]
         print("  world: could not save (%s)" % err)
         return 0
+    _world_err[0] = ""
     for k, v, sig in changed:
         _world_sig[k] = sig
     return len(changed)
@@ -4712,6 +4726,8 @@ async def main():
     port = srv.sockets[0].getsockname()[1]
     print("Time Machine game server on port %d" % port)
     print("  accounts: %s | bots: %s | world saving: %s" % ("on" if CFG["supabase_url"] else "OFF (dev mode)", CFG["allow_bots"], "on" if world_on() else "off (memory only)"))
+    if not world_on() and _world_err[0]:
+        print("  WARNING: " + _world_err[0])
     if not CFG["origins"]:
         print("  WARNING: ALLOWED_ORIGINS is not set, so only pages on localhost can connect. Set it to your site's address.")
     async with srv:

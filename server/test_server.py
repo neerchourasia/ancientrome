@@ -1069,6 +1069,22 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.4)
         self.assertTrue(room.over)
 
+    # ---------------------------------------------------------------- the world key
+
+    def test_a_service_key_copied_with_dots_is_refused_and_explained(self):
+        saved = dict(server.CFG)
+        try:
+            server.CFG.update(supabase_url="https://x.supabase.co", service_key="sb_secret_abc\u2022\u2022\u2022\u2022")
+            server._world_err[0] = ""
+            self.assertFalse(server.world_on())
+            self.assertIn("copy the whole key again", server._world_err[0])
+            server.CFG["service_key"] = "sb_secret_abcdefghijk"
+            self.assertTrue(server.world_on())
+        finally:
+            server.CFG.clear()
+            server.CFG.update(saved)
+            server._world_err[0] = ""
+
     # ---------------------------------------------------------------- the pyramid is kept
 
     async def test_pyramid_a_fresh_server_takes_what_a_browser_remembers_once(self):

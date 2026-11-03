@@ -62,3 +62,5 @@ Spectating. Matches are one duel or one race at a time.
 ## Ranked matches, friends and friend chats
 
 These need a logged-in account. Ratings (Elo), friend lists, friend requests and messages left for absent friends are kept **in the server's memory**, so a restart of the server forgets requests and waiting messages. Each player's browser keeps its own copy of its rating and friend list in their saved game and sends it back when it connects, so ratings and friendships come back by themselves. A friendship counts only when both sides have it, and friends are named by a public id (a hash of the account id), never the account id itself. To make everything permanent on the server, move these tables to Supabase.
+
+**If `/health` says `"world": false` or shows a `world_error`:** `SUPABASE_SERVICE_KEY` is missing or wrong. Copy the secret key with its copy button in Supabase (Project Settings > API Keys); copying the shown text gives the masked version with dots, which cannot work. `/health` shows what went wrong in `world_error`.
