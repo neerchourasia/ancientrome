@@ -882,3 +882,11 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #mini-touch .mt-dpad .u { grid-area: 1 / 2; } #mini-touch .mt-dpad .l { grid-area: 2 / 1; } #mini-touch .mt-dpad .r { grid-area: 2 / 3; } #mini-touch .mt-dpad .d { grid-area: 3 / 2; }
 body.touch .dpanel button, body.touch .dpanel select { min-height: 40px; }
 .hf-row { margin: 4px 0; font-size: .92rem; line-height: 1.45; }
+
+/* profile charts */
+.pf-bars { display: grid; gap: 5px; margin: 4px 0 10px; }
+.pf-bar { display: grid; grid-template-columns: 7.5em 1fr 6em; align-items: center; gap: 8px; font-size: .85rem; }
+.pf-track { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.1); }
+.pf-seg.w { background: #4f9f5e; } .pf-seg.d { background: #c9b458; } .pf-seg.l { background: #b3453d; }
+.pf-bp { text-align: right; color: var(--muted); font-size: .8rem; }
+.pf-spark { width: 100%; max-width: 360px; height: 70px; background: rgba(255,255,255,.05); border-radius: 8px; }

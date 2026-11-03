@@ -147,7 +147,9 @@ const Online = (() => {
       t.textContent = `${p.name} · rating ${p.r}${p.busy ? " · in a game" : ""} `;
       const b = document.createElement("button"); b.type = "button"; b.textContent = "Challenge"; b.disabled = !!p.busy;
       b.addEventListener("click", () => { send({ t: "challenge", a: "send", id: p.id, game: $o("ch-game").value }); b.disabled = true; });
-      li.append(t, b); ul.append(li);
+      li.append(t, b);
+      if (p.acc && typeof Swap !== "undefined") { const tb = document.createElement("button"); tb.type = "button"; tb.textContent = "🔁 Trade"; tb.title = "Ask them to swap things (they need an account too)"; tb.disabled = !!p.busy; tb.addEventListener("click", () => { Swap.requestId(p); tb.disabled = true; }); li.append(" ", tb); }
+      ul.append(li);
     }
   }
   function openChallenge() {

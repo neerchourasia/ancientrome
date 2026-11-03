@@ -1548,6 +1548,96 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"hall": {"tourneys": [{"k": "chess"}, 5], "weekly": "x"}})      # junk is ignored
         self.assertEqual((server.HALL["tourneys"], server.HALL["weekly"]), ([], []))
 
+    def test_profile_keeps_rating_history_and_win_streaks(self):
+        server.STATS.clear()
+        self.addCleanup(server.STATS.clear)
+        a, b = self.WC("aaaaaaaaaaaa", "Ann"), self.WC("bbbbbbbbbbbb", "Ben")
+        server.RATINGS.clear(); server.RECENT.clear()
+        for res in ("w", "w", "d", "w", "l", "w"):
+            server.stats_add(a, "xiangqi", res, ["Ben"])
+        rec = server.STATS["aaaaaaaaaaaa"]
+        self.assertEqual((rec["cs"], rec["bs"], len(rec["rh"])), (1, 3, 6))                  # (a draw does not break a streak; a loss does)
+        for _ in range(50):
+            server.stats_add(a, "xiangqi", "l", ["Ben"])
+        self.assertEqual(len(server.STATS["aaaaaaaaaaaa"]["rh"]), 40)
+        v = server.profile_view("aaaaaaaaaaaa")
+        self.assertEqual((v["streak"], len(v["rh"])), ([0, 3], 40))
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.STATS.clear()
+        server.world_apply(snap)
+        self.assertEqual((server.STATS["aaaaaaaaaaaa"]["bs"], len(server.STATS["aaaaaaaaaaaa"]["rh"])), (3, 40))
+
+    async def test_trading_with_a_stranger_has_limits_a_waiting_time_and_a_daily_cap(self):
+        self.accounts("ann", "bob", "cy")
+        server.TRADE_STRANGER.clear()
+        self.addCleanup(server.TRADE_STRANGER.clear)
+        saved = server.TRADE_WAIT
+        server.TRADE_WAIT = 0.0
+        self.addCleanup(lambda: setattr(server, "TRADE_WAIT", saved))
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        guest = await self.player("Guest")
+        ann.send({"t": "challenge", "a": "list"})
+        rows = {r["name"]: r for r in (await ann.until(lambda m: m["t"] == "chal" and m["a"] == "list"))["list"]}
+        self.assertEqual((rows["Bob"]["acc"], rows["Guest"]["acc"]), (True, False))
+        ann.send({"t": "social", "a": "trade_req_id", "id": rows["Guest"]["id"]})                         # a guest has no account
+        self.assertIn("account", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "trade_req_id", "id": rows["Bob"]["id"]})
+        req = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "req")
+        self.assertEqual((req["name"], req["stranger"]), ("Ann", True))
+        bob.send({"t": "social", "a": "trade_yes", "fid": req["fid"]})
+        op = await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
+        await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
+        self.assertEqual((op["stranger"], op["limits"]), (True, {"items": 3, "coins": 1000}))
+        ann.send({"t": "social", "a": "trade_offer", "items": ["a1", "b2", "c3", "d4", "e5"], "coins": 99999})      # cut down to 3 things and 1000 denarii
+        seen = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        self.assertEqual((len(seen["items"]), seen["coins"]), (3, 1000))
+        bob.send({"t": "social", "a": "trade_offer", "items": ["z9"], "coins": 5})
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        ann.send({"t": "social", "a": "trade_ok"})
+        bob.send({"t": "social", "a": "trade_ok"})
+        wait = await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "wait")                       # not done at once
+        self.assertIn("secs", wait)
+        ann.send({"t": "social", "a": "trade_offer", "items": ["a1"], "coins": 0})                         # a change in the waiting time starts again
+        await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
+        server.trade_tick()
+        with self.assertRaises(asyncio.TimeoutError):
+            await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "done", timeout=0.5)
+        ann.send({"t": "social", "a": "trade_ok"})
+        bob.send({"t": "social", "a": "trade_ok"})
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "wait")
+        server.trade_tick()
+        done_a = await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "done")
+        done_b = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "done")
+        self.assertEqual((done_a["give"]["items"], done_a["get"]["items"], done_b["get"]["items"]), (["a1"], ["z9"], ["a1"]))
+        ann.send({"t": "social", "a": "trade_req_id", "id": rows["Bob"]["id"]})                           # another stranger trade at once: not yet
+        self.assertIn("minute", (await ann.until(lambda m: m["t"] == "fr_msg" and "minute" in m["msg"]))["msg"])
+        for fid in list(server.TRADE_STRANGER):                                                          # the daily cap
+            server.TRADE_STRANGER[fid] = [time.time() - 3600 * (i + 1) for i in range(5)]
+        ann.send({"t": "social", "a": "trade_req_id", "id": rows["Bob"]["id"]})
+        self.assertIn("enough trades", (await ann.until(lambda m: m["t"] == "fr_msg" and "enough" in m["msg"]))["msg"])
+
+    async def test_trading_with_a_stranger_can_be_cancelled_in_the_waiting_time(self):
+        self.accounts("ann", "bob")
+        server.TRADE_STRANGER.clear()
+        saved = server.TRADE_WAIT
+        server.TRADE_WAIT = 30.0
+        self.addCleanup(lambda: (setattr(server, "TRADE_WAIT", saved), server.TRADE_STRANGER.clear()))
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "challenge", "a": "list"})
+        bid = next(r["id"] for r in (await ann.until(lambda m: m["t"] == "chal" and m["a"] == "list"))["list"] if r["name"] == "Bob")
+        ann.send({"t": "social", "a": "trade_req_id", "id": bid})
+        req = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "req")
+        bob.send({"t": "social", "a": "trade_yes", "fid": req["fid"]})
+        await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
+        ann.send({"t": "social", "a": "trade_ok"})
+        bob.send({"t": "social", "a": "trade_ok"})
+        await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "wait")
+        server.trade_tick()                                                                              # (thirty seconds have not passed)
+        bob.send({"t": "social", "a": "trade_cancel"})
+        closed = await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "closed")
+        self.assertIn("stopped", closed["why"])
+        self.assertEqual({f: v for f, v in server.TRADE_STRANGER.items() if v}, {})                    # (a cancelled trade does not count)
+
     def test_tourney_is_saved_and_a_match_that_was_live_waits_again(self):
         self.tourney_fresh()
         t = self.tourney_pure("xiangqi", 4)

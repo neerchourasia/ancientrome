@@ -12,6 +12,31 @@ const Profile = (() => {
   const ago = (t) => { const s = Math.max(0, Date.now() / 1000 - t); return s < 3600 ? `${Math.max(1, Math.floor(s / 60))} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : `${Math.floor(s / 86400)} days ago`; };
   let cur = null;
 
+  // charts: how you do in each game (green won, gold drawn, red lost), the rating over the last matches, and the winning streak
+  function stats(body) {
+    const kinds = Object.keys(cur.games || {}).filter((k) => cur.games[k].reduce((x, y) => x + y, 0) > 0);
+    if (!kinds.length) return;
+    body.append(el("h4", "Results by game"));
+    const bars = el("div", undefined, "pf-bars");
+    for (const k of kinds.sort((a, b) => cur.games[b].reduce((x, y) => x + y, 0) - cur.games[a].reduce((x, y) => x + y, 0))) {
+      const [w, l, d] = cur.games[k], n = w + l + d, row = el("div", undefined, "pf-bar"), track = el("div", undefined, "pf-track");
+      for (const [v, cls] of [[w, "w"], [d, "d"], [l, "l"]]) if (v) { const seg = el("span", undefined, `pf-seg ${cls}`); seg.style.flexGrow = v; track.append(seg); }
+      row.append(el("span", GAMES[k] || k, "pf-bl"), track, el("span", `${Math.round(100 * w / n)}% of ${n}`, "pf-bp")); bars.append(row);
+    }
+    body.append(bars);
+    const rh = cur.rh || [];
+    if (rh.length >= 2) {
+      const lo = Math.min(...rh), hi = Math.max(...rh), W = 300, H = 70, span = Math.max(20, hi - lo), ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("class", "pf-spark"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Rating over your last matches");
+      const pts = rh.map((v, i) => `${(i / (rh.length - 1)) * (W - 8) + 4},${H - 8 - ((v - lo) / span) * (H - 16)}`).join(" ");
+      const line = document.createElementNS(ns, "polyline"); line.setAttribute("points", pts); line.setAttribute("fill", "none"); line.setAttribute("stroke", "#e2b955"); line.setAttribute("stroke-width", "2.5"); line.setAttribute("stroke-linejoin", "round"); svg.append(line);
+      const last = pts.split(" ").pop().split(","), dot = document.createElementNS(ns, "circle"); dot.setAttribute("cx", last[0]); dot.setAttribute("cy", last[1]); dot.setAttribute("r", "4"); dot.setAttribute("fill", "#fff3cf"); svg.append(dot);
+      body.append(el("h4", `Rating over your last ${rh.length} matches (${lo} to ${hi})`), svg);
+    }
+    const st = cur.streak || [0, 0];
+    if (st[1]) body.append(el("p", `🔥 Winning streak: ${st[0]} now, ${st[1]} at best`, "pf-sum"));
+  }
+
   function render() {
     const body = $p("pf-body"); body.replaceChildren();
     if (!cur) { body.append(el("p", Online.connected ? "Loading..." : "Profiles need the game server: wait to be connected.", "dnote")); return; }
@@ -22,6 +47,7 @@ const Profile = (() => {
     if (c[0] || c[1] || c[2]) body.append(el("p", `Weekly cup: 🥇 ${c[0]}  🥈 ${c[1]}  🥉 ${c[2]}`, "pf-sum"));
     if (cur.sv && cur.sv.length) body.append(el("p", `🏺 Souvenirs ${cur.sv.length}/16: ${cur.sv.map((id) => (Souvenirs.list.find((s) => s[0] === id) || [0, 0, ""])[2]).join(" ")}`, "pf-sum"));
     if (cur.tw) body.append(el("p", `🏟️ Tournaments won: ${cur.tw}`, "pf-sum"));
+    stats(body);
     const kinds = Object.keys(cur.games || {}).sort((a, b) => cur.games[b].reduce((x, y) => x + y, 0) - cur.games[a].reduce((x, y) => x + y, 0));
     if (kinds.length) {
       const t = el("table", undefined, "pf-table");

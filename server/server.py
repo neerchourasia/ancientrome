@@ -315,6 +315,7 @@ class Conn:
         self.watching = None       # the match they are watching (a MiniRoom or DragonRoom), if any
         self.cheer_t = 0.0         # when they last cheered
         self.souv_t = -99.0        # when they last told us which souvenirs they have
+        self.trade_t = None        # when they last asked someone to trade
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
@@ -2779,6 +2780,7 @@ async def world_loop():
                 houses_once()
             if n % 4 == 0:
                 tourney_tick()
+                trade_tick()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
         except Exception as e:  # never let a bug here stop the world
@@ -3662,11 +3664,50 @@ def social_start(conn, m):
 
 TRADE_ITEMS, TRADE_COINS, TRADE_REQ_LIFE = 6, 100000, 60.0
 TRADE_REQS = {}            # (fid of the one asking, fid of the one asked) -> when
+# Trading with someone who is not a friend (asked from the Challenge list): both need an account, a trade holds at most 3 things and 1000 denarii from each side, once both have locked in
+# there are ten seconds to change your mind (any change unlocks, either side can cancel), and one account can make a stranger trade every two minutes and five in a day.
+TRADE_STRANGER_ITEMS, TRADE_STRANGER_COINS, TRADE_WAIT, TRADE_STRANGER_GAP, TRADE_STRANGER_DAY = 3, 1000, 10.0, 120.0, 5
+TRADE_STRANGER = collections.defaultdict(list)     # fid -> when its stranger trades were completed (not saved)
 
 
-def clean_offer(m):
+def clean_offer(m, stranger=False):
     items = [i for i in (m.get("items") or []) if isinstance(i, str) and re.fullmatch(r"[a-z0-9_]{2,24}", i)] if isinstance(m.get("items"), list) else []
-    return {"items": list(dict.fromkeys(items))[:TRADE_ITEMS], "coins": int(num(m.get("coins"), 0, TRADE_COINS, 0)), "ok": False}
+    return {"items": list(dict.fromkeys(items))[:TRADE_STRANGER_ITEMS if stranger else TRADE_ITEMS], "coins": int(num(m.get("coins"), 0, TRADE_STRANGER_COINS if stranger else TRADE_COINS, 0)), "ok": False}
+
+
+def stranger_block(conn):
+    """Why this account cannot start a trade with a stranger just now (None if it can)."""
+    t = time.time()
+    recent = [x for x in TRADE_STRANGER[conn.fid] if t - x < 86400]
+    TRADE_STRANGER[conn.fid] = recent
+    if recent and t - recent[-1] < TRADE_STRANGER_GAP:
+        return "You can trade with someone who is not a friend again in %d minute(s)." % (int((TRADE_STRANGER_GAP - (t - recent[-1])) // 60) + 1)
+    if len(recent) >= TRADE_STRANGER_DAY:
+        return "That is enough trades with strangers for one day."
+    return None
+
+
+def trade_complete(tr):
+    a, b = tr["a"], tr["b"]
+    mine, theirs = tr["o"][id(a)], tr["o"][id(b)]
+    for c, give, get in ((a, mine, theirs), (b, theirs, mine)):
+        c.trade = None
+        c.send({"t": "fr_trade", "s": "done", "get": {"items": get["items"], "coins": get["coins"]}, "give": {"items": give["items"], "coins": give["coins"]}})
+    if tr.get("stranger"):
+        for c in (a, b):
+            TRADE_STRANGER[c.fid].append(time.time())
+    if mine["coins"] >= 3000 or theirs["coins"] >= 3000:
+        flag("large trade", "%s and %s traded %d / %d denarii" % (a.name, b.name, mine["coins"], theirs["coins"]), "low", conn=a, gap=300)
+
+
+def trade_tick():
+    """Finishes the trades with strangers whose ten seconds are up."""
+    t = time.time()
+    for c in list(CONNS):
+        tr = getattr(c, "trade", None)
+        if tr and tr["a"] is c and tr.get("done_at") and t >= tr["done_at"]:
+            tr["done_at"] = None
+            trade_complete(tr)
 
 
 def trade_other(conn):
@@ -3687,6 +3728,22 @@ def trade_close(conn, why):
 
 def on_trade(conn, a, m):
     t = now()
+    if a == "trade_req_id":                                                   # asking someone from the Challenge list (they may not be a friend)
+        target = conn_by_id(str(m.get("id"))[:16])
+        if not conn.fid or target is None or target is conn or not target.fid or target.closed or not target.hello:
+            return social_msg(conn, "Both of you need an account to trade, and they must be online.")
+        if conn.trade or conn.room or target.trade or target.room:
+            return social_msg(conn, "They are not free to trade right now (busy or already trading).")
+        stranger = not mutual(conn.fid, target.fid)
+        why = stranger_block(conn) if stranger else None
+        if why:
+            return social_msg(conn, why)
+        if conn.trade_t is not None and t - conn.trade_t < 5.0:
+            return social_msg(conn, "Wait a moment before asking again.")
+        conn.trade_t = t
+        TRADE_REQS[(conn.fid, target.fid)] = t
+        target.send({"t": "fr_trade", "s": "req", "fid": conn.fid, "name": conn.name, "stranger": stranger, "r": rating_of(conn)["r"]})
+        return social_msg(conn, "Trade request sent.")
     if a == "trade_req":
         fid = clean_fid(m.get("fid"))
         others = [c for c in conns_of(fid) if not c.room] if fid else []
@@ -3702,18 +3759,24 @@ def on_trade(conn, a, m):
         fid = clean_fid(m.get("fid"))
         asked = TRADE_REQS.pop((fid, conn.fid), None) if fid else None
         starters = [c for c in conns_of(fid) if not c.room and not c.trade] if fid else []
-        if asked is None or t - asked > TRADE_REQ_LIFE or not starters or not mutual(conn.fid, fid):
+        if asked is None or t - asked > TRADE_REQ_LIFE or not starters:
             return social_msg(conn, "That trade request has run out.")
         if a == "trade_no":
             return starters[0].send({"t": "fr_trade", "s": "closed", "why": "%s said no thanks." % conn.name})
         if conn.trade or conn.room:
             return
-        tr = {"a": starters[0], "b": conn, "o": {}}
+        stranger = not mutual(conn.fid, fid)
+        why = (stranger_block(conn) or stranger_block(starters[0])) if stranger else None
+        if why:
+            starters[0].send({"t": "fr_trade", "s": "closed", "why": why})
+            return social_msg(conn, why)
+        tr = {"a": starters[0], "b": conn, "o": {}, "stranger": stranger, "done_at": None}
         tr["o"][id(tr["a"])] = {"items": [], "coins": 0, "ok": False}
         tr["o"][id(conn)] = {"items": [], "coins": 0, "ok": False}
         tr["a"].trade = conn.trade = tr
-        tr["a"].send({"t": "fr_trade", "s": "open", "name": conn.name})
-        conn.send({"t": "fr_trade", "s": "open", "name": tr["a"].name})
+        lim = {"items": TRADE_STRANGER_ITEMS, "coins": TRADE_STRANGER_COINS} if stranger else None
+        tr["a"].send({"t": "fr_trade", "s": "open", "name": conn.name, "stranger": stranger, "limits": lim})
+        conn.send({"t": "fr_trade", "s": "open", "name": tr["a"].name, "stranger": stranger, "limits": lim})
         return
     tr = getattr(conn, "trade", None)
     if not tr:
@@ -3722,8 +3785,9 @@ def on_trade(conn, a, m):
     if a == "trade_cancel":
         return trade_close(conn, "%s stopped the trade." % conn.name)
     if a == "trade_offer":
-        tr["o"][id(conn)] = clean_offer(m)
+        tr["o"][id(conn)] = clean_offer(m, tr.get("stranger"))
         tr["o"][id(other)]["ok"] = False
+        tr["done_at"] = None                                                  # (a change during the ten seconds starts everything again)
         other.send({"t": "fr_trade", "s": "theirs", "items": tr["o"][id(conn)]["items"], "coins": tr["o"][id(conn)]["coins"], "ok": False})
         conn.send({"t": "fr_trade", "s": "unlock"})
         return
@@ -3731,12 +3795,12 @@ def on_trade(conn, a, m):
         tr["o"][id(conn)]["ok"] = True
         other.send({"t": "fr_trade", "s": "theirs_ok"})
         if tr["o"][id(other)]["ok"]:
-            mine, theirs = tr["o"][id(conn)], tr["o"][id(other)]
-            for c, give, get in ((conn, mine, theirs), (other, theirs, mine)):
-                c.trade = None
-                c.send({"t": "fr_trade", "s": "done", "get": {"items": get["items"], "coins": get["coins"]}, "give": {"items": give["items"], "coins": give["coins"]}})
-            if mine["coins"] >= 3000 or theirs["coins"] >= 3000:
-                flag("large trade", "%s and %s traded %d / %d denarii" % (conn.name, other.name, mine["coins"], theirs["coins"]), "low", conn=conn, gap=300)
+            if tr.get("stranger"):                                            # with a stranger: ten seconds to look again (or cancel) first
+                tr["done_at"] = time.time() + TRADE_WAIT
+                for c in (conn, other):
+                    c.send({"t": "fr_trade", "s": "wait", "secs": int(TRADE_WAIT)})
+            else:
+                trade_complete(tr)
         return
 
 
@@ -4596,7 +4660,7 @@ def clean_tourney(t):
 # games are kept as move lists, so anyone can replay them. Profiles are public (a name and some numbers), and only for players with an account.
 STATS = {}                 # friend id -> {"name", "r" (rating), "g": {kind: [wins, losses, draws]}, "cups": [gold, silver, bronze], "hist": [{"k", "r", "vs", "t", "rp"}]}
 REPLAYS = []               # [{"id", "k", "names", "w" (winner, -1 draw), "mv" [[from, to], ...], "t"}], newest last
-STATS_MAX, REPLAYS_MAX, HIST_MAX = 5000, 100, 12
+STATS_MAX, REPLAYS_MAX, HIST_MAX, RH_MAX = 5000, 100, 12, 40
 
 
 def stats_rec(fid, name):
@@ -4619,6 +4683,10 @@ def stats_add(conn, kind, result, vs, rp=None):
     g = rec["g"].setdefault(kind, [0, 0, 0])
     g["wld".index(result)] += 1
     rec["r"] = rating_of(conn)["r"]
+    rec["rh"] = (rec.get("rh", []) + [rec["r"]])[-RH_MAX:]                                         # the rating after every match (for the chart on the profile)
+    cs = rec.get("cs", 0)
+    rec["cs"] = cs + 1 if result == "w" else 0 if result == "l" else cs                              # the winning streak (a draw neither adds nor breaks it)
+    rec["bs"] = max(rec.get("bs", 0), rec["cs"])
     row = {"k": kind, "r": result, "vs": vs[:3], "t": int(time.time())}
     if rp:
         row["rp"] = rp
@@ -4701,7 +4769,7 @@ def profile_view(fid):
     w, l, d = (sum(v[i] for v in games.values()) for i in range(3))
     have = {r["id"] for r in REPLAYS}
     hist = [dict(h, rp=h["rp"] if h.get("rp") in have else None) for h in rec["hist"]]
-    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "hist": hist[::-1], "online": bool(conns_of(fid))}
+    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "rh": rec.get("rh", []), "streak": [rec.get("cs", 0), rec.get("bs", 0)], "hist": hist[::-1], "online": bool(conns_of(fid))}
 
 
 def on_profile(conn, m):
@@ -4899,7 +4967,7 @@ def on_challenge(conn, m):
         return
     a, t = m.get("a"), now()
     if a == "list":
-        out = [{"id": c.id, "name": c.name, "r": rating_of(c)["r"], "busy": 0 if chal_free(c) else 1} for c in CONNS if c is not conn and not c.closed and c.hello]
+        out = [{"id": c.id, "name": c.name, "r": rating_of(c)["r"], "busy": 0 if chal_free(c) else 1, "acc": bool(c.fid)} for c in CONNS if c is not conn and not c.closed and c.hello]
         out.sort(key=lambda o: (o["busy"], -o["r"], o["name"]))
         return conn.send({"t": "chal", "a": "list", "list": out[:40]})
     if a == "send":
@@ -4969,7 +5037,7 @@ def on_social(conn, m):
     if conn.social_n < 1:
         return social_msg(conn, "Slow down a little.")
     conn.social_n -= 1
-    if a in ("trade_req", "trade_yes", "trade_no", "trade_cancel", "trade_offer", "trade_ok"):
+    if a in ("trade_req", "trade_req_id", "trade_yes", "trade_no", "trade_cancel", "trade_offer", "trade_ok"):
         return on_trade(conn, a, m)
     if a == "stats":
         return on_stats(conn, m)
@@ -5501,7 +5569,8 @@ def world_apply(rows):
             if clean_fid(f) and isinstance(r, dict) and isinstance(r.get("g"), dict):
                 STATS[f] = {"name": str(r.get("name", ""))[:24], "r": int(num(r.get("r"), 0, 4000, START_RATING)),
                             "g": {str(k)[:12]: [int(num(x, 0, 1e6, 0)) for x in (v + [0, 0, 0])[:3]] for k, v in list(r["g"].items())[:20] if isinstance(v, list)},
-                            "tw": int(num(r.get("tw"), 0, 1e6, 0)), "sv": [i for i in SOUVENIRS if i in (r.get("sv") if isinstance(r.get("sv"), list) else [])],
+                            "tw": int(num(r.get("tw"), 0, 1e6, 0)), "rh": [int(num(x, 0, 4000, 0)) for x in (r.get("rh") if isinstance(r.get("rh"), list) else [])[-RH_MAX:]],
+                            "cs": int(num(r.get("cs"), 0, 1e6, 0)), "bs": int(num(r.get("bs"), 0, 1e6, 0)), "sv": [i for i in SOUVENIRS if i in (r.get("sv") if isinstance(r.get("sv"), list) else [])],
                             "cups": [int(num(x, 0, 1e6, 0)) for x in ((r.get("cups") if isinstance(r.get("cups"), list) else []) + [0, 0, 0])[:3]],
                             "hist": [{"k": str(h.get("k"))[:12], "r": h.get("r") if h.get("r") in ("w", "l", "d") else "d", "vs": [str(n)[:24] for n in (h.get("vs") or [])[:3]], "t": int(num(h.get("t"), 0, 4e9, 0)), "rp": h.get("rp") if isinstance(h.get("rp"), str) else None}
                                      for h in (r.get("hist") if isinstance(r.get("hist"), list) else [])[-HIST_MAX:] if isinstance(h, dict)]}
