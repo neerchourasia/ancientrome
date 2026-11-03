@@ -1339,6 +1339,67 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply(snap)
         self.assertEqual(server.NOTICES["cancun"][0]["text"], "fresh news")
 
+    async def test_watch_a_dragon_boat_race_and_cheer(self):
+        ws, ms, room = await self.start_dragon(2)
+        cy = await self.player("Cy")
+        cy.send({"t": "watch", "a": "list"})
+        lst = (await cy.until(lambda m: m["t"] == "watch" and m["a"] == "list"))["list"]
+        self.assertEqual([(r["kind"], sorted(r["names"])) for r in lst], [("dragon", ["Ann", "Ben"])])
+        cy.send({"t": "watch", "a": "join", "room": lst[0]["room"]})
+        joined = await cy.until(lambda m: m["t"] == "match")
+        self.assertEqual((joined["mode"], joined["watch"], joined["length"], joined["beat"]), ("dragon", True, 250.0, 0.6))
+        self.assertLess(joined["countdown"], 0)                                                # (the race is already under way)
+        room.step(0.1)
+        got = await cy.until(lambda m: m["t"] == "dragon")                                    # the boats' positions reach the watcher
+        self.assertEqual((len(got["p"]), got["w"]), (2, 1))
+        cy.send({"t": "watch", "a": "cheer", "e": "🔥"})
+        for w in (ws[0], ws[1], cy):                                                          # everyone sees the cheer
+            c = await w.until(lambda m: m["t"] == "cheer")
+            self.assertEqual((c["name"], c["e"]), ("Cy", "🔥"))
+        cy.send({"t": "watch", "a": "cheer", "e": "😮"})                                       # too soon after the last one: ignored
+        with self.assertRaises(asyncio.TimeoutError):
+            await ws[0].until(lambda m: m["t"] == "cheer", timeout=0.5)
+        server.on_watch(next(c for c in server.CONNS if c.name == "Cy"), {"a": "cheer", "e": "💩"}) # (and only the listed cheers)
+        a, b = room.players
+        a.s, a.v, b.s, b.v = 249.5, 6.0, 200.0, 4.0
+        for _ in range(3):
+            room.step(0.1)
+        b.s = 249.5
+        for _ in range(3):
+            room.step(0.1)
+        end = await cy.until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual((end["mode"], end.get("watch"), end["order"][0]["i"]), ("dragon", True, 0))
+        self.assertNotIn("rank", end)
+
+    async def test_watch_the_ball_game(self):
+        ws, ms, room = await self.start_mini("ball")
+        cy = await self.player("Cy")
+        cy.send({"t": "watch", "a": "list"})
+        lst = (await cy.until(lambda m: m["t"] == "watch" and m["a"] == "list"))["list"]
+        self.assertEqual([r["kind"] for r in lst], ["ball"])
+        cy.send({"t": "watch", "a": "join", "room": lst[0]["room"]})
+        joined = await cy.until(lambda m: m["t"] == "match")
+        self.assertEqual((joined["mode"], joined["watch"], [p["name"] for p in joined["players"]]), ("ball", True, ["Ann", "Ben"]))
+        room.step(0.1)
+        got = await cy.until(lambda m: m["t"] == "mini")
+        self.assertEqual((len(got["b"]), len(got["p"])), (3, 2))                              # the ball and both players
+
+    def test_weekly_end_of_week_is_announced_in_chat(self):
+        self.weekly_fresh()
+        sent = []
+        with mock.patch.object(server, "broadcast_chat", side_effect=lambda e: sent.append(e["text"])):
+            server.WEEKLY["week"] -= 1
+            server.WEEKLY["scores"] = {"aaaaaaaaaaaa": {"name": "Ann", "pts": 9, "blk": 0, "bp": 0}, "bbbbbbbbbbbb": {"name": "Ben", "pts": 5, "blk": 0, "bp": 0}}
+            server.weekly_roll()
+        self.assertEqual(len(sent), 2)
+        self.assertIn("🥇 Ann (9)", sent[0])
+        self.assertIn("🥈 Ben (5)", sent[0])
+        self.assertIn("A new weekly cup begins", sent[1])
+        server.CHAT_LOG.clear()
+        with mock.patch.object(server, "broadcast_chat", side_effect=lambda e: sent.append(e["text"])):
+            server.weekly_roll()                                                              # the same week again: nothing is said
+        self.assertEqual(len(sent), 2)
+
     # ---------------------------------------------------------------- profiles and replays
 
     def test_profile_collects_results_history_and_cups(self):

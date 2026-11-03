@@ -88,7 +88,8 @@ const Online = (() => {
       case "left": waiting = false; setMsg(""); break;
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
       case "watch": Mini.onWatch(m); break;
-      case "match": waiting = false; setMsg(""); if (m.watch) { Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "cheer": Mini.onCheer(m); break;
+      case "match": waiting = false; setMsg(""); if (m.watch) { if (m.mode === "ball") toCity("cancun"); else if (m.mode === "dragon") toCity("beijing"); Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;

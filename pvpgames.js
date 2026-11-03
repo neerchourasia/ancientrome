@@ -43,13 +43,13 @@ const Mini = (() => {
     m = msg; st = null; note = ""; held.clear(); kite = { x: m.you === 0 ? 22 : 78, y: 30 }; hitAt = [0, 0]; pullAt = [0, 0];
     mode = "online";
     m.title = m.watch ? `👀 ${m.players.map((p) => p.name).join(" vs ")}` : `${TITLES[m.mode]}${m.ranked ? " (ranked)" : ""}`; head.textContent = m.title;
-    m.kind = m.mode; help.textContent = m.watch ? "You are watching this match. Press Esc or the button to stop." : HELP[m.kind];
+    m.kind = m.mode; help.textContent = m.watch ? "You are watching this match. Press 1 2 3 4 to cheer. Esc or the button stops." : HELP[m.kind];
     ov.querySelector("#mini-leave").textContent = m.watch ? "Stop watching" : "Leave the game";
     if (m.kind === "xiangqi") xqSetup();
     ov.classList.add("show");
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
-    if (!m.watch) Sfx.play("horn");
+    if (!m.watch) Sfx.play("horn"); else cheerBar(true);
   }
 
   const GAME_KEYS = new Set(["Space", "KeyA", "KeyD", "KeyW", "KeyS", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Escape"]);
@@ -162,7 +162,48 @@ const Mini = (() => {
   const court = () => ({ x: CANCUN_X - 150, z: -35 });
   const HALF_U = 12.5, HALF_W = 34;
 
+  function makeBallFig(pl, color) {
+    const fig = createFigure(); paintFigure(fig.mats, pl.look); applyAccessories(fig, pl.look.acc);
+    fig.sword.visible = false; fig.g.rotation.order = "YXZ";
+    const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
+    x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = color; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.2; tag.renderOrder = 10; fig.g.add(tag);
+    scene.add(fig.g); return fig;
+  }
+  function start3dWatch(msg) {                                         // watching: both players are drawn, you stand beside the court's south end and can walk about
+    if (city !== "cancun") { send({ t: "watch", a: "leave" }); toast("The ball game is played on the Great Ball Court in Cancún."); return; }
+    closePanels(); Vitals.stopRest();
+    m = msg; m.kind = "ball"; st = null; note = ""; sendT = 0;
+    const c = court();
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 10), new THREE.MeshLambertMaterial({ color: 0x7a2d12 })); ball.position.set(c.x, 6, c.z); scene.add(ball);
+    const figs = m.players.map((pl, i) => { const f = makeBallFig(pl, i === 0 ? "#9fe0ff" : "#ffb09c"); f.g.position.set(c.x, 0.05, c.z + (i === 0 ? -12 : 12)); return f; });
+    const hud = document.createElement("div"); hud.id = "ball-hud"; hud.innerHTML = '<b id="bh-score"></b><span id="bh-note"></span><small id="bh-help"></small>'; document.body.append(hud);
+    hud.querySelector("#bh-help").textContent = "You are watching. Walk about to find a good view. 1 2 3 4 cheer. Esc stops watching.";
+    bg = { ball, figs, hud, watch: true, tx: [c.x, c.x], tz: [c.z - 12, c.z + 12], tyaw: [0, Math.PI], phase: [0, 0] };
+    mode = "online"; placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.1; cheerBar(true);
+    toast(`Watching pok-ta-pok: ${m.players.map((p) => p.name).join(" vs ")}.`);
+  }
+  function updateBallWatch(dt) {
+    updatePlayer(dt);
+    const c = court(), k = Math.min(1, dt * 14);
+    if (st && st.b) { bg.ball.position.x += (c.x + st.b[0] - bg.ball.position.x) * k; bg.ball.position.y += (st.b[1] - bg.ball.position.y) * k; bg.ball.position.z += (c.z + st.b[2] - bg.ball.position.z) * k; }
+    bg.figs.forEach((f, i) => {
+      if (st && st.p && st.p[i]) { bg.tx[i] = c.x + st.p[i][0]; bg.tz[i] = c.z + st.p[i][1]; bg.tyaw[i] = st.p[i][2]; }
+      const px = f.g.position.x, pz = f.g.position.z;
+      f.g.position.x += (bg.tx[i] - px) * k; f.g.position.z += (bg.tz[i] - pz) * k; f.g.position.y = 0.05;
+      let dy = bg.tyaw[i] - f.g.rotation.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI; f.g.rotation.y += dy * k;
+      const speed = Math.hypot(bg.tx[i] - px, bg.tz[i] - pz) / Math.max(dt, 0.001); f.phase = (f.phase || 0) + dt * Math.min(speed, 8) * 1.1;
+      const w = Math.min(1, speed / 5) * 0.7 * Math.sin(f.phase), hit = performance.now() - hitAt[i] < 220;
+      f.parts.armL.rotation.x = -w; f.parts.armR.rotation.x = hit ? 2.2 : w; f.parts.legL.rotation.x = -w; f.parts.legR.rotation.x = w;
+    });
+    noteT -= dt; if (noteT <= 0) note = "";
+    const s = st ? st.s : [0, 0];
+    bg.hud.querySelector("#bh-score").textContent = `${nameOf(0)} ${s[0]}  –  ${s[1]} ${nameOf(1)}${st && st.w ? `  ·  👀 ${st.w}` : ""}`;
+    bg.hud.querySelector("#bh-note").textContent = note;
+  }
+
   function start3d(msg) {
+    if (msg.watch) return start3dWatch(msg);
     if (city !== "cancun") { send({ t: "leave" }); toast("The ball game is played on the Great Ball Court in Cancún."); return; }
     closePanels(); Vitals.stopRest();
     m = msg; m.kind = "ball"; st = null; note = ""; sendT = 0;
@@ -183,11 +224,12 @@ const Mini = (() => {
     Sfx.play("horn"); toast(`Pok-ta-pok${m.ranked ? " (ranked)" : ""}! Hit the ball with Space, keep it off your half.`);
   }
 
-  function swing() { if (bg && m) { send({ t: "hit", yaw: +player.yaw.toFixed(3) }); } else if (dg && m) { send({ t: "stroke" }); } }
+  function swing() { if (m && m.watch) return; if (bg && m) { send({ t: "hit", yaw: +player.yaw.toFixed(3) }); } else if (dg && m) { send({ t: "stroke" }); } }
 
   function update(dt) {
     if (dg && m) { updateDragon(dt); return; }
     if (!bg || !m) return;
+    if (bg.watch) { updateBallWatch(dt); return; }
     updatePlayer(dt);
     const c = court(), lo = me() === 0 ? -HALF_W : 0.8, hi = me() === 0 ? -0.8 : HALF_W;
     player.x = Math.max(c.x - HALF_U, Math.min(c.x + HALF_U, player.x)); player.z = Math.max(c.z + lo, Math.min(c.z + hi, player.z));
@@ -211,7 +253,7 @@ const Mini = (() => {
 
   function cleanup3d() {
     if (!bg) return;
-    scene.remove(bg.ball); scene.remove(bg.fig.g); bg.hud.remove(); bg = null;
+    scene.remove(bg.ball); if (bg.figs) bg.figs.forEach((f) => scene.remove(f.g)); else scene.remove(bg.fig.g); bg.hud.remove(); bg = null; cheerBar(false);
     const c = court(); placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.02;       // back on foot beside the court's south end
   }
 
@@ -240,29 +282,31 @@ const Mini = (() => {
   }
 
   function startDragon(msg) {
-    if (city !== "beijing") { send({ t: "leave" }); toast("The dragon boat race is on Kunming Lake in Beijing."); return; }
+    if (city !== "beijing") { send(msg.watch ? { t: "watch", a: "leave" } : { t: "leave" }); toast("The dragon boat race is on Kunming Lake in Beijing."); return; }
     closePanels(); Vitals.stopRest();
     m = msg; m.kind = "dragon"; st = null; note = "";
     const c = { x: BEIJING_X + Beijing.COURSE.x0, lanes: Beijing.COURSE.lanes };
     const boats = m.players.map((pl, i) => {
       const g = makeBoat(BOAT_COLORS[i % 4]); g.position.set(c.x, 0.06, c.lanes[i % 4]); scene.add(g);
       const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
-      x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = i === m.you ? "#9fe0ff" : "#fff3cf"; x.fillText(pl.name.replace(" (practice bot)", ""), 128, 44);
+      x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = mine(i) ? "#9fe0ff" : "#fff3cf"; x.fillText(pl.name.replace(" (practice bot)", ""), 128, 44);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(4, 1, 1); tag.position.set(0, 5, 0); tag.renderOrder = 10; g.add(tag);
       return { g, s: 0, v: 0, phase: Math.random() * 6, last: 0 };
     });
     const hud = document.createElement("div"); hud.id = "dragon-hud";
     hud.innerHTML = '<b id="dh-pos"></b><div id="dh-drum"><i></i></div><span id="dh-note"></span><small id="dh-help"></small>'; document.body.append(hud);
-    hud.querySelector("#dh-help").textContent = "Press Space (or A and D in turn) on every beat of the drum. Strokes on the beat drive the boat hard. Esc leaves.";
+    hud.querySelector("#dh-help").textContent = m.watch ? "You are watching: the camera follows the leading boat. 1 2 3 4 cheer. Esc stops watching." : "Press Space (or A and D in turn) on every beat of the drum. Strokes on the beat drive the boat hard. Esc leaves.";
     dg = { boats, hud, t0: performance.now() + m.countdown * 1000, beat: m.beat * 1000, len: m.length, last: -1, noteT: 0, cx: c.x };
     mode = "online"; Beijing.setBoating(true);
     addEventListener("keydown", onDragonKey, true);
     player.yaw = -Math.PI / 2; player.pitch = -0.14; player.vx = player.vz = 0;
-    Sfx.play("horn"); toast("Dragon boat race! Paddle on the beat of the drum.");
+    if (m.watch) { cheerBar(true); toast(`Watching the dragon boat race: ${m.players.map((p) => p.name).join(", ")}.`); }
+    else { Sfx.play("horn"); toast("Dragon boat race! Paddle on the beat of the drum."); }
   }
   function onDragonKey(e) {
     if (!dg || !m) return;
     if (e.code === "Escape") { e.preventDefault(); e.stopPropagation(); leave(); return; }
+    if (m.watch) return;
     if (e.code !== "Space" && e.code !== "KeyA" && e.code !== "KeyD" && e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
     e.preventDefault(); e.stopPropagation();
     if (e.repeat) return;
@@ -277,8 +321,9 @@ const Mini = (() => {
 
   function updateDragon(dt) {
     const now = performance.now(), tNow = now - dg.t0;
-    // the camera follows your boat
-    const mine = dg.boats[me()];
+    // the camera follows your boat (or, when watching, the one in front)
+    const focus = m.watch ? dg.boats.reduce((best, b, i) => (b.s > dg.boats[best].s ? i : best), 0) : me();
+    const mine = dg.boats[focus];
     for (let i = 0; i < dg.boats.length; i++) {
       const b = dg.boats[i], row = st && st.p ? st.p[i] : null;
       if (row) { b.s += (row[1] - b.s) * Math.min(1, dt * 6); b.v = row[2]; }
@@ -287,7 +332,7 @@ const Mini = (() => {
       b.g.rotation.z = Math.sin(now / 500 + i * 2) * 0.012;
       b.phase += dt * (1.5 + b.v * 1.4);
       for (const r of b.g.userData.rows) { const sw = Math.sin(b.phase + r.k * 0.2 + (r.sz > 0 ? 0 : 0)); r.pad.rotation.z = sw * 0.5; r.pad.position.y = 1.0 + Math.max(0, sw) * 0.35; r.body.rotation.z = sw * 0.12; r.head2.position.x = r.body.position.x + sw * 0.08; }
-      const k = b.g.userData.drum; if (i === me()) k.scale.set(1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140), 1, 1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140));
+      const k = b.g.userData.drum; if (i === focus) k.scale.set(1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140), 1, 1 + 0.25 * Math.max(0, 1 - (((tNow % dg.beat) + dg.beat) % dg.beat) / 140));
     }
     player.x = mine.g.position.x + 1.5; player.z = mine.g.position.z; player.feet = 1.0; player.y = player.feet + EYE; player.yaw = -Math.PI / 2; player.vx = player.vz = 0;
     // the drum: a sound on every beat, a circle that pulses, and the countdown before the start
@@ -295,14 +340,24 @@ const Mini = (() => {
     if (tNow >= 0 && beatNo !== dg.last) { dg.last = beatNo; Sfx.play("drum"); }
     const phase = tNow >= 0 ? ((tNow % dg.beat) + dg.beat) % dg.beat : 0;
     const ring = dg.hud.querySelector("#dh-drum i"); ring.style.transform = `scale(${1 + 0.6 * Math.max(0, 1 - phase / 160)})`; ring.style.opacity = tNow < 0 ? 0.35 : 1;
-    const order = dg.boats.map((b, i) => [i, b.s]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), place = order.indexOf(me()) + 1;
+    const order = dg.boats.map((b, i) => [i, b.s]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), place = order.indexOf(focus) + 1;
     const q = dg.q !== undefined && now - dg.qT < 700 ? (dg.q >= 1 ? "Perfect!" : dg.q >= 0.6 ? "Good" : "Ragged...") : "";
-    dg.hud.querySelector("#dh-pos").textContent = tNow < 0 ? `Get ready... ${Math.ceil(-tNow / 1000)}` : `${["1st", "2nd", "3rd", "4th"][place - 1]} of ${dg.boats.length} · ${Math.min(dg.len, Math.round(mine.s))} / ${Math.round(dg.len)} m · ${Math.round(mine.v * 3.6)} km/h`;
+    if (m.watch) dg.hud.querySelector("#dh-pos").textContent = tNow < 0 ? `Get ready... ${Math.ceil(-tNow / 1000)}` : `${nameOf(focus)} leads · ${Math.min(dg.len, Math.round(mine.s))} / ${Math.round(dg.len)} m${st && st.w ? `  ·  👀 ${st.w}` : ""}`;
+    else dg.hud.querySelector("#dh-pos").textContent = tNow < 0 ? `Get ready... ${Math.ceil(-tNow / 1000)}` : `${["1st", "2nd", "3rd", "4th"][place - 1]} of ${dg.boats.length} · ${Math.min(dg.len, Math.round(mine.s))} / ${Math.round(dg.len)} m · ${Math.round(mine.v * 3.6)} km/h`;
     dg.hud.querySelector("#dh-note").textContent = tNow < 0 ? "" : q;
   }
 
   function endDragon(res) {
     if (!m || !dg) return;
+    if (m.watch) {
+      const first = res.order[0], table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  ");
+      cleanup();
+      showResult(first && first.time != null ? `${first.name} won the race` : "The race is over", `${table}.`, [
+        { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
+        { label: "Close", fn: closePanels },
+      ]);
+      return;
+    }
     const idx = m.you, rank = res.order.findIndex((o) => o.i === idx) + 1, n = res.order.length;
     const prize = rank === 1 ? 60 : rank === 2 && n >= 3 ? 25 : 0;
     Vitals.coins += prize;
@@ -318,7 +373,7 @@ const Mini = (() => {
     if (!dg) return;
     removeEventListener("keydown", onDragonKey, true);
     for (const b of dg.boats) scene.remove(b.g);
-    dg.hud.remove(); dg = null; Beijing.setBoating(false);
+    dg.hud.remove(); dg = null; Beijing.setBoating(false); cheerBar(false);
     placeAt(BEIJING_X + Beijing.DOCK.x - 3, Beijing.DOCK.z, -Math.PI / 2); player.pitch = -0.02;
   }
 
@@ -389,6 +444,7 @@ const Mini = (() => {
     held.clear(); if (ov) ov.classList.remove("show");
     xqCleanup(); cleanup3d(); cleanupDragon();
     const rpBar = document.getElementById("mini-rp"); if (rpBar) rpBar.remove();
+    cheerBar(false);
     m = null; st = null;
     if (mode === "online") mode = "walk";
   }
@@ -461,9 +517,30 @@ const Mini = (() => {
     last = performance.now(); raf = requestAnimationFrame(loop);
   }
 
+  // ------------------------------------------------------------------ cheering: watchers press 1 to 4 (or the buttons) and everybody in the match sees the emoji float up
+  const CHEERS = ["👏", "🔥", "🎉", "😮"];
+  function cheerKey(e) {
+    if (!m || !m.watch || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !/^Digit[1-4]$/.test(e.code)) return;
+    e.preventDefault(); e.stopPropagation(); send({ t: "watch", a: "cheer", e: CHEERS[Number(e.code.slice(5)) - 1] });
+  }
+  function cheerBar(on) {
+    const old = document.getElementById("cheer-bar"); if (old) old.remove();
+    removeEventListener("keydown", cheerKey, true);
+    if (!on) return;
+    const bar = document.createElement("div"); bar.id = "cheer-bar";
+    CHEERS.forEach((emo, i) => { const b = document.createElement("button"); b.type = "button"; b.textContent = emo; b.title = `Cheer (${i + 1})`; b.addEventListener("click", () => send({ t: "watch", a: "cheer", e: emo })); bar.append(b); });
+    document.body.append(bar); addEventListener("keydown", cheerKey, true);
+  }
+  function onCheer(c) {                                                 // somebody shouted: an emoji with their name floats up
+    if (!c || !CHEERS.includes(c.e)) return;
+    const f = document.createElement("div"); f.className = "cheer-float"; f.style.left = `${15 + Math.random() * 70}%`;
+    f.textContent = `${c.e} `; const n = document.createElement("small"); n.textContent = String(c.name || "").slice(0, 16); f.append(n);
+    document.body.append(f); setTimeout(() => f.remove(), 3200);
+  }
+
   // ------------------------------------------------------------------ the list of matches you can watch (PvP menu: Watch a match)
   let specTimer = 0;
-  const SPEC_NAMES = { xiangqi: "Xiangqi", kushti: "Kushti", kites: "Kite fight" };
+  const SPEC_NAMES = { xiangqi: "Xiangqi", kushti: "Kushti", kites: "Kite fight", ball: "Pok-ta-pok", dragon: "Dragon boat race" };
   function openWatch() {
     if (!Online.connected) { toast("Watching needs the game server: wait to be connected."); return; }
     if (typeof mode !== "undefined" && mode !== "walk") return;
@@ -487,5 +564,5 @@ const Mini = (() => {
     else if (w.a === "no") toast(w.msg || "You cannot watch that match.");
   }
 
-  return { start, on, onWatch, openWatch, replay, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
+  return { start, on, onWatch, onCheer, openWatch, replay, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
 })();

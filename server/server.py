@@ -312,7 +312,8 @@ class Conn:
         self.admin = False         # set from the database when they log in with an admin account
         self.vid, self.ua = None, ""   # the visitor id their browser made up (for the admin's visitor list) and the kind of browser they use
         self.wlast, self.fast = None, 0   # where they last said they were (x, z, city, time) and how many updates in a row were impossibly fast
-        self.watching = None       # the match they are watching (a MiniRoom), if any
+        self.watching = None       # the match they are watching (a MiniRoom or DragonRoom), if any
+        self.cheer_t = 0.0         # when they last cheered
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
@@ -1086,6 +1087,9 @@ class MiniRoom:
     def setup(self):
         pass
 
+    def watch_match(self):
+        return {"t": "match", "mode": self.kind, "room": self.id, "you": 0, "watch": True, "ranked": self.ranked, "players": self.roster}
+
     def on_msg(self, conn, m):
         if not self.over and conn.me is not None:
             self.msg(conn.me, m)
@@ -1558,8 +1562,9 @@ class XiangqiRoom(MiniRoom):
 
 MINI_ROOMS = {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom, "xiangqi": XiangqiRoom}
 LIVE_MINI = {}                                                  # id -> MiniRoom, every game in progress
-WATCHABLE = ("xiangqi", "kushti", "kites")                        # (the ball game and the dragon boat race are 3D and cannot be watched yet)
+WATCHABLE = ("xiangqi", "kushti", "kites", "ball", "dragon")
 MAX_WATCHERS = 20
+CHEERS = ("👏", "🔥", "🎉", "😮")                               # what a watcher can shout, one every 1.2 seconds
 
 
 def watch_list():
@@ -1582,6 +1587,19 @@ def on_watch(conn, m):
         return conn.send({"t": "watch", "a": "list", "list": watch_list()})
     if a == "leave":
         return unwatch(conn)
+    if a == "cheer":
+        room, e = conn.watching, m.get("e")
+        t = now()
+        if room is None or room.over or e not in CHEERS or t - conn.cheer_t < 1.2:
+            return
+        conn.cheer_t = t
+        msg = {"t": "cheer", "name": conn.name, "e": e}
+        for p in room.players:
+            if p.conn:
+                p.conn.send(msg)
+        for c in room.watchers:
+            c.send(msg)
+        return
     if a != "join":
         return
     room = LIVE_MINI.get(m.get("room")) if isinstance(m.get("room"), str) else None
@@ -1594,7 +1612,7 @@ def on_watch(conn, m):
     unwatch(conn)
     conn.watching = room
     room.watchers.append(conn)
-    conn.send({"t": "match", "mode": room.kind, "room": room.id, "you": 0, "watch": True, "ranked": room.ranked, "players": room.roster})
+    conn.send(room.watch_match())
     if room.snap:
         conn.send(room.snap)
 
@@ -1793,14 +1811,20 @@ class DragonRoom:
             self.players.append(Rower(None, len(self.players), bot=True))
         self.start_at = now() + DRAGON_COUNTDOWN
         self.over, self.events, self.first_fin = False, [], None
+        self.watchers, self.snap, self.t0, self.ranked = [], None, now(), sum(1 for c in conns if c) >= 2
         for p in self.players:
             if p.conn:
+                unwatch(p.conn)
                 p.conn.room, p.conn.me, p.conn.queue = self, p, None
-        roster = [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look} for q in self.players]
+        roster = self.roster = [{"i": q.i, "name": q.name, "cls": q.cls, "look": q.look} for q in self.players]
         for p in self.players:
             if p.conn:
                 p.conn.send({"t": "match", "mode": "dragon", "room": self.id, "you": p.i, "countdown": DRAGON_COUNTDOWN, "length": DRAGON_LEN, "beat": DRAGON_BEAT, "players": roster})
+        LIVE_MINI[self.id] = self
         self.task = asyncio.ensure_future(self.run())
+
+    def watch_match(self):
+        return {"t": "match", "mode": "dragon", "room": self.id, "you": 0, "watch": True, "countdown": round(self.start_at - now(), 2), "length": DRAGON_LEN, "beat": DRAGON_BEAT, "players": self.roster}
 
     def on_msg(self, conn, m):
         p = conn.me
@@ -1851,11 +1875,14 @@ class DragonRoom:
                         p.fin = t - self.start_at
                         if self.first_fin is None:
                             self.first_fin = t
-        payload = {"t": "dragon", "p": [[p.i, round(p.s, 1), round(p.v, 2), 1 if p.fin is not None and p.fin != float("inf") else 0] for p in self.players], "ev": self.events}
+        payload = {"t": "dragon", "p": [[p.i, round(p.s, 1), round(p.v, 2), 1 if p.fin is not None and p.fin != float("inf") else 0] for p in self.players], "ev": self.events, "w": len(self.watchers)}
         self.events = []
+        self.snap = dict(payload, ev=[])
         for p in self.players:
             if p.conn:
                 p.conn.send(payload)
+        for c in self.watchers:
+            c.send(payload)
         humans = [p for p in self.players if p.conn]
         if racing and humans and all(p.fin is not None for p in humans):
             self.finish("finished")
@@ -1868,9 +1895,14 @@ class DragonRoom:
         if self.over:
             return
         self.over = True
+        LIVE_MINI.pop(self.id, None)
         order = sorted(self.players, key=lambda p: (p.fin if p.fin is not None else float("inf"), -p.s))
         msg = {"t": "end", "mode": "dragon", "reason": reason,
                "order": [{"i": p.i, "name": p.name, "time": (round(p.fin, 2) if p.fin not in (None, float("inf")) else None), "perfect": p.perfect, "strokes": p.strokes} for p in order]}
+        for c in self.watchers:
+            c.watching = None
+            c.send(dict(msg, watch=True))
+        self.watchers = []
         ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who], self.kind) if reason != "empty" else {}
         for p in self.players:
             if p.conn:
@@ -2738,6 +2770,8 @@ async def world_loop():
                 heist_once()
             if n % 4 == 0:
                 houses_once()
+            if n % 240 == 0:
+                weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
         except Exception as e:  # never let a bug here stop the world
             print("world error:", repr(e))
 
@@ -4069,9 +4103,26 @@ def weekly_roll(t=None):
             if coins and len(PRIZES.get(fid, [])) < 8:
                 PRIZES.setdefault(fid, []).append({"id": "w%d" % old, "week": old, "theme": th["name"], "rank": i + 1, "coins": coins, "pts": r["pts"]})
         WEEKLY["last"] = {"week": old, "theme": th["name"], "top": top} if top else WEEKLY["last"]
+        weekly_announce(th, top, wk)
+    elif old >= 0:
+        weekly_announce(week_theme(old), [], wk)
     WEEKLY["week"] = wk
     WEEKLY["scores"] = {}
     world_soon()
+
+
+def weekly_announce(old_theme, top, new_week):
+    """Tells everybody who is online how the cup ended and what the next one is."""
+    medals = ["🥇", "🥈", "🥉"]
+    nt = week_theme(new_week)
+    lines = []
+    if top:
+        lines.append("🏆 The weekly cup (%s) is over! %s. Prizes are sent to winners when they log in." % (old_theme["name"], "  ".join("%s %s (%d)" % (medals[i], n, p) for i, (n, p) in enumerate(top))))
+    lines.append("🏆 A new weekly cup begins: %s. %s" % (nt["name"], nt["blurb"]))
+    for text in lines:
+        entry = {"t": "chat", "sys": 1, "text": text, "ts": int(time.time())}
+        CHAT_LOG.append(entry)
+        broadcast_chat(entry)
 
 
 def weekly_rec(conn):

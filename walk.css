@@ -838,3 +838,9 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .bb-list { margin: 8px 0; padding-left: 0; list-style: none; font-size: .92rem; line-height: 1.45; }
 .bb-list li { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .gd-motd { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--gold); font-size: .9rem; }
+/* cheering */
+#cheer-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 12; display: flex; gap: 8px; }
+#cheer-bar button { font-size: 1.5rem; padding: 6px 12px; border-radius: 999px; background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.55); cursor: pointer; }
+.cheer-float { position: fixed; bottom: 90px; z-index: 12; font-size: 2rem; pointer-events: none; animation: cheer-up 3s ease-out forwards; }
+.cheer-float small { font-size: .8rem; color: #fff3cf; text-shadow: 0 1px 3px #000; }
+@keyframes cheer-up { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-55vh); opacity: 0; } }
