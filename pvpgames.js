@@ -82,11 +82,11 @@ const Mini = (() => {
     if (!m || s.k !== m.kind) return;
     st = s;
     for (const e of s.ev || []) {
-      if (e[0] === "move") { Sfx.play(e[4] ? "hit" : "stone"); if (e[1] !== me()) setNote(e[4] ? "They took a piece." : ""); }
+      if (e[0] === "move") { Sfx.play(e[4] ? "hit" : "clack"); if (e[1] !== me()) setNote(e[4] ? "They took a piece." : ""); }
       else if (e[0] === "throw") { Sfx.play("hit"); setNote(e[1] === me() ? "You win the throw!" : `${nameOf(e[1])} wins the throw.`); }
       else if (e[0] === "draw") setNote("A draw: the throw is wrestled again.");
-      else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("stone"); }
-      else if (e[0] === "point") { Sfx.play(e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${e[1] === me() ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
+      else if (e[0] === "hit") { hitAt[e[1]] = performance.now(); Sfx.play("bounce"); }
+      else if (e[0] === "point") { Sfx.play(e[3] === "ring" ? "ring" : e[2] > 1 ? "medal" : "coin"); setNote(e[3] === "ring" ? `${e[1] === me() ? "You" : nameOf(e[1])} sent it through the ring!` : `${e[1] === me() ? "You score" : nameOf(e[1]) + " scores"} ${e[2]}`); }
     }
     if (m.kind === "kites" && s.p) for (let i = 0; i < 2; i++) if (s.p[i][3]) pullAt[i] = performance.now();
   }
@@ -287,7 +287,7 @@ const Mini = (() => {
     player.x = mine.g.position.x + 1.5; player.z = mine.g.position.z; player.feet = 1.0; player.y = player.feet + EYE; player.yaw = -Math.PI / 2; player.vx = player.vz = 0;
     // the drum: a sound on every beat, a circle that pulses, and the countdown before the start
     const beatNo = Math.floor(tNow / dg.beat);
-    if (tNow >= 0 && beatNo !== dg.last) { dg.last = beatNo; Sfx.play("stone"); }
+    if (tNow >= 0 && beatNo !== dg.last) { dg.last = beatNo; Sfx.play("drum"); }
     const phase = tNow >= 0 ? ((tNow % dg.beat) + dg.beat) % dg.beat : 0;
     const ring = dg.hud.querySelector("#dh-drum i"); ring.style.transform = `scale(${1 + 0.6 * Math.max(0, 1 - phase / 160)})`; ring.style.opacity = tNow < 0 ? 0.35 : 1;
     const order = dg.boats.map((b, i) => [i, b.s]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), place = order.indexOf(me()) + 1;

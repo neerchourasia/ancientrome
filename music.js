@@ -1,7 +1,8 @@
 "use strict";
 // Background music, made in the browser (no audio files). It changes with where you are: a Dorian lyre with a flute in ancient
-// Rome, soft piano in modern Rome, a raga with a tanpura drone, sitar plucks and a light tabla in Mughal Delhi, and a bright
-// scale in modern Delhi. It slows and thins in rain, storms and at night, and speeds up and brightens on a festival day. It
+// Rome, soft piano in modern Rome, a raga with a tanpura drone, sitar plucks and a light tabla in Mughal Delhi, a bright
+// scale in modern Delhi, a clay flute over deep drums in Maya Chichén Itzá, a marimba-like pluck over a light beat in modern Cancún, and a pentatonic zither with a slow gong in
+// Ming and modern Beijing. It slows and thins in rain, storms and at night, and speeds up and brightens on a festival day. It
 // plays only while you walk, drive or watch (not in fights, races or naval battles, which have their own sound), through the
 // same output as the rest of the sound, so the Sound switch silences it too. Depends on audio.js, weather.js, festival.js.
 
@@ -16,6 +17,10 @@ const Music = (() => {
     "rome-modern": { scale: [0, 2, 4, 7, 9], root: 261.63, bpm: 72, wave: "sine", cut: 3200, density: 0.5, drone: [0.5, 0.75], flute: false },
     "delhi-ancient": { scale: [0, 1, 4, 5, 7, 8, 11], root: 130.81, bpm: 68, wave: "sawtooth", cut: 1900, density: 0.6, drone: [1, 1.5], tabla: true },
     "delhi-modern": { scale: [0, 2, 4, 6, 7, 9, 11], root: 146.83, bpm: 78, wave: "triangle", cut: 3000, density: 0.5, drone: [0.5, 0.75], tabla: false },
+    "cancun-ancient": { scale: [0, 3, 5, 7, 10], root: 130.81, bpm: 60, wave: "triangle", cut: 1800, density: 0.5, drone: [1, 1.5], flute: true, drum: "maya" },
+    "cancun-modern": { scale: [0, 2, 4, 7, 9], root: 196, bpm: 92, wave: "sine", cut: 3600, density: 0.6, drone: [0.5, 0.75], drum: "latin" },
+    "beijing-ancient": { scale: [0, 2, 4, 7, 9], root: 196, bpm: 58, wave: "triangle", cut: 2400, density: 0.45, drone: [1, 1.5], flute: true, drum: "gong" },
+    "beijing-modern": { scale: [0, 2, 5, 7, 9], root: 220, bpm: 74, wave: "sine", cut: 3400, density: 0.5, drone: [0.5, 0.75], drum: "gong" },
   };
 
   function init() {
@@ -76,6 +81,12 @@ const Music = (() => {
     if (st.tabla && !m.rain) {                                           // a soft tabla: a low and a high hit in a loop of eight
       const pat = step % 8;
       if (pat === 0) hit(t, 140, 0.16); else if (pat === 3 || pat === 5) hit(t, 900, 0.07); else if (pat === 6 && Math.random() < 0.5) hit(t, 520, 0.06);
+    }
+    if (st.drum && !m.rain) {                                             // Cancún: deep drums, or a light beat; Beijing: a slow gong every four bars
+      const pat = step % 8;
+      if (st.drum === "maya") { if (pat === 0 || pat === 4) hit(t, 110, 0.2); else if (pat === 6 && Math.random() < 0.6) hit(t, 700, 0.06); }
+      else if (st.drum === "latin") { if (pat === 0 || pat === 3 || pat === 6) hit(t, 160, 0.12); else if (pat === 5) hit(t, 1100, 0.05); }
+      else if (st.drum === "gong" && step % 32 === 0) pluck(base * 0.5, t, 3, "sine", 0.16, 900);
     }
     step++;
   }

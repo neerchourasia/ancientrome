@@ -157,7 +157,7 @@ const Online = (() => {
     else if (m.a === "no") toast(m.msg || "The challenge did not work.");
     else if (m.a === "in") {
       if (mode !== "walk" || duel || typeof started === "undefined" || !started) { send({ t: "challenge", a: "decline", from: m.from }); return; }   // busy: the challenger is told no
-      Sfx.play("horn");
+      Sfx.play("chime");
       Dialog.confirm(`${m.name} (rating ${m.r}) challenges you to ${m.what || "a ranked duel"}. Accept?`).then((yes) => send({ t: "challenge", a: yes ? "accept" : "decline", from: m.from }));
     }
   }
