@@ -26,7 +26,7 @@ const Hall = (() => {
     body.append(el("h4", "🏟️ Latest tournament winners", "tn-round"));
     if (!view.tourneys.length) body.append(el("p", "No tournament has finished yet. Open one under 🏟️ Tournaments!", "dnote small"));
     for (const t of view.tourneys.slice(0, 8)) {
-      const row = el("p", `${t.auto ? "📅 " : ""}${(GAMES[t.k] || t.k).replace(/^\S+ /, "")}: ${t.champ} (${t.n} players) · ${ago(t.t)} `, "hf-row");
+      const row = el("p", `${t.g ? "👥 " : ""}${t.auto ? "📅 " : ""}${(GAMES[t.k] || t.k).replace(/^\S+ /, "")}: ${t.champ} (${t.g ? `${t.n} guilds` : `${t.n} players`}) · ${ago(t.t)} `, "hf-row");
       if (t.rp) { const b = el("button", "▶ Final"); b.type = "button"; b.title = "Watch the replay of the final"; b.addEventListener("click", () => { closePanels(); Online.navalSend({ t: "replay", id: t.rp }); }); row.append(b); }
       body.append(row);
     }

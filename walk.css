@@ -900,3 +900,5 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 
 .dq-bar { height: 12px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; margin: 8px 0 4px; }
 .dq-bar i { display: block; height: 100%; background: #e0b84a; transition: width .3s; }
+
+.tn-team { display: block; margin: 8px 0; font-size: .9rem; }

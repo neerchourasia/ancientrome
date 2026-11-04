@@ -4462,6 +4462,8 @@ def tourney_say(text):
 
 
 def tourney_name(t):
+    if t.get("team"):
+        return "Guild " + {"xiangqi": "xiangqi", "kushti": "kushti", "kites": "kite fight", "ball": "pok-ta-pok"}[t["kind"]] + " cup"
     return ("Saturday " if t.get("auto") else "") + {"xiangqi": "Xiangqi", "kushti": "Kushti", "kites": "Kite fight", "ball": "Pok-ta-pok", "dragon": "Dragon boat"}[t["kind"]] + " tournament"
 
 
@@ -4539,8 +4541,127 @@ def tourney_deal(t, fids, first):
     return out
 
 
+# A guild cup is a tournament between guilds (TEAM_GUILDS at most, a squad of two to four players each, the best ratings first). Two guilds meet in one match per pair of squad
+# members (best against best); the guild that wins more of them goes on, and a tie is settled by one more match between their best players. It runs on the same machinery as a
+# tournament (the same rooms, call-ups, walkovers and replays): a match carries "pair" (which two guilds) and "gk" (their keys).
+TEAM_GUILDS, TEAM_SQUAD, TEAM_PRIZES, TEAM_TREASURY = 4, 4, (400, 200), (500, 250)
+
+
+def team_guild_of(t, f):
+    p = tourney_player(t, f)
+    return p.get("g") if p else None
+
+
+def team_squad(t, gk):
+    return sorted([p["f"] for p in t["players"] if p.get("g") == gk], key=lambda f: (-tourney_seed(t, f), f))
+
+
+def team_deal(t, gks):
+    """The matches of a round for these guilds (strongest first): the odd one out has a bye."""
+    gks = sorted(gks, key=lambda g: (-sum(tourney_seed(t, f) for f in team_squad(t, g)), g))
+    bye = [gks.pop(0)] if len(gks) % 2 else []                                        # (the strongest has the bye)
+    if len(gks) == 4:
+        gks = [gks[0], gks[3], gks[1], gks[2]]                                         # (the two strongest cannot meet before the final)
+    out = []
+    for i in range(0, len(gks) - 1, 2):
+        a, b = team_squad(t, gks[i]), team_squad(t, gks[i + 1])
+        for j in range(min(len(a), len(b))):
+            m = tourney_match([a[j], b[j]], 1)
+            m["pair"], m["gk"] = i // 2, [gks[i], gks[i + 1]]
+            out.append(m)
+    t.setdefault("bye", {})[str(len(t["rounds"]))] = bye
+    return out
+
+
+def team_wins(t, rd, pair):
+    gk = next(m["gk"] for m in rd if m["pair"] == pair)
+    return gk, [sum(1 for m in rd if m["pair"] == pair and m["w"] and team_guild_of(t, m["w"][0]) == g) for g in gk]
+
+
+def team_round_done(t):
+    rd = t["rounds"][-1]
+    ri = len(t["rounds"]) - 1
+    pairs = sorted({m["pair"] for m in rd})
+    winners, losers = list(t.get("bye", {}).get(str(ri), [])), []
+    for pr in pairs:
+        gk, w = team_wins(t, rd, pr)
+        if w[0] == w[1]:                                                       # a tie: the best player of each guild, once more
+            a, b = team_squad(t, gk[0])[0], team_squad(t, gk[1])[0]
+            m = tourney_match([a, b], 1)
+            m["pair"], m["gk"], m["sd"] = pr, gk, 1
+            rd.append(m)
+            world_soon()
+            return
+        winners.append(gk[0] if w[0] > w[1] else gk[1])
+        losers.append(gk[1] if w[0] > w[1] else gk[0])
+    for g in losers:
+        for f in team_squad(t, g):
+            t["out"][f] = ri
+    if len(winners) == 1:
+        return team_end(t, winners[0], losers[0] if losers else None)
+    t["rounds"].append(team_deal(t, winners))
+    for g in winners:
+        for f in team_squad(t, g):
+            for c in conns_of(f):
+                c.send({"t": "tourney", "a": "msg", "msg": "Your guild is through to the %s." % tourney_label(t, ri + 1).lower()})
+    world_soon()
+
+
+def team_end(t, champ, second):
+    gname = lambda g: t["gn"].get(g, g)
+    places = [[g, gname(g), i + 1] for i, g in enumerate([champ, second]) if g]
+    t["state"], t["ended"], t["places"] = "done", time.time(), places
+    t["champ"] = gname(champ)
+    final = t["rounds"][-1]
+    hall_add("tourneys", {"k": t["kind"], "champ": t["champ"], "n": len({p.get("g") for p in t["players"]}), "auto": 0, "t": int(time.time()), "rp": (final[-1].get("rp") or ""), "g": 1})
+    tourney_say("🏟️ The %s is over! 🥇 %s%s" % (tourney_name(t).lower(), t["champ"], ("  🥈 " + gname(second)) if second else ""))
+    big = len(t["players"]) >= TOURNEY_PRIZE_MIN
+    day = time.time() - 86400
+    for rank, g in enumerate([champ, second]):
+        if not g:
+            continue
+        if big and g in GUILDS:
+            GUILDS[g]["treasury"] += TEAM_TREASURY[rank]
+            guild_say(GUILDS[g], "Your guild took %s in the %s: %d denarii for the treasury!" % (["first place", "second place"][rank], tourney_name(t).lower(), TEAM_TREASURY[rank]))
+        for fid in team_squad(t, g):
+            if rank == 0:
+                rec = stats_rec(fid, tourney_pname(t, fid))
+                if rec is not None:
+                    rec["tw"] = rec.get("tw", 0) + 1
+            TOURNEY_WON[fid] = [x for x in TOURNEY_WON[fid] if x > day]
+            if not big or len(TOURNEY_WON[fid]) >= TOURNEY_DAILY or len(PRIZES.get(fid, [])) >= 8:
+                continue
+            TOURNEY_WON[fid].append(time.time())
+            PRIZES.setdefault(fid, []).append({"id": "t" + t["id"], "week": 0, "theme": tourney_name(t), "rank": rank + 1, "coins": TEAM_PRIZES[rank], "pts": 0, "tour": 1})
+            for c in conns_of(fid):
+                c.send({"t": "weekly_prize", "prizes": PRIZES[fid]})
+    done = sorted([x for x in TOURNEYS.values() if x["state"] in ("done", "cancelled")], key=lambda x: x["ended"])
+    for x in done[:-TOURNEY_KEEP]:
+        del TOURNEYS[x["id"]]
+    world_soon()
+
+
+def team_start(t):
+    """Closes sign-up: guilds that have fewer than two players online are dropped."""
+    t["players"] = [p for p in t["players"] if conns_of(p["f"])]
+    counts = collections.Counter(p.get("g") for p in t["players"])
+    t["players"] = [p for p in t["players"] if counts[p.get("g")] >= 2]
+    gks = sorted({p.get("g") for p in t["players"]})
+    if len(gks) < 2:
+        t["state"], t["ended"] = "cancelled", time.time()
+        for p in t["players"]:
+            for c in conns_of(p["f"]):
+                c.send({"t": "tourney", "a": "msg", "msg": "The %s was cancelled: it needs two guilds with at least two players each." % tourney_name(t).lower()})
+        tourney_say("🏟️ The %s was cancelled: it needs two guilds with at least two players each." % tourney_name(t).lower())
+    else:
+        t["state"] = "running"
+        t["rounds"] = [team_deal(t, gks)]
+        tourney_say("🏟️ The %s begins: %s! Watch the matches under 👀 Watch a match." % (tourney_name(t).lower(), " against ".join(t["gn"].get(g, g) for g in gks[:4])))
+    world_soon()
+
+
 def tourney_label(t, ri):
-    n = len(t["rounds"][ri])
+    n = len({m["pair"] for m in t["rounds"][ri]}) if t.get("team") else len(t["rounds"][ri])
     if n == 1:
         return "Final"
     if t["kind"] == "dragon":
@@ -4562,6 +4683,8 @@ def tourney_free_conn(fid):
 
 
 def tourney_start(t):
+    if t.get("team"):
+        return team_start(t)
     t["players"] = [p for p in t["players"] if conns_of(p["f"])]                  # (someone who logged off while waiting is dropped)
     if len(t["players"]) < TOURNEY_MIN:
         t["state"], t["ended"] = "cancelled", time.time()
@@ -4609,6 +4732,8 @@ def tourney_settle(t, m, order):
 
 
 def tourney_round_done(t):
+    if t.get("team"):
+        return team_round_done(t)
     rd = t["rounds"][-1]
     ri = len(t["rounds"]) - 1
     if len(rd) == 1:
@@ -4722,15 +4847,17 @@ def tourney_tick():
 
 def tourney_row(t, conn):
     return {"id": t["id"], "kind": t["kind"], "name": tourney_name(t), "state": t["state"], "n": len(t["players"]), "cap": t["cap"], "in": max(0, int(t["start_at"] - time.time())) if t["state"] == "open" else 0,
-            "auto": bool(t.get("auto")), "round": tourney_label(t, len(t["rounds"]) - 1) if t["rounds"] and t["state"] == "running" else "", "joined": bool(conn.fid and tourney_player(t, conn.fid)), "champ": t["champ"]}
+            "auto": bool(t.get("auto")), "round": tourney_label(t, len(t["rounds"]) - 1) if t["rounds"] and t["state"] == "running" else "", "joined": bool(conn.fid and tourney_player(t, conn.fid)), "champ": t["champ"], "team": bool(t.get("team"))}
 
 
 def tourney_view(t, conn):
     out = tourney_row(t, conn)
     have = {r["id"] for r in REPLAYS}
-    out.update({"t": "tourney", "a": "view", "players": [p["name"] for p in sorted(t["players"], key=lambda p: -p["seed"])], "places": [[p[1], p[2]] for p in t["places"]], "prize": len(t["players"]) >= TOURNEY_PRIZE_MIN, "host": bool(conn.fid) and conn.fid == t["by"],
+    out.update({"t": "tourney", "a": "view", "players": [p["name"] for p in sorted(t["players"], key=lambda p: -p["seed"])],
+                "guilds": [{"name": t["gn"].get(g, g), "players": [tourney_pname(t, f) for f in team_squad(t, g)]} for g in sorted({p.get("g") for p in t["players"]})] if t.get("team") else [], "places": [[p[1], p[2]] for p in t["places"]], "prize": len(t["players"]) >= TOURNEY_PRIZE_MIN, "host": bool(conn.fid) and conn.fid == t["by"],
                 "rounds": [{"label": tourney_label(t, i), "m": [{"ps": [tourney_pname(t, f) for f in m["ps"]], "w": [tourney_pname(t, f) for f in m["w"]], "st": m["st"], "room": m["room"], "bye": bool(m.get("bye")),
-                                                                 "me": bool(conn.fid) and conn.fid in m["ps"], "rp": m.get("rp") if m.get("rp") in have else None} for m in rd]} for i, rd in enumerate(t["rounds"])]})
+                                                                 "me": bool(conn.fid) and conn.fid in m["ps"], "rp": m.get("rp") if m.get("rp") in have else None,
+                                                                 **({"g": [t["gn"].get(g, g) for g in m["gk"]], "sd": bool(m.get("sd"))} if t.get("team") else {})} for m in rd]} for i, rd in enumerate(t["rounds"])]})
     return out
 
 
@@ -4739,7 +4866,8 @@ def on_tourney(conn, m):
     if a == "list":
         live = sorted([t for t in TOURNEYS.values() if t["state"] in ("open", "running")], key=lambda t: t["created"])
         done = sorted([t for t in TOURNEYS.values() if t["state"] == "done"], key=lambda t: -t["ended"])[:5]
-        return conn.send({"t": "tourney", "a": "list", "list": [tourney_row(t, conn) for t in live + done], "login": bool(conn.fid), "kinds": list(TOURNEY_KINDS), "prize": list(TOURNEY_PRIZES), "min": TOURNEY_PRIZE_MIN})
+        return conn.send({"t": "tourney", "a": "list", "list": [tourney_row(t, conn) for t in live + done], "login": bool(conn.fid), "kinds": list(TOURNEY_KINDS), "prize": list(TOURNEY_PRIZES), "min": TOURNEY_PRIZE_MIN,
+                                                       "lead": bool(guild_of(conn) and guild_of(conn)["leader"] == conn.fid)})
     t = TOURNEYS.get(str(m.get("id"))[:12]) if a != "create" else None
     if a == "get":
         return conn.send(tourney_view(t, conn)) if t else conn.send({"t": "tourney", "a": "no", "msg": "That tournament is over."})
@@ -4748,10 +4876,17 @@ def on_tourney(conn, m):
     if not conn.fid:
         return conn.send({"t": "tourney", "a": "no", "msg": "Log in to your account to enter a tournament."})
     if a == "create":
-        kind, cap = m.get("kind"), m.get("cap")
-        if kind not in TOURNEY_KINDS or cap not in TOURNEY_CAPS:
+        kind, cap, team = m.get("kind"), m.get("cap"), bool(m.get("team"))
+        if team:
+            cap = TEAM_GUILDS * TEAM_SQUAD
+            gd = guild_of(conn)
+            if kind not in TOURNEY_KINDS or kind == "dragon":
+                return
+            if not gd or gd["leader"] != conn.fid:
+                return conn.send({"t": "tourney", "a": "no", "msg": "Only the leader of a guild can open a guild cup."})
+        elif kind not in TOURNEY_KINDS or cap not in TOURNEY_CAPS:
             return
-        if any(x["kind"] == kind and x["state"] == "open" for x in TOURNEYS.values()):
+        if any(x["kind"] == kind and x["state"] == "open" and bool(x.get("team")) == team for x in TOURNEYS.values()):
             return conn.send({"t": "tourney", "a": "no", "msg": "There is already one open for that game: join it."})
         if sum(1 for x in TOURNEYS.values() if x["state"] in ("open", "running")) >= TOURNEY_ACTIVE:
             return conn.send({"t": "tourney", "a": "no", "msg": "There are too many tournaments on right now."})
@@ -4761,8 +4896,13 @@ def on_tourney(conn, m):
             return conn.send({"t": "tourney", "a": "no", "msg": "You opened one a moment ago. Wait a few minutes."})
         TOURNEY_MADE[conn.fid] = time.time()
         t = tourney_new(conn, kind, cap)
+        if team:
+            t["team"], t["gn"] = 1, {}
         TOURNEYS[t["id"]] = t
-        tourney_say("🏟️ %s opened a %s for up to %d players! Sign up under 🏟️ Tournaments in the menu: it starts in %d minutes." % (conn.name, tourney_name(t).lower(), cap, int(TOURNEY_REG // 60)))
+        if team:
+            tourney_say("🏟️ %s opened a %s! Guilds can sign up with a squad of two to four players (a guild member presses Sign up under 🏟️ Tournaments): it starts in %d minutes." % (conn.name, tourney_name(t).lower(), int(TOURNEY_REG // 60)))
+        else:
+            tourney_say("🏟️ %s opened a %s for up to %d players! Sign up under 🏟️ Tournaments in the menu: it starts in %d minutes." % (conn.name, tourney_name(t).lower(), cap, int(TOURNEY_REG // 60)))
         a = "join"
     if t is None:
         return conn.send({"t": "tourney", "a": "no", "msg": "That tournament is over."})
@@ -4775,7 +4915,17 @@ def on_tourney(conn, m):
             return conn.send({"t": "tourney", "a": "no", "msg": "That tournament is full."})
         if tourney_active_of(conn.fid):
             return conn.send({"t": "tourney", "a": "no", "msg": "You are in a tournament already."})
-        t["players"].append({"f": conn.fid, "name": conn.name, "seed": rating_of(conn)["r"]})
+        pl = {"f": conn.fid, "name": conn.name, "seed": rating_of(conn)["r"]}
+        if t.get("team"):
+            gk, gd = GUILD_OF.get(conn.fid), guild_of(conn)
+            if not gd:
+                return conn.send({"t": "tourney", "a": "no", "msg": "Join a guild first: a guild cup is played for your guild."})
+            if sum(1 for p in t["players"] if p.get("g") == gk) >= TEAM_SQUAD:
+                return conn.send({"t": "tourney", "a": "no", "msg": "Your guild's squad is full (%d players)." % TEAM_SQUAD})
+            if gk not in {p.get("g") for p in t["players"]} and len({p.get("g") for p in t["players"]}) >= TEAM_GUILDS:
+                return conn.send({"t": "tourney", "a": "no", "msg": "That cup already has %d guilds." % TEAM_GUILDS})
+            pl["g"], t["gn"][gk] = gk, gd["name"]
+        t["players"].append(pl)
         world_soon()
         return conn.send(tourney_view(t, conn))
     if a == "start":
@@ -4801,22 +4951,28 @@ def clean_tourney(t):
     try:
         if not isinstance(t, dict) or t.get("kind") not in TOURNEY_KINDS or t.get("state") not in ("open", "running", "done", "cancelled") or not isinstance(t.get("id"), str):
             return None
-        players = [{"f": p["f"], "name": str(p.get("name", ""))[:24], "seed": int(num(p.get("seed"), 0, 4000, START_RATING))} for p in t["players"][:16] if isinstance(p, dict) and clean_fid(p.get("f"))]
+        team = bool(t.get("team")) and t["kind"] != "dragon"
+        players = [{"f": p["f"], "name": str(p.get("name", ""))[:24], "seed": int(num(p.get("seed"), 0, 4000, START_RATING)), **({"g": str(p.get("g", ""))[:40]} if team else {})}
+                   for p in t["players"][:16] if isinstance(p, dict) and clean_fid(p.get("f"))]
         fids = {p["f"] for p in players}
         rounds = []
         for rd in t["rounds"][:8]:
             ms = []
-            for m in rd[:8]:
+            for m in rd[:12]:
                 ps = [f for f in m["ps"][:4] if f in fids]
                 if not ps:
                     continue
                 nm = tourney_match(ps, int(num(m.get("adv"), 1, 4, 1)))
                 nm.update({"st": "done" if m.get("st") == "done" else "wait", "order": [f for f in m.get("order", []) if f in fids][:4], "w": [f for f in m.get("w", []) if f in fids][:4], "tries": int(num(m.get("tries"), 0, 9, 0)), "bye": bool(m.get("bye")), "rp": m.get("rp")[:12] if isinstance(m.get("rp"), str) else None})
+                if team:
+                    nm.update({"pair": int(num(m.get("pair"), 0, 8, 0)), "gk": [str(g)[:40] for g in (m.get("gk") if isinstance(m.get("gk"), list) else ["", ""])[:2]], "sd": 1 if m.get("sd") else 0})
                 ms.append(nm)
             rounds.append(ms)
         return {"id": t["id"][:12], "kind": t["kind"], "by": str(t.get("by", ""))[:40], "state": t["state"], "auto": 1 if t.get("auto") else 0, "rem": 1 if t.get("rem") else 0, "created": float(num(t.get("created"), 0, 4e9, 0)), "start_at": float(num(t.get("start_at"), 0, 4e9, 0)),
                 "cap": 16 if t.get("cap") == 16 else 8, "players": players, "rounds": rounds, "out": {f: int(num(r, 0, 8, 0)) for f, r in (t.get("out") or {}).items() if f in fids}, "ended": float(num(t.get("ended"), 0, 4e9, 0)),
-                "champ": str(t.get("champ", ""))[:24], "places": [[p[0], str(p[1])[:24], int(num(p[2], 1, 3, 1))] for p in t.get("places", [])[:6] if isinstance(p, list) and len(p) == 3]}
+                "champ": str(t.get("champ", ""))[:24], "places": [[p[0], str(p[1])[:24], int(num(p[2], 1, 3, 1))] for p in t.get("places", [])[:6] if isinstance(p, list) and len(p) == 3],
+                **({"team": 1, "gn": {str(k)[:40]: str(v)[:18] for k, v in list((t.get("gn") or {}).items())[:8]},
+                    "bye": {str(k)[:2]: [str(g)[:40] for g in v[:1]] for k, v in list((t.get("bye") or {}).items())[:8] if isinstance(v, list)}} if team else {})}
     except Exception:
         return None
 
@@ -5860,7 +6016,7 @@ def world_apply(rows):
                               for n in lst[-NOTICE_MAX:] if isinstance(n, dict)]
     hl = rows.get("hall")
     if isinstance(hl, dict):
-        HALL["tourneys"] = [{"k": r["k"], "champ": str(r.get("champ", ""))[:24], "n": int(num(r.get("n"), 0, 99, 0)), "auto": 1 if r.get("auto") else 0, "t": int(num(r.get("t"), 0, 4e9, 0)), "rp": r["rp"][:12] if isinstance(r.get("rp"), str) else ""}
+        HALL["tourneys"] = [{"k": r["k"], "champ": str(r.get("champ", ""))[:24], "n": int(num(r.get("n"), 0, 99, 0)), "auto": 1 if r.get("auto") else 0, "t": int(num(r.get("t"), 0, 4e9, 0)), "rp": r["rp"][:12] if isinstance(r.get("rp"), str) else "", **({"g": 1} if r.get("g") else {})}
                             for r in (hl.get("tourneys") if isinstance(hl.get("tourneys"), list) else [])[-HALL_KEEP["tourneys"]:] if isinstance(r, dict) and r.get("k") in TOURNEY_KINDS]
         HALL["weekly"] = [{"week": int(num(r.get("week"), 0, 1e6, 0)), "theme": str(r.get("theme", ""))[:40], "t": int(num(r.get("t"), 0, 4e9, 0)),
                            "top": [[str(x[0])[:24], int(num(x[1], 0, 1e6, 0))] for x in (r.get("top") if isinstance(r.get("top"), list) else [])[:3] if isinstance(x, list) and len(x) == 2]}

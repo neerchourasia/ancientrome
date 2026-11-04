@@ -7,7 +7,7 @@
 const Tournament = (() => {
   const GAMES = [["xiangqi", "♟️ Xiangqi"], ["kushti", "🤼 Kushti"], ["kites", "🪁 Kite fight"], ["ball", "🏀 Pok-ta-pok"], ["dragon", "🐉 Dragon boats"]];
   const NAMES = Object.fromEntries(GAMES);
-  let list = null, view = null, open_ = null, timer = 0, form = { kind: "xiangqi", cap: 8 };
+  let list = null, view = null, open_ = null, timer = 0, form = { kind: "xiangqi", cap: 8, team: false };
   const $t = (id) => document.getElementById(id);
   const send = (o) => Online.navalSend({ t: "tourney", ...o });
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
@@ -25,27 +25,37 @@ const Tournament = (() => {
     for (const t of list.list) {
       const row = el("div", undefined, "sp-row");
       const when = t.state === "open" ? `signing up · ${t.n}/${t.cap} · starts in ${mmss(t.in)}` : t.state === "running" ? `${t.round || "under way"} · ${t.n} players` : `won by ${t.champ || "nobody"}`;
-      row.append(el("span", `${t.auto ? "📅 " : ""}${t.state === "done" ? "🏆 " : t.state === "running" ? "▶ " : "🟢 "}${t.name}: ${when}${t.joined ? "  ·  you are in" : ""}`));
+      row.append(el("span", `${t.team ? "👥 " : ""}${t.auto ? "📅 " : ""}${t.state === "done" ? "🏆 " : t.state === "running" ? "▶ " : "🟢 "}${t.name}: ${when}${t.joined ? "  ·  you are in" : ""}`));
       const b = btn("Bracket", () => { open_ = t.id; send({ a: "get", id: t.id }); });
       row.append(b);
-      if (t.state === "open" && !t.joined && list.login) row.append(btn("Sign up", () => send({ a: "join", id: t.id })));
+      if (t.state === "open" && !t.joined && list.login) row.append(btn(t.team ? "Play for your guild" : "Sign up", () => send({ a: "join", id: t.id })));
       body.append(row);
     }
     if (!list.list.length) body.append(el("p", "No tournament is on right now.", "dnote"));
     if (list.login) {
       const f = el("div", undefined, "gd-row");
-      const sel = el("select"); for (const [k, n] of GAMES) { const o = el("option", n); o.value = k; sel.append(o); } sel.value = form.kind;
+      if (form.team && form.kind === "dragon") form.kind = "xiangqi";
+      const sel = el("select"); for (const [k, n] of GAMES) { if (form.team && k === "dragon") continue; const o = el("option", n); o.value = k; sel.append(o); } sel.value = form.kind;
       sel.addEventListener("change", () => { form.kind = sel.value; });
       const cap = el("select"); for (const c of [8, 16]) { const o = el("option", `up to ${c} players`); o.value = c; cap.append(o); } cap.value = form.cap;
       cap.addEventListener("change", () => { form.cap = Number(cap.value); });
-      f.append(sel, cap, btn("Open a tournament", () => send({ a: "create", kind: form.kind, cap: form.cap })));
+      f.append(sel);
+      if (!form.team) f.append(cap);
+      f.append(btn(form.team ? "Open a guild cup" : "Open a tournament", () => send({ a: "create", kind: form.kind, cap: form.cap, team: form.team })));
       body.append(f);
+      if (list.lead) {                                                              // the leader of a guild can open a cup between guilds
+        const lab = el("label", undefined, "tn-team"), cb = el("input"); cb.type = "checkbox"; cb.checked = form.team;
+        cb.addEventListener("change", () => { form.team = cb.checked; render(); });
+        lab.append(cb, document.createTextNode(" 👥 Guild cup: your guild against other guilds (a squad of 2 to 4 players each)"));
+        body.append(lab);
+      }
     }
     if (canNotify() && Notification.permission !== "denied") {
       const on = remindOn();
       const rb = btn(on ? "🔔 Reminder is on: turn it off" : "🔔 Remind me before the Saturday tournament", () => { on ? setRemind(false) : setRemind(true); }, "tn-remind");
       body.append(rb);
     } else if (canNotify()) body.append(el("p", "Notifications are blocked for this site in your browser, so reminders are off.", "dnote small"));
+    body.append(el("p", "A guild cup is opened by the leader of a guild. Up to four guilds sign up (any member of a guild presses Play for your guild; a squad is 2 to 4 players). Two guilds meet in one match for each pair of squad members, best against best: the guild with more wins goes on, and a tie is settled by one more match between their best players. The winning squad wins 400 denarii each and the guild's treasury gets 500 (second place: 200 and 250).", "dnote small"));
     body.append(el("p", `With ${list.min} or more players the winner takes ${list.prize[0]} denarii, second ${list.prize[1]} and third ${list.prize[2]}. The Saturday tournament, which the server opens by itself every week (sign-up from 16:00 UTC, first match at 18:00), pays double. Wins here count in the weekly cup and your profile too.`, "dnote small"));
   }
 
@@ -60,15 +70,17 @@ const Tournament = (() => {
       if (v.joined) row.append(btn("Leave", () => send({ a: "leave", id: v.id }))); else row.append(btn("Sign up", () => send({ a: "join", id: v.id })));
       if (v.host) { const go = btn("Start now", () => send({ a: "start", id: v.id }), "tn-start"); go.disabled = v.n < 2; go.title = v.n < 2 ? "You need at least two players" : "Close sign-up and draw the bracket"; row.append(go); }
       body.append(row);
-      body.append(el("p", `Players: ${v.players.join(", ") || "nobody yet"}`, "dnote small"));
+      if (v.team) { for (const g of v.guilds || []) body.append(el("p", `👥 ${g.name}: ${g.players.join(", ")}`, "dnote small")); if (!(v.guilds || []).length) body.append(el("p", "No guild has signed up yet.", "dnote small")); }
+      else body.append(el("p", `Players: ${v.players.join(", ") || "nobody yet"}`, "dnote small"));
     }
     if (v.state === "done" && v.places.length) body.append(el("p", v.places.map(([n, r]) => `${["🥇", "🥈", "🥉"][r - 1]} ${n}`).join("   "), "wk-you"));
+    if (v.team && v.state === "running") body.append(el("p", "Guild cup: each pair of squad members plays a match, and the guild with more wins goes on.", "dnote small"));
     for (const rd of v.rounds) {
       body.append(el("h4", rd.label, "tn-round"));
       for (const m of rd.m) {
         const row = el("div", undefined, `sp-row${m.me ? " tn-me" : ""}`);
         const names = m.ps.map((n) => (m.w.includes(n) && m.st === "done" ? `✔ ${n}` : n)).join(m.ps.length > 2 || v.kind === "dragon" ? ", " : " vs ");
-        row.append(el("span", m.bye ? `${m.ps[0]} (bye)` : `${names}${m.st === "live" ? "  ·  playing now" : m.st === "wait" ? "  ·  waiting" : ""}`));
+        row.append(el("span", m.bye ? `${m.ps[0]} (bye)` : `${m.g ? `${m.g[0]} vs ${m.g[1]}${m.sd ? " (tie-break)" : ""}: ` : ""}${names}${m.st === "live" ? "  ·  playing now" : m.st === "wait" ? "  ·  waiting" : ""}`));
         if (m.rp && m.st === "done") row.append(btn("▶ Replay", () => { closePanels(); Online.navalSend({ t: "replay", id: m.rp }); }));
         if (m.st === "live" && m.room) row.append(btn("Watch", () => { closePanels(); Online.navalSend({ t: "watch", a: "join", room: m.room }); }));
         body.append(row);

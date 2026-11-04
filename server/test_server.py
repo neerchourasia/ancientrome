@@ -1244,6 +1244,162 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"weekly": {"week": 3, "scores": {"not a friend id": {"pts": 99}}, "prizes": {"zz": [1]}}})       # junk is ignored
         self.assertEqual(server.WEEKLY["scores"], {})
 
+    # ---------------------------------------------------------------- guild cups
+
+    class GC:                                                          # a stand-in for a connection that can be told things
+        def __init__(self, fid, name):
+            self.fid, self.name, self.uid, self.id, self.hello, self.closed, self.sent = fid, name, "u-" + name, "id-" + name, True, False, []
+        def send(self, m):
+            self.sent.append(m)
+        def close(self):
+            self.closed = True
+
+    def team_fresh(self):
+        self.tourney_fresh()
+        server.GUILDS.clear(); server.GUILD_OF.clear(); server.HALL.update(tourneys=[], weekly=[], seasons=[])
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear(), server.HALL.update(tourneys=[], weekly=[], seasons=[])))
+
+    def team_pure(self, sizes):
+        """A running guild cup: guild g1 has sizes[0] players with the best ratings, g2 the next ones, ... Fids are 0000000000<guild><n>."""
+        t = {"id": "g1", "kind": "kushti", "by": "", "team": 1, "gn": {}, "state": "running", "created": 0, "start_at": 0, "cap": 16, "rounds": [], "out": {}, "ended": 0, "champ": "", "places": [], "players": []}
+        for gi, n in enumerate(sizes, 1):
+            server.GUILDS["g%d" % gi] = {"name": "Guild%d" % gi, "tag": "G%d" % gi, "leader": "%011x%d" % (gi, 1), "members": {}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+            t["gn"]["g%d" % gi] = "Guild%d" % gi
+            for k in range(1, n + 1):
+                f = "%011x%d" % (gi, k)
+                t["players"].append({"f": f, "name": "G%dP%d" % (gi, k), "seed": 2000 - 100 * gi - 10 * k, "g": "g%d" % gi})
+                server.GUILDS["g%d" % gi]["members"][f] = "G%dP%d" % (gi, k)
+        t["rounds"] = [server.team_deal(t, ["g%d" % i for i in range(1, len(sizes) + 1)])]
+        server.TOURNEYS["g1"] = t
+        return t
+
+    def settle_by_seed(self, t, ri, loser_gk=None):
+        """Every waiting match of the round goes to the better seed, unless it is a player of loser_gk (a guild that loses all of its matches)."""
+        for m in t["rounds"][ri]:
+            if m["st"] == "done":
+                continue
+            a, b = m["ps"]
+            order = [a, b] if server.tourney_seed(t, a) >= server.tourney_seed(t, b) else [b, a]
+            if loser_gk and server.team_guild_of(t, order[0]) == loser_gk:
+                order.reverse()
+            server.tourney_settle(t, m, order)
+
+    def test_guild_cup_bracket_squads_and_byes(self):
+        self.team_fresh()
+        t = self.team_pure([3, 2, 4, 2])                                                       # four guilds: strongest meets weakest
+        rd = t["rounds"][0]
+        pairs = sorted({tuple(m["gk"]) for m in rd})
+        self.assertEqual(len(pairs), 2)
+        self.assertEqual(sorted(len([m for m in rd if m["pair"] == i]) for i in (0, 1)), [2, 2])   # (as many matches as the smaller squad has)
+        self.assertNotIn(("g3", "g1"), [tuple(p) for p in pairs] + [tuple(reversed(p)) for p in pairs])     # (g3 has the most players and g1 the next: the two strongest are on different sides)
+        self.assertEqual(server.tourney_label(t, 0), "Semifinal")
+        for m in rd:                                                                           # best against best inside a pair
+            a, b = m["ps"]
+            self.assertEqual(server.team_squad(t, m["gk"][0]).index(a), server.team_squad(t, m["gk"][1]).index(b))
+        t3 = self.team_pure([2, 3, 2])                                                         # three guilds: the strongest has a bye
+        self.assertEqual(t3["bye"]["0"], ["g2"])                                                # (the one with most players)
+        self.assertEqual({tuple(m["gk"]) for m in t3["rounds"][0]}, {("g1", "g3")})
+
+    def test_guild_cup_runs_to_a_final_with_tie_break_prizes_and_treasury(self):
+        self.team_fresh()
+        t = self.team_pure([2, 2, 2, 2])
+        self.assertEqual(len(t["rounds"][0]), 4)
+        self.settle_by_seed(t, 0)                                                              # the stronger guild wins both matches of each pair
+        server.tourney_round_done(t)
+        self.assertEqual(len(t["rounds"]), 2)
+        final = t["rounds"][1]
+        self.assertEqual(server.tourney_label(t, 1), "Final")
+        gks = final[0]["gk"]
+        self.assertEqual(len(final), 2)
+        server.tourney_settle(t, final[0], [final[0]["ps"][0], final[0]["ps"][1]])             # one match each: a tie
+        server.tourney_settle(t, final[1], [final[1]["ps"][1], final[1]["ps"][0]])
+        server.tourney_round_done(t)
+        self.assertEqual(len(final), 3)                                                        # the best two players meet once more
+        self.assertTrue(final[2]["sd"])
+        self.assertEqual(t["state"], "running")
+        sd = final[2]
+        server.tourney_settle(t, sd, [sd["ps"][1], sd["ps"][0]])                               # the second guild's best player wins it
+        server.tourney_round_done(t)
+        self.assertEqual(t["state"], "done")
+        champ = gks[1]
+        self.assertEqual(t["champ"], "Guild" + champ[1:])
+        self.assertEqual([p[2] for p in t["places"]], [1, 2])
+        self.assertEqual(server.GUILDS[champ]["treasury"], 500)
+        self.assertEqual(server.GUILDS[gks[0]]["treasury"], 250)
+        pr = server.PRIZES
+        self.assertEqual({f: p[0]["coins"] for f, p in pr.items() if p[0].get("tour")}, {**{f: 400 for f in [p["f"] for p in t["players"] if p["g"] == champ]}, **{f: 200 for f in [p["f"] for p in t["players"] if p["g"] == gks[0]]}})
+        self.assertEqual(server.HALL["tourneys"][-1]["champ"], t["champ"])
+        self.assertEqual(server.HALL["tourneys"][-1]["g"], 1)
+        self.assertEqual(sum(r.get("tw", 0) for r in server.STATS.values()), 2)                # the winning squad's two players
+
+    def test_guild_cup_two_guilds_go_straight_to_the_final(self):
+        self.team_fresh()
+        t = self.team_pure([2, 2])
+        self.assertEqual(server.tourney_label(t, 0), "Final")
+        self.settle_by_seed(t, 0)
+        server.tourney_round_done(t)
+        self.assertEqual((t["state"], t["champ"]), ("done", "Guild1"))
+        self.assertEqual(sorted(p[0]["coins"] for p in server.PRIZES.values()), [200, 200, 400, 400])     # (two guilds of two are the fewest a cup can have: four players)
+        self.assertEqual((server.GUILDS["g1"]["treasury"], server.GUILDS["g2"]["treasury"]), (500, 250))
+
+    def test_guild_cup_rules_for_opening_and_signing_up(self):
+        self.team_fresh()
+        server.TOURNEY_MADE.clear()
+        lead, mem, other = self.GC("%012x" % 1, "Lea"), self.GC("%012x" % 2, "Max"), self.GC("%012x" % 3, "Ola")
+        server.GUILDS["romans"] = {"name": "Romans", "tag": "ROM", "leader": lead.fid, "members": {lead.fid: "Lea", mem.fid: "Max"}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+        server.GUILD_OF.update({lead.fid: "romans", mem.fid: "romans"})
+        for c in (lead, mem, other):
+            server.CONNS.add(c) if hasattr(server.CONNS, "add") else server.CONNS.append(c)
+        self.addCleanup(lambda: [server.CONNS.discard(c) if hasattr(server.CONNS, "discard") else server.CONNS.remove(c) for c in (lead, mem, other)])
+        server.on_tourney(mem, {"a": "create", "kind": "kushti", "team": True})              # only a guild's leader opens one
+        self.assertEqual(server.TOURNEYS, {})
+        self.assertIn("leader", mem.sent[-1]["msg"])
+        server.on_tourney(lead, {"a": "create", "kind": "dragon", "team": True})
+        self.assertEqual(server.TOURNEYS, {})
+        server.on_tourney(lead, {"a": "create", "kind": "kushti", "team": True})
+        t = next(iter(server.TOURNEYS.values()))
+        self.assertEqual((t["team"], t["cap"], [p["name"] for p in t["players"]], t["gn"]), (1, 16, ["Lea"], {"romans": "Romans"}))
+        self.assertEqual(server.tourney_name(t), "Guild kushti cup")
+        server.on_tourney(mem, {"a": "join", "id": t["id"]})
+        self.assertEqual(len(t["players"]), 2)
+        server.on_tourney(other, {"a": "join", "id": t["id"]})                                   # no guild: no
+        self.assertEqual(len(t["players"]), 2)
+        self.assertIn("guild", other.sent[-1]["msg"])
+        server.on_tourney(lead, {"a": "list"})
+        self.assertTrue(lead.sent[-1]["lead"])
+        self.assertTrue(lead.sent[-1]["list"][0]["team"])
+        server.on_tourney(mem, {"a": "list"})
+        self.assertFalse(mem.sent[-1]["lead"])
+        view = server.tourney_view(t, lead)
+        self.assertEqual(view["guilds"], [{"name": "Romans", "players": ["Lea", "Max"]}])
+        for i in range(4, 7):                                                                    # a squad has four players at most
+            c = self.GC("%012x" % i, "P%d" % i)
+            server.GUILD_OF[c.fid] = "romans"; server.GUILDS["romans"]["members"][c.fid] = c.name
+            server.on_tourney(c, {"a": "join", "id": t["id"]})
+        self.assertEqual(len([p for p in t["players"] if p["g"] == "romans"]), 4)
+        self.assertIn("full", c.sent[-1]["msg"])
+        for gi in range(1, 5):                                                                   # four guilds at most
+            c = self.GC("%012x" % (100 + gi), "Q%d" % gi)
+            server.GUILDS["x%d" % gi] = {"name": "X%d" % gi, "tag": "X", "leader": c.fid, "members": {c.fid: c.name}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+            server.GUILD_OF[c.fid] = "x%d" % gi
+            server.on_tourney(c, {"a": "join", "id": t["id"]})
+        self.assertEqual(len({p["g"] for p in t["players"]}), 4)
+        self.assertIn("guilds", c.sent[-1]["msg"])
+
+    def test_guild_cup_is_saved_and_loaded(self):
+        self.team_fresh()
+        t = self.team_pure([2, 2])
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.TOURNEYS.clear()
+        server.world_apply(snap)
+        back = server.TOURNEYS["g1"]
+        self.assertEqual((back["team"], back["gn"], back["bye"]), (1, {"g1": "Guild1", "g2": "Guild2"}, {"0": []}))
+        self.assertEqual([p["g"] for p in back["players"]], ["g1", "g1", "g2", "g2"])
+        self.assertEqual([(m["pair"], m["gk"]) for m in back["rounds"][0]], [(m["pair"], m["gk"]) for m in t["rounds"][0]])
+        self.settle_by_seed(back, 0)                                                             # and it can be played on
+        server.tourney_round_done(back)
+        self.assertEqual(back["state"], "done")
+
     # ---------------------------------------------------------------- rating seasons
 
     def season_fresh(self):
