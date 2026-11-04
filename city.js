@@ -221,7 +221,7 @@ function buildInsulae(scene) {
     o.position.set(b.x, 0, b.z); o.scale.set(b.w + 0.5, 3.2, b.d + 0.5); o.updateMatrix(); shops.setMatrixAt(i, o.matrix);
     o.position.set(b.x, b.h, b.z); o.scale.set(b.w + 1.4, 1.1, b.d + 1.4); o.updateMatrix(); roofs.setMatrixAt(i, o.matrix);
     body.setColorAt(i, PLASTER_ANCIENT[b.ci]);
-    addBlockerBox(b.x - b.w / 2, b.x + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, 0, b.h + 1);
+    b.blk = addBlockerBox(b.x - b.w / 2, b.x + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, 0, b.h + 1);      // (kept, so a block can become a shop you walk into: interiors.js)
     MAP_SHAPES.push({ k: "r", x0: b.x - b.w / 2, x1: b.x + b.w / 2, z0: b.z - b.d / 2, z1: b.z + b.d / 2, c: "#d29b72" });
   });
   for (const m of [body, shops, roofs]) { m.instanceMatrix.needsUpdate = true; scene.add(m); }
@@ -238,6 +238,7 @@ function applyInsulaeEra(modern) {
   list.forEach((b, i) => body.setColorAt(i, palette[b.ci]));
   body.instanceColor.needsUpdate = true;
   shops.material.color.setHex(modern ? 0x24313a : 0x5a3f2c);
+  if (typeof Interiors !== "undefined") Interiors.setEra(modern);
   roofs.material.color.setHex(modern ? 0x3a3a3a : 0xa04a2c);
 }
 

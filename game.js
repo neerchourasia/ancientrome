@@ -52,6 +52,7 @@ function init() {
   Home.build();
   Souvenirs.build(worldScene);
   buildInsulae(scene);
+  Interiors.setup();
   Jail.buildRome(scene);
   Stalls.street(scene, "rome", [["Colosseum", 305, 66], ["Via Sacra", 110, 16], ["Forum", 50, 42], ["Capitoline", -235, 8], ["Pantheon", -455, -440], ["Trajan's Forum", -150, -210], ["Circus", -190, 132], ["Harbour", 74, 80], ["Forum Boarium", -405, 55], ["Theatre of Pompey", -655, -50], ["Via Domus", 150, -44]]);
   buildTrees(scene);
@@ -1810,6 +1811,7 @@ function tick(dt) {
   Pets.update(dt);
   Cage.update(dt);
   Doors.update(dt);
+  Interiors.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

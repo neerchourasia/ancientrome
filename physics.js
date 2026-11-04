@@ -128,7 +128,7 @@ function roofAt(x, z, y) {
   for (let i = 0; i < list.length; i++) {
     const b = list[i];
     if (b.y1 <= top || b.y1 > y || b.y1 < 2.5 || b.off || (b.era && (b.era === "modern") !== modernEra)) continue;
-    if (b.y0 > 2) { if (base < 0) base = groundBase(x, z); if (b.y0 > base + 2) continue; }                 // (it must stand on the ground, not hang in the air)
+    if (b.y0 > 2 && !b.roof) { if (base < 0) base = groundBase(x, z); if (b.y0 > base + 2) continue; }                 // (it must stand on the ground, not hang in the air)
     if (b.t === 0) {
       if (b.x1 - b.x0 >= 4 && b.z1 - b.z0 >= 4 && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) top = b.y1;
     } else if (b.t === 1) {
