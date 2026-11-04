@@ -81,6 +81,7 @@ const Mini = (() => {
     if (!m || !GAME_KEYS.has(e.code)) return;
     e.preventDefault(); e.stopPropagation();
     if (e.code === "Escape") { leave(); return; }
+    if (m.tape) { if (!e.repeat && tape) { if (e.code === "Space") tape.paused = !tape.paused; else if (e.code === "ArrowRight") tapeSeek(tape.pos + 5); else if (e.code === "ArrowLeft") tapeSeek(tape.pos - 5); tapeBarUpdate(); } return; }
     if (m.replay) { if (e.repeat) return; if (e.code === "ArrowRight" || e.code === "KeyD") rpStep(1); else if (e.code === "ArrowLeft" || e.code === "KeyA") rpStep(-1); else if (e.code === "Space") { m.replay.auto = !m.replay.auto; m.replay.t = 0; } return; }
     if (e.repeat || m.watch) return;
     held.add(e.code);
@@ -375,9 +376,10 @@ const Mini = (() => {
   function endDragon(res) {
     if (!m || !dg) return;
     if (m.watch) {
-      const first = res.order[0], table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  "), link = m.tape ? curRp : null;
+      const first = res.order[0], table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  "), link = m.tape ? curRp : null, again = m.tape ? lastTape : null;
       cleanup();
       showResult(first && first.time != null ? `${first.name} won the race` : "The race is over", `${table}.`, [
+        ...(again ? [{ label: "↻ Watch again", fn: () => { closePanels(); replayTape(again); } }] : []),
         ...(link ? [{ label: "🔗 Copy replay link", fn: () => replayLink(link) }] : []),
         { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
         { label: "Close", fn: closePanels },
@@ -467,6 +469,7 @@ const Mini = (() => {
   // ------------------------------------------------------------------ the end
   function cleanup() {
     tapeStop();
+    const tb = document.getElementById("tape-bar"); if (tb) tb.remove();
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); touchOff(); if (ov) ov.classList.remove("show");
@@ -479,9 +482,10 @@ const Mini = (() => {
   function end(res) {
     if (!m) return;
     if (m.watch) {                                                       // a match you watched: no prize and no rating, just who won
-      const names = m.players.map((p) => p.name), draw = res.winner === -1, kind = m.kind, link = m.tape ? curRp : null;
+      const names = m.players.map((p) => p.name), draw = res.winner === -1, kind = m.kind, link = m.tape ? curRp : null, again = m.tape ? lastTape : null;
       cleanup();
       showResult(draw ? "A draw" : `${names[res.winner]} won`, `${names[0]} against ${names[1]}: ${res.score && kind !== "xiangqi" ? res.score.join(" to ") : ""}${res.reason ? ` (${res.reason})` : ""}.`.replace(": ()", ""), [
+        ...(again ? [{ label: "↻ Watch again", fn: () => { closePanels(); replayTape(again); } }] : []),
         ...(link ? [{ label: "🔗 Copy replay link", fn: () => replayLink(link) }] : []),
         { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
         { label: "Close", fn: closePanels },
@@ -557,13 +561,46 @@ const Mini = (() => {
 
   // ------------------------------------------------------------------ replaying a finished kushti, kite, pok-ta-pok or dragon boat match: the server keeps the states it sent (a few a second), and they are played back
   // through the screen used for watching a live match (the ball game and the boats need you to be in Cancún / Beijing, where their scenery is)
+  let lastTape = null;   // the replay that was played last (for Watch again)
   let tape = null;       // { fr (frames: [seconds, state]), i (next frame), t0, kind, end, last (the frame before) }
   const lerp = (a, b, k) => a + (b - a) * k;
   function tapeStop() { if (tape) { clearInterval(tape.timer); tape = null; } }
+  const SPEEDS = [0.5, 1, 2, 4];
+  const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function tapeSeek(to) {                                              // jump to a time: the state of the last frame before it is shown (without its sounds)
+    if (!tape) return;
+    const fr = tape.fr, total = fr[fr.length - 1][0];
+    tape.pos = Math.max(0, Math.min(total, to));
+    let i = 0; while (i < fr.length && fr[i][0] <= tape.pos) i++;
+    tape.i = i; tape.prev = i ? fr[i - 1] : null;
+    if (i) { const s = Object.assign({ k: tape.kind, t: tape.kind === "dragon" ? "dragon" : "mini" }, fr[i - 1][1], { ev: [] }); if (tape.kind === "dragon") onDragon(s); else on(s); }
+  }
+  function tapeBarUpdate() {
+    const b = document.getElementById("tape-bar"); if (!b || !tape) return;
+    b.querySelector(".tp-time").textContent = `${clock(tape.pos)} / ${clock(tape.fr[tape.fr.length - 1][0])}`;
+    b.querySelector(".tp-play").textContent = tape.paused ? "▶" : "⏸";
+    b.querySelector(".tp-speed").textContent = `×${tape.speed}`;
+  }
+  function tapeBar() {
+    const old = document.getElementById("tape-bar"); if (old) old.remove();
+    const bar = document.createElement("div"); bar.id = "tape-bar";
+    const add = (cls, text, title, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = text; b.title = title; b.addEventListener("click", (e) => { e.stopPropagation(); fn(); tapeBarUpdate(); }); bar.append(b); };
+    add("tp-restart", "⏮", "From the start", () => { tapeSeek(0); });
+    add("tp-back", "−10 s", "Back 10 seconds", () => { tapeSeek(tape.pos - 10); });
+    add("tp-play", "⏸", "Pause or play (Space)", () => { tape.paused = !tape.paused; });
+    add("tp-fwd", "+10 s", "Forward 10 seconds", () => { tapeSeek(tape.pos + 10); });
+    add("tp-speed", "×1", "Speed", () => { tape.speed = SPEEDS[(SPEEDS.indexOf(tape.speed) + 1) % SPEEDS.length]; });
+    const t = document.createElement("span"); t.className = "tp-time"; bar.append(t);
+    document.body.append(bar);
+  }
   function tapeTick() {
     if (!tape || !m) { tapeStop(); return; }
-    const el = (performance.now() - tape.t0) / 1000, fr = tape.fr;
-    while (tape.i < fr.length && fr[tape.i][0] <= el) {
+    const nowT = performance.now(), fr = tape.fr;
+    if (!tape.paused) tape.pos += Math.min(0.2, (nowT - tape.last) / 1000) * tape.speed;
+    tape.last = nowT;
+    const el = tape.pos;
+    tapeBarUpdate();
+    while (tape.i < fr.length && !tape.paused && fr[tape.i][0] <= el) {
       const s = Object.assign({ k: tape.kind, t: tape.kind === "dragon" ? "dragon" : "mini", ev: [] }, fr[tape.i][1]);
       if (tape.kind === "dragon") onDragon(s); else on(s);
       tape.prev = fr[tape.i]; tape.i++;
@@ -590,8 +627,10 @@ const Mini = (() => {
     if (!m || !m.tape) return;
     m.title = `▶ ${rp.names.join(rp.k === "dragon" ? ", " : " vs ")}`;
     if (head) head.textContent = m.title;
-    tape = { fr: rp.fr, i: 0, t0: performance.now(), kind: rp.k, end: rp.end, prev: null, timer: setInterval(tapeTick, 33) };
-    const hint = "Replay: Esc closes it.";
+    lastTape = rp;
+    tape = { fr: rp.fr, i: 0, pos: 0, last: performance.now(), speed: 1, paused: false, kind: rp.k, end: rp.end, prev: null, rp, timer: setInterval(tapeTick, 33) };
+    tapeBar();
+    const hint = "Replay: use the buttons below (Space pauses, the arrow keys skip). Esc closes it.";
     if (help && ov && ov.classList.contains("show")) help.textContent = hint;
     const bh = document.getElementById("bh-help") || document.getElementById("dh-help"); if (bh) bh.textContent = hint;
   }

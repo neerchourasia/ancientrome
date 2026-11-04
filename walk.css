@@ -902,3 +902,6 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .dq-bar i { display: block; height: 100%; background: #e0b84a; transition: width .3s; }
 
 .tn-team { display: block; margin: 8px 0; font-size: .9rem; }
+#tape-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 12; display: flex; gap: 6px; align-items: center; background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.55); border-radius: 999px; padding: 6px 12px; }
+#tape-bar button { min-width: 40px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+#tape-bar .tp-time { margin-left: 6px; font-variant-numeric: tabular-nums; color: #fff3cf; font-size: .9rem; }
