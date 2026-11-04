@@ -213,7 +213,7 @@ const Car = (() => {
   function enter() {
     if (!nearby() || eraOf(car.M) !== era) return;
     if (car.M.fly && Weather.grounded) { toast(`Flights are grounded in this weather (${Weather.kind}). Wait for it to pass.`); return; }
-    driving = true; mode = "drive";
+    driving = true; mode = "drive"; walkRoof = 0;
     showPilot();
     placeCircles(false);
     camYaw = car.yaw;
@@ -229,7 +229,7 @@ const Car = (() => {
   function exit(silent) {
     if (!driving) return;
     if (car.M.rail && !silent && !Subway.canLeave({ x: car.x, z: car.z, v: car.v })) { toast("Stop the train inside a station to get off."); return; }
-    if (car.M.fly && heightUp() > Chute.MIN_HEIGHT && !silent) {                                        // high enough in the air: bail out and parachute down (chute.js)
+    if (car.M.fly && car.alt > 1.5 && heightUp() > Chute.MIN_HEIGHT && !silent) {                                        // high enough in the air: bail out and parachute down (chute.js)
       const info = { x: car.x, z: car.z, y: car.y, yaw: car.yaw, v: Math.abs(car.v), name: car.M.name };
       if (typeof Trade !== "undefined") Trade.lose();                                                // the crates it carried are lost
       driving = false; car.v = 0;
@@ -238,11 +238,12 @@ const Car = (() => {
       Chute.bail(info);
       return;
     }
-    if (car.M.fly && (car.alt > 1.5 || (onRoof() && !silent && heightUp() <= Chute.MIN_HEIGHT))) {       // too low for a parachute, and you cannot step out of a plane in the air (unless you are forced to)
-      if (!silent) { if (onRoof() && car.alt <= 1.5) { toast("You are on a roof: there is no way down from here. Take off again, or climb above 15 m and press Esc to parachute."); return; } toast(car.alt > 6 ? "Land first! Slow down and come down gently on a street or a square, or climb above 15 m and press Esc to parachute." : "Land first! Slow down and come down gently on a street or a square."); return; }
+    if (car.M.fly && car.alt > 1.5) {                                                                // too low for a parachute, and you cannot step out of a plane in the air (unless you are forced to)
+      if (!silent) { toast(car.alt > 6 ? "Land first! Slow down and come down gently on a street or a square, or climb above 15 m and press Esc to parachute." : "Land first! Slow down and come down gently on a street or a square."); return; }
       car.alt = 0; car.vy = 0; car.gnd = groundAt(car.x, car.z); car.y = car.gnd; car.g.position.y = car.y;
     }
     if (car.M.fly) { car.g.rotation.set(0, car.yaw, 0); car.throttle = 0; car.roll = car.pitch = 0; car.vx = car.vz = 0; flyOnReady = false; $("#drive-alt").textContent = ""; }
+    walkRoof = car.M.fly && onRoof() && !silent ? car.gnd : 0;                                       // landed on a roof: you step out onto it (physics.js)
     driving = false; car.v = 0;
     if (car.M.fly) { if (car.g.userData.prop) car.g.userData.prop.visible = true; if (car.g.userData.cockpit) car.g.userData.cockpit.visible = false; for (const m of car.g.userData.shell || []) m.visible = true; }
     mode = "walk";
@@ -257,7 +258,7 @@ const Car = (() => {
     player.yaw = car.yaw; player.pitch = -0.05;
     placeCircles(true);
     if (car.M.rail) { Subway.afterExit({ x: car.x, z: car.z }); return; }                           // the metro: up to the street, and the train goes away
-    if (!silent) toast(`You got off. Your ${car.M.name.toLowerCase()} stays parked here.`);
+    if (!silent) toast(walkRoof ? `You got off on the roof, ${Math.round(walkRoof)} m above the street. Walk back to your ${car.M.name.toLowerCase()} to fly on, or step off the edge.` : `You got off. Your ${car.M.name.toLowerCase()} stays parked here.`);
   }
 
   function toggleEnter() { if (driving) exit(); else if (nearby()) enter(); else if (car && eraOf(car.M) === era) toast(`Walk up to your ${car.M.name.toLowerCase()} to ${car.M.verb || "get in"}.`); }

@@ -90,8 +90,16 @@ function addBlockerRing(p) {
   return item;
 }
 
-// Height of the walkable surface at (x, z).
+// While you stand on a roof (walkRoof is its height, set when you step out of an aircraft that has landed there) the roofs at that height count as ground for you, so you can walk about on them.
+let walkRoof = 0;
 function groundAt(x, z) {
+  const h = groundBase(x, z);
+  if (walkRoof > 0) { const r = roofAt(x, z, walkRoof + 0.5); if (r > h) return r; }
+  return h;
+}
+
+// Height of the walkable surface at (x, z), not counting roofs.
+function groundBase(x, z) {
   let h = heightAt(x, z);
   const list = platformGrid.at(x, z);
   for (let i = 0; i < list.length; i++) {
@@ -120,7 +128,7 @@ function roofAt(x, z, y) {
   for (let i = 0; i < list.length; i++) {
     const b = list[i];
     if (b.y1 <= top || b.y1 > y || b.y1 < 2.5 || b.off || (b.era && (b.era === "modern") !== modernEra)) continue;
-    if (b.y0 > 2) { if (base < 0) base = groundAt(x, z); if (b.y0 > base + 2) continue; }                 // (it must stand on the ground, not hang in the air)
+    if (b.y0 > 2) { if (base < 0) base = groundBase(x, z); if (b.y0 > base + 2) continue; }                 // (it must stand on the ground, not hang in the air)
     if (b.t === 0) {
       if (b.x1 - b.x0 >= 4 && b.z1 - b.z0 >= 4 && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) top = b.y1;
     } else if (b.t === 1) {

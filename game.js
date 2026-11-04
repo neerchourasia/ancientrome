@@ -690,6 +690,7 @@ function updatePlayer(dt) {
   player.bob += moving * dt * 1.6;
 
   const ground = groundAt(player.x, player.z);
+  if (walkRoof > 0 && ground < walkRoof - 0.4) walkRoof = 0;                                      // stepped off the edge of the roof: back to street level
   player.feet += (ground - player.feet) * Math.min(1, dt * 14);
 
   // jumping: a simple hop, with gravity pulling you back down to the ground you're standing on
@@ -1241,7 +1242,7 @@ function travel(to, lm, then) {
 }
 
 function arriveIn(to, lm) {
-  city = to;
+  city = to; walkRoof = 0;
   if (to === "delhi") {
     Delhi.build(scene);
     Object.assign(BOUNDS, Delhi.BOUNDS); Object.assign(MAP, Delhi.MAP);
