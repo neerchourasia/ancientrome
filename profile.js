@@ -47,6 +47,9 @@ const Profile = (() => {
     if (c[0] || c[1] || c[2]) body.append(el("p", `Weekly cup: 🥇 ${c[0]}  🥈 ${c[1]}  🥉 ${c[2]}`, "pf-sum"));
     if (cur.sv && cur.sv.length) body.append(el("p", `🏺 Souvenirs ${cur.sv.length}/16: ${cur.sv.map((id) => (Souvenirs.list.find((s) => s[0] === id) || [0, 0, ""])[2]).join(" ")}`, "pf-sum"));
     if (cur.tw) body.append(el("p", `🏟️ Tournaments won: ${cur.tw}`, "pf-sum"));
+    const sc = cur.st || [0, 0, 0];
+    if (sc[0] || sc[1] || sc[2]) body.append(el("p", `🏅 Season trophies: 🥇 ${sc[0]}  🥈 ${sc[1]}  🥉 ${sc[2]}`, "pf-sum"));
+    if ((cur.sh || []).length) body.append(el("p", `Past seasons: ${cur.sh.slice(0, 6).map(([no, place, r]) => `${no}: number ${place} (${r})`).join(" · ")}`, "dnote small"));
     stats(body);
     const kinds = Object.keys(cur.games || {}).sort((a, b) => cur.games[b].reduce((x, y) => x + y, 0) - cur.games[a].reduce((x, y) => x + y, 0));
     if (kinds.length) {

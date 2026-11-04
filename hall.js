@@ -18,9 +18,18 @@ const Hall = (() => {
   function render() {
     const body = $h("hf-body"); if (!body) return; body.replaceChildren();
     if (!view) { body.append(el("p", Online.connected ? "Loading..." : "The hall of fame needs the game server: wait to be connected.", "dnote")); return; }
+    if (view.season) {
+      const d = Math.floor(view.season.ends / 86400);
+      body.append(el("h4", `🏅 Season ${view.season.no}`, "tn-round"), el("p", `Ends in ${d >= 1 ? `${d} day${d > 1 ? "s" : ""}` : "less than a day"}. The three best ratings among players with ${view.season.min} or more matches this season win a trophy, then every rating moves halfway back to 1000.`, "dnote small"));
+      for (const s of (view.seasons || []).slice(0, 3)) body.append(el("p", `Season ${s.no}: ${s.top.map(([n, r], i) => `${["🥇", "🥈", "🥉"][i]} ${n} (${r})`).join("  ")}`, "hf-row"));
+    }
     body.append(el("h4", "🏟️ Latest tournament winners", "tn-round"));
     if (!view.tourneys.length) body.append(el("p", "No tournament has finished yet. Open one under 🏟️ Tournaments!", "dnote small"));
-    for (const t of view.tourneys.slice(0, 8)) body.append(el("p", `${t.auto ? "📅 " : ""}${(GAMES[t.k] || t.k).replace(/^\S+ /, "")}: ${t.champ} (${t.n} players) · ${ago(t.t)}`, "hf-row"));
+    for (const t of view.tourneys.slice(0, 8)) {
+      const row = el("p", `${t.auto ? "📅 " : ""}${(GAMES[t.k] || t.k).replace(/^\S+ /, "")}: ${t.champ} (${t.n} players) · ${ago(t.t)} `, "hf-row");
+      if (t.rp) { const b = el("button", "▶ Final"); b.type = "button"; b.title = "Watch the replay of the final"; b.addEventListener("click", () => { closePanels(); Online.navalSend({ t: "replay", id: t.rp }); }); row.append(b); }
+      body.append(row);
+    }
     body.append(el("h4", "🥇 Weekly cup podiums", "tn-round"));
     if (!view.weekly.length) body.append(el("p", "No weekly cup has ended yet.", "dnote small"));
     for (const w of view.weekly.slice(0, 6)) body.append(el("p", `${w.theme}: ${w.top.map(([n, p], i) => `${["🥇", "🥈", "🥉"][i]} ${n} (${p})`).join("  ")}`, "hf-row"));
@@ -31,7 +40,13 @@ const Hall = (() => {
     body.append(el("p", "Only players with an account are listed, and a game needs three matches against real people to count.", "dnote small"));
   }
 
-  function on(m) { if (m.t !== "hall") return; view = m; if ($h("hall").classList.contains("show")) render(); }
+  function on(m) {
+    if (m.t === "season") {                                                        // a season has just ended: the server sends your rating after the reset
+      if (m.rank) Social.setRank(m.rank);
+      toast(`🏅 Season ${m.no} is over!${m.top && m.top.length ? ` ${m.top.map(([n, r], i) => `${["🥇", "🥈", "🥉"][i]} ${n} (${r})`).join(" ")}.` : ""} Your rating moved halfway back to 1000: season ${m.next} begins.`);
+      return;
+    }
+    if (m.t !== "hall") return; view = m; if ($h("hall").classList.contains("show")) render(); }
   function open() {
     if (!Online.connected) { toast("The hall of fame needs the game server: wait to be connected."); return; }
     Online.navalSend({ t: "hall", a: "get" }); render(); openPanel("#hall");

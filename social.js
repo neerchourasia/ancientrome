@@ -23,7 +23,7 @@ const Social = (() => {
   function snapshot() { return { rank: { ...rank }, friends: [...friends.values()].map((f) => ({ fid: f.fid, name: f.name })) }; }
   function restore(o) {
     if (!o || typeof o !== "object") return;
-    if (o.rank && Number.isFinite(o.rank.r)) rank = { r: Math.round(o.rank.r), w: o.rank.w | 0, l: o.rank.l | 0, d: o.rank.d | 0 };
+    if (o.rank && Number.isFinite(o.rank.r)) rank = { r: Math.round(o.rank.r), w: o.rank.w | 0, l: o.rank.l | 0, d: o.rank.d | 0, ...(Number.isInteger(o.rank.s) ? { s: o.rank.s } : {}) };
     for (const f of Array.isArray(o.friends) ? o.friends : []) if (f && /^[0-9a-f]{12}$/.test(f.fid) && !friends.has(f.fid)) friends.set(f.fid, { fid: f.fid, name: String(f.name || "Friend").slice(0, 16), online: false, unread: 0 });
     render();
   }
@@ -85,7 +85,7 @@ const Social = (() => {
     render();
   }
 
-  function setRank(k) { if (k && Number.isFinite(k.r)) { rank = { r: k.r, w: k.w | 0, l: k.l | 0, d: k.d | 0 }; persist(); render(); } }
+  function setRank(k) { if (k && Number.isFinite(k.r)) { rank = { r: k.r, w: k.w | 0, l: k.l | 0, d: k.d | 0, ...(Number.isInteger(k.s) ? { s: k.s } : {}) }; persist(); render(); } }
 
   // ------------------------------------------------------------------ the screen
 

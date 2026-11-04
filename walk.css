@@ -897,3 +897,6 @@ body.touch .dpanel button, body.touch .dpanel select { min-height: 40px; }
 .in-lang { margin-right: 10px; }
 html[lang="hi"] body, html[lang="hi"] button, html[lang="hi"] select, html[lang="hi"] input { font-family: system-ui, -apple-system, "Kohinoor Devanagari", "Noto Sans Devanagari", "Devanagari Sangam MN", sans-serif; }
 html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang="zh"] input { font-family: system-ui, -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+
+.dq-bar { height: 12px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; margin: 8px 0 4px; }
+.dq-bar i { display: block; height: 100%; background: #e0b84a; transition: width .3s; }

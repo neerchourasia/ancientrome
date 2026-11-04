@@ -56,7 +56,7 @@ const Online = (() => {
 
   function onMessage(m) {
     switch (m.t) {
-      case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); Festival.sync(); setMsg(""); break;
+      case "welcome": welcome = m; Admin.server = !!m.admin; if (m.rank) Social.setRank(m.rank); Festival.sync(); setMsg(""); if (m.rank) send({ t: "daily", a: "get" }); break;
       case "fest": case "diyas": Festival.remote(m); break;
       case "shoved": gotShoved(m); break;
       case "shove_ok": toast(`You shoved ${m.name}`); noteKnock(); break;
@@ -78,7 +78,8 @@ const Online = (() => {
       case "pyr": case "pyr_done": Cancun.pyrOn(m); break;
       case "weekly": case "weekly_prize": Weekly.on(m); break;
       case "tourney": Tournament.on(m); break;
-      case "hall": Hall.on(m); break;
+      case "hall": case "season": Hall.on(m); break;
+      case "daily": Daily.on(m); break;
       case "profile": case "replay": Profile.on(m); break;
       case "notice": Bulletin.on(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }

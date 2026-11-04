@@ -12,6 +12,11 @@ const Tournament = (() => {
   const send = (o) => Online.navalSend({ t: "tourney", ...o });
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
   const btn = (text, fn, cls) => { const b = el("button", text, cls); b.type = "button"; b.addEventListener("click", fn); return b; };
+  const REM_KEY = "rome-tn-remind", REM_SEEN = "rome-tn-reminded";
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  const canNotify = () => typeof Notification !== "undefined";
+  const remindOn = () => canNotify() && Notification.permission === "granted" && store.get(REM_KEY) === "1";
+  let remTimer = 0;
   const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   function renderList(body) {
@@ -36,6 +41,11 @@ const Tournament = (() => {
       f.append(sel, cap, btn("Open a tournament", () => send({ a: "create", kind: form.kind, cap: form.cap })));
       body.append(f);
     }
+    if (canNotify() && Notification.permission !== "denied") {
+      const on = remindOn();
+      const rb = btn(on ? "🔔 Reminder is on: turn it off" : "🔔 Remind me before the Saturday tournament", () => { on ? setRemind(false) : setRemind(true); }, "tn-remind");
+      body.append(rb);
+    } else if (canNotify()) body.append(el("p", "Notifications are blocked for this site in your browser, so reminders are off.", "dnote small"));
     body.append(el("p", `With ${list.min} or more players the winner takes ${list.prize[0]} denarii, second ${list.prize[1]} and third ${list.prize[2]}. The Saturday tournament, which the server opens by itself every week (sign-up from 16:00 UTC, first match at 18:00), pays double. Wins here count in the weekly cup and your profile too.`, "dnote small"));
   }
 
@@ -59,10 +69,32 @@ const Tournament = (() => {
         const row = el("div", undefined, `sp-row${m.me ? " tn-me" : ""}`);
         const names = m.ps.map((n) => (m.w.includes(n) && m.st === "done" ? `✔ ${n}` : n)).join(m.ps.length > 2 || v.kind === "dragon" ? ", " : " vs ");
         row.append(el("span", m.bye ? `${m.ps[0]} (bye)` : `${names}${m.st === "live" ? "  ·  playing now" : m.st === "wait" ? "  ·  waiting" : ""}`));
+        if (m.rp && m.st === "done") row.append(btn("▶ Replay", () => { closePanels(); Online.navalSend({ t: "replay", id: m.rp }); }));
         if (m.st === "live" && m.room) row.append(btn("Watch", () => { closePanels(); Online.navalSend({ t: "watch", a: "join", room: m.room }); }));
         body.append(row);
       }
     }
+  }
+
+  // A browser notification 15 minutes before a Saturday tournament starts; it needs this tab to stay open, so it asks the server once a minute while the reminder is on.
+  function remindCheck() {
+    if (!remindOn() || !Online.connected) return;
+    send({ a: "list" });
+    const t = list && list.list.find((x) => x.auto && x.state === "open" && x.in <= 900 && x.in > 0);
+    if (!t || store.get(REM_SEEN) === t.id) return;
+    store.set(REM_SEEN, t.id);
+    try {
+      new Notification("🏟️ Saturday tournament", { body: `${t.name} starts in ${Math.max(1, Math.round(t.in / 60))} minutes${t.joined ? ": you are signed up." : ". Sign up under Tournaments in the menu."}`, tag: "rome-tourney" });
+    } catch (e) {}
+  }
+  function startRemind() { clearInterval(remTimer); if (remindOn()) { remTimer = setInterval(remindCheck, 60000); setTimeout(remindCheck, 4000); } }
+  function setRemind(on) {
+    if (!on) { store.set(REM_KEY, "0"); clearInterval(remTimer); render(); toast("Reminder off."); return; }
+    Notification.requestPermission().then((p) => {
+      if (p === "granted") { store.set(REM_KEY, "1"); startRemind(); toast("🔔 You will get a notification 15 minutes before the Saturday tournament, as long as this tab stays open."); }
+      else toast("Notifications were not allowed, so there is no reminder.");
+      render();
+    }).catch(() => {});
   }
 
   function render() {
@@ -91,6 +123,6 @@ const Tournament = (() => {
     timer = setInterval(() => { if (!$t("tourney").classList.contains("show")) { clearInterval(timer); return; } send({ a: "list" }); if (open_) send({ a: "get", id: open_ }); }, 5000);
   }
   function openIt() { if (!Online.connected) { toast("Tournaments need the game server: wait to be connected."); return; } show(); }
-  function bind() { const b = $t("btn-tourney"); if (b) b.addEventListener("click", openIt); }
+  function bind() { const b = $t("btn-tourney"); if (b) b.addEventListener("click", openIt); startRemind(); }
   return { bind, on, open: openIt };
 })();

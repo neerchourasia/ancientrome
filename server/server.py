@@ -31,6 +31,7 @@ import signal
 import struct
 import sys
 import time
+import zlib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1126,6 +1127,7 @@ class MiniRoom:
 
     def send_state(self, extra):
         payload = dict({"t": "mini", "k": self.kind, "ev": self.events, "s": [p.score for p in self.players], "w": len(self.watchers)}, **extra)
+        tape_frame(self, payload)
         self.events = []
         self.snap = dict(payload, ev=[])
         for p in self.players:
@@ -1144,7 +1146,7 @@ class MiniRoom:
             c.send({"t": "end", "mode": self.kind, "winner": winner, "reason": reason, "score": [q.score for q in self.players], "ranked": self.ranked, "watch": True})
         self.watchers = []
         entries = [(p.who, 0 if p.i == winner or winner == -1 else 1) for p in self.players if p.who]
-        rp = replay_add(self.kind, [p.name for p in self.players], winner, getattr(self, "record", [])) if self.ranked and reason != "empty" else None
+        rp = replay_add(self.kind, [p.name for p in self.players], winner, getattr(self, "record", []), tape_of(self), {"winner": winner, "reason": reason, "score": [q.score for q in self.players], "looks": [q.look for q in self.players]}) if self.ranked and reason != "empty" else None
         ranks = rate_placements(entries, self.kind, rp) if self.ranked and reason != "empty" else {}
         for p in self.players:
             if p.conn:
@@ -1157,7 +1159,7 @@ class MiniRoom:
                 p.conn.room = p.conn.me = None
         tm = getattr(self, "tm", None)
         if tm:
-            tourney_done(tm, [getattr(self.players[i].who, "fid", None) for i in ((winner, 1 - winner) if winner in (0, 1) and len(self.players) == 2 else ())])
+            tourney_done(tm, [getattr(self.players[i].who, "fid", None) for i in ((winner, 1 - winner) if winner in (0, 1) and len(self.players) == 2 else ())], rp)
         self.task.cancel()
 
 
@@ -1881,6 +1883,7 @@ class DragonRoom:
                         if self.first_fin is None:
                             self.first_fin = t
         payload = {"t": "dragon", "p": [[p.i, round(p.s, 1), round(p.v, 2), 1 if p.fin is not None and p.fin != float("inf") else 0] for p in self.players], "ev": self.events, "w": len(self.watchers)}
+        tape_frame(self, {k: v for k, v in payload.items() if k != "t"})
         self.events = []
         self.snap = dict(payload, ev=[])
         for p in self.players:
@@ -1908,14 +1911,17 @@ class DragonRoom:
             c.watching = None
             c.send(dict(msg, watch=True))
         self.watchers = []
-        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who], self.kind) if reason != "empty" else {}
+        rp = replay_add("dragon", [p.name for p in order], 0, [], tape_of(self), {"order": msg["order"]}) if self.ranked and reason != "empty" else None
+        if rp:
+            msg["rp"] = rp
+        ranks = rate_placements([(p.who, k) for k, p in enumerate(order) if p.who], self.kind, rp) if reason != "empty" else {}
         for p in self.players:
             if p.conn:
                 p.conn.send(dict(msg, rank=ranks[id(p.who)]) if id(p.who) in ranks else msg)
                 p.conn.room = p.conn.me = None
         tm = getattr(self, "tm", None)
         if tm:
-            tourney_done(tm, [getattr(p.who, "fid", None) for p in order if p.who])
+            tourney_done(tm, [getattr(p.who, "fid", None) for p in order if p.who], rp)
         self.task.cancel()
 
 
@@ -2783,6 +2789,7 @@ async def world_loop():
                 trade_tick()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
+                season_roll()
         except Exception as e:  # never let a bug here stop the world
             print("world error:", repr(e))
 
@@ -3494,7 +3501,9 @@ def rating_of(conn):
 
 
 def public_rank(rec):
-    return {"r": rec["r"], "w": rec["w"], "l": rec["l"], "d": rec["d"]}
+    if SEASON["n"] < 0:
+        season_roll()                                      # (the very first time: the season the clock is in starts now)
+    return {"r": rec["r"], "w": rec["w"], "l": rec["l"], "d": rec["d"], "s": SEASON["n"]}
 
 
 def claim_rank(conn, claimed):
@@ -3502,6 +3511,10 @@ def claim_rank(conn, claimed):
     if not conn.uid or conn.uid in RATINGS or not isinstance(claimed, dict):
         return
     r = int(num(claimed.get("r"), 0, 4000, START_RATING))
+    if SEASON["n"] < 0:
+        season_roll()
+    if isinstance(claimed.get("s"), int) and not isinstance(claimed.get("s"), bool) and SEASON["n"] > claimed["s"]:          # a rating from an older season is pulled in as the seasons since then would have done
+        r = rating_soft(r, SEASON["n"] - claimed["s"])
     RATINGS[conn.uid] = {"r": r, "w": int(num(claimed.get("w"), 0, 100000)), "l": int(num(claimed.get("l"), 0, 100000)), "d": int(num(claimed.get("d"), 0, 100000)), "name": conn.name}
 
 
@@ -4126,6 +4139,68 @@ def on_pyr(conn, m):
     pyr_broadcast(pyr_view())
 
 
+# ---------------------------------------------------------------- rating seasons
+# A season is eight weeks (it starts and ends with a weekly cup). When it ends the three best ratings among the players who played at least five matches in it win a trophy (shown in the
+# profile and the hall of fame), every player's rating moves halfway back to 1000 (so the ones who start late can catch up), and the next season begins. A browser that was away remembers its rating with
+# the season it belongs to, so the server brings it up to date when it comes back (ratings themselves are kept by the browsers: see claim_rank).
+SEASON_WEEKS, SEASON_MIN = 8, 5
+SEASON = {"n": -1, "no": 1, "last": None}           # n: the eight-week period of the clock (saved), no: the number shown to players, last: {"no", "top": [[name, rating]]}
+
+
+def season_of(t=None):
+    return week_of(time.time() if t is None else t) // SEASON_WEEKS
+
+
+def season_ends(n=None):
+    return ((SEASON["n"] if n is None else n) + 1) * SEASON_WEEKS * WEEK_LEN + 4 * 86400
+
+
+def rating_soft(r, gap=1):
+    return START_RATING + int((r - START_RATING) / (2 ** min(max(gap, 1), 10)))
+
+
+def season_roll(t=None):
+    """Closes the seasons that have ended (normally one) and starts the new one."""
+    cur = season_of(t)
+    if SEASON["n"] < 0:
+        SEASON["n"] = cur
+        return world_soon()
+    for _ in range(10):
+        if SEASON["n"] >= cur:
+            break
+        season_close()
+    if SEASON["n"] < cur:
+        SEASON["n"] = cur
+    world_soon()
+
+
+def season_close():
+    no = SEASON["no"]
+    ranked = sorted(((f, r) for f, r in STATS.items() if r.get("sg", 0) >= SEASON_MIN), key=lambda x: (-x[1]["r"], x[1]["name"]))
+    top = []
+    for i, (f, r) in enumerate(ranked):
+        if i < 3:
+            r["st"] = (list(r.get("st", [0, 0, 0])) + [0, 0, 0])[:3]
+            r["st"][i] += 1
+            top.append([r["name"], r["r"]])
+        r["sh"] = (r.get("sh", []) + [[no, i + 1, r["r"]]])[-12:]
+    for r in STATS.values():
+        r["r"], r["sg"] = rating_soft(r["r"]), 0
+    for r in RATINGS.values():
+        r["r"] = rating_soft(r["r"])
+    SEASON["n"] += 1
+    SEASON["no"] = no + 1
+    SEASON["last"] = {"no": no, "top": top}
+    if top:
+        hall_add("seasons", {"no": no, "top": top, "t": int(time.time())})
+    medals = ["🥇", "🥈", "🥉"]
+    tourney_say("🏅 Season %d is over!%s Everybody's rating moves halfway back to 1000: season %d begins now." % (no, (" " + "  ".join("%s %s (%d)" % (medals[i], n, r) for i, (n, r) in enumerate(top)) + ".") if top else "", no + 1))
+    for c in CONNS:
+        if c.hello and not c.closed and c.uid:
+            c.send({"t": "season", "no": no, "next": no + 1, "rank": public_rank(rating_of(c)), "top": top})
+    world_soon()
+
+
 # ---------------------------------------------------------------- the weekly cup
 # Every Monday (UTC) a new week starts with a theme. Players with an account score points all week: a win in a match against real people is worth 3 points and any other
 # result 1, and games that suit the week's theme count double; laying pyramid blocks adds a few more (a lot more in Pyramid Week, but with a cap). When the week ends the top
@@ -4214,6 +4289,7 @@ def weekly_rec(conn):
 
 
 def weekly_match(conn, kind, won):
+    daily_add(conn, "match", kind, won)
     r = weekly_rec(conn)
     if r is None or not kind:
         return
@@ -4225,6 +4301,7 @@ def weekly_match(conn, kind, won):
 
 
 def weekly_block(conn):
+    daily_add(conn, "blocks")
     r = weekly_rec(conn)
     if r is None:
         return
@@ -4272,6 +4349,93 @@ def on_weekly(conn, m):
             world_soon()
         return
     return conn.send(weekly_view(conn))
+
+
+# ---------------------------------------------------------------- the daily quest
+# Every day (UTC) the server picks one small goal for everybody: win or play matches against real people (practice bots and farmed rematches do not count), play a certain kind of game, or carry blocks of the
+# pyramid. With an account, finishing it pays denarii, and every day in a row makes the prize bigger (up to a week). The prize is sent the same way as the weekly cup's (it waits until the browser confirms it).
+DAY_LEN = 86400
+QUESTS = [
+    {"k": "blocks", "n": 12, "text": "Carry 12 blocks of the great pyramid in Cancún"},
+    {"k": "win", "n": 1, "text": "Win a match against a real person"},
+    {"k": "play", "n": 3, "text": "Play 3 matches against real people"},
+    {"k": "game", "n": 1, "kinds": ("xiangqi",), "text": "Play a game of xiangqi against a real person"},
+    {"k": "blocks", "n": 20, "text": "Carry 20 blocks of the great pyramid in Cancún"},
+    {"k": "game", "n": 1, "kinds": ("kushti", "kites", "ball"), "text": "Play kushti, a kite fight or pok-ta-pok against a real person"},
+    {"k": "win", "n": 2, "text": "Win 2 matches against real people"},
+    {"k": "game", "n": 1, "kinds": ("dragon",), "text": "Race a dragon boat against real people"},
+    {"k": "game", "n": 1, "kinds": ("duel", "brawl", "team2", "coop", "wushu"), "text": "Fight in the arena: a duel, brawl, team fight or wushu bout against real people"},
+    {"k": "game", "n": 1, "kinds": ("race", "derby", "naval"), "text": "Take part in a chariot race, derby or naval battle against real people"},
+]
+DAILY_COINS, DAILY_STEP, DAILY_DAYS = 60, 15, 7          # the prize is 60 denarii, 15 more for every day in a row, up to the seventh
+DAILY = {}                                               # friend id -> {"day", "p" (progress), "done", "s" (days in a row), "b" (best), "l" (last day finished)} (saved)
+
+
+def day_of(t=None):
+    return int((time.time() if t is None else t) // DAY_LEN)
+
+
+def daily_quest(day):
+    return QUESTS[(day * 3) % len(QUESTS)]
+
+
+def daily_coins(streak):
+    return DAILY_COINS + DAILY_STEP * (min(max(streak, 1), DAILY_DAYS) - 1)
+
+
+def daily_rec(conn):
+    """The quest record of a logged-in player for today (None for guests: prizes need an account)."""
+    if not conn or not getattr(conn, "fid", None):
+        return None
+    today = day_of()
+    r = DAILY.get(conn.fid)
+    if r is None:
+        if len(DAILY) >= 5000:
+            for f in [f for f, x in DAILY.items() if x["day"] < today - 30]:
+                del DAILY[f]
+        if len(DAILY) >= 5000:
+            return None
+        r = DAILY[conn.fid] = {"day": today, "p": 0, "done": 0, "s": 0, "b": 0, "l": -1}
+    if r["day"] != today:
+        r["day"], r["p"], r["done"] = today, 0, 0
+        if r["l"] < today - 1:
+            r["s"] = 0
+    return r
+
+
+def daily_view(conn):
+    r = daily_rec(conn)
+    today = day_of()
+    q = daily_quest(today)
+    streak = r["s"] if r else 0
+    return {"t": "daily", "text": q["text"], "n": q["n"], "p": min(r["p"], q["n"]) if r else 0, "done": bool(r and r["done"]), "streak": streak, "best": r["b"] if r else 0, "login": bool(r),
+            "coins": daily_coins(streak if r and r["done"] else streak + 1), "ends": int((today + 1) * DAY_LEN - time.time()), "min": DAILY_COINS, "max": daily_coins(DAILY_DAYS)}
+
+
+def daily_add(conn, what, kind=None, won=False):
+    r = daily_rec(conn)
+    if r is None or r["done"]:
+        return
+    q = daily_quest(r["day"])
+    if not ((what == "blocks" and q["k"] == "blocks") or (what == "match" and (q["k"] == "play" or (q["k"] == "win" and won) or (q["k"] == "game" and kind in q["kinds"])))):
+        return
+    r["p"] += 1
+    if r["p"] >= q["n"]:
+        r["done"] = 1
+        r["s"] = r["s"] + 1 if r["l"] == r["day"] - 1 else 1
+        r["b"] = max(r["b"], r["s"])
+        r["l"] = r["day"]
+        if len(PRIZES.get(conn.fid, [])) < 8:
+            PRIZES.setdefault(conn.fid, []).append({"id": "q%d" % r["day"], "week": 0, "theme": "Daily quest", "rank": r["s"], "coins": daily_coins(r["s"]), "pts": 0, "quest": 1})
+            for c in conns_of(conn.fid):
+                c.send({"t": "weekly_prize", "prizes": PRIZES[conn.fid]})
+    for c in conns_of(conn.fid):
+        c.send(daily_view(c))
+    world_soon()
+
+
+def on_daily(conn, m):
+    return conn.send(daily_view(conn))
 
 
 # ---------------------------------------------------------------- tournaments
@@ -4345,7 +4509,7 @@ def tourney_seed(t, fid):
 
 
 def tourney_match(ps, adv):
-    return {"ps": ps, "adv": adv, "st": "wait", "order": [], "w": [], "room": None, "call": None, "tries": 0, "absent": []}
+    return {"ps": ps, "adv": adv, "st": "wait", "order": [], "w": [], "room": None, "call": None, "tries": 0, "absent": [], "rp": None}
 
 
 def tourney_deal(t, fids, first):
@@ -4412,7 +4576,7 @@ def tourney_start(t):
     world_soon()
 
 
-def tourney_done(tm, order):
+def tourney_done(tm, order, rp=None):
     """A tournament match ended. order: the people in it, best first (empty for a draw)."""
     t = TOURNEYS.get(tm[0])
     if not t or t["state"] != "running" or tm[1] >= len(t["rounds"]) or tm[2] >= len(t["rounds"][tm[1]]):
@@ -4433,6 +4597,7 @@ def tourney_done(tm, order):
                     c.send({"t": "tourney", "a": "call", "id": t["id"], "kind": t["kind"], "label": "Replay", "in": int(TOURNEY_REMATCH), "vs": [tourney_pname(t, o) for o in m["ps"] if o != f]})
             return
     order += [f for f in m["ps"] if f not in order]
+    m["rp"] = rp if rp in {r["id"] for r in REPLAYS} else None
     tourney_settle(t, m, order)
 
 
@@ -4470,7 +4635,7 @@ def tourney_end(t):
     t["state"], t["ended"], t["places"] = "done", time.time(), places
     t["champ"] = places[0][1] if places else ""
     if places:
-        hall_add("tourneys", {"k": t["kind"], "champ": t["champ"], "n": len(t["players"]), "auto": 1 if t.get("auto") else 0, "t": int(time.time())})
+        hall_add("tourneys", {"k": t["kind"], "champ": t["champ"], "n": len(t["players"]), "auto": 1 if t.get("auto") else 0, "t": int(time.time()), "rp": final.get("rp") or ""})
     medals = ("🥇", "🥈", "🥉")
     if places:
         tourney_say("🏟️ The %s is over! %s" % (tourney_name(t).lower(), "  ".join("%s %s" % (medals[p[2] - 1], p[1]) for p in places[:3])))
@@ -4562,9 +4727,10 @@ def tourney_row(t, conn):
 
 def tourney_view(t, conn):
     out = tourney_row(t, conn)
+    have = {r["id"] for r in REPLAYS}
     out.update({"t": "tourney", "a": "view", "players": [p["name"] for p in sorted(t["players"], key=lambda p: -p["seed"])], "places": [[p[1], p[2]] for p in t["places"]], "prize": len(t["players"]) >= TOURNEY_PRIZE_MIN, "host": bool(conn.fid) and conn.fid == t["by"],
                 "rounds": [{"label": tourney_label(t, i), "m": [{"ps": [tourney_pname(t, f) for f in m["ps"]], "w": [tourney_pname(t, f) for f in m["w"]], "st": m["st"], "room": m["room"], "bye": bool(m.get("bye")),
-                                                                 "me": bool(conn.fid) and conn.fid in m["ps"]} for m in rd]} for i, rd in enumerate(t["rounds"])]})
+                                                                 "me": bool(conn.fid) and conn.fid in m["ps"], "rp": m.get("rp") if m.get("rp") in have else None} for m in rd]} for i, rd in enumerate(t["rounds"])]})
     return out
 
 
@@ -4645,7 +4811,7 @@ def clean_tourney(t):
                 if not ps:
                     continue
                 nm = tourney_match(ps, int(num(m.get("adv"), 1, 4, 1)))
-                nm.update({"st": "done" if m.get("st") == "done" else "wait", "order": [f for f in m.get("order", []) if f in fids][:4], "w": [f for f in m.get("w", []) if f in fids][:4], "tries": int(num(m.get("tries"), 0, 9, 0)), "bye": bool(m.get("bye"))})
+                nm.update({"st": "done" if m.get("st") == "done" else "wait", "order": [f for f in m.get("order", []) if f in fids][:4], "w": [f for f in m.get("w", []) if f in fids][:4], "tries": int(num(m.get("tries"), 0, 9, 0)), "bye": bool(m.get("bye")), "rp": m.get("rp")[:12] if isinstance(m.get("rp"), str) else None})
                 ms.append(nm)
             rounds.append(ms)
         return {"id": t["id"][:12], "kind": t["kind"], "by": str(t.get("by", ""))[:40], "state": t["state"], "auto": 1 if t.get("auto") else 0, "rem": 1 if t.get("rem") else 0, "created": float(num(t.get("created"), 0, 4e9, 0)), "start_at": float(num(t.get("start_at"), 0, 4e9, 0)),
@@ -4667,7 +4833,7 @@ def stats_rec(fid, name):
     if fid not in STATS:
         if len(STATS) >= STATS_MAX:
             return None
-        STATS[fid] = {"name": name, "r": START_RATING, "g": {}, "cups": [0, 0, 0], "hist": []}
+        STATS[fid] = {"name": name, "r": START_RATING, "g": {}, "cups": [0, 0, 0], "hist": [], "st": [0, 0, 0], "sh": [], "sg": 0}
     STATS[fid]["name"] = name
     return STATS[fid]
 
@@ -4682,6 +4848,7 @@ def stats_add(conn, kind, result, vs, rp=None):
         return
     g = rec["g"].setdefault(kind, [0, 0, 0])
     g["wld".index(result)] += 1
+    rec["sg"] = rec.get("sg", 0) + 1                                                                 # matches this season
     rec["r"] = rating_of(conn)["r"]
     rec["rh"] = (rec.get("rh", []) + [rec["r"]])[-RH_MAX:]                                         # the rating after every match (for the chart on the profile)
     cs = rec.get("cs", 0)
@@ -4694,13 +4861,89 @@ def stats_add(conn, kind, result, vs, rp=None):
     world_soon()
 
 
-def replay_add(kind, names, winner, moves):
-    """Keeps a finished xiangqi game; returns its id."""
-    if kind != "xiangqi" or not moves:
+# The other games are kept as a "tape": the states the server sent to the players (a few a second, with every event), squeezed with zlib. A browser plays a tape through the same screen
+# that is used for watching a live match. Tapes are big, so they are limited (a few minutes of play each, and a fixed amount of space for all of them: the oldest go first).
+TAPE_GAP = {"kushti": 0.0, "kites": 0.1, "ball": 0.1, "dragon": 0.2}         # seconds between two frames kept (0: every one)
+TAPE_FRAMES, TAPE_BYTES, TAPE_BUDGET = 2400, 150000, 1500000                 # frames in one tape, bytes of one tape (squeezed), bytes of all the tapes together
+
+
+def tape_frame(room, payload):
+    """Called with every state a ranked room sends: keeps some of them (events are never lost: they ride on the next frame kept)."""
+    if not room.ranked or room.kind not in TAPE_GAP:
+        return
+    tp = getattr(room, "tape", None)
+    if tp is None:
+        tp = room.tape = {"f": [], "t": -9.0, "ev": []}
+    if len(tp["f"]) >= TAPE_FRAMES:
+        return
+    t = now() - room.t0
+    tp["ev"] += payload.get("ev") or []
+    if t - tp["t"] < TAPE_GAP[room.kind]:
+        return
+    tp["t"] = t
+    fr = {k: v for k, v in payload.items() if k not in ("t", "k", "w", "ev")}
+    if tp["ev"]:
+        fr["ev"] = tp["ev"][:12]
+    tp["ev"] = []
+    tp["f"].append([round(t, 2), fr])
+
+
+def tape_of(room):
+    """The squeezed tape of a finished room (None if there is nothing worth keeping, or it is too big)."""
+    tp = getattr(room, "tape", None)
+    if not tp or len(tp["f"]) < 5:
+        return None
+    raw = zlib.compress(json.dumps(tp["f"], separators=(",", ":")).encode(), 9)
+    return base64.b64encode(raw).decode() if len(raw) <= TAPE_BYTES else None
+
+
+def tape_frames(rp):
+    """The frames of a kept tape (a list of [seconds, state]); [] if it is damaged."""
+    try:
+        d = zlib.decompressobj()
+        fr = json.loads(d.decompress(base64.b64decode(rp["tp"]), 4000000))
+        return fr if isinstance(fr, list) else []
+    except Exception:
+        return []
+
+
+def replay_end(kind, e):
+    """How a kept match ended, cut down to what the browser shows."""
+    if kind == "dragon":
+        return {"order": [{"i": int(num(o.get("i"), 0, 3, 0)), "name": str(o.get("name", ""))[:24], "time": None if o.get("time") is None else float(num(o.get("time"), 0, 1e4, 0)),
+                           "perfect": int(num(o.get("perfect"), 0, 1e4, 0)), "strokes": int(num(o.get("strokes"), 0, 1e4, 0))} for o in (e.get("order") if isinstance(e.get("order"), list) else [])[:4] if isinstance(o, dict)]}
+    sc = e.get("score") if isinstance(e.get("score"), list) else [0, 0]
+    looks = [clean_look(l) for l in (e.get("looks") if isinstance(e.get("looks"), list) else [])[:2] if isinstance(l, dict)]
+    return {"winner": int(num(e.get("winner"), -1, 1, -1)), "reason": str(e.get("reason", ""))[:16], "score": [int(num(x, 0, 1e4, 0)) for x in (sc + [0, 0])[:2]], "looks": looks}
+
+
+def replay_pinned():
+    return {h.get("rp") for h in HALL["tourneys"] if h.get("rp")}
+
+
+def replay_trim():
+    """Drops the oldest replays above the limits (the ones the hall of fame points to stay)."""
+    keep = replay_pinned()
+    while len(REPLAYS) > REPLAYS_MAX or sum(len(r.get("tp", "")) for r in REPLAYS) > TAPE_BUDGET:
+        i = next((i for i, r in enumerate(REPLAYS) if r["id"] not in keep and (len(REPLAYS) > REPLAYS_MAX or r.get("tp"))), None)
+        if i is None:
+            break
+        del REPLAYS[i]
+
+
+def replay_add(kind, names, winner, moves, tape=None, end=None):
+    """Keeps a finished game (xiangqi as its moves, the others as a tape); returns its id."""
+    if kind == "xiangqi":
+        if not moves:
+            return None
+    elif not tape or kind not in TAPE_GAP:
         return None
     rid = os.urandom(4).hex()
-    REPLAYS.append({"id": rid, "k": kind, "names": [n[:24] for n in names], "w": winner, "mv": [list(m) for m in moves][:300], "t": int(time.time())})
-    del REPLAYS[:-REPLAYS_MAX]
+    rec = {"id": rid, "k": kind, "names": [n[:24] for n in names], "w": winner, "mv": [list(m) for m in moves][:300], "t": int(time.time())}
+    if kind != "xiangqi":
+        rec["tp"], rec["end"] = tape, end
+    REPLAYS.append(rec)
+    replay_trim()
     world_soon()
     return rid
 
@@ -4731,8 +4974,8 @@ def on_souv(conn, m):
 # ---------------------------------------------------------------- the hall of fame
 # Past tournament winners, the last weeks' cup podiums, and the best players: most wins in each game, the highest ratings, most tournaments won and most weekly cups won. Everything but the
 # two history lists is worked out from the profiles when someone asks; the history lists are saved with the world (`hall`).
-HALL = {"tourneys": [], "weekly": []}           # tourneys: [{"k", "champ", "n", "auto", "t"}], weekly: [{"week", "theme", "top": [[name, points]], "t"}], newest last
-HALL_KEEP = {"tourneys": 20, "weekly": 12}
+HALL = {"tourneys": [], "weekly": [], "seasons": []}           # tourneys: [{"k", "champ", "n", "auto", "t"}], weekly: [{"week", "theme", "top": [[name, points]], "t"}], newest last
+HALL_KEEP = {"tourneys": 20, "weekly": 12, "seasons": 8}
 HALL_GAMES = ("xiangqi", "kushti", "kites", "ball", "dragon", "duel", "wushu")
 
 
@@ -4742,6 +4985,7 @@ def hall_add(key, row):
 
 
 def hall_view():
+    season_roll()
     rows = list(STATS.values())
     best = {}
     for kind in HALL_GAMES:
@@ -4750,7 +4994,9 @@ def hall_view():
         if got:
             best[kind] = [list(x) for x in got[:5]]
     games = lambda r: sum(sum(g) for g in r["g"].values())
-    return {"t": "hall", "tourneys": HALL["tourneys"][::-1], "weekly": HALL["weekly"][::-1], "best": best,
+    have = {r["id"] for r in REPLAYS}
+    return {"t": "hall", "season": {"no": SEASON["no"], "ends": max(0, int(season_ends() - time.time())), "weeks": SEASON_WEEKS, "min": SEASON_MIN}, "seasons": HALL["seasons"][::-1],
+            "tourneys": [dict(h, rp=h["rp"] if h.get("rp") in have else "") for h in HALL["tourneys"][::-1]], "weekly": HALL["weekly"][::-1], "best": best,
             "rating": [[r["name"], r["r"]] for r in sorted((r for r in rows if games(r) >= 5), key=lambda r: (-r["r"], r["name"]))[:10]],
             "tw": [[r["name"], r["tw"]] for r in sorted((r for r in rows if r.get("tw")), key=lambda r: (-r["tw"], r["name"]))[:5]],
             "cups": [[r["name"], r["cups"][0]] for r in sorted((r for r in rows if r["cups"][0]), key=lambda r: (-r["cups"][0], r["name"]))[:5]]}
@@ -4769,7 +5015,7 @@ def profile_view(fid):
     w, l, d = (sum(v[i] for v in games.values()) for i in range(3))
     have = {r["id"] for r in REPLAYS}
     hist = [dict(h, rp=h["rp"] if h.get("rp") in have else None) for h in rec["hist"]]
-    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "rh": rec.get("rh", []), "streak": [rec.get("cs", 0), rec.get("bs", 0)], "hist": hist[::-1], "online": bool(conns_of(fid))}
+    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "rh": rec.get("rh", []), "streak": [rec.get("cs", 0), rec.get("bs", 0)], "st": rec.get("st", [0, 0, 0]), "sh": rec.get("sh", [])[::-1], "hist": hist[::-1], "online": bool(conns_of(fid))}
 
 
 def on_profile(conn, m):
@@ -4840,7 +5086,15 @@ def on_notice(conn, m):
 def on_replay(conn, m):
     rid = m.get("id")
     rp = next((r for r in REPLAYS if r["id"] == rid), None) if isinstance(rid, str) else None
-    conn.send({"t": "replay", "rp": rp, "b0": "".join(xq_parse(XQ_START))} if rp else {"t": "replay", "none": True})
+    if rp is None:
+        return conn.send({"t": "replay", "none": True})
+    if rp["k"] != "xiangqi":
+        fr = tape_frames(rp)
+        if not fr:
+            return conn.send({"t": "replay", "none": True})
+        extra = {"cd": DRAGON_COUNTDOWN, "len": DRAGON_LEN, "beat": DRAGON_BEAT} if rp["k"] == "dragon" else {}
+        return conn.send({"t": "replay", "rp": {"id": rp["id"], "k": rp["k"], "names": rp["names"], "w": rp["w"], "end": rp.get("end"), "fr": fr, **extra}})
+    conn.send({"t": "replay", "rp": rp, "b0": "".join(xq_parse(XQ_START))})
 
 
 
@@ -5255,6 +5509,8 @@ async def handle_msg(conn, m):
         return on_pyr(conn, m)
     if t == "weekly":
         return on_weekly(conn, m)
+    if t == "daily":
+        return on_daily(conn, m)
     if t == "watch":
         return on_watch(conn, m)
     if t == "tourney":
@@ -5518,7 +5774,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
@@ -5561,7 +5817,14 @@ def world_apply(rows):
         for f, lst in (list(pz.items())[:5000] if isinstance(pz, dict) else []):
             if clean_fid(f) and isinstance(lst, list):
                 PRIZES[f] = [{"id": str(p.get("id"))[:12], "week": int(num(p.get("week"), 0, 1e6, 0)), "theme": str(p.get("theme", ""))[:40], "rank": int(num(p.get("rank"), 1, 1e6, 1)),
-                              "coins": int(num(p.get("coins"), 0, 1e6, 0)), "pts": int(num(p.get("pts"), 0, 1e6, 0)), **({"tour": 1} if p.get("tour") else {})} for p in lst[:8] if isinstance(p, dict)]
+                              "coins": int(num(p.get("coins"), 0, 1e6, 0)), "pts": int(num(p.get("pts"), 0, 1e6, 0)), **({"tour": 1} if p.get("tour") else {}), **({"quest": 1} if p.get("quest") else {})} for p in lst[:8] if isinstance(p, dict)]
+    dl = rows.get("daily")
+    if isinstance(dl, dict):
+        DAILY.clear()
+        for f, r in list(dl.items())[:5000]:
+            if clean_fid(f) and isinstance(r, dict):
+                DAILY[f] = {"day": int(num(r.get("day"), 0, 1e6, 0)), "p": int(num(r.get("p"), 0, 1000, 0)), "done": 1 if r.get("done") else 0, "s": int(num(r.get("s"), 0, 1e5, 0)),
+                            "b": int(num(r.get("b"), 0, 1e5, 0)), "l": int(num(r.get("l"), -1, 1e6, -1))}
     sp = rows.get("stats")
     if isinstance(sp, dict):
         STATS.clear()
@@ -5572,12 +5835,22 @@ def world_apply(rows):
                             "tw": int(num(r.get("tw"), 0, 1e6, 0)), "rh": [int(num(x, 0, 4000, 0)) for x in (r.get("rh") if isinstance(r.get("rh"), list) else [])[-RH_MAX:]],
                             "cs": int(num(r.get("cs"), 0, 1e6, 0)), "bs": int(num(r.get("bs"), 0, 1e6, 0)), "sv": [i for i in SOUVENIRS if i in (r.get("sv") if isinstance(r.get("sv"), list) else [])],
                             "cups": [int(num(x, 0, 1e6, 0)) for x in ((r.get("cups") if isinstance(r.get("cups"), list) else []) + [0, 0, 0])[:3]],
+                            "st": [int(num(x, 0, 1e6, 0)) for x in ((r.get("st") if isinstance(r.get("st"), list) else []) + [0, 0, 0])[:3]], "sg": int(num(r.get("sg"), 0, 1e6, 0)),
+                            "sh": [[int(num(x[0], 1, 1e6, 1)), int(num(x[1], 1, 1e5, 1)), int(num(x[2], 0, 4000, 0))] for x in (r.get("sh") if isinstance(r.get("sh"), list) else [])[-12:] if isinstance(x, list) and len(x) == 3],
                             "hist": [{"k": str(h.get("k"))[:12], "r": h.get("r") if h.get("r") in ("w", "l", "d") else "d", "vs": [str(n)[:24] for n in (h.get("vs") or [])[:3]], "t": int(num(h.get("t"), 0, 4e9, 0)), "rp": h.get("rp") if isinstance(h.get("rp"), str) else None}
                                      for h in (r.get("hist") if isinstance(r.get("hist"), list) else [])[-HIST_MAX:] if isinstance(h, dict)]}
         REPLAYS.clear()
         for r in (sp.get("replays") if isinstance(sp.get("replays"), list) else [])[-REPLAYS_MAX:]:
             if isinstance(r, dict) and isinstance(r.get("id"), str) and isinstance(r.get("mv"), list) and isinstance(r.get("names"), list):
-                REPLAYS.append({"id": r["id"][:12], "k": "xiangqi", "names": [str(n)[:24] for n in r["names"][:2]], "w": int(num(r.get("w"), -1, 1, -1)), "mv": [[int(num(a, 0, 89, 0)), int(num(b, 0, 89, 0))] for a, b in [m for m in r["mv"][:300] if isinstance(m, list) and len(m) == 2]], "t": int(num(r.get("t"), 0, 4e9, 0))})
+                kind = r.get("k") if r.get("k") in TAPE_GAP else "xiangqi"
+                rec = {"id": r["id"][:12], "k": kind, "names": [str(n)[:24] for n in r["names"][:4 if kind == "dragon" else 2]], "w": int(num(r.get("w"), -1, 3, -1)),
+                       "mv": [[int(num(a, 0, 89, 0)), int(num(b, 0, 89, 0))] for a, b in [m for m in r["mv"][:300] if isinstance(m, list) and len(m) == 2]], "t": int(num(r.get("t"), 0, 4e9, 0))}
+                if kind != "xiangqi":
+                    tp, end = r.get("tp"), r.get("end")
+                    if not (isinstance(tp, str) and len(tp) <= TAPE_BYTES * 2 and isinstance(end, dict)):
+                        continue
+                    rec["tp"], rec["end"] = tp, replay_end(kind, end)
+                REPLAYS.append(rec)
     nt = rows.get("notices")
     if isinstance(nt, dict):
         NOTICES.clear()
@@ -5587,11 +5860,19 @@ def world_apply(rows):
                               for n in lst[-NOTICE_MAX:] if isinstance(n, dict)]
     hl = rows.get("hall")
     if isinstance(hl, dict):
-        HALL["tourneys"] = [{"k": r["k"], "champ": str(r.get("champ", ""))[:24], "n": int(num(r.get("n"), 0, 99, 0)), "auto": 1 if r.get("auto") else 0, "t": int(num(r.get("t"), 0, 4e9, 0))}
+        HALL["tourneys"] = [{"k": r["k"], "champ": str(r.get("champ", ""))[:24], "n": int(num(r.get("n"), 0, 99, 0)), "auto": 1 if r.get("auto") else 0, "t": int(num(r.get("t"), 0, 4e9, 0)), "rp": r["rp"][:12] if isinstance(r.get("rp"), str) else ""}
                             for r in (hl.get("tourneys") if isinstance(hl.get("tourneys"), list) else [])[-HALL_KEEP["tourneys"]:] if isinstance(r, dict) and r.get("k") in TOURNEY_KINDS]
         HALL["weekly"] = [{"week": int(num(r.get("week"), 0, 1e6, 0)), "theme": str(r.get("theme", ""))[:40], "t": int(num(r.get("t"), 0, 4e9, 0)),
                            "top": [[str(x[0])[:24], int(num(x[1], 0, 1e6, 0))] for x in (r.get("top") if isinstance(r.get("top"), list) else [])[:3] if isinstance(x, list) and len(x) == 2]}
                           for r in (hl.get("weekly") if isinstance(hl.get("weekly"), list) else [])[-HALL_KEEP["weekly"]:] if isinstance(r, dict)]
+        HALL["seasons"] = [{"no": int(num(r.get("no"), 1, 1e6, 1)), "t": int(num(r.get("t"), 0, 4e9, 0)),
+                            "top": [[str(x[0])[:24], int(num(x[1], 0, 4000, 0))] for x in (r.get("top") if isinstance(r.get("top"), list) else [])[:3] if isinstance(x, list) and len(x) == 2]}
+                           for r in (hl.get("seasons") if isinstance(hl.get("seasons"), list) else [])[-HALL_KEEP["seasons"]:] if isinstance(r, dict)]
+    sn = rows.get("season")
+    if isinstance(sn, dict):
+        SEASON["n"], SEASON["no"] = int(num(sn.get("n"), -1, 1e6, -1)), int(num(sn.get("no"), 1, 1e6, 1))
+        last = sn.get("last")
+        SEASON["last"] = {"no": int(num(last.get("no"), 1, 1e6, 1)), "top": [[str(x[0])[:24], int(num(x[1], 0, 4000, 0))] for x in (last.get("top") if isinstance(last.get("top"), list) else [])[:3] if isinstance(x, list) and len(x) == 2]} if isinstance(last, dict) else None
     ta = rows.get("tourney_auto")
     if isinstance(ta, dict):
         TOURNEY_AUTO["week"] = int(num(ta.get("week"), -1, 1e6, -1))

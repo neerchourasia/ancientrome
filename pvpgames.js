@@ -70,10 +70,10 @@ const Mini = (() => {
     ov.querySelector("#mini-leave").textContent = m.watch ? "Stop watching" : "Leave the game";
     if (m.kind === "xiangqi") xqSetup();
     ov.classList.add("show");
-    if (m.kind === "kushti" || m.kind === "kites") touchOn(m.kind);
+    if ((m.kind === "kushti" || m.kind === "kites") && !m.tape) touchOn(m.kind);
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
-    if (!m.watch) Sfx.play("horn"); else cheerBar(true);
+    if (!m.watch) Sfx.play("horn"); else if (!m.tape) cheerBar(true);
   }
 
   const GAME_KEYS = new Set(["Space", "KeyA", "KeyD", "KeyW", "KeyS", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Escape"]);
@@ -204,8 +204,8 @@ const Mini = (() => {
     const hud = document.createElement("div"); hud.id = "ball-hud"; hud.innerHTML = '<b id="bh-score"></b><span id="bh-note"></span><small id="bh-help"></small>'; document.body.append(hud);
     hud.querySelector("#bh-help").textContent = "You are watching. Walk about to find a good view. 1 2 3 4 cheer. Esc stops watching.";
     bg = { ball, figs, hud, watch: true, tx: [c.x, c.x], tz: [c.z - 12, c.z + 12], tyaw: [0, Math.PI], phase: [0, 0] };
-    mode = "online"; placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.1; cheerBar(true);
-    toast(`Watching pok-ta-pok: ${m.players.map((p) => p.name).join(" vs ")}.`);
+    mode = "online"; placeAt(c.x + 18, c.z + 40, Math.PI); player.pitch = -0.1; if (!m.tape) cheerBar(true);
+    toast(`${m.tape ? "Replay" : "Watching"} pok-ta-pok: ${m.players.map((p) => p.name).join(" vs ")}.`);
   }
   function updateBallWatch(dt) {
     updatePlayer(dt);
@@ -322,10 +322,10 @@ const Mini = (() => {
     hud.querySelector("#dh-help").textContent = m.watch ? "You are watching: the camera follows the leading boat. 1 2 3 4 cheer. Esc stops watching." : "Press Space (or A and D in turn) on every beat of the drum. Strokes on the beat drive the boat hard. Esc leaves.";
     dg = { boats, hud, t0: performance.now() + m.countdown * 1000, beat: m.beat * 1000, len: m.length, last: -1, noteT: 0, cx: c.x };
     mode = "online"; Beijing.setBoating(true);
-    touchOn("dragon");
+    if (!m.tape) touchOn("dragon");
     addEventListener("keydown", onDragonKey, true);
     player.yaw = -Math.PI / 2; player.pitch = -0.14; player.vx = player.vz = 0;
-    if (m.watch) { cheerBar(true); toast(`Watching the dragon boat race: ${m.players.map((p) => p.name).join(", ")}.`); }
+    if (m.watch) { if (!m.tape) cheerBar(true); toast(`${m.tape ? "Replay of" : "Watching"} the dragon boat race: ${m.players.map((p) => p.name).join(", ")}.`); }
     else { Sfx.play("horn"); toast("Dragon boat race! Paddle on the beat of the drum."); }
   }
   function onDragonKey(e) {
@@ -390,6 +390,7 @@ const Mini = (() => {
     const table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  ");
     cleanup();
     showResult(rank === 1 ? "You won the dragon boat race!" : `You finished ${ords[rank] || "last"}`, `${table}. ${me0 && me0.strokes ? `${me0.perfect} of your ${me0.strokes} strokes were right on the beat.` : ""}${prize ? ` Prize: +${prize} denarii.` : ""}`, [
+      ...(res.rp ? [{ label: "Watch the replay", fn: () => { closePanels(); send({ t: "replay", id: res.rp }); } }] : []),
       { label: "Race again", fn: () => { closePanels(); Online.openLobby(); } },
       { label: "Close", fn: closePanels },
     ]);
@@ -464,6 +465,7 @@ const Mini = (() => {
 
   // ------------------------------------------------------------------ the end
   function cleanup() {
+    tapeStop();
     cancelAnimationFrame(raf); raf = 0;
     removeEventListener("keydown", onKey, true); removeEventListener("keyup", onUp, true);
     held.clear(); touchOff(); if (ov) ov.classList.remove("show");
@@ -499,7 +501,7 @@ const Mini = (() => {
   }
   function leave() {
     if (!m) return;
-    if (m.replay) { cleanup(); return; }
+    if (m.replay || m.tape) { cleanup(); return; }
     send(m.watch ? { t: "watch", a: "leave" } : { t: "leave" });
     const was = m.watch; cleanup(); toast(was ? "You stopped watching." : "You left the game.");
   }
@@ -520,6 +522,7 @@ const Mini = (() => {
     return true;
   }
   function replay(msg) {
+    if (msg.rp && msg.rp.k && msg.rp.k !== "xiangqi") return replayTape(msg.rp);
     if (!msg.rp || typeof msg.b0 !== "string") { toast("That replay is no longer kept."); return; }
     if (m || typeof mode === "undefined" || mode !== "walk") return;
     if (!ov) build();
@@ -540,6 +543,48 @@ const Mini = (() => {
     ov.classList.add("show");
     addEventListener("keydown", onKey, true); addEventListener("keyup", onUp, true);
     last = performance.now(); raf = requestAnimationFrame(loop);
+  }
+
+
+  // ------------------------------------------------------------------ replaying a finished kushti, kite, pok-ta-pok or dragon boat match: the server keeps the states it sent (a few a second), and they are played back
+  // through the screen used for watching a live match (the ball game and the boats need you to be in Cancún / Beijing, where their scenery is)
+  let tape = null;       // { fr (frames: [seconds, state]), i (next frame), t0, kind, end, last (the frame before) }
+  const lerp = (a, b, k) => a + (b - a) * k;
+  function tapeStop() { if (tape) { clearInterval(tape.timer); tape = null; } }
+  function tapeTick() {
+    if (!tape || !m) { tapeStop(); return; }
+    const el = (performance.now() - tape.t0) / 1000, fr = tape.fr;
+    while (tape.i < fr.length && fr[tape.i][0] <= el) {
+      const s = Object.assign({ k: tape.kind, t: tape.kind === "dragon" ? "dragon" : "mini", ev: [] }, fr[tape.i][1]);
+      if (tape.kind === "dragon") onDragon(s); else on(s);
+      tape.prev = fr[tape.i]; tape.i++;
+    }
+    if (tape.kind === "kites" && st && tape.prev && tape.i < fr.length) {                     // the kites move smoothly between two frames
+      const a = tape.prev, b = fr[tape.i], k = Math.max(0, Math.min(1, (el - a[0]) / Math.max(0.01, b[0] - a[0])));
+      if (a[1].p && b[1].p) st = Object.assign({}, st, { p: a[1].p.map((row, i) => row.map((v, j) => (j < 3 ? lerp(v, b[1].p[i][j], k) : v))) });
+    }
+    if (tape.i >= fr.length && el > fr[fr.length - 1][0] + 1.2) {
+      const fin = tape.end || {}, kind = tape.kind; tapeStop();
+      if (kind === "dragon") endDragon({ order: fin.order || [] }); else end(Object.assign({ winner: -1, score: [0, 0] }, fin));
+    }
+  }
+  function replayTape(rp) {
+    if (m || typeof mode === "undefined" || mode !== "walk") return;
+    if (!Array.isArray(rp.fr) || rp.fr.length < 2) { toast("That replay is no longer kept."); return; }
+    const looks = (rp.end && rp.end.looks) || [];
+    const players = rp.names.map((name, i) => ({ i, name, look: looks[i] || { skin: 0, hair: 0, toga: i ? 4 : 2, sash: i ? 3 : 1, acc: [] } }));
+    const where = { ball: ["cancun", "the Great Ball Court in Cancún"], dragon: ["beijing", "Kunming Lake in Beijing"] }[rp.k];
+    if (where && city !== where[0]) { toast(`Go to ${where[1]} to watch this replay: that is where the scenery is.`); return; }
+    const msg = { t: "match", mode: rp.k, you: 0, watch: true, tape: true, ranked: true, players };
+    if (rp.k === "dragon") Object.assign(msg, { countdown: rp.cd, length: rp.len, beat: rp.beat });
+    start(msg);
+    if (!m || !m.tape) return;
+    m.title = `▶ ${rp.names.join(rp.k === "dragon" ? ", " : " vs ")}`;
+    if (head) head.textContent = m.title;
+    tape = { fr: rp.fr, i: 0, t0: performance.now(), kind: rp.k, end: rp.end, prev: null, timer: setInterval(tapeTick, 33) };
+    const hint = "Replay: Esc closes it.";
+    if (help && ov && ov.classList.contains("show")) help.textContent = hint;
+    const bh = document.getElementById("bh-help") || document.getElementById("dh-help"); if (bh) bh.textContent = hint;
   }
 
   // ------------------------------------------------------------------ cheering: watchers press 1 to 4 (or the buttons) and everybody in the match sees the emoji float up

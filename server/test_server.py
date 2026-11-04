@@ -1244,9 +1244,168 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"weekly": {"week": 3, "scores": {"not a friend id": {"pts": 99}}, "prizes": {"zz": [1]}}})       # junk is ignored
         self.assertEqual(server.WEEKLY["scores"], {})
 
+    # ---------------------------------------------------------------- rating seasons
+
+    def season_fresh(self):
+        server.STATS.clear(); server.RATINGS.clear(); server.HALL.update(tourneys=[], weekly=[], seasons=[])
+        saved = dict(server.SEASON)
+        def back():
+            server.SEASON.clear(); server.SEASON.update(saved); server.STATS.clear(); server.RATINGS.clear(); server.HALL.update(tourneys=[], weekly=[], seasons=[])
+        self.addCleanup(back)
+        n = server.season_of(datetime.datetime(2026, 11, 2, tzinfo=datetime.timezone.utc).timestamp())
+        t0 = n * server.SEASON_WEEKS * server.WEEK_LEN + 4 * 86400                                  # the first second of a season
+        self.assertEqual(server.season_of(t0), n)
+        self.assertEqual(server.season_of(t0 - 1), n - 1)
+        server.SEASON.update(n=n, no=1, last=None)
+        return t0
+
+    def test_season_ends_with_trophies_and_a_soft_reset(self):
+        t0 = self.season_fresh()
+        f = lambda i: "%012x" % i
+        mk = lambda i, name, r, sg: server.STATS.__setitem__(f(i), {"name": name, "r": r, "g": {}, "cups": [0, 0, 0], "hist": [], "st": [0, 0, 0], "sh": [], "sg": sg})
+        mk(1, "Ann", 1300, 9); mk(2, "Ben", 1100, 6); mk(3, "Cy", 900, 5); mk(4, "Di", 800, 7); mk(5, "Ed", 1500, 2)         # Ed has the best rating but played two matches
+        server.RATINGS["u1"] = {"r": 1300, "w": 5, "l": 1, "d": 0, "name": "Ann"}
+        server.season_roll(t0 + 3 * server.WEEK_LEN)                                           # nothing happens in the middle of a season
+        self.assertEqual((server.SEASON["no"], server.STATS[f(1)]["r"]), (1, 1300))
+        server.season_roll(t0 + 8 * server.WEEK_LEN + 60)
+        self.assertEqual((server.SEASON["no"], server.SEASON["n"]), (2, server.season_of(t0) + 1))
+        self.assertEqual(server.SEASON["last"], {"no": 1, "top": [["Ann", 1300], ["Ben", 1100], ["Cy", 900]]})
+        self.assertEqual([server.STATS[f(i)]["st"] for i in (1, 2, 3, 4, 5)], [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0], [0, 0, 0]])
+        self.assertEqual([server.STATS[f(i)]["r"] for i in (1, 2, 3, 4, 5)], [1150, 1050, 950, 900, 1250])            # halfway back to 1000
+        self.assertEqual(server.RATINGS["u1"]["r"], 1150)
+        self.assertEqual(server.STATS[f(4)]["sh"], [[1, 4, 800]])                               # (the old rating and place stay in the profile)
+        self.assertEqual(server.STATS[f(5)]["sh"], [])                                           # (nobody who played less than five matches is placed)
+        self.assertTrue(all(r["sg"] == 0 for r in server.STATS.values()))
+        self.assertEqual([h["no"] for h in server.HALL["seasons"]], [1])
+        self.assertEqual(server.hall_view()["seasons"][0]["top"][0], ["Ann", 1300])
+        self.assertEqual(server.profile_view(f(1))["st"], [1, 0, 0])
+        server.season_roll(t0 + 8 * server.WEEK_LEN + 120)                                      # once only
+        self.assertEqual(server.SEASON["no"], 2)
+
+    def test_season_ratings_from_browsers_that_were_away_are_brought_up_to_date(self):
+        t0 = self.season_fresh()
+        server.season_roll(t0 + 8 * server.WEEK_LEN + 60)
+        server.season_roll(t0 + 16 * server.WEEK_LEN + 60)
+        self.assertEqual(server.SEASON["no"], 3)
+        c = self.WC("aaaaaaaaaaaa", "Ann")
+        server.claim_rank(c, {"r": 1400, "w": 3, "l": 0, "d": 0, "s": server.SEASON["n"] - 2})                    # two seasons ago: halved twice
+        self.assertEqual(server.RATINGS["u-Ann"]["r"], 1100)
+        d = self.WC("bbbbbbbbbbbb", "Ben")
+        server.claim_rank(d, {"r": 1400, "w": 3, "l": 0, "d": 0, "s": server.SEASON["n"]})                        # this season: kept
+        self.assertEqual(server.RATINGS["u-Ben"]["r"], 1400)
+        e = self.WC("cccccccccccc", "Cy")
+        server.claim_rank(e, {"r": 1400, "w": 3, "l": 0, "d": 0})                                                 # a browser that does not know seasons yet: kept
+        self.assertEqual(server.RATINGS["u-Cy"]["r"], 1400)
+        self.assertEqual(server.public_rank(server.RATINGS["u-Ben"])["s"], server.SEASON["n"])
+        self.assertEqual([server.rating_soft(r) for r in (1000, 1200, 800, 1001)], [1000, 1100, 900, 1000])
+
+    def test_season_first_start_begins_in_the_current_season_and_is_saved(self):
+        t0 = self.season_fresh()
+        server.SEASON.update(n=-1, no=1, last=None)
+        server.public_rank({"r": 1000, "w": 0, "l": 0, "d": 0})                                  # (the first time anybody asks)
+        self.assertEqual(server.SEASON["n"], server.season_of())
+        server.SEASON.update(n=server.season_of(t0), no=4, last={"no": 3, "top": [["Ann", 1210]]})
+        server.HALL["seasons"] = [{"no": 3, "t": 5, "top": [["Ann", 1210]]}]
+        server.STATS["abcdef012345"] = {"name": "Ann", "r": 1210, "g": {"xiangqi": [1, 0, 0]}, "cups": [0, 0, 0], "hist": [], "st": [1, 0, 0], "sh": [[3, 1, 1210]], "sg": 4}
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.SEASON.update(n=-1, no=1, last=None); server.STATS.clear(); server.HALL["seasons"] = []
+        server.world_apply(snap)
+        self.assertEqual((server.SEASON["n"], server.SEASON["no"], server.SEASON["last"]["top"]), (server.season_of(t0), 4, [["Ann", 1210]]))
+        self.assertEqual(server.HALL["seasons"][0]["no"], 3)
+        self.assertEqual((server.STATS["abcdef012345"]["st"], server.STATS["abcdef012345"]["sh"], server.STATS["abcdef012345"]["sg"]), ([1, 0, 0], [[3, 1, 1210]], 4))
+
+    # ---------------------------------------------------------------- the daily quest
+
+    def daily_fresh(self):
+        server.DAILY.clear(); server.PRIZES.clear()
+        self.addCleanup(lambda: (server.DAILY.clear(), server.PRIZES.clear()))
+
+    def quest_day(self, k, kinds=None):
+        return next(d for d in range(20000, 20100) if server.daily_quest(d)["k"] == k and (kinds is None or server.daily_quest(d).get("kinds") == kinds))
+
+    def test_daily_quest_changes_every_day_and_covers_every_kind(self):
+        qs = [server.daily_quest(d)["text"] for d in range(20000, 20000 + len(server.QUESTS))]
+        self.assertEqual(len(set(qs)), len(server.QUESTS))                           # a full cycle shows every quest
+        self.assertTrue(all(server.daily_quest(d) != server.daily_quest(d + 1) for d in range(20000, 20040)))
+        self.assertEqual([server.daily_coins(s) for s in (0, 1, 2, 7, 30)], [60, 60, 75, 150, 150])
+
+    def test_daily_matches_blocks_guests_and_bots(self):
+        self.daily_fresh()
+        a, guest = self.WC("aaaaaaaaaaaa", "Ann"), self.WC(None, "Guest")
+        win = self.quest_day("win")
+        with mock.patch.object(server.time, "time", return_value=win * 86400 + 100):
+            n = server.daily_quest(win)["n"]
+            server.daily_add(a, "match", "xiangqi", False)                           # a defeat is not a win
+            server.daily_add(a, "blocks")                                            # blocks are not matches
+            self.assertEqual(server.DAILY[a.fid]["p"], 0)
+            for _ in range(n):
+                server.daily_add(a, "match", "xiangqi", True)
+            self.assertTrue(server.DAILY[a.fid]["done"])
+            self.assertEqual([p["coins"] for p in server.PRIZES[a.fid]], [60])
+            server.daily_add(a, "match", "xiangqi", True)                            # done is done: no second prize
+            self.assertEqual(len(server.PRIZES[a.fid]), 1)
+            server.daily_add(guest, "match", "xiangqi", True)                        # guests have no account
+            self.assertNotIn(None, server.DAILY)
+        pk = self.quest_day("game", ("xiangqi",))
+        with mock.patch.object(server.time, "time", return_value=pk * 86400 + 100):
+            b = self.WC("bbbbbbbbbbbb", "Ben")
+            server.daily_add(b, "match", "kushti", True)                             # the wrong game
+            self.assertEqual(server.DAILY[b.fid]["p"], 0)
+            server.daily_add(b, "match", "xiangqi", False)
+            self.assertTrue(server.DAILY[b.fid]["done"])
+        bl = self.quest_day("blocks")
+        with mock.patch.object(server.time, "time", return_value=bl * 86400 + 100):
+            c = self.WC("cccccccccccc", "Cy")
+            for _ in range(server.daily_quest(bl)["n"] - 1):
+                server.daily_add(c, "blocks")
+            self.assertFalse(server.DAILY[c.fid]["done"])
+            self.assertEqual(server.daily_view(c)["p"], server.daily_quest(bl)["n"] - 1)
+            server.daily_add(c, "blocks")
+            self.assertTrue(server.daily_view(c)["done"])
+
+    def test_daily_streak_grows_and_breaks(self):
+        self.daily_fresh()
+        a = self.WC("aaaaaaaaaaaa", "Ann")
+        coins = []
+        def finish(day):
+            with mock.patch.object(server.time, "time", return_value=day * 86400 + 50):
+                q = server.daily_quest(day)
+                for _ in range(q["n"]):
+                    server.daily_add(a, "blocks" if q["k"] == "blocks" else "match", (q.get("kinds") or ("xiangqi",))[0], True)
+                self.assertTrue(server.DAILY[a.fid]["done"], q)
+                coins.append(server.PRIZES[a.fid][-1]["coins"])
+                server.PRIZES[a.fid].clear()
+        for d in (20000, 20001, 20002):
+            finish(d)
+        self.assertEqual(coins, [60, 75, 90])
+        with mock.patch.object(server.time, "time", return_value=20003 * 86400 + 50):     # a day missed: the streak is back to nothing
+            self.assertEqual(server.daily_view(a)["streak"], 3)
+        with mock.patch.object(server.time, "time", return_value=20004 * 86400 + 50):
+            self.assertEqual(server.daily_view(a)["streak"], 0)
+        finish(20004)
+        self.assertEqual(coins[-1], 60)
+        self.assertEqual(server.DAILY[a.fid]["b"], 3)
+        for d in range(20005, 20014):
+            finish(d)
+        self.assertEqual(coins[-1], 150)                                                  # capped at the seventh day
+
+    def test_daily_is_saved_and_loaded(self):
+        self.daily_fresh()
+        f = "abcdef012345"
+        server.DAILY[f] = {"day": 20000, "p": 2, "done": 0, "s": 4, "b": 6, "l": 19999}
+        server.PRIZES[f] = [{"id": "q19999", "week": 0, "theme": "Daily quest", "rank": 4, "coins": 105, "pts": 0, "quest": 1}]
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.DAILY.clear(); server.PRIZES.clear()
+        server.world_apply(snap)
+        self.assertEqual(server.DAILY[f], {"day": 20000, "p": 2, "done": 0, "s": 4, "b": 6, "l": 19999})
+        self.assertEqual(server.PRIZES[f][0].get("quest"), 1)
+        server.world_apply({"daily": {"junk": {"day": 1}, f: "x"}})
+        self.assertEqual(server.DAILY, {})
+
     # ---------------------------------------------------------------- tournaments
 
     def tourney_fresh(self):
+        patch = mock.patch.object(server, "daily_add"); patch.start(); self.addCleanup(patch.stop)         # (today's quest must not pay prizes into these tests)
         server.TOURNEYS.clear(); server.TOURNEY_WON.clear(); server.TOURNEY_MADE.clear(); server.PRIZES.clear(); server.STATS.clear()
         saved = (server.TOURNEY_GAP, server.TOURNEY_GRACE, server.TOURNEY_REMATCH)
         server.TOURNEY_GAP = server.TOURNEY_REMATCH = 0.0
@@ -1260,6 +1419,33 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         t["rounds"] = [server.tourney_deal(t, [p["f"] for p in t["players"]], True)]
         server.TOURNEYS["t1"] = t
         return t
+
+    def test_tourney_matches_remember_their_replay_and_the_hall_links_the_final(self):
+        self.tourney_fresh()
+        server.REPLAYS.clear(); server.HALL.update(tourneys=[], weekly=[])
+        self.addCleanup(lambda: (server.REPLAYS.clear(), server.HALL.update(tourneys=[], weekly=[])))
+        f = lambda i: "%012x" % i
+        t = self.tourney_pure("kushti", 2)
+        m = t["rounds"][0][0]
+        rid = server.replay_add("kushti", ["P1", "P2"], 0, [], "tape", {"winner": 0, "reason": "throws", "score": [2, 0]})
+        m["st"], m["room"] = "live", "r1"
+        server.tourney_done(("t1", 0, 0, "r1"), [f(1), f(2)], rid)
+        self.assertEqual(m["rp"], rid)
+        server.tourney_round_done(t)
+        self.assertEqual(t["state"], "done")
+        row = server.HALL["tourneys"][-1]
+        self.assertEqual((row["champ"], row["rp"]), ("P1", rid))
+        self.assertEqual(server.hall_view()["tourneys"][0]["rp"], rid)
+        view = server.tourney_view(t, self.WC(f(1), "P1"))
+        self.assertEqual(view["rounds"][0]["m"][0]["rp"], rid)
+        server.REPLAYS.clear()                                                              # a replay that is gone is not offered
+        self.assertEqual(server.hall_view()["tourneys"][0]["rp"], "")
+        self.assertIsNone(server.tourney_view(t, self.WC(f(1), "P1"))["rounds"][0]["m"][0]["rp"])
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.TOURNEYS.clear(); server.HALL["tourneys"].clear()
+        server.world_apply(snap)
+        self.assertEqual(server.HALL["tourneys"][-1]["rp"], rid)
+        self.assertEqual(server.TOURNEYS["t1"]["rounds"][0][0]["rp"], rid)
 
     def test_tourney_bracket_seeds_and_byes(self):
         self.tourney_fresh()
@@ -1880,6 +2066,84 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ws[1].send({"t": "profile"})                                                           # a guest has no profile of their own
         self.assertTrue((await ws[1].until(lambda m: m["t"] == "profile"))["none"])
 
+    async def test_kites_tape_is_kept_and_can_be_fetched(self):
+        server.REPLAYS.clear()
+        self.addCleanup(server.REPLAYS.clear)
+        ws, ms, room = await self.start_mini("kites")
+        a, b = room.players
+        a.x, a.y, b.x, b.y = 50.0, 30.0, 52.0, 30.0
+        a.pull_until = time.monotonic() + 5
+        for i in range(8):
+            a.x += 0.2
+            room.step(0.1)
+            await asyncio.sleep(0.12)                                                        # (frames are kept 0.1 s apart)
+        b.string = 1.0
+        room.step(0.1)
+        end = await ws[0].until(lambda m: m["t"] == "end", timeout=3)
+        self.assertEqual(len(end["rp"]), 8)
+        ws[1].send({"t": "replay", "id": end["rp"]})
+        got = (await ws[1].until(lambda m: m["t"] == "replay"))["rp"]
+        self.assertEqual((got["k"], got["names"], got["end"]["winner"], got["end"]["reason"]), ("kites", ["Ann", "Ben"], 0, "cut"))
+        self.assertGreaterEqual(len(got["fr"]), 5)
+        self.assertTrue(all(len(f) == 2 and "p" in f[1] for f in got["fr"]))
+        self.assertEqual([f[0] for f in got["fr"]], sorted(f[0] for f in got["fr"]))               # in time order
+        self.assertNotIn("t", got["fr"][0][1])
+        self.assertNotIn("tp", got)
+
+    def test_tape_frames_keep_events_and_are_thinned(self):
+        class R:
+            ranked, kind = True, "kites"
+        r = R()
+        r.t0 = server.now() - 10
+        with mock.patch.object(server, "now") as nw:
+            for i in range(60):
+                nw.return_value = r.t0 + i * 0.05                                            # a state every 0.05 s
+                server.tape_frame(r, {"t": "mini", "k": "kites", "w": 3, "p": [[i, 1, 100, 0]], "ev": [["hit", 0]] if i == 7 else []})
+        fr = r.tape["f"]
+        self.assertLess(len(fr), 40)                                                         # one every 0.1 s, not every 0.05
+        self.assertTrue(any(f[1].get("ev") == [["hit", 0]] for f in fr))                      # the event is on a frame that was kept
+        self.assertTrue(all("w" not in f[1] and "k" not in f[1] for f in fr))
+        self.assertIsNotNone(server.tape_of(r))
+        r2 = R()
+        r2.t0 = server.now()
+        server.tape_frame(r2, {"p": []})
+        self.assertIsNone(server.tape_of(r2))                                                 # too short to keep
+        r.ranked = False
+        r3 = R(); r3.ranked = False; r3.t0 = server.now()
+        server.tape_frame(r3, {"p": []})
+        self.assertFalse(hasattr(r3, "tape"))                                                 # only ranked matches are taped
+
+    def test_replays_are_trimmed_but_the_hall_of_fame_keeps_its_own(self):
+        server.REPLAYS.clear(); server.HALL.update(tourneys=[], weekly=[])
+        self.addCleanup(lambda: (server.REPLAYS.clear(), server.HALL.update(tourneys=[], weekly=[])))
+        big = "x" * 400000
+        first = server.replay_add("kites", ["A", "B"], 0, [], big, {"winner": 0, "reason": "cut", "score": [0, 0]})
+        server.HALL["tourneys"].append({"k": "kites", "champ": "A", "n": 4, "auto": 0, "t": 1, "rp": first})
+        for _ in range(5):
+            server.replay_add("kites", ["A", "B"], 0, [], big, {"winner": 0, "reason": "cut", "score": [0, 0]})
+        self.assertLessEqual(sum(len(r.get("tp", "")) for r in server.REPLAYS), server.TAPE_BUDGET)
+        self.assertIn(first, [r["id"] for r in server.REPLAYS])                                # the final in the hall stays
+        self.assertIsNone(server.replay_add("kushti", ["A", "B"], 0, [], None, {}))             # nothing to keep
+        self.assertIsNone(server.replay_add("naval", ["A", "B"], 0, [], "x", {}))
+
+    def test_tapes_are_saved_and_loaded(self):
+        server.REPLAYS.clear()
+        self.addCleanup(server.REPLAYS.clear)
+        fr = [[i * 0.1, {"p": [[i, 1, 100, 0]]}] for i in range(8)]
+        tp = base64.b64encode(server.zlib.compress(json.dumps(fr).encode())).decode()
+        rid = server.replay_add("kites", ["Ann", "Ben"], 1, [], tp, {"winner": 1, "reason": "cut", "score": [0, 0]})
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.REPLAYS.clear()
+        server.world_apply(snap)
+        self.assertEqual([r["id"] for r in server.REPLAYS], [rid])
+        self.assertEqual(server.tape_frames(server.REPLAYS[0]), fr)
+        self.assertEqual(server.REPLAYS[0]["end"], {"winner": 1, "reason": "cut", "score": [0, 0], "looks": []})
+        snap["stats"]["replays"].append({"id": "zz", "k": "kites", "names": ["a", "b"], "w": 0, "mv": [], "t": 1})      # a tape that has no tape is dropped
+        server.REPLAYS.clear()
+        server.world_apply(snap)
+        self.assertEqual(len(server.REPLAYS), 1)
+        self.assertEqual(server.tape_frames({"tp": "not a tape"}), [])
+
     # ---------------------------------------------------------------- xiangqi (Chinese chess)
 
     def xq(self, rows):
@@ -2067,8 +2331,9 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         room = next(c.room for c in server.CONNS if c.room)
         room.task.cancel()
         room.start_at = time.monotonic() - 3.0
-        for _ in range(20):
-            room.step(0.1)
+        with mock.patch.object(server.random, "random", return_value=0.0):      # (a crew skips a stroke now and then: not in this test)
+            for _ in range(20):
+                room.step(0.1)
         self.assertTrue(all(p.s > 0 for p in room.players if p.bot))      # the practice crews paddle themselves
 
     # ---------------------------------------------------------------- chariot derby
