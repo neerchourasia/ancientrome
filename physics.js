@@ -112,6 +112,29 @@ function groundAt(x, z) {
   return h;
 }
 
+// The top of the highest big solid thing (a building, a tower, a dome, the rim of the Colosseum) that (x, z) lies over and that is not higher than y (a little above it): aircraft land on it.
+// Thin walls, fences, trees, lamp posts and things that hang in the air (arches, lintels) are not roofs. 0 when there is none.
+function roofAt(x, z, y) {
+  let top = 0, base = -1;
+  const list = blockerGrid.at(x, z);
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    if (b.y1 <= top || b.y1 > y || b.y1 < 2.5 || b.off || (b.era && (b.era === "modern") !== modernEra)) continue;
+    if (b.y0 > 2) { if (base < 0) base = groundAt(x, z); if (b.y0 > base + 2) continue; }                 // (it must stand on the ground, not hang in the air)
+    if (b.t === 0) {
+      if (b.x1 - b.x0 >= 4 && b.z1 - b.z0 >= 4 && x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1) top = b.y1;
+    } else if (b.t === 1) {
+      if (b.r >= 2.5 && Math.hypot(x - b.cx, z - b.cz) <= b.r) top = b.y1;
+    } else {
+      const dx = x - b.cx, dz = z - b.cz;
+      if (b.zs && Math.sign(dz) !== b.zs) continue;
+      const u = Math.hypot(dx / b.ax, dz / b.az);
+      if ((b.u1 - b.u0) * Math.min(b.ax, b.az) >= 3 && u >= b.u0 && u <= b.u1 && !inCorridor(b, dx, dz)) top = b.y1;
+    }
+  }
+  return top;
+}
+
 function blockedAt(x, z, feet) {
   for (let i = 0; i < dynBlockers.length; i++) {
     const d = dynBlockers[i];
