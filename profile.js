@@ -47,6 +47,7 @@ const Profile = (() => {
     if (c[0] || c[1] || c[2]) body.append(el("p", `Weekly cup: 🥇 ${c[0]}  🥈 ${c[1]}  🥉 ${c[2]}`, "pf-sum"));
     if (cur.sv && cur.sv.length) body.append(el("p", `🏺 Souvenirs ${cur.sv.length}/16: ${cur.sv.map((id) => (Souvenirs.list.find((s) => s[0] === id) || [0, 0, ""])[2]).join(" ")}`, "pf-sum"));
     if (cur.tw) body.append(el("p", `🏟️ Tournaments won: ${cur.tw}`, "pf-sum"));
+    if (cur.rf) body.append(el("p", `🏢 Roofs landed on: ${cur.rf} (highest ${cur.rm} m above the street)`, "pf-sum"));
     const sc = cur.st || [0, 0, 0];
     if (sc[0] || sc[1] || sc[2]) body.append(el("p", `🏅 Season trophies: 🥇 ${sc[0]}  🥈 ${sc[1]}  🥉 ${sc[2]}`, "pf-sum"));
     if ((cur.sh || []).length) body.append(el("p", `Past seasons: ${cur.sh.slice(0, 6).map(([no, place, r]) => `${no}: number ${place} (${r})`).join(" · ")}`, "dnote small"));
@@ -62,7 +63,7 @@ const Profile = (() => {
       const ul = el("ul", undefined, "pf-hist");
       for (const h of cur.hist) {
         const li = el("li"); li.append(el("span", `${RES[h.r] || h.r}: ${GAMES[h.k] || h.k} vs ${(h.vs || []).join(", ") || "?"} · ${ago(h.t)}`));
-        if (h.rp) { const b = el("button", "▶ Replay"); b.type = "button"; b.addEventListener("click", () => send2({ t: "replay", id: h.rp })); li.append(b); }
+        if (h.rp) { const b = el("button", "▶ Replay"); b.type = "button"; b.addEventListener("click", () => send2({ t: "replay", id: h.rp })); li.append(b); const lk = el("button", "🔗"); lk.type = "button"; lk.title = "Copy a link to this replay"; lk.addEventListener("click", () => Mini.replayLink(h.rp)); li.append(lk); }
         ul.append(li);
       }
       body.append(ul);
@@ -88,6 +89,11 @@ const Profile = (() => {
     const b = $p("btn-profile"); if (b) b.addEventListener("click", () => open());
     let want = null;
     try { want = new URLSearchParams(location.search).get("profile"); } catch (e) { /* ignore */ }
+    let rp = null;
+    try { rp = new URLSearchParams(location.search).get("replay"); } catch (e) { /* ignore */ }
+    if (rp && /^[0-9a-f]{8}$/.test(rp)) {                                               // a shared replay: play it as soon as the game has started and is online
+      const t = setInterval(() => { if (typeof started !== "undefined" && started && Online.connected && mode === "walk") { clearInterval(t); send2({ t: "replay", id: rp }); } }, 1000);
+    }
     if (want && /^[0-9a-f]{12}$/.test(want)) {                                          // a shared link: show that profile as soon as the game has started and is online
       const t = setInterval(() => { if (typeof started !== "undefined" && started && Online.connected && mode === "walk") { clearInterval(t); open(want); } }, 1000);
     }

@@ -318,7 +318,17 @@ const Car = (() => {
     return true;
   }
   let roofNoteAt = 0;
-  function roofNote() { if (onRoof() && performance.now() - roofNoteAt > 6000) { roofNoteAt = performance.now(); toast(`🏢 You landed on a roof, ${Math.round(heightUp())} m above the street! Take off again from here, or roll off the edge.`); } }
+  // Roofs landed on and the highest one are counted in the browser (achievements.js) and told to the server (the profile, and the daily quest).
+  const ROOF_KEY = "rome-roofs";
+  const roofs = { n: 0, max: 0 };
+  try { const o = JSON.parse(localStorage.getItem(ROOF_KEY) || "{}"); roofs.n = Math.max(0, Math.floor(Number(o.n)) || 0); roofs.max = Math.max(0, Math.floor(Number(o.max)) || 0); } catch (e) { /* ignore */ }
+  function roofLanded() {
+    const h = Math.round(heightUp());
+    roofs.n++; roofs.max = Math.max(roofs.max, h);
+    try { localStorage.setItem(ROOF_KEY, JSON.stringify(roofs)); } catch (e) { /* ignore */ }
+    if (typeof Online !== "undefined" && Online.connected) Online.navalSend({ t: "roof", h });
+  }
+  function roofNote() { if (onRoof() && performance.now() - roofNoteAt > 6000) { roofNoteAt = performance.now(); roofLanded(); toast(`🏢 You landed on a roof, ${Math.round(heightUp())} m above the street! Take off again from here, or roll off the edge.`); } }
   const fitsAir = (dx, dz) => (onRoof() ? roofFits(dx, dz) : fits(dx, dz));
   function crashPlane(why) {
     Vitals.hp = Math.max(0, Vitals.hp - 38); player.shake = 1; $("#flash").style.opacity = 0.6; Sfx.play("crash");
@@ -715,6 +725,7 @@ const Car = (() => {
     get speed() { return car && driving ? Math.abs(car.v) : 0; },
     state: () => (car && driving ? { x: car.x, z: car.z, yaw: car.yaw, v: car.v, alt: car.alt || 0, roll: car.roll || 0 } : null),
     debugSet: (o) => { if (car) Object.assign(car, o); },
+    get roofs() { return { ...roofs }; },
     flyOn, get flyReady() { return flyOnReady; }, get airborne() { return !!car && driving && car.M.fly && car.alt > 1; },                      // where your car is and how fast (the police chase it)
     drag: (f) => { if (car && driving) car.v *= f; },                                                        // a police car alongside slows you down
     get verb() { return car ? car.M.verb || "get in" : "get in"; },

@@ -375,9 +375,10 @@ const Mini = (() => {
   function endDragon(res) {
     if (!m || !dg) return;
     if (m.watch) {
-      const first = res.order[0], table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  ");
+      const first = res.order[0], table = res.order.map((o, k) => `${k + 1}. ${o.name}${o.time != null ? ` (${o.time.toFixed(1)} s)` : " (did not finish)"}`).join("  ·  "), link = m.tape ? curRp : null;
       cleanup();
       showResult(first && first.time != null ? `${first.name} won the race` : "The race is over", `${table}.`, [
+        ...(link ? [{ label: "🔗 Copy replay link", fn: () => replayLink(link) }] : []),
         { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
         { label: "Close", fn: closePanels },
       ]);
@@ -478,9 +479,10 @@ const Mini = (() => {
   function end(res) {
     if (!m) return;
     if (m.watch) {                                                       // a match you watched: no prize and no rating, just who won
-      const names = m.players.map((p) => p.name), draw = res.winner === -1, kind = m.kind;
+      const names = m.players.map((p) => p.name), draw = res.winner === -1, kind = m.kind, link = m.tape ? curRp : null;
       cleanup();
       showResult(draw ? "A draw" : `${names[res.winner]} won`, `${names[0]} against ${names[1]}: ${res.score && kind !== "xiangqi" ? res.score.join(" to ") : ""}${res.reason ? ` (${res.reason})` : ""}.`.replace(": ()", ""), [
+        ...(link ? [{ label: "🔗 Copy replay link", fn: () => replayLink(link) }] : []),
         { label: "Watch another", fn: () => { closePanels(); openWatch(); } },
         { label: "Close", fn: closePanels },
       ]);
@@ -521,7 +523,14 @@ const Mini = (() => {
     if (d > 0) Sfx.play("clack");
     return true;
   }
+  let curRp = null;                                                    // the id of the replay on the screen (for its link)
+  function replayLink(id) {
+    if (!id) return;
+    const url = `${location.origin}${location.pathname}?replay=${id}`;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast("Link to the replay copied."), () => toast(url));
+  }
   function replay(msg) {
+    curRp = msg.rp && msg.rp.id;
     if (msg.rp && msg.rp.k && msg.rp.k !== "xiangqi") return replayTape(msg.rp);
     if (!msg.rp || typeof msg.b0 !== "string") { toast("That replay is no longer kept."); return; }
     if (m || typeof mode === "undefined" || mode !== "walk") return;
@@ -536,7 +545,7 @@ const Mini = (() => {
     ov.querySelector("#mini-leave").textContent = "Close the replay";
     xqSetup(); rpStep(0); st = { k: "xiangqi", b: msg.b0, turn: 0, legal: [], last: null, check: false, clk: [0, 0], s: [0, 0], ev: [] };
     const bar = document.createElement("div"); bar.id = "mini-rp";
-    for (const [label, fn] of [["◀ Back", () => rpStep(-1)], ["▶ Play / pause", () => { m.replay.auto = !m.replay.auto; m.replay.t = 0; }], ["Next ▶", () => rpStep(1)]]) {
+    for (const [label, fn] of [["◀ Back", () => rpStep(-1)], ["▶ Play / pause", () => { m.replay.auto = !m.replay.auto; m.replay.t = 0; }], ["Next ▶", () => rpStep(1)], ["🔗 Link", () => replayLink(curRp)]]) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.addEventListener("click", fn); bar.append(b);
     }
     ov.insertBefore(bar, ov.querySelector("#mini-leave"));
@@ -604,7 +613,7 @@ const Mini = (() => {
   function onCheer(c) {                                                 // somebody shouted: an emoji with their name floats up
     if (!c || !CHEERS.includes(c.e)) return;
     const f = document.createElement("div"); f.className = "cheer-float"; f.style.left = `${15 + Math.random() * 70}%`;
-    f.textContent = `${c.e} `; const n = document.createElement("small"); n.textContent = String(c.name || "").slice(0, 16); f.append(n);
+    f.textContent = `${c.e} `; const n = document.createElement("small"); n.textContent = `${String(c.name || "").slice(0, 16)}${c.g ? ` (${String(c.g).slice(0, 12)})` : ""}`; f.append(n);
     document.body.append(f); setTimeout(() => f.remove(), 3200);
   }
 
@@ -621,7 +630,11 @@ const Mini = (() => {
     const body = document.getElementById("spec-body"); if (!body) return; body.replaceChildren();
     if (!list) { const p = document.createElement("p"); p.className = "dnote"; p.textContent = "Looking for matches..."; body.append(p); return; }
     if (!list.length) { const p = document.createElement("p"); p.className = "dnote"; p.textContent = "No match between real people is on right now. Start one in Play online, then others can watch you."; body.append(p); return; }
+    const cups = new Map();                                              // guild cup matches are grouped under the two guilds, with how much each side has been cheered
+    for (const r of list) if (r.cup) { const k = r.cup.names.join("|"); if (!cups.has(k)) cups.set(k, { cup: r.cup, rows: [] }); cups.get(k).rows.push(r); }
+    list = [...cups.values()].flatMap((g) => [{ head: g.cup }, ...g.rows]).concat(list.filter((r) => !r.cup));
     for (const r of list) {
+      if (r.head) { const h = document.createElement("h4"); h.className = "tn-round"; h.textContent = `👥 ${r.head.names[0]} vs ${r.head.names[1]}  ·  👏 ${r.head.tally[0]} : ${r.head.tally[1]}`; body.append(h); continue; }
       const row = document.createElement("div"); row.className = "sp-row";
       const t = document.createElement("span"); t.textContent = `${r.tour ? "🏟️ " : ""}${SPEC_NAMES[r.kind] || r.kind}: ${r.names.join(" vs ")}  ·  ${Math.floor(r.sec / 60)} min${r.n ? `  ·  👀 ${r.n}` : ""}`;
       const b = document.createElement("button"); b.type = "button"; b.textContent = "Watch";
@@ -634,5 +647,5 @@ const Mini = (() => {
     else if (w.a === "no") toast(w.msg || "You cannot watch that match.");
   }
 
-  return { start, on, onWatch, onCheer, openWatch, replay, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
+  return { start, on, onWatch, onCheer, openWatch, replay, replayLink, onDragon, end, endDragon, leave, lost, swing, update, get active() { return !!m; }, get is3d() { return !!bg || !!dg; } };
 })();

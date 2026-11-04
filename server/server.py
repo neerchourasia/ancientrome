@@ -1574,11 +1574,33 @@ MAX_WATCHERS = 20
 CHEERS = ("👏", "🔥", "🎉", "😮")                               # what a watcher can shout, one every 1.2 seconds
 
 
+def room_cup(room):
+    """The tournament and the two guilds' keys when a room is a match of a guild cup (None otherwise)."""
+    tm = getattr(room, "tm", None)
+    t = TOURNEYS.get(tm[0]) if tm else None
+    if not t or not t.get("team"):
+        return None
+    try:
+        gk = t["rounds"][tm[1]][tm[2]].get("gk")
+    except (IndexError, TypeError):
+        return None
+    return (t, list(gk)) if gk and len(gk) == 2 else None
+
+
+def watch_row(r):
+    row = {"room": r.id, "kind": r.kind, "names": [p.name for p in r.players], "n": len(r.watchers), "sec": int(now() - r.t0), "tour": bool(getattr(r, "tm", None))}
+    cup = room_cup(r)
+    if cup:
+        t, gk = cup
+        row["cup"] = {"names": [t["gn"].get(g, g) for g in gk], "tally": [t.get("cheers", {}).get(g, 0) for g in gk]}
+    return row
+
+
 def watch_list():
     """Matches between real people that someone can sit down and watch, the ones with the most watchers first."""
     rows = [r for r in LIVE_MINI.values() if not r.over and r.kind in WATCHABLE and sum(1 for p in r.players if p.conn) >= 2]
     rows.sort(key=lambda r: (-len(r.watchers), r.t0))
-    return [{"room": r.id, "kind": r.kind, "names": [p.name for p in r.players], "n": len(r.watchers), "sec": int(now() - r.t0), "tour": bool(getattr(r, "tm", None))} for r in rows[:20]]
+    return [watch_row(r) for r in rows[:20]]
 
 
 def unwatch(conn):
@@ -1601,6 +1623,11 @@ def on_watch(conn, m):
             return
         conn.cheer_t = t
         msg = {"t": "cheer", "name": conn.name, "e": e}
+        cup = room_cup(room)
+        gk = GUILD_OF.get(conn.fid) if conn.fid else None
+        if cup and gk in cup[1]:                                                       # a guild's member cheering a guild cup match: it counts for their guild
+            cup[0].setdefault("cheers", {})[gk] = cup[0].get("cheers", {}).get(gk, 0) + 1
+            msg["g"] = cup[0]["gn"].get(gk, gk)
         for p in room.players:
             if p.conn:
                 p.conn.send(msg)
@@ -4366,6 +4393,8 @@ QUESTS = [
     {"k": "game", "n": 1, "kinds": ("dragon",), "text": "Race a dragon boat against real people"},
     {"k": "game", "n": 1, "kinds": ("duel", "brawl", "team2", "coop", "wushu"), "text": "Fight in the arena: a duel, brawl, team fight or wushu bout against real people"},
     {"k": "game", "n": 1, "kinds": ("race", "derby", "naval"), "text": "Take part in a chariot race, derby or naval battle against real people"},
+    {"k": "roof", "n": 1, "min": 0, "text": "Land an aircraft on a roof"},
+    {"k": "roof", "n": 1, "min": 30, "text": "Land an aircraft on a roof at least 30 m above the street (Cancún, Old Delhi and Beijing have some)"},
 ]
 DAILY_COINS, DAILY_STEP, DAILY_DAYS = 60, 15, 7          # the prize is 60 denarii, 15 more for every day in a row, up to the seventh
 DAILY = {}                                               # friend id -> {"day", "p" (progress), "done", "s" (days in a row), "b" (best), "l" (last day finished)} (saved)
@@ -4376,7 +4405,7 @@ def day_of(t=None):
 
 
 def daily_quest(day):
-    return QUESTS[(day * 3) % len(QUESTS)]
+    return QUESTS[(day * 5) % len(QUESTS)]
 
 
 def daily_coins(streak):
@@ -4412,12 +4441,12 @@ def daily_view(conn):
             "coins": daily_coins(streak if r and r["done"] else streak + 1), "ends": int((today + 1) * DAY_LEN - time.time()), "min": DAILY_COINS, "max": daily_coins(DAILY_DAYS)}
 
 
-def daily_add(conn, what, kind=None, won=False):
+def daily_add(conn, what, kind=None, won=False, h=0):
     r = daily_rec(conn)
     if r is None or r["done"]:
         return
     q = daily_quest(r["day"])
-    if not ((what == "blocks" and q["k"] == "blocks") or (what == "match" and (q["k"] == "play" or (q["k"] == "win" and won) or (q["k"] == "game" and kind in q["kinds"])))):
+    if not ((what == "blocks" and q["k"] == "blocks") or (what == "roof" and q["k"] == "roof" and h >= q["min"]) or (what == "match" and (q["k"] == "play" or (q["k"] == "win" and won) or (q["k"] == "game" and kind in q["kinds"])))):
         return
     r["p"] += 1
     if r["p"] >= q["n"]:
@@ -4436,6 +4465,28 @@ def daily_add(conn, what, kind=None, won=False):
 
 def on_daily(conn, m):
     return conn.send(daily_view(conn))
+
+
+ROOF_GAP = 6.0                                           # seconds between two roof landings that count
+
+
+def on_roof(conn, m):
+    """A pilot says they have landed on a roof h metres above the street (the browser works it out): counted in the profile and for the daily quest."""
+    if not conn.fid:
+        return
+    t = now()
+    if t - getattr(conn, "roof_t", -99.0) < ROOF_GAP:
+        return
+    conn.roof_t = t
+    h = int(num(m.get("h"), 0, 800, 0))
+    if h < 2:
+        return
+    rec = stats_rec(conn.fid, conn.name)
+    if rec is not None:
+        rec["rf"] = rec.get("rf", 0) + 1
+        rec["rm"] = max(rec.get("rm", 0), h)
+        world_soon()
+    daily_add(conn, "roof", h=h)
 
 
 # ---------------------------------------------------------------- tournaments
@@ -4989,7 +5040,7 @@ def stats_rec(fid, name):
     if fid not in STATS:
         if len(STATS) >= STATS_MAX:
             return None
-        STATS[fid] = {"name": name, "r": START_RATING, "g": {}, "cups": [0, 0, 0], "hist": [], "st": [0, 0, 0], "sh": [], "sg": 0}
+        STATS[fid] = {"name": name, "r": START_RATING, "g": {}, "cups": [0, 0, 0], "hist": [], "st": [0, 0, 0], "sh": [], "sg": 0, "rf": 0, "rm": 0}
     STATS[fid]["name"] = name
     return STATS[fid]
 
@@ -5171,7 +5222,7 @@ def profile_view(fid):
     w, l, d = (sum(v[i] for v in games.values()) for i in range(3))
     have = {r["id"] for r in REPLAYS}
     hist = [dict(h, rp=h["rp"] if h.get("rp") in have else None) for h in rec["hist"]]
-    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "rh": rec.get("rh", []), "streak": [rec.get("cs", 0), rec.get("bs", 0)], "st": rec.get("st", [0, 0, 0]), "sh": rec.get("sh", [])[::-1], "hist": hist[::-1], "online": bool(conns_of(fid))}
+    return {"t": "profile", "fid": fid, "name": rec["name"], "r": rec["r"], "w": w, "l": l, "d": d, "games": games, "fav": fav, "cups": rec["cups"], "tw": rec.get("tw", 0), "sv": rec.get("sv", []), "rh": rec.get("rh", []), "streak": [rec.get("cs", 0), rec.get("bs", 0)], "st": rec.get("st", [0, 0, 0]), "sh": rec.get("sh", [])[::-1], "rf": rec.get("rf", 0), "rm": rec.get("rm", 0), "hist": hist[::-1], "online": bool(conns_of(fid))}
 
 
 def on_profile(conn, m):
@@ -5667,6 +5718,8 @@ async def handle_msg(conn, m):
         return on_weekly(conn, m)
     if t == "daily":
         return on_daily(conn, m)
+    if t == "roof":
+        return on_roof(conn, m)
     if t == "watch":
         return on_watch(conn, m)
     if t == "tourney":
@@ -5991,7 +6044,7 @@ def world_apply(rows):
                             "tw": int(num(r.get("tw"), 0, 1e6, 0)), "rh": [int(num(x, 0, 4000, 0)) for x in (r.get("rh") if isinstance(r.get("rh"), list) else [])[-RH_MAX:]],
                             "cs": int(num(r.get("cs"), 0, 1e6, 0)), "bs": int(num(r.get("bs"), 0, 1e6, 0)), "sv": [i for i in SOUVENIRS if i in (r.get("sv") if isinstance(r.get("sv"), list) else [])],
                             "cups": [int(num(x, 0, 1e6, 0)) for x in ((r.get("cups") if isinstance(r.get("cups"), list) else []) + [0, 0, 0])[:3]],
-                            "st": [int(num(x, 0, 1e6, 0)) for x in ((r.get("st") if isinstance(r.get("st"), list) else []) + [0, 0, 0])[:3]], "sg": int(num(r.get("sg"), 0, 1e6, 0)),
+                            "st": [int(num(x, 0, 1e6, 0)) for x in ((r.get("st") if isinstance(r.get("st"), list) else []) + [0, 0, 0])[:3]], "sg": int(num(r.get("sg"), 0, 1e6, 0)), "rf": int(num(r.get("rf"), 0, 1e6, 0)), "rm": int(num(r.get("rm"), 0, 800, 0)),
                             "sh": [[int(num(x[0], 1, 1e6, 1)), int(num(x[1], 1, 1e5, 1)), int(num(x[2], 0, 4000, 0))] for x in (r.get("sh") if isinstance(r.get("sh"), list) else [])[-12:] if isinstance(x, list) and len(x) == 3],
                             "hist": [{"k": str(h.get("k"))[:12], "r": h.get("r") if h.get("r") in ("w", "l", "d") else "d", "vs": [str(n)[:24] for n in (h.get("vs") or [])[:3]], "t": int(num(h.get("t"), 0, 4e9, 0)), "rp": h.get("rp") if isinstance(h.get("rp"), str) else None}
                                      for h in (r.get("hist") if isinstance(r.get("hist"), list) else [])[-HIST_MAX:] if isinstance(h, dict)]}

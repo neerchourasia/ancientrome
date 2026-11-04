@@ -1386,6 +1386,33 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len({p["g"] for p in t["players"]}), 4)
         self.assertIn("guilds", c.sent[-1]["msg"])
 
+    def test_guild_cup_matches_are_marked_in_the_watch_list_and_cheers_are_tallied(self):
+        import types
+        self.team_fresh()
+        t = self.team_pure([2, 2])
+        m = t["rounds"][0][0]
+        ga, gb = m["gk"]
+        pa, pb = self.GC(m["ps"][0], "A1"), self.GC(m["ps"][1], "B1")
+        room = types.SimpleNamespace(id="r1", kind="kushti", players=[types.SimpleNamespace(name="A1", conn=pa), types.SimpleNamespace(name="B1", conn=pb)], watchers=[], t0=server.now() - 65, over=False, tm=("g1", 0, 0, "r1"))
+        row = server.watch_row(room)
+        self.assertEqual((row["tour"], row["cup"]), (True, {"names": ["Guild" + ga[1:], "Guild" + gb[1:]], "tally": [0, 0]}))
+        plain = types.SimpleNamespace(id="r2", kind="kushti", players=room.players, watchers=[], t0=server.now(), over=False)                    # a normal match has no cup
+        self.assertNotIn("cup", server.watch_row(plain))
+        def cheer(fid, name, guild):
+            w = self.GC(fid, name)
+            server.GUILD_OF[fid] = guild
+            w.watching, w.cheer_t = room, -99.0
+            room.watchers.append(w)
+            server.on_watch(w, {"a": "cheer", "e": "👏"})
+            return w
+        w1 = cheer("%012x" % 501, "Fan1", ga)
+        cheer("%012x" % 502, "Fan2", ga)
+        cheer("%012x" % 503, "Fan3", gb)
+        cheer("%012x" % 504, "Stranger", "other")                                                    # nobody's guild: shown to everybody but not counted
+        self.assertEqual(server.watch_row(room)["cup"]["tally"], [2, 1])
+        self.assertEqual([x for x in pa.sent if x.get("t") == "cheer"][0]["g"], "Guild" + ga[1:])
+        self.assertNotIn("g", [x for x in pa.sent if x.get("t") == "cheer"][-1])
+
     def test_guild_cup_is_saved_and_loaded(self):
         self.team_fresh()
         t = self.team_pure([2, 2])
@@ -1527,7 +1554,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
             with mock.patch.object(server.time, "time", return_value=day * 86400 + 50):
                 q = server.daily_quest(day)
                 for _ in range(q["n"]):
-                    server.daily_add(a, "blocks" if q["k"] == "blocks" else "match", (q.get("kinds") or ("xiangqi",))[0], True)
+                    if q["k"] == "roof":
+                        server.daily_add(a, "roof", h=100)
+                    else:
+                        server.daily_add(a, "blocks" if q["k"] == "blocks" else "match", (q.get("kinds") or ("xiangqi",))[0], True)
                 self.assertTrue(server.DAILY[a.fid]["done"], q)
                 coins.append(server.PRIZES[a.fid][-1]["coins"])
                 server.PRIZES[a.fid].clear()
@@ -1544,6 +1574,42 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         for d in range(20005, 20014):
             finish(d)
         self.assertEqual(coins[-1], 150)                                                  # capped at the seventh day
+
+    def test_roof_landings_are_counted_and_count_for_the_daily_quest(self):
+        self.daily_fresh(); server.STATS.clear()
+        self.addCleanup(server.STATS.clear)
+        a, guest = self.WC("aaaaaaaaaaaa", "Ann"), self.WC(None, "Guest")
+        low, tall = self.quest_day("roof"), None
+        tall = next(d for d in range(20000, 20100) if server.daily_quest(d)["k"] == "roof" and server.daily_quest(d)["min"] == 30)
+        low = next(d for d in range(20000, 20100) if server.daily_quest(d)["k"] == "roof" and server.daily_quest(d)["min"] == 0)
+        with mock.patch.object(server.time, "time", return_value=tall * 86400 + 50), mock.patch.object(server, "now") as nw:
+            nw.return_value = 1000.0
+            server.on_roof(a, {"t": "roof", "h": 13})                                         # a low roof: counted, but the quest wants 30 m
+            self.assertEqual((server.STATS[a.fid]["rf"], server.STATS[a.fid]["rm"]), (1, 13))
+            self.assertFalse(server.DAILY[a.fid]["done"])
+            nw.return_value = 1002.0
+            server.on_roof(a, {"t": "roof", "h": 40})                                         # too soon after the last one: ignored
+            self.assertEqual(server.STATS[a.fid]["rf"], 1)
+            nw.return_value = 1010.0
+            server.on_roof(a, {"t": "roof", "h": 40})
+            self.assertEqual((server.STATS[a.fid]["rf"], server.STATS[a.fid]["rm"]), (2, 40))
+            self.assertTrue(server.DAILY[a.fid]["done"])
+            nw.return_value = 1020.0
+            server.on_roof(a, {"t": "roof", "h": 99999})                                      # silly heights are cut down
+            self.assertEqual(server.STATS[a.fid]["rm"], 800)
+            nw.return_value = 1030.0
+            server.on_roof(a, {"t": "roof", "h": "x"}); server.on_roof(a, {"t": "roof", "h": 1})       # junk and something that is not a roof
+            self.assertEqual(server.STATS[a.fid]["rf"], 3)
+            server.on_roof(guest, {"t": "roof", "h": 50})                                     # guests have no profile
+            self.assertEqual(len(server.STATS), 1)
+        with mock.patch.object(server.time, "time", return_value=low * 86400 + 50), mock.patch.object(server, "now", return_value=2000.0):
+            b = self.WC("bbbbbbbbbbbb", "Ben")
+            server.on_roof(b, {"t": "roof", "h": 5})
+            self.assertTrue(server.DAILY[b.fid]["done"])
+        self.assertEqual(server.profile_view(a.fid)["rf"], 3)
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.STATS.clear(); server.world_apply(snap)
+        self.assertEqual((server.STATS[a.fid]["rf"], server.STATS[a.fid]["rm"]), (3, 800))
 
     def test_daily_is_saved_and_loaded(self):
         self.daily_fresh()

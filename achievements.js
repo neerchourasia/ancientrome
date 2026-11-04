@@ -27,6 +27,8 @@ const Achievements = (() => {
     ["share", "📈", "Shareholder", "Buy shares on the exchange.", "", 20, () => typeof Exchange !== "undefined" && Exchange.count > 0],
     ["gold1", "🥇", "On the podium", "Win a gold medal in a race event.", "", 50, () => medals(1) >= 1],
     ["gold3", "🏁", "Champion", "Win gold on all three courses of a city.", "Champion", 400, () => medals(1) >= 3],
+    ["roof1", "🏢", "Rooftop landing", "Land an aircraft on a roof.", "", 30, () => typeof Car !== "undefined" && Car.roofs.n >= 1],
+    ["roof2", "🌆", "Skyscraper pilot", "Land an aircraft on a roof 100 m above the street (the towers of Beijing).", "Sky Pilot", 200, () => typeof Car !== "undefined" && Car.roofs.max >= 100],
     ["guild", "🛡", "Joiner", "Join or found a guild.", "", 20, () => typeof Guilds !== "undefined" && Guilds.inGuild],
     ["sea", "⛵", "Sea legs", "Arrive in a city by sea.", "", 20, () => typeof Voyage !== "undefined" && Voyage.count >= 1],
     ["sea3", "🧭", "Explorer", "Arrive in all three cities by sea.", "Explorer", 200, () => typeof Voyage !== "undefined" && Voyage.count >= 3],
