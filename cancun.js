@@ -49,7 +49,7 @@ const Cancun = (() => {
     mesh.castShadow = o.cast !== false; mesh.receiveShadow = true;
     parent.add(mesh);
     const ex = o.era ? { era: o.era } : undefined;      // era: this thing (and its collision) exists only in the Maya days ("ancient") or only today ("modern")
-    if (o.solid) addBlockerBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h, ex);
+    if (o.solid) mesh.userData.blk = addBlockerBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h, ex);
     if (o.walk) addPlatformBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0 + h, ex);
     if (o.map) MAP_SHAPES.push({ k: "r", x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, c: o.map });
     return mesh;
@@ -400,7 +400,13 @@ const Cancun = (() => {
         const w = 46, d = 26, h = 22 + (i % 3) * 8, hx = 740;
         if (i === 3) {                                                                                                   // a pyramid-shaped hotel, like the ones the Maya built
           for (let k = 0; k < 7; k++) { const s = 44 - k * 5.5; mbox(g, X(hx), k * 4.2, z, s, 4.2, s, walls[1], { solid: true, era: "modern", map: k === 0 ? "#e8d4b8" : undefined }); }
-        } else mbox(g, X(hx), 0, z, d, h, w, walls[i % 3], { solid: true, era: "modern", map: "#d9d9d6" });
+        } else {
+          const hotel = mbox(g, X(hx), 0, z, d, h, w, walls[i % 3], { solid: true, era: "modern", map: "#d9d9d6" });
+          if (typeof Interiors !== "undefined" && i % 3 !== 2) {                                                         // the lobby of some hotels is a shop you can walk into (interiors.js)
+            const tint = [0xffffff, 0xffe0c4, 0xcfe8f2][i % 3];
+            Interiors.register({ x: X(hx), z, w: d, d: w, h, kinds: "cancun", side: "W", parent: g, era: "modern", blk: hotel.userData.blk, tint: () => tint, upper: walls[i % 3], hide: () => { hotel.visible = false; } });
+          }
+        }
         mbox(g, X(hx - 16), 0, z, 0.4, 9, 6, C.glass, { cast: false });
       });
       for (let i = 0; i < 26; i++) {
@@ -415,7 +421,8 @@ const Cancun = (() => {
       }
       sign(g, X(bx - 9), 4.6, -4, 4.2, 1.3, "KUKULCÁN", "Hotel Zone ->", Math.PI / 2);
       // the visitor centre and a car park by the plaza
-      mbox(g, X(180), 0, 110, 36, 7, 16, C.white, { solid: true, era: "modern" });
+      const centre = mbox(g, X(180), 0, 110, 36, 7, 16, C.white, { solid: true, era: "modern" });
+      if (typeof Interiors !== "undefined") Interiors.register({ x: X(180), z: 110, w: 36, d: 16, h: 7, kinds: "cancunCentre", side: "N", signY: 3.6, parent: g, era: "modern", blk: centre.userData.blk, tint: () => 0xf3f1ea, hide: () => { centre.visible = false; } });
       mbox(g, X(180), 7, 110, 38, 0.8, 18, C.red);
       sign(g, X(180), 5.2, 101.7, 6, 1.5, "CHICHÉN ITZÁ", "visitor centre", Math.PI);
       for (let i = 0; i < 4; i++) mbox(g, X(150 + i * 10), 0.8, 140, 3, 1.6, 6.5, [C.red, C.white, C.glass, C.dark][i], { solid: true, era: "modern" });

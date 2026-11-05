@@ -10,7 +10,7 @@ const Doors = (() => {
 
   // A door in a gap of the wall at (x, z), world coordinates. axis "x": the wall runs east-west (you walk through north-south); "z": the wall runs
   // north-south. w, h: the size of the gap. swing: +1 or -1, which way it opens (towards the inside of the house). blockers: where to keep its collision (a house's list).
-  function add(parent, x, z, axis, w, h, swing, blockers, y0 = 0) {
+  function add(parent, x, z, axis, w, h, swing, blockers, y0 = 0, era) {
     const pivot = new THREE.Group();
     const alongX = axis === "x";
     pivot.position.set(alongX ? x - w / 2 : x, y0, alongX ? z : z - w / 2);
@@ -24,7 +24,7 @@ const Doors = (() => {
     }
     const handle = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), knob); handle.position.set(alongX ? w - 0.25 : 0.1, h * 0.48, alongX ? 0.1 : w - 0.25); pivot.add(handle);
     parent.add(pivot);
-    const blocker = addBlockerBox(alongX ? x - w / 2 : x - 0.15, alongX ? x + w / 2 : x + 0.15, alongX ? z - 0.15 : z - w / 2, alongX ? z + 0.15 : z + w / 2, y0, y0 + h);
+    const blocker = addBlockerBox(alongX ? x - w / 2 : x - 0.15, alongX ? x + w / 2 : x + 0.15, alongX ? z - 0.15 : z - w / 2, alongX ? z + 0.15 : z + w / 2, y0, y0 + h, era ? { era } : undefined);   // era: the door only exists in the Maya days ("ancient") or only today ("modern")
     if (blockers) blockers.push(blocker);
     doors.push({ pivot, blocker, x, z, w, t: 0, swing, alongX, parent, y0 });
   }

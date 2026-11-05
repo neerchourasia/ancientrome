@@ -383,7 +383,7 @@ const Delhi = (() => {
       o.position.set(X(b.x), 0, b.z); o.scale.set(b.w, b.h, b.d); o.updateMatrix(); body.setMatrixAt(i, o.matrix);
       o.position.set(X(b.x), b.h, b.z); o.scale.set(b.w + 0.8, 0.9, b.d + 0.8); o.updateMatrix(); roofs.setMatrixAt(i, o.matrix);
       body.setColorAt(i, MUGHAL_WALLS[b.ci]);
-      addBlockerBox(X(b.x) - b.w / 2, X(b.x) + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, 0, b.h + 1);
+      b.blk = addBlockerBox(X(b.x) - b.w / 2, X(b.x) + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, 0, b.h + 1);
       MAP_SHAPES.push({ k: "r", x0: X(b.x) - b.w / 2, x1: X(b.x) + b.w / 2, z0: b.z - b.d / 2, z1: b.z + b.d / 2, c: "#d6a67f" });
     });
     body.instanceMatrix.needsUpdate = roofs.instanceMatrix.needsUpdate = true; body.instanceColor.needsUpdate = true;
@@ -405,6 +405,16 @@ const Delhi = (() => {
     });
     for (const m of [doors, awn, bal]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; scene.add(m); }
     awn.instanceColor.needsUpdate = true;
+    // every sixth shop on Chandni Chowk is one you can walk into (interiors.js): its solid block and dark doorway are swapped for a real room the first time you come near
+    if (typeof Interiors !== "undefined") shops.forEach((b, j) => {
+      if (j % 6 !== 2) return;
+      const i = bodies.indexOf(b);
+      Interiors.register({
+        x: X(b.x), z: b.z, w: b.w, d: b.d, h: b.h, kinds: "delhi", side: b.shop > 0 ? "N" : "S", signY: 4.3, parent: scene, blk: b.blk,
+        tint: (m) => (m ? MODERN_WALLS : MUGHAL_WALLS)[b.ci],
+        hide: () => { for (const mesh of [body, doors]) { const k = mesh === body ? i : j; o.rotation.set(0, 0, 0); o.position.set(0, 0, 0); o.scale.set(0, 0, 0); o.updateMatrix(); mesh.setMatrixAt(k, o.matrix); mesh.instanceMatrix.needsUpdate = true; } },
+      });
+    });
     palettes.push({ mesh: awn, list: shops, mughal: MUGHAL_AWN, modern: MODERN_AWN, key: "ai" });
   }
   const DELHI_MATS = {};

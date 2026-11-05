@@ -51,7 +51,7 @@ const Beijing = (() => {
     mesh.castShadow = o.cast !== false; mesh.receiveShadow = true;
     parent.add(mesh);
     const ex = o.era ? { era: o.era } : undefined;
-    if (o.solid) addBlockerBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h, ex);
+    if (o.solid) mesh.userData.blk = addBlockerBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0, y0 + h, ex);
     if (o.walk) addPlatformBox(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, y0 + h, ex);
     if (o.map) MAP_SHAPES.push({ k: "r", x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, c: o.map });
     return mesh;
@@ -284,6 +284,7 @@ const Beijing = (() => {
 
   // ---------- the hutongs and your courtyard house ----------
 
+  let halls = 0;
   function courtyard(cx, cz, w, d, gateSide, big) {
     const g = root, hh = big ? 3.8 : 3.4;
     const wall = (x, z, ww, dd) => mbox(g, x, 0, z, ww, hh, dd, C.brick, { solid: true });
@@ -292,7 +293,8 @@ const Beijing = (() => {
     wall(cx - (w + gapW) / 4 - gapW / 4 - 0.01, cz + d / 2, (w - gapW) / 2, 0.7); wall(cx + (w + gapW) / 4 + gapW / 4 + 0.01, cz + d / 2, (w - gapW) / 2, 0.7);
     mbox(g, cx, hh - 0.6, cz + d / 2, gapW + 1.2, 0.6, 0.9, C.redDark); roof(g, cx, hh, cz + d / 2, gapW + 1, 0.8, 1.2, C.tile);
     // the rooms round the yard
-    mbox(g, cx, 0, cz - d / 2 + 4, w - 7, 3.4, 5.5, C.redDark, { solid: true }); roof(g, cx, 3.4, cz - d / 2 + 4, w - 7, 5.5, 2.2, C.tile);
+    const hall = mbox(g, cx, 0, cz - d / 2 + 4, w - 7, 3.4, 5.5, C.redDark, { solid: true }); roof(g, cx, 3.4, cz - d / 2 + 4, w - 7, 5.5, 2.2, C.tile);
+    if (typeof Interiors !== "undefined" && halls++ % 4 === 1) Interiors.register({ x: cx, z: cz - d / 2 + 4, w: w - 7, d: 5.5, h: 3.4, kinds: "beijingHall", side: "S", signY: 3.05, parent: g, blk: hall.userData.blk, tint: () => 0x7a1c16, hide: () => { hall.visible = false; } });                // the north hall of some courtyards is a shop you can walk into (interiors.js)
     for (const sx of [-1, 1]) { mbox(g, cx + sx * (w / 2 - 3), 0, cz, 4.5, 3, d - 14, C.redDark, { solid: true }); roof(g, cx + sx * (w / 2 - 3), 3, cz, 4.5, d - 14, 1.8, C.tile); }
     trees(cx - X(0), cz, 3, 3, 1, "ball");
   }
@@ -378,9 +380,11 @@ const Beijing = (() => {
 
   function buildCBD() {
     const g = modernG;
+    let towers = 0;
     plane(1800, 22, C.road, X(-100), 0.05, -24, g); plane(22, 760, C.road, X(300), 0.05, 150, g); plane(22, 600, C.road, X(-420), 0.05, 150, g);          // roads
     for (const [x, z, w, d, h] of [[470, 130, 40, 40, 110], [470, 240, 38, 38, 140], [470, 340, 44, 40, 90], [545, 90, 38, 36, 170], [640, 130, 40, 40, 120], [640, 330, 42, 40, 100], [700, 230, 36, 36, 150], [545, 320, 40, 40, 80]]) {
-      mbox(g, X(x), 0, z, w, h, d, k2(x), { solid: true, era: "modern", map: "#6fa8c9" });
+      const tower = mbox(g, X(x), 0, z, w, h, d, k2(x), { solid: true, era: "modern", map: "#6fa8c9" });
+      if (typeof Interiors !== "undefined" && [0, 2, 4, 7].includes(towers++)) Interiors.register({ x: X(x), z, w, d, h, kinds: "beijingCbd", side: "S", parent: g, era: "modern", blk: tower.userData.blk, tint: () => (x % 2 ? 0x8fbad4 : 0x6f8fae), upper: k2(x), hide: () => { tower.visible = false; } });   // the foot of some towers is a shop you can walk into (interiors.js)
     }
     mbox(g, X(560), 0, 215, 34, 255, 34, C.glass, { solid: true, era: "modern", map: "#6fa8c9" }); mbox(g, X(560), 255, 215, 24, 20, 24, C.glassDark);        // China Zun
     for (let k = 0; k < 14; k++) mbox(g, X(-440 - (k % 2) * 8), 0, 420 + k * 20, 10, 14 + (k % 3) * 6, 14, C.concrete, { solid: true, era: "modern" });
