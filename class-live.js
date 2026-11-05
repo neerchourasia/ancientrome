@@ -1,6 +1,6 @@
 "use strict";
 // The class dashboard (class-live.html): the teacher's page. The address has the class id and the secret key after the #, so they are never sent anywhere except to the game server, as the
-// key to read the class (server.py, "classes"). It asks the server every five seconds and shows every student's progress.
+// key to read the class (server.py, "classes"). It asks the server every three seconds and shows every student's progress.
 (() => {
   const $ = (id) => document.getElementById(id);
   const h = new URLSearchParams(location.hash.slice(1)), cid = h.get("c") || "", key = h.get("k") || "";
@@ -57,5 +57,5 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); a.download = "class.csv"; a.click();
   });
   $("print").addEventListener("click", () => window.print());
-  poll(); setInterval(poll, 5000);
+  poll(); setInterval(poll, 3000);
 })();

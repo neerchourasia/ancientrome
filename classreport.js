@@ -1,6 +1,6 @@
 "use strict";
 // The class report: when a teacher has switched on "watch what each student does" (class.html), the link has a class id (cid=...) and this file, in each student's browser, tells the game server how the
-// student is getting on, every ten seconds, so the teacher's dashboard (class-live.html) can show it. The students are told: the bar at the bottom of the screen says "your teacher can see your
+// student is getting on, every five seconds, so the teacher's dashboard (class-live.html) can show it. The students are told: the bar at the bottom of the screen says "your teacher can see your
 // progress". What is sent: the name the student chose for their character, the city and era, the money, the sights found, how many shops they walked into, errands and goods made, how many achievements,
 // the hunt's progress, and a few short lines of what they did ("found the Pantheon", "walked into a tavern"). Never chat, never anything typed, no addresses. The server keeps it in memory for ten hours
 // at most (server.py, "classes"). Without a class id nothing is sent at all (online.js). Depends on online.js, hunt.js, shopkeep.js and the globals of game.js.
@@ -12,7 +12,8 @@ const ClassReport = (() => {
   try { sid = localStorage.getItem("rome-csid") || ""; } catch (e) { /* storage unavailable */ }
   if (!/^[0-9a-f]{12}$/.test(sid)) { sid = hex(6); try { localStorage.setItem("rome-csid", sid); } catch (e) { /* ignore */ } }
 
-  const note = (text) => { if (!on()) return; queue.push(String(text).slice(0, 80)); if (queue.length > 20) queue.shift(); };
+  let soon = 0;
+  const note = (text) => { if (!on()) return; queue.push(String(text).slice(0, 80)); if (queue.length > 20) queue.shift(); if (!soon) soon = setTimeout(() => { soon = 0; tick(); }, 1500); };       // (what they did is reported a moment later, not at the next ten seconds)
   const nameOf = (id) => { try { const l = ALL_LANDMARKS.find((x) => x.id === id); return l ? l.name : id; } catch (e) { return id; } };
 
   function snapshot() {
@@ -33,8 +34,8 @@ const ClassReport = (() => {
     if (d.hunt && d.hunt.done && !last.huntDone) { last.huntDone = true; note(`finished the hunt in ${Math.floor(d.hunt.done / 60)}:${String(d.hunt.done % 60).padStart(2, "0")}`); }
     Online.classReport(CLASSMODE.cid, sid, Character.name, d, queue.splice(0, 8));
   }
-  setInterval(tick, 10000);
-  setTimeout(tick, 4000);
+  setInterval(tick, 5000);
+  const first = setInterval(() => { if (typeof started !== "undefined" && started && Character.exists) { clearInterval(first); tick(); } }, 500);        // (the first report goes as soon as the character is made)
   addEventListener("pagehide", () => { if (on()) { note("left the page"); tick(); } });
   return { note, tick };
 })();
