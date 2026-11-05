@@ -97,6 +97,7 @@ const Account = (() => {
         vitals: { hp: Math.round(Vitals.hp), horses: Math.round(Vitals.horses), coins: Vitals.coins, hunger: Math.round(Vitals.hunger) },
         time: { hour: +Time.hour.toFixed(2), day: Time.day },
         owned: Market.snapshot(),
+        goods: Shopkeep.snapshot(),
         tax: Tax.snapshot(),
         jobs: Jobs.snapshot(),
         ships: Shipyard.snapshot(),
@@ -135,6 +136,7 @@ const Account = (() => {
       if (Number.isFinite(v.hunger)) Vitals.hunger = v.hunger;
     }
     if (p.owned && typeof p.owned === "object") Market.restore(p.owned);
+    if (p.goods && typeof p.goods === "object") Shopkeep.restore(p.goods);
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
     if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);
@@ -167,6 +169,7 @@ const Account = (() => {
   function keepMineOverServer(row, at) {
     const so = row.progress && row.progress.owned ? row.progress.owned : {}, mo = Market.snapshot();
     Market.restore({ house: Math.max(mo.house, so.house | 0), dhouse: Math.max(mo.dhouse, so.dhouse | 0), chouse: Math.max(mo.chouse | 0, so.chouse | 0), bhouse: Math.max(mo.bhouse | 0, so.bhouse | 0), items: [...new Set([...mo.items, ...(Array.isArray(so.items) ? so.items : [])])], worn: mo.worn });
+    if (row.progress && row.progress.goods) Shopkeep.merge(row.progress.goods);
     if (typeof Treasure !== "undefined" && row.progress && row.progress.treasure) Treasure.merge(row.progress.treasure);
     if (typeof Ventures !== "undefined" && row.progress && row.progress.ventures) Ventures.merge(row.progress.ventures);
     if (typeof Exchange !== "undefined" && row.progress && row.progress.stocks) Exchange.merge(row.progress.stocks);
@@ -207,6 +210,7 @@ const Account = (() => {
   function keepLocal(mine, row) {
     const mo = mine.progress.owned || {}, so = Market.snapshot();
     Market.restore({ house: Math.max(so.house, mo.house | 0), dhouse: Math.max(so.dhouse, mo.dhouse | 0), chouse: Math.max(so.chouse | 0, mo.chouse | 0), bhouse: Math.max(so.bhouse | 0, mo.bhouse | 0), items: [...new Set([...so.items, ...(mo.items || [])])], worn: so.worn.length ? so.worn : (mo.worn || []) });
+    if (mine.progress.goods) Shopkeep.merge(mine.progress.goods);
     if (Array.isArray(mine.progress.discovered)) {
       discovered = new Set([...discovered, ...mine.progress.discovered.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game))]);
       try { localStorage.setItem("rome-discovered", JSON.stringify([...discovered])); } catch (e) { /* ignore */ }

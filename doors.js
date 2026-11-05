@@ -26,7 +26,9 @@ const Doors = (() => {
     parent.add(pivot);
     const blocker = addBlockerBox(alongX ? x - w / 2 : x - 0.15, alongX ? x + w / 2 : x + 0.15, alongX ? z - 0.15 : z - w / 2, alongX ? z + 0.15 : z + w / 2, y0, y0 + h, era ? { era } : undefined);   // era: the door only exists in the Maya days ("ancient") or only today ("modern")
     if (blockers) blockers.push(blocker);
-    doors.push({ pivot, blocker, x, z, w, t: 0, swing, alongX, parent, y0 });
+    const rec = { pivot, blocker, x, z, w, t: 0, swing, alongX, parent, y0, locked: false };      // locked: a shop that is shut for the night stays shut (interiors.js)
+    doors.push(rec);
+    return rec;
   }
 
   function update(dt) {
@@ -35,11 +37,11 @@ const Doors = (() => {
       const dist = Math.hypot(player.x - d.x, player.z - d.z);
       if (dist > 60) continue;
       const vis = shown(d.parent);
-      const want = vis && (mode === "walk" || mode === "drive") && dist < (d.t > 0.2 ? 3.4 : 2.6) && Math.abs(player.feet - d.y0) < 2.5 ? 1 : 0;   // opens within 2.6 m, and stays open until you are 3.4 m away
+      const want = vis && !d.locked && (mode === "walk" || mode === "drive") && dist < (d.t > 0.2 ? 3.4 : 2.6) && Math.abs(player.feet - d.y0) < 2.5 ? 1 : 0;   // opens within 2.6 m, and stays open until you are 3.4 m away
       d.t += (want - d.t) * Math.min(1, dt * 5);
       if (Math.abs(want - d.t) < 0.01) d.t = want;
       d.pivot.rotation.y = d.swing * d.t * 1.65;
-      if (vis) d.blocker.off = d.t > 0.45;                                                       // an open door lets you through
+      if (vis) d.blocker.off = d.t > 0.45 && !d.locked;                                                       // an open door lets you through
     }
   }
 

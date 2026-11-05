@@ -869,6 +869,13 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 #photo-flash.go { animation: photoflash .35s ease-out; }
 @keyframes photoflash { 0% { opacity: .85; } 100% { opacity: 0; } }
 .sv-lock { opacity: .55; }
+#sk-body { display: grid; gap: 10px; }
+#sk-body h3 { margin: 4px 0 0; font-size: 1rem; }
+#sk-body .sk-line { margin: 0; font-style: italic; line-height: 1.4; }
+#sk-body .sk-note { margin: 0; padding: 8px 12px; border-radius: 8px; background: rgba(217,180,74,.18); border: 1px solid rgba(217,180,74,.5); }
+.sk-menu { display: grid; gap: 8px; }
+#sk-body > button, .sk-menu button { font: 700 .95rem inherit; cursor: pointer; padding: 9px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); text-align: left; }
+#sk-body > button:disabled, .sk-menu button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* phones: buttons for the games that need a keyboard (see pvpgames.js) */
 #mini-touch { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 9; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 22px; pointer-events: none; }

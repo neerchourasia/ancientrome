@@ -300,6 +300,7 @@ const Cancun = (() => {
     mbox(g, X(x), 0.9, z - HOME.hd + 0.6, 3.4, 0.14, 0.9, C.red, { cast: false });                                        // the hammock
     sign(g, X(x), 3.7, z + HOME.hd + 0.3, 2.6, 0.8, "CASITA", "your home", Math.PI);
     if (typeof Souvenirs !== "undefined") Souvenirs.addShelf(g, { x: X(-66.85), z: 95.5, face: "w", floor: 0.15 });      // the souvenir shelf, on the east wall
+    if (typeof Shopkeep !== "undefined") Shopkeep.addShelf(g, { x: X(-73.15), z: 95, face: "e", floor: 0.15 });           // the shelf for the goods you buy in the shops, on the west wall
   }
 
 
@@ -429,6 +430,16 @@ const Cancun = (() => {
     }
   }
 
+
+  // three trading houses south of the market square, in Maya days: lime-plastered, thatched, and you can walk into them (interiors.js)
+  function buildMayaShops() {
+    const g = ancientG;
+    [[-45, 200], [45, 200], [0, 222]].forEach(([x, z]) => {
+      const w = 14, d = 10, h = 3.6, hut = mbox(g, X(x), 0, z, w, h, d, C.lime, { solid: true, era: "ancient", map: "#e4dcc3" });
+      const roof = new T.Mesh(new T.ConeGeometry(1, 1, 4), C.thatch); roof.scale.set(w * 0.83, 3.0, d * 0.88); roof.position.set(X(x), h + 1.5, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof);
+      if (typeof Interiors !== "undefined") Interiors.register({ x: X(x), z, w, d, h, kinds: "cancunMaya", side: "N", parent: g, era: "ancient", blk: hut.userData.blk, tint: () => 0xe4dcc3, hide: () => { hut.visible = false; } });
+    });
+  }
 
   // ---------- the sea floor, the coral reef and its fish; the cenote swimming pond; snorkelling ----------
 
@@ -672,6 +683,7 @@ const Cancun = (() => {
     buildCasita();
     buildHouseTiers();
     buildCoast();
+    buildMayaShops();
     buildSea();
     buildPond();
     buildHire();

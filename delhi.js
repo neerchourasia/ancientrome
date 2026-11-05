@@ -405,6 +405,11 @@ const Delhi = (() => {
     });
     for (const m of [doors, awn, bal]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; scene.add(m); }
     awn.instanceColor.needsUpdate = true;
+    // and every 29th block in the lanes behind them: a shop you can walk into too (door on whichever side has open ground)
+    if (typeof Interiors !== "undefined") bodies.forEach((b, i) => {
+      if (b.shop || i % 29 !== 7) return;
+      Interiors.register({ x: X(b.x), z: b.z, w: b.w, d: b.d, h: b.h, kinds: "delhi", parent: scene, blk: b.blk, tint: (m) => (m ? MODERN_WALLS : MUGHAL_WALLS)[b.ci], hide: () => { o.rotation.set(0, 0, 0); o.position.set(0, 0, 0); o.scale.set(0, 0, 0); o.updateMatrix(); body.setMatrixAt(i, o.matrix); body.instanceMatrix.needsUpdate = true; } });
+    });
     // every sixth shop on Chandni Chowk is one you can walk into (interiors.js): its solid block and dark doorway are swapped for a real room the first time you come near
     if (typeof Interiors !== "undefined") shops.forEach((b, j) => {
       if (j % 6 !== 2) return;
@@ -554,6 +559,7 @@ const Delhi = (() => {
       Dresser.register("delhi", X(dx), dz, f, () => houseTier === t);
     });
     if (typeof Souvenirs !== "undefined") for (const [t, sx, sz, f] of [[0, -96.3, -33, "w"], [1, -92.8, -43.5, "w"], [2, -76.7, -69.2, "w"], [3, -76.7, -69.2, "w"], [4, -76.7, -69.2, "w"], [5, -76.7, -69.2, "w"]]) Souvenirs.addShelf(houses[t].g, { x: X(sx), z: sz, face: f, floor: 0.02 });    // the souvenir shelf in every size of house
+    if (typeof Shopkeep !== "undefined") for (const [t, sx, sz, f] of [[0, -103.7, -32.3, "e"], [1, -92.8, -40.5, "w"], [2, -76.7, -72.2, "w"], [3, -76.7, -72.2, "w"], [4, -76.7, -72.2, "w"], [5, -76.7, -72.2, "w"]]) Shopkeep.addShelf(houses[t].g, { x: X(sx), z: sz, face: f, floor: 0.02 });    // the shelf for the goods you buy in the shops, beside the souvenir shelf
     // a garage for every upgrade (not the small house), by the east wall of the plot, open to the west
     const gm = { wall: D.cream, roof: D.redDark, dark: lambert(0x6a625a), door: D.wood };
     for (let t = 1; t <= 5; t++) for (const p of Garage.parts(-72, -28, "w")) hb(t, p.x, p.y0, p.z, p.w, p.h, p.d, gm[p.mat], p.solid);

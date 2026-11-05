@@ -4395,6 +4395,7 @@ QUESTS = [
     {"k": "game", "n": 1, "kinds": ("race", "derby", "naval"), "text": "Take part in a chariot race, derby or naval battle against real people"},
     {"k": "roof", "n": 1, "min": 0, "text": "Land an aircraft on a roof"},
     {"k": "roof", "n": 1, "min": 30, "text": "Land an aircraft on a roof at least 30 m above the street (Cancún, Old Delhi and Beijing have some)"},
+    {"k": "errand", "n": 2, "text": "Do 2 errands for shopkeepers (walk into a shop and ask the keeper for work)"},
 ]
 DAILY_COINS, DAILY_STEP, DAILY_DAYS = 60, 15, 7          # the prize is 60 denarii, 15 more for every day in a row, up to the seventh
 DAILY = {}                                               # friend id -> {"day", "p" (progress), "done", "s" (days in a row), "b" (best), "l" (last day finished)} (saved)
@@ -4446,7 +4447,7 @@ def daily_add(conn, what, kind=None, won=False, h=0):
     if r is None or r["done"]:
         return
     q = daily_quest(r["day"])
-    if not ((what == "blocks" and q["k"] == "blocks") or (what == "roof" and q["k"] == "roof" and h >= q["min"]) or (what == "match" and (q["k"] == "play" or (q["k"] == "win" and won) or (q["k"] == "game" and kind in q["kinds"])))):
+    if not ((what == "blocks" and q["k"] == "blocks") or (what == "roof" and q["k"] == "roof" and h >= q["min"]) or (what == "errand" and q["k"] == "errand") or (what == "match" and (q["k"] == "play" or (q["k"] == "win" and won) or (q["k"] == "game" and kind in q["kinds"])))):
         return
     r["p"] += 1
     if r["p"] >= q["n"]:
@@ -4468,6 +4469,7 @@ def on_daily(conn, m):
 
 
 ROOF_GAP = 6.0                                           # seconds between two roof landings that count
+ERRAND_GAP = 20.0                                        # seconds between two shop errands that count (the browser fetches the goods and hands them in)
 
 
 def on_roof(conn, m):
@@ -4487,6 +4489,17 @@ def on_roof(conn, m):
         rec["rm"] = max(rec.get("rm", 0), h)
         world_soon()
     daily_add(conn, "roof", h=h)
+
+
+def on_errand(conn, m):
+    """A shopkeeper's errand was handed in (the browser checks the goods): counted for the daily quest."""
+    if not conn.fid:
+        return
+    t = now()
+    if t - getattr(conn, "errand_t", -99.0) < ERRAND_GAP:
+        return
+    conn.errand_t = t
+    daily_add(conn, "errand")
 
 
 # ---------------------------------------------------------------- tournaments
@@ -5720,6 +5733,8 @@ async def handle_msg(conn, m):
         return on_daily(conn, m)
     if t == "roof":
         return on_roof(conn, m)
+    if t == "errand":
+        return on_errand(conn, m)
     if t == "watch":
         return on_watch(conn, m)
     if t == "tourney":

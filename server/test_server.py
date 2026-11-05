@@ -1556,6 +1556,8 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
                 for _ in range(q["n"]):
                     if q["k"] == "roof":
                         server.daily_add(a, "roof", h=100)
+                    elif q["k"] == "errand":
+                        server.daily_add(a, "errand")
                     else:
                         server.daily_add(a, "blocks" if q["k"] == "blocks" else "match", (q.get("kinds") or ("xiangqi",))[0], True)
                 self.assertTrue(server.DAILY[a.fid]["done"], q)
@@ -1574,6 +1576,28 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         for d in range(20005, 20014):
             finish(d)
         self.assertEqual(coins[-1], 150)                                                  # capped at the seventh day
+
+    def test_shop_errands_count_for_the_daily_quest(self):
+        self.daily_fresh()
+        a, guest = self.WC("aaaaaaaaaaaa", "Ann"), self.WC(None, "Guest")
+        day = next(d for d in range(20000, 20100) if server.daily_quest(d)["k"] == "errand")
+        other = next(d for d in range(20000, 20100) if server.daily_quest(d)["k"] != "errand")
+        with mock.patch.object(server.time, "time", return_value=other * 86400 + 50), mock.patch.object(server, "now") as nw:
+            nw.return_value = 1000.0
+            server.on_errand(a, {"t": "errand"})                                               # another day's quest: nothing happens
+            self.assertEqual(server.DAILY[a.fid]["p"], 0)
+        with mock.patch.object(server.time, "time", return_value=day * 86400 + 50), mock.patch.object(server, "now") as nw:
+            nw.return_value = 2000.0
+            server.on_errand(a, {"t": "errand"})
+            self.assertEqual(server.DAILY[a.fid]["p"], 1)
+            nw.return_value = 2005.0
+            server.on_errand(a, {"t": "errand"})                                               # too soon: ignored
+            self.assertEqual(server.DAILY[a.fid]["p"], 1)
+            nw.return_value = 2030.0
+            server.on_errand(a, {"t": "errand"})
+            self.assertTrue(server.DAILY[a.fid]["done"])
+            server.on_errand(guest, {"t": "errand"})                                           # guests have no daily quest
+            self.assertNotIn(guest.fid, server.DAILY)
 
     def test_roof_landings_are_counted_and_count_for_the_daily_quest(self):
         self.daily_fresh(); server.STATS.clear()

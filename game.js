@@ -51,6 +51,7 @@ function init() {
   Harbour.build(scene);
   Home.build();
   Souvenirs.build(worldScene);
+  Shopkeep.addShelf(worldScene, { x: 249.72, z: 46.9, face: "e", floor: 0.15 });   // the shelf for the goods you buy in the shops, north of the souvenir shelf
   buildInsulae(scene);
   Interiors.setup();
   Jail.buildRome(scene);
@@ -71,7 +72,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Shopkeep.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -188,6 +189,7 @@ function wireInput(canvas) {
       else { const m = /^(?:Digit|Key|Numpad)([1-5])$/.exec(k); if (m) Watch.setAct(Number(m[1]) - 1); }
     } else if (mode === "walk" && canStart()) {
       if (Subway.key(k)) { /* the metro: F at an entrance or on a platform, R and U on a platform */ }
+      else if (k === "KeyF" && Shopkeep.act()) { /* talked to a shopkeeper, or sat down at a table */ }
       else if (k === "KeyF" && Estate.at()) Estate.open();
       else if (k === "KeyF" && Relics.at()) Relics.open();
       else if (k === "KeyF" && Online.atBallCourt()) Online.playBall();
@@ -256,6 +258,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
     if ($("#prompt").dataset.kind === "car") { Car.enter(); return; }
     if ($("#prompt").dataset.kind === "dgame") { DGames.playHere(); return; }
+    if ($("#prompt").dataset.kind === "shop") { Shopkeep.act(); return; }
     if ($("#prompt").dataset.kind === "stall") { Stalls.open(); return; }
     if ($("#prompt").dataset.kind === "job") { Jobs.act(); return; }
     if ($("#prompt").dataset.kind === "garage") { Garage.open(); return; }
@@ -884,6 +887,7 @@ function updateAvatar(dt) {
   const swing = pace > 0.3 ? Math.sin(avPhase) * Math.min(1, pace / 8.5) * 0.7 : 0;
   avParts.armL.rotation.x = swing; avParts.armR.rotation.x = -swing;
   avParts.legL.rotation.x = -swing; avParts.legR.rotation.x = swing;
+  if (Shopkeep.seated) { avParts.legL.rotation.x = avParts.legR.rotation.x = 1.45; avatar.position.y -= 0.1; }          // sitting on a stool in a shop
   if (mode === "online") Online.poseMine(avParts);
   Emotes.update(avFig, dt);
 }
@@ -1296,7 +1300,7 @@ function updatePrompt() {
   if (mode === "walk" && !panelOpen) {
     const stables = inCircusArea(player.x, player.z);
     p.dataset.kind = "";
-    if (Vitals.resting) text = "Resting... move to stand up";
+    if (Vitals.resting) { text = Shopkeep.seated ? Shopkeep.prompt() : "Resting... move to stand up"; if (Shopkeep.seated) p.dataset.kind = "shop"; }
     else if (era === "modern" && (inArena(player.x, player.z) || inCircusTrack(player.x, player.z) || inColosseum(player.x, player.z) || inCircusStands(player.x, player.z))) text = "The games only ran in Ancient Rome. Press K to go back";
     else if (inArena(player.x, player.z)) text = Vitals.canFight() ? "F: gladiators · U: animal hunt · L: lion · N: build your ship and fight a naval battle · V: watch the games" : "Too wounded to fight. Press Z to rest and heal · V: watch the games";
     else if (inCircusTrack(player.x, player.z)) text = !Vitals.canRace() ? "The horses need rest. Press Z to rest at the stables · V: watch a race" : `R: race a chariot (${Math.round(Vitals.RACE_ENTRY * Character.mod("fee"))} denarii) · V: watch a race`;
@@ -1304,6 +1308,7 @@ function updatePrompt() {
     else if (inColosseum(player.x, player.z)) text = "Press V to watch the games";
     else if (inCircusStands(player.x, player.z)) text = "Press V to watch a chariot race";
     if (!text && city === "delhi") { const v = Delhi.venueAt(player.x, player.z, player.feet); if (v) { text = v.text; p.dataset.kind = "dgame"; } }
+    if (!text) { const sp = Shopkeep.prompt(); if (sp) { text = sp; p.dataset.kind = "shop"; } }
     if (!text) { const st = Stalls.at(player.x, player.z, player.feet); if (st) { text = st.id === "board" ? "F: read the job board" : `F: shop at the ${st.name}`; p.dataset.kind = "stall"; } }
     if (!text) { const jp = Jobs.at(player.x, player.z, player.feet); if (jp) { text = jp.text; p.dataset.kind = "job"; } }
     if (!text) { const rb = Robbery.at(player.x, player.z, player.feet); if (rb) { text = `F: break into ${rb.name}'s house and rob it`; p.dataset.kind = "rob"; } }
@@ -1812,6 +1817,7 @@ function tick(dt) {
   Cage.update(dt);
   Doors.update(dt);
   Interiors.update(dt);
+  Shopkeep.update();
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 
