@@ -58,12 +58,23 @@
     <label>Language of the menus
       <select id="c-lang"><option value="en">English</option><option value="es">Español</option><option value="it">Italiano</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select>
     </label>
+    <label>Money in the game <small>(the game's play money: a made-up one by default, so nothing is confused with real money)</small>
+      <select id="c-cur"><option value="aspcgua">aspcgua (made up)</option><option value="denarii">denarii (the Roman coin)</option></select>
+    </label>
     <label>Start at a sight <small>(optional: the class begins there, in front of it)</small>
       <select id="c-at"><option value="">Where the city begins</option></select>
     </label>
     <label>Time of day <small>(optional: the sun and the shops follow it)</small>
       <select id="c-hour"><option value="">As the game has it</option><option value="8">Morning (8:00)</option><option value="12">Noon (12:00)</option><option value="18">Evening (18:00)</option><option value="22">Night (22:00)</option></select>
     </label>
+    <div>
+      <label class="check"><input type="checkbox" id="c-watch"><span>Let me watch what each student does<small>You get a dashboard that shows every student as they play: where they are, the sights they found, the hunt, and a list of what they did.</small></span></label>
+      <div id="c-watch-box" hidden style="margin-top:10px;display:grid;gap:8px">
+        <p class="muted" style="margin:0">Students see "your teacher can see your progress" at the bottom of their screen. What is sent: the name they chose for their character, the city, their money, the sights found, a few counts and short lines like "found the Pantheon". Never chat and never anything typed. It is kept in memory on the game server for at most ten hours and never saved. <b>If you teach children, check that your school allows this before you turn it on.</b></p>
+        <div class="row"><a class="btn big" id="c-dash" href="#" target="_blank" rel="noopener">📊 Open the class dashboard</a><button type="button" id="c-newclass">Start a new class</button></div>
+        <p class="muted" style="margin:0"><small>The dashboard link holds your secret key: keep it to yourself. Opening it again later, on this computer, shows the same class. "Start a new class" makes a fresh key, so students of the old link are no longer shown.</small></p>
+      </div>
+    </div>
     <div>
       <b>Scavenger hunt</b> <small class="muted">(optional: tick the sights the students must find. A checklist shows on their screen, and when they have found them all they get a finished screen with their name, the time and a code to show you.)</small>
       <div id="c-hunt"></div>
@@ -114,7 +125,7 @@
 
   <p><a href="./">← Back to the game</a></p>
 </main>
-<script src="classcode.js?v=490"></script>
-<script src="class.js?v=490"></script>
+<script src="classcode.js?v=493"></script>
+<script src="class.js?v=493"></script>
 </body>
 </html>

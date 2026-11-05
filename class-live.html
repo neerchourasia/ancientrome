@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Class dashboard</title>
+  <style>
+    :root { --bg: #1c1610; --ink: #f1ead8; --muted: #c9bd9f; --gold: #e2b955; --card: #2a2118; --line: rgba(226,185,85,.35); --ok: #8fd49a; --idle: #c9bd9f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    main { max-width: 1100px; margin: 0 auto; padding: 22px 14px 48px; }
+    h1 { margin: 0 0 4px; font: 700 1.7rem Georgia, serif; }
+    .muted { color: var(--muted); }
+    .bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0 16px; }
+    .pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px; }
+    button { font: 700 .95rem system-ui; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
+    table { border-collapse: collapse; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--gold); font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+    tr.row { cursor: pointer; }
+    tr.row:hover { background: rgba(255,255,255,.04); }
+    .live { color: var(--ok); } .idle { color: var(--idle); }
+    .more td { background: #14100b; }
+    .more ul { margin: 0; padding-left: 18px; }
+    .sights { color: var(--muted); font-size: .85rem; }
+    #msg { min-height: 1.4em; }
+    .err { color: #f0a090; }
+    @media print { button, .bar button { display: none; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Class dashboard</h1>
+  <p class="muted" id="sub">Everything the students in your class do, as it happens. Click a student to see what they did.</p>
+  <div class="bar">
+    <span class="pill" id="count">0 students</span>
+    <span class="pill" id="active">0 active now</span>
+    <span class="pill" id="hunt"></span>
+    <button type="button" id="csv">Download a table (CSV)</button>
+    <button type="button" id="print">Print</button>
+  </div>
+  <p id="msg" class="muted" role="status"></p>
+  <table>
+    <thead><tr><th>Student</th><th>Last seen</th><th>Where</th><th>Sights found</th><th>Hunt</th><th>Shops</th><th>Errands</th><th>Money</th><th>Latest</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="muted" style="margin-top:18px">Students' names are the ones they chose for their character. The game keeps this in memory on its server for at most ten hours after the last report and never saves it. Closing this page does not end the class.</p>
+</main>
+<script src="config.js?v=493"></script>
+<script src="class-live.js?v=493"></script>
+</body>
+</html>

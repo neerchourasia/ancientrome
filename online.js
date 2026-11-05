@@ -406,6 +406,13 @@ const Online = (() => {
     } catch (e) { return { ok: true }; } finally { clearTimeout(timer); }
   }
 
+  // In class mode the one thing sent to the game server is the class report, when the teacher has switched on watching (classreport.js): a name the student chose and what the game knows of their progress
+  function classReport(cid, sid, name, data, events) {
+    if (!URL || !/^[0-9a-f]{8}$/.test(cid || "")) return;
+    const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
+    try { fetch(`${http}/class/report?c=${cid}&s=${sid}&n=${encodeURIComponent(name)}&d=${encodeURIComponent(JSON.stringify(data))}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
+  }
+
   function walkTick(dt) {
     walkSendT -= dt;
     if (walkSendT > 0) return;
@@ -702,5 +709,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, classReport, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

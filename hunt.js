@@ -57,5 +57,5 @@ const Hunt = (() => {
     if (!doneAt && found().length === ids.length) finish();
   }
   const reopen = () => { if (doneAt) finish(); };
-  return { start, update, reopen, get active() { return ids.length > 0; }, get done() { return !!doneAt; } };
+  return { start, update, reopen, get progress() { return ids.length ? { n: found().length, of: ids.length, done: doneAt ? Math.round((doneAt - t0) / 1000) : 0 } : null; }, get active() { return ids.length > 0; }, get done() { return !!doneAt; } };
 })();

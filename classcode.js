@@ -1,7 +1,8 @@
 "use strict";
 // Class codes: a short code that carries the options of a class link (Latin names, fights, era, city, language, start sight, hour, scavenger-hunt sights), so a teacher can give the class a code to type
 // into the box on the front page instead of a link. There is no server to look a code up in, so the code IS the options: 24 bits of settings, then 7 bits for each sight of the hunt, written in
-// base 32 (digits and letters without I, L, O and U, so it is easy to read out), in groups of five, with a last character that catches a typing mistake. The class name is not in the code.
+// base 32 (digits and letters without I, L, O and U, so it is easy to read out), in groups of five, with a last character that catches a typing mistake. After the hunt come 3 bits for the currency
+// of the class and, when the teacher watches the class, the class id (1 flag bit and 32 bits). The class name is not in the code.
 // The list of sights below must never be reordered (codes in use would change meaning): new sights go at the end. Used by class.html (makes the code) and index.html (the box that takes it).
 
 const ClassCode = (() => {
@@ -14,6 +15,7 @@ const ClassCode = (() => {
     "Beijing": [["b-tiananmen", "Tiananmen, the Gate of Heavenly Peace"], ["b-meridian", "The Meridian Gate"], ["b-harmony", "Hall of Supreme Harmony"], ["b-jingshan", "Jingshan Hill"], ["b-heaven", "Temple of Heaven"], ["b-drum", "The Drum Tower"], ["b-bell", "The Bell Tower"], ["b-hutong", "The Hutongs"], ["b-summer", "The Summer Palace"], ["b-lake", "Kunming Lake"], ["b-bridge", "The Seventeen-Arch Bridge"], ["b-wall", "The Great Wall at Badaling"], ["b-square", "Tiananmen Square (today)"], ["b-cbd", "The CBD towers (today)"]],
   };
   const IDS = Object.values(GROUPS).flat().map((s) => s[0]);
+  const CURRENCIES = ["aspcgua", "denarii"];             // (the money of a class: the first is the made-up default; the second is the game's own denarii. Add new ones at the end only.)
 
   const check = (vals) => vals.reduce((a, v, i) => (a + v * (2 * i + 1)) % 32, 0);               // (odd weights: any one wrong character is always caught)
   function encode(o) {
@@ -24,6 +26,8 @@ const ClassCode = (() => {
     put(o.hour === null || o.hour === undefined || o.hour === "" ? 0 : (Math.round(Number(o.hour)) % 24) + 1, 5);
     put(o.at && IDS.indexOf(o.at) >= 0 ? IDS.indexOf(o.at) + 1 : 0, 7);
     put(hunt.length, 4); for (const i of hunt) put(i + 1, 7);
+    put(Math.max(0, CURRENCIES.indexOf(o.cur)), 3);
+    if (/^[0-9a-f]{8}$/.test(o.cid || "")) { put(1, 1); for (let i = 0; i < 8; i++) put(parseInt(o.cid[i], 16), 4); } else put(0, 1);
     while (bits.length % 5) bits.push(0);
     const vals = []; for (let i = 0; i < bits.length; i += 5) vals.push(bits.slice(i, i + 5).reduce((a, b) => a * 2 + b, 0));
     vals.push(check(vals));
@@ -47,6 +51,8 @@ const ClassCode = (() => {
     const at = get(7); o.at = at === 0 ? "" : IDS[at - 1]; if (at > IDS.length) return null;
     const n = get(4); if (n > 12 || bits.length < pos + n * 7) return null;
     o.hunt = []; for (let i = 0; i < n; i++) { const k = get(7); if (k < 1 || k > IDS.length) return null; o.hunt.push(IDS[k - 1]); }
+    o.cur = CURRENCIES[get(3)] || CURRENCIES[0];
+    o.cid = ""; if (get(1) && bits.length >= pos + 32) for (let i = 0; i < 8; i++) o.cid += get(4).toString(16);
     return o;
   }
   // the link for some options: the class name is shown on the screen; options are only added when they differ from what a link starts with
@@ -61,6 +67,8 @@ const ClassCode = (() => {
     if (o.at) p.set("at", o.at);
     if (o.hour !== null && o.hour !== undefined && o.hour !== "") p.set("hour", String(o.hour));
     if (o.hunt && o.hunt.length) p.set("hunt", o.hunt.join(","));
+    if (o.cur === "denarii") p.set("cur", "denarii");
+    if (/^[0-9a-f]{8}$/.test(o.cid || "")) p.set("cid", o.cid);
     return p.toString().replace(/%2C/g, ",");
   }
 
@@ -78,5 +86,5 @@ const ClassCode = (() => {
     input.addEventListener("input", () => { msg.textContent = ""; });
   }
   if (typeof document !== "undefined") { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind); else bind(); }
-  return { encode, decode, query, GROUPS, IDS };
+  return { encode, decode, query, GROUPS, IDS, CURRENCIES };
 })();

@@ -198,6 +198,54 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.3)
         self.assertFalse(server.BLOCKED.get(vid_b))
 
+    async def http_get(self, path):
+        r, w = await asyncio.open_connection("127.0.0.1", self.port)
+        w.write(("GET %s HTTP/1.1\r\nHost: x\r\n\r\n" % path).encode())
+        raw = (await r.read()).decode()
+        w.close()
+        return raw
+
+    async def test_a_teacher_sees_the_students_of_a_class_and_nobody_else_does(self):
+        server.CLASSES.clear(); server.CLASS_HITS.clear()
+        self.addCleanup(server.CLASSES.clear)
+        key = "0123456789abcdef0123456789abcdef"
+        cid = hashlib.sha256(key.encode()).hexdigest()[:8]
+        data = json.dumps({"city": "rome", "era": "ancient", "coins": 120, "shops": 3, "errands": 1, "crafted": 0, "ach": 2, "sights": ["forum", "pantheon", "x" * 60], "hunt": {"n": 1, "of": 3, "done": 0}})
+        ev = json.dumps(["found The Pantheon", "walked into Pistrinum <script>"])
+        q = lambda sid, name, d=data, e=ev: "/class/report?c=%s&s=%s&n=%s&d=%s&e=%s" % (cid, sid, urllib.parse.quote(name), urllib.parse.quote(d), urllib.parse.quote(e))
+        self.assertIn("204", await self.http_get(q("a" * 12, "Maria")))
+        self.assertIn("204", await self.http_get(q("b" * 12, "Ben", data, "[]")))
+        raw = await self.http_get("/class/view?c=%s&k=%s" % (cid, key))
+        self.assertIn("200 OK", raw)
+        view = json.loads(raw.split("\r\n\r\n", 1)[1])
+        self.assertEqual([s["name"] for s in view["students"]], ["Ben", "Maria"])
+        maria = view["students"][1]
+        self.assertEqual((maria["city"], maria["coins"], maria["shops"], maria["hunt"]), ("rome", 120, 3, {"n": 1, "of": 3, "done": 0}))
+        self.assertEqual(maria["sights"][:2], ["forum", "pantheon"])
+        self.assertEqual(len(maria["sights"][2]), 24)                                      # long values are cut
+        self.assertEqual([e["text"] for e in maria["events"]], ["found The Pantheon", "walked into Pistrinum script"])   # odd characters are stripped
+        # the wrong key, a key for another class, and bad ids see or change nothing
+        self.assertIn("403", await self.http_get("/class/view?c=%s&k=%s" % (cid, "f" * 32)))
+        self.assertIn("403", await self.http_get("/class/view?c=%s&k=%s" % ("12345678", key)))
+        self.assertIn("400", await self.http_get("/class/report?c=%s&s=zz&n=Eve&d=%%7B%%7D&e=%%5B%%5D" % cid))
+        self.assertIn("400", await self.http_get("/class/report?c=nothex12&s=%s&n=Eve&d=%%7B%%7D&e=%%5B%%5D" % ("c" * 12)))
+        # a second report from the same student updates them (after a moment); a flood of reports is ignored
+        server.CLASSES[cid]["s"]["a" * 12]["at"] -= 5
+        self.assertTrue(server.class_report(cid, "a" * 12, "Maria", {"coins": 500, "sights": ["forum"]}, ["done"]))
+        self.assertEqual(server.CLASSES[cid]["s"]["a" * 12]["coins"], 500)
+        self.assertTrue(server.class_report(cid, "a" * 12, "Maria", {"coins": 9}, []))
+        self.assertEqual(server.CLASSES[cid]["s"]["a" * 12]["coins"], 500)               # (too soon: ignored)
+        # classes are forgotten after ten hours, and a class holds only so many students
+        with mock.patch.object(server, "now", return_value=server.now() + server.CLASS_TTL + 10):
+            self.assertEqual(server.class_view(cid, key), {"students": []})
+            server.class_prune(server.now())
+            self.assertNotIn(cid, server.CLASSES)
+        for i in range(server.CLASS_STUDENTS):
+            server.class_report(cid, "%012x" % (i + 1), "S%d" % i, {}, [])
+        self.assertFalse(server.class_report(cid, "f" * 12, "One more", {}, []))
+        # nothing about a class is written to the saved world
+        self.assertNotIn("class", json.dumps(list(server.world_snapshot().keys())))
+
     async def test_user_journey_is_recorded_and_only_admins_can_read_it(self):
         vid = "c" * 32
         server.JOURNEYS.clear(); server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear(); server.JOURNEY_HITS.clear()

@@ -2,7 +2,7 @@
 // Languages: 🌐 in the menu (Settings) and at the top of the front page. Spanish, Italian, Hindi and Chinese for the menu, the panel headings, the front page and the most common buttons and
 // messages. Nothing in the game's own code changes: this file walks the page, and wherever a piece of text (or a tooltip) is exactly one of the English phrases in the table below it shows the
 // translation instead; a MutationObserver does the same for text the game adds later (toasts, panels). Anything not in the table stays in English, and so do the long help texts and the guide.
-// The choice is kept in the browser (rome-lang). English is the default, and while English is on this file does nothing at all.
+// The choice is kept in the browser (rome-lang). English is the default; the only thing this file then does is swap the word for the game's money (see curFix).
 // Each row of ROWS is [English, Spanish, Italian, Hindi, Chinese]; the English text must be exactly what the page shows (spaces collapsed). To add a phrase, add a row.
 
 const I18n = (() => {
@@ -558,6 +558,8 @@ const I18n = (() => {
     ["Have a class code?", "¿Tienes un código de clase?", "Hai un codice della classe?", "क्या आपके पास कक्षा का कोड है?", "有课堂代码吗?"],
     ["Join class", "Unirse a la clase", "Unisciti alla classe", "कक्षा में शामिल हों", "加入课堂"],
     ["That code does not look right. Check it and try again.", "Ese código no parece correcto. Revísalo e inténtalo de nuevo.", "Quel codice non sembra giusto. Controllalo e riprova.", "यह कोड सही नहीं लगता। जाँचकर फिर से कोशिश करें।", "这个代码好像不对。请检查后再试一次。"],
+    // the class report notice
+    ["Class mode: {0} · your teacher can see your progress", "Modo clase: {0} · tu profesor puede ver tu progreso", "Modalità classe: {0} · il tuo insegnante può vedere i tuoi progressi", "कक्षा मोड: {0} · आपके शिक्षक आपकी प्रगति देख सकते हैं", "课堂模式:{0} · 老师可以看到你的进度"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [
@@ -599,8 +601,14 @@ const I18n = (() => {
   const ATTRS = ["title", "placeholder", "aria-label"];
 
   const latinOn = () => typeof Latin !== "undefined" && Latin.on;                    // (Latin names for Rome: latin.js)
+  // The game's money is called something that does not exist: aspcgua (one word for one and for many). Wherever the page says denarii (or denarius, denarios, denari, दीनार, 第纳尔) it shows aspcgua instead, in every
+  // language and in every mode, unless a class link says cur=denarii. The two lines that are about the real Roman coin (the denarius souvenir) are left as they are.
+  const REAL_COIN = ["A silver denarius", "about one denarius"];
+  const curName = () => (typeof CLASSMODE !== "undefined" && CLASSMODE.on && CLASSMODE.cur === "denarii" ? "" : "aspcgua");
+  const curFix = (s) => { const c = curName(); return c && !REAL_COIN.some((r) => s.includes(r)) ? s.replace(/\bdenari(?:us|i|os)?\b/gi, c).replace(/दीनार|第纳尔/g, c) : s; };
+  const active = () => lang !== "en" || latinOn() || !!curName();
   function translate(src) {
-    if (lang === "en" && !latinOn()) return src;
+    if (!active()) return src;
     const key = src.replace(/\s+/g, " ").trim();
     if (!key) return src;
     let out = latinOn() ? Latin.map(key) : undefined;
@@ -608,8 +616,8 @@ const I18n = (() => {
     if (out === undefined && lang !== "en") {
       for (const [re, t] of PATTERNS) if (re.test(key)) { out = key.replace(re, t[lang]); break; }
     }
-    if (out === undefined) return src;
-    return (src.match(/^\s*/) || [""])[0] + out + (src.match(/\s*$/) || [""])[0];
+    if (out === undefined) { const fixed = curFix(src); return fixed; }
+    return (src.match(/^\s*/) || [""])[0] + curFix(out) + (src.match(/\s*$/) || [""])[0];
   }
 
   function doText(node) {
@@ -638,7 +646,7 @@ const I18n = (() => {
     for (const n of nodes) if (n.isConnected !== false) walk(n);
   }
   function watch() {
-    if (obs || (lang === "en" && !latinOn())) return;
+    if (obs || !active()) return;
     obs = new MutationObserver((list) => {                  // (at once, before the next frame is drawn, so no English flashes up first)
       for (const r of list) {
         if (r.type === "childList") for (const n of r.addedNodes) queue.add(n);
@@ -655,9 +663,9 @@ const I18n = (() => {
     try { localStorage.setItem(KEY, l); } catch (e) { /* ignore */ }
     document.documentElement.lang = l;
     for (const s of document.querySelectorAll(".lang-select")) s.value = l;
-    if (l === "en" && !latinOn()) { if (obs) { obs.disconnect(); obs = null; } }
+    if (!active()) { if (obs) { obs.disconnect(); obs = null; } }
     walk(document.body);                                    // (English puts the originals back, because the page's own text is the source)
-    if (l !== "en" || latinOn()) watch();
+    if (active()) watch();
   }
   function refresh() { set(lang); }                         // (after Latin names are switched on or off)
 

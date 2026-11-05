@@ -398,7 +398,7 @@ const Account = (() => {
   // players, chat and the game server stay off.
   function startClass(c) {
     demo = true; classMode = true; demoOver = false; clearInterval(demoTimer);
-    const bar = $a("demo-bar"), t = c && c.name ? (typeof I18n !== "undefined" ? I18n.t("Class mode: {0} · not saved · other players are off").replace("{0}", c.name) : `Class mode: ${c.name} · not saved · other players are off`) : (typeof I18n !== "undefined" ? I18n.t("Class mode · not saved · other players are off") : "Class mode · not saved · other players are off");
+    const watched = !!(c && c.cid), bar = $a("demo-bar"), t = watched ? (typeof I18n !== "undefined" ? I18n.t("Class mode: {0} · your teacher can see your progress") : "Class mode: {0} · your teacher can see your progress").replace("{0}", c.name || "Class") : c && c.name ? (typeof I18n !== "undefined" ? I18n.t("Class mode: {0} · not saved · other players are off").replace("{0}", c.name) : `Class mode: ${c.name} · not saved · other players are off`) : (typeof I18n !== "undefined" ? I18n.t("Class mode · not saved · other players are off") : "Class mode · not saved · other players are off");
     $a("demo-text").textContent = t; $a("demo-login").hidden = true; $a("btn-account").hidden = true; bar.hidden = false;
     return true;
   }

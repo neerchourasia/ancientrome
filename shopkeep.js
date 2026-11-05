@@ -272,6 +272,7 @@ const Shopkeep = (() => {
     const e = st.errand; if (!e || e.shop !== shop.id || owns(e.good) < e.n) return;
     const pay = Math.round(e.reward * (1 + 0.05 * repOf(shop.id)));
     st.inv[e.good] = owns(e.good) - e.n; if (!st.inv[e.good]) delete st.inv[e.good];
+    if (typeof ClassReport !== "undefined") ClassReport.note(`did an errand for a ${shop.kindName.toLowerCase()}`);
     Vitals.coins += pay; st.errand = null; st.done++; st.rep[shop.id] = (st.rep[shop.id] || 0) + Math.round(pay / 2); Sfx.play("coin"); save();
     if (typeof Online !== "undefined" && Online.connected) Online.navalSend({ t: "errand" });
     say(T_("Thank you! Here are {0} denarii. Errands done: {1}", pay, st.done));

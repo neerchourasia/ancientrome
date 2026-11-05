@@ -2,6 +2,12 @@
 // The teacher page (class.html): builds the class link from the options and copies it.
 (() => {
   const $ = (id) => document.getElementById(id);
+  // the class key (secret: only the teacher's browser and the dashboard link have it) and the class id (the first 8 hex digits of its sha256: the server checks the key against it)
+  let key = "", cid = "";
+  try { key = localStorage.getItem("rome-class-key") || ""; } catch (e) { /* storage unavailable */ }
+  const newKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  const sha8 = async (k) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(k))), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 8);
+  async function setKey(k) { key = k; try { localStorage.setItem("rome-class-key", k); } catch (e) { /* ignore */ } cid = await sha8(k); show(); }
   const SIGHTS = ClassCode.GROUPS;                                   // (the sights, by city: classcode.js)
   for (const [city, list] of Object.entries(SIGHTS)) {
     const grp = document.createElement("optgroup"); grp.label = city;
@@ -19,7 +25,7 @@
   }
 
   function options() {
-    return { latin: $("c-latin").checked, fights: $("c-fights").checked, city: $("c-city").value, era: $("c-era").value, lang: $("c-lang").value, at: $("c-at").value, hour: $("c-hour").value === "" ? null : Number($("c-hour").value), hunt: [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12) };
+    return { cur: $("c-cur").value, cid: $("c-watch").checked ? cid : "", latin: $("c-latin").checked, fights: $("c-fights").checked, city: $("c-city").value, era: $("c-era").value, lang: $("c-lang").value, at: $("c-at").value, hour: $("c-hour").value === "" ? null : Number($("c-hour").value), hunt: [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12) };
   }
   function link() {
     const p = new URLSearchParams();
@@ -31,6 +37,8 @@
     if ($("c-lang").value !== "en") p.set("lang", $("c-lang").value);
     if ($("c-at").value) p.set("at", $("c-at").value);
     if ($("c-hour").value) p.set("hour", $("c-hour").value);
+    if ($("c-cur").value === "denarii") p.set("cur", "denarii");
+    if ($("c-watch").checked && cid) p.set("cid", cid);
     const hunt = [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12);
     if (hunt.length) p.set("hunt", hunt.join(","));
     return `${location.origin}${location.pathname.replace(/[^/]*$/, "")}?${p.toString().replace(/%2C/g, ",")}`;
@@ -40,8 +48,11 @@
     for (const b of document.querySelectorAll(".c-hunt-box:not(:checked)")) b.disabled = n >= 12;        // (up to 12 sights)
     const l = link(); $("c-link").textContent = l; $("c-open").href = l; $("c-msg").textContent = "";
     $("c-code").textContent = ClassCode.encode(options());
+    $("c-watch-box").hidden = !$("c-watch").checked;
+    if (key && cid) $("c-dash").href = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}class-live.html#c=${cid}&k=${key}`;
   }
-  for (const id of ["c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
+  $("c-newclass").addEventListener("click", () => { setKey(newKey()); $("c-msg").textContent = "A new class has been started."; });
+  for (const id of ["c-cur", "c-watch", "c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
   $("c-copy").addEventListener("click", async () => {
     const l = link();
     try { await navigator.clipboard.writeText(l); $("c-msg").textContent = "Copied."; }
@@ -50,5 +61,5 @@
   $("c-copycode").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("c-code").textContent); $("c-msg").textContent = "Code copied."; } catch (e) { $("c-msg").textContent = "Select the code and copy it (Ctrl+C)."; }
   });
-  show();
+  (async () => { if (!/^[0-9a-f]{32}$/.test(key)) { key = newKey(); try { localStorage.setItem("rome-class-key", key); } catch (e) { /* ignore */ } } cid = await sha8(key); show(); })();
 })();
