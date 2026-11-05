@@ -23,7 +23,7 @@ const Online = (() => {
   let noConnectUntil = 0;                                   // after a kick or a block the browser stops trying to come back
   function connect() {
     if (!URL || Date.now() < noConnectUntil) return;
-    if (typeof Account !== "undefined" && Account.demo) { setMsg("Online play needs an account: log in to play with other people."); return; }   // the demo is offline
+    if (typeof Account !== "undefined" && Account.demo) { setMsg(Account.why("Online play needs an account: log in to play with other people.")); return; }   // the demo is offline
     const key = [accountToken(), Character.name, Character.cls, JSON.stringify(Character.look), Market.worn.join(), Market.pet].join("|");
     if (ws && ws.readyState <= 1) {
       if (key === helloKey || duel || waiting) return;   // fine as it is
@@ -196,22 +196,22 @@ const Online = (() => {
   // standing at the xiangqi pavilion in Beijing: F starts a game against a practice bot at once
   const atXiangqi = () => city === "beijing" && mode === "walk" && !panelOpen && typeof started !== "undefined" && started && !waiting && Beijing.atXiangqi();
   function playXiangqi() {
-    if (typeof Account !== "undefined" && Account.demo) { toast("Xiangqi against others (or the bot) needs the game server, so it needs an account: log in first."); return; }
+    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("Xiangqi against others (or the bot) needs the game server, so it needs an account: log in first.")); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
     send({ t: "queue", mode: "xiangqi", bot: true, practice: true });
   }
   function playWushu() {
-    if (typeof Account !== "undefined" && Account.demo) { toast("The wushu bout needs the game server, so it needs an account: log in first."); return; }
+    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("The wushu bout needs the game server, so it needs an account: log in first.")); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
     send({ t: "queue", mode: "wushu", bot: true, practice: true });
   }
   function playDragon() {
-    if (typeof Account !== "undefined" && Account.demo) { toast("The dragon boat race needs the game server, so it needs an account: log in first."); return; }
+    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("The dragon boat race needs the game server, so it needs an account: log in first.")); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
     send({ t: "queue", mode: "dragon", bot: true, practice: true });
   }
   function playBall() {
-    if (typeof Account !== "undefined" && Account.demo) { toast("Pok-ta-pok needs the game server, so it needs an account: log in first."); return; }
+    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("Pok-ta-pok needs the game server, so it needs an account: log in first.")); return; }
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
     send({ t: "queue", mode: "ball", bot: true, practice: true });      // a practice game against a bot at once (play real people from the PvP menu)
   }

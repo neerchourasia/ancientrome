@@ -13,7 +13,7 @@ const Interiors = (() => {
     { name: "Bakery", trade: "food", keeper: "The baker", line: "Fresh bread, friend! Come back when you are hungry.", counter: 0xb5835a, goods: [0xe0b26a, 0xc98b46, 0xf0d9a0], sign: "#8c5a2b" },
     { name: "Tavern", trade: "food", late: true, keeper: "The innkeeper", line: "Wine from the hills and a warm seat. Sit as long as you like.", counter: 0x6b4a2b, goods: [0x7a2d3a, 0x5b2230, 0xb0884a], sign: "#6a2630" },
     { name: "Workshop", trade: "goods", keeper: "The smith", line: "Mind the tools. Everything here is made by hand.", counter: 0x7a6a58, goods: [0x8a8a8a, 0x5d5d5d, 0xa0a0a0], sign: "#444a50" },
-    { name: "Cloth shop", trade: "clothes", keeper: "The weaver", line: "Wool, linen and the best dyes in the district.", counter: 0x9a7a5a, goods: [0x9c3a2e, 0x2f5f8f, 0xd9b44a], sign: "#7a3b6a" },
+    { name: "Cloth shop", trade: "clothes", keeper: "The clothier", line: "Wool, linen and the best dyes in the district.", counter: 0x9a7a5a, goods: [0x9c3a2e, 0x2f5f8f, 0xd9b44a], sign: "#7a3b6a" },
     { name: "Oil seller", trade: "goods", keeper: "The merchant", line: "Olive oil by the jar. Taste it: you will not find better.", counter: 0xa08050, goods: [0xb7a23a, 0x8a7a2a, 0xcfc060], sign: "#6a6a2a" },
     { name: "Potter", trade: "goods", keeper: "The potter", line: "Jars, lamps and cups. Every one is different.", counter: 0x8a6a4a, goods: [0xc4673c, 0xa94f2c, 0xd98b5a], sign: "#9a4a2a" },
   ];
@@ -230,10 +230,10 @@ const Interiors = (() => {
       return { fig: f, seat: -1, sit: false, along: sp.along, depth: sp.depth, yaw: sp.yaw, state: "away", path: [], pi: 0, x: 0, z: 0, ph: ci * 2 };
     });
     // the sign over the door, outside
-    const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.72), new THREE.MeshBasicMaterial({ map: signTexture(tr(kind.name), kind.sign) }));
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.72), new THREE.MeshBasicMaterial({ map: signTexture((typeof Latin !== "undefined" && Latin.sign(kind.name)) || tr(kind.name), kind.sign) }));
     sg.position.set(side === "E" ? x1 + 0.03 : side === "W" ? x0 - 0.03 : b.x, ext && ext.signY ? ext.signY : Math.min(3.55, top - 0.4), side === "S" ? z1 + 0.03 : side === "N" ? z0 - 0.03 : b.z);
     sg.rotation.y = side === "S" ? 0 : side === "N" ? Math.PI : side === "E" ? Math.PI / 2 : -Math.PI / 2;
-    g.add(sg);
+    g.add(sg); p.sg = sg;
     p.winMat = new THREE.MeshBasicMaterial({ color: 0x2a2418 });                                         // two windows beside the door: dark by day, lit at night when the shop is open
     const wallLen = side === "N" || side === "S" ? b.w : b.d;
     if (wallLen >= DOOR_W + 4.6) for (const k of [-1, 1]) {
@@ -340,6 +340,10 @@ const Interiors = (() => {
     }
     return null;
   }
+  // (the signs are drawn when a shop is built: after Latin names are switched on or off they are drawn again)
+  function refreshSigns() {
+    for (const p of picked) if (p.built && p.sg) { const old = p.sg.material.map; p.sg.material.map = signTexture((typeof Latin !== "undefined" && Latin.sign(p.kind.name)) || tr(p.kind.name), p.kind.sign); p.sg.material.needsUpdate = true; if (old) old.dispose(); }
+  }
   const insideShop = () => { const p = picked.find((q) => q.built && q.inside && q.open); return p ? info(p) : null; };       // the open shop you are in, if any
   const info = (p) => ({ p, id: (p.ext ? p.idk : "rome") + "#" + p.i, name: p.kind.name, keeper: p.kind.keeper, line: p.kind.line, trade: p.kind.trade, city: CITY_OF[p.ext ? p.ext.kinds : "rome"] });
   // the kinds of shop there are in a city in the era you are in (for the errands the keepers ask of you)
@@ -355,5 +359,5 @@ const Interiors = (() => {
     return best;
   }
 
-  return { setup, register, addHouse, update, setEra, picked: () => picked, keeperNear, seatNear, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
+  return { setup, register, addHouse, refreshSigns, update, setEra, picked: () => picked, keeperNear, seatNear, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
 })();

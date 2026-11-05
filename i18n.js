@@ -540,6 +540,12 @@ const I18n = (() => {
     ["Ritual knife", "Cuchillo ritual", "Coltello rituale", "अनुष्ठान की छुरी", "祭祀刀"],
     ["Scholar's set", "Juego del erudito", "Set dello studioso", "विद्वान का सेट", "文房四宝套装"],
     ["Tea gift set", "Set de regalo de té", "Set regalo di tè", "चाय उपहार सेट", "茶具礼盒"],
+    ["The clothier", "El comerciante de ropa", "Il commerciante di abiti", "कपड़ा व्यापारी", "衣料商"],
+    ["Class mode: {0} · not saved · other players are off", "Modo clase: {0} · no se guarda · los otros jugadores están desactivados", "Modalità classe: {0} · non viene salvato · gli altri giocatori sono disattivati", "कक्षा मोड: {0} · सहेजा नहीं जाता · दूसरे खिलाड़ी बंद हैं", "课堂模式:{0} · 不保存 · 其他玩家已关闭"],
+    ["Class mode · not saved · other players are off", "Modo clase · no se guarda · los otros jugadores están desactivados", "Modalità classe · non viene salvato · gli altri giocatori sono disattivati", "कक्षा मोड · सहेजा नहीं जाता · दूसरे खिलाड़ी बंद हैं", "课堂模式 · 不保存 · 其他玩家已关闭"],
+    ["🏛️ Latin names", "🏛️ Nombres en latín", "🏛️ Nomi in latino", "🏛️ लैटिन नाम", "🏛️ 拉丁语名称"],
+    ["Other players and the game server are off in class mode.", "Los otros jugadores y el servidor del juego están desactivados en el modo clase.", "Gli altri giocatori e il server di gioco sono disattivati nella modalità classe.", "कक्षा मोड में दूसरे खिलाड़ी और गेम सर्वर बंद हैं।", "课堂模式下其他玩家和游戏服务器都已关闭。"],
+    ["The arena fights are switched off in this class.", "Los combates de la arena están desactivados en esta clase.", "I combattimenti nell'arena sono disattivati in questa classe.", "इस कक्षा में अखाड़े की लड़ाइयाँ बंद हैं।", "本课堂已关闭竞技场战斗。"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [
@@ -580,12 +586,14 @@ const I18n = (() => {
   const textMeta = new WeakMap(), attrMeta = new WeakMap();          // node -> { src (the English), out (what we put there) }
   const ATTRS = ["title", "placeholder", "aria-label"];
 
+  const latinOn = () => typeof Latin !== "undefined" && Latin.on;                    // (Latin names for Rome: latin.js)
   function translate(src) {
-    if (lang === "en") return src;
+    if (lang === "en" && !latinOn()) return src;
     const key = src.replace(/\s+/g, " ").trim();
     if (!key) return src;
-    let out = maps[lang].get(key);
-    if (out === undefined) {
+    let out = latinOn() ? Latin.map(key) : undefined;
+    if (out === undefined && lang !== "en") out = maps[lang].get(key);
+    if (out === undefined && lang !== "en") {
       for (const [re, t] of PATTERNS) if (re.test(key)) { out = key.replace(re, t[lang]); break; }
     }
     if (out === undefined) return src;
@@ -618,7 +626,7 @@ const I18n = (() => {
     for (const n of nodes) if (n.isConnected !== false) walk(n);
   }
   function watch() {
-    if (obs || lang === "en") return;
+    if (obs || (lang === "en" && !latinOn())) return;
     obs = new MutationObserver((list) => {                  // (at once, before the next frame is drawn, so no English flashes up first)
       for (const r of list) {
         if (r.type === "childList") for (const n of r.addedNodes) queue.add(n);
@@ -635,10 +643,11 @@ const I18n = (() => {
     try { localStorage.setItem(KEY, l); } catch (e) { /* ignore */ }
     document.documentElement.lang = l;
     for (const s of document.querySelectorAll(".lang-select")) s.value = l;
-    if (l === "en") { if (obs) { obs.disconnect(); obs = null; } }
+    if (l === "en" && !latinOn()) { if (obs) { obs.disconnect(); obs = null; } }
     walk(document.body);                                    // (English puts the originals back, because the page's own text is the source)
-    if (l !== "en") watch();
+    if (l !== "en" || latinOn()) watch();
   }
+  function refresh() { set(lang); }                         // (after Latin names are switched on or off)
 
   function init() {
     let saved = "en";
@@ -650,5 +659,5 @@ const I18n = (() => {
     set(saved);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-  return { set, t: translate, get lang() { return lang; }, rows: ROWS.length };
+  return { set, refresh, t: translate, get lang() { return lang; }, rows: ROWS.length };
 })();

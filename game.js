@@ -311,6 +311,20 @@ function wireInput(canvas) {
   for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
   for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startDemo()) begin(); else Account.gate(begin); });
   $("#demo-login").addEventListener("click", () => Account.open());
+  // class mode: a teacher's link (classmode.js) starts the game at once, with no login; the options in the link are applied once the student has made a character
+  if (window.CLASSMODE && CLASSMODE.on) {
+    Account.startClass(CLASSMODE); begin();
+    const lb = $("#class-latin");
+    if (lb) { lb.hidden = false; lb.classList.toggle("on", Latin.on); lb.addEventListener("click", () => { Latin.set(!Latin.on); lb.classList.toggle("on", Latin.on); }); }
+    let tries = 0;
+    const iv = setInterval(() => {
+      if (++tries > 600) { clearInterval(iv); return; }
+      if (!started || !Character.exists || creatorOpen) return;
+      clearInterval(iv);
+      if (CLASSMODE.era === "modern" && era !== "modern") toggleEra();
+      if (CLASSMODE.city !== "rome") arriveIn(CLASSMODE.city, null);
+    }, 500);
+  }
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);

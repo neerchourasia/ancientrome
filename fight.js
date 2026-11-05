@@ -171,6 +171,7 @@ const Fight = (() => {
 
   // opts.lion: only the lion (bow). opts.hunt: an animal hunt (boar, leopard, bear, then the lion). Otherwise three gladiators.
   function start(opts = {}) {
+    if (typeof CLASSMODE !== "undefined" && CLASSMODE.on && !CLASSMODE.fights) { toast(typeof I18n !== "undefined" ? I18n.t("The arena fights are switched off in this class.") : "The arena fights are switched off in this class."); return; }
     if (active) return;
     if (opts.trial) Vitals.hp = Math.max(Vitals.hp, 60); // the guards give you water and a rag for your wounds
     if (!opts.trial && !Vitals.canFight()) {

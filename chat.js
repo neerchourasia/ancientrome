@@ -73,7 +73,7 @@ const Chat = (() => {
   async function sendPic(file) {
     if (!file || !/^image\//.test(file.type)) { add({ sys: 1, text: "That is not a picture." }); return; }
     if (!Account.loggedIn) { add({ sys: 1, text: "Log in to your account to send pictures." }); return; }
-    if (!Online.connected) { add({ sys: 1, text: (Account.demo ? "Chat needs an account: log in to talk to other players." : "Not connected to the game server yet. Try again in a moment.") }); return; }
+    if (!Online.connected) { add({ sys: 1, text: (Account.demo ? Account.why("Chat needs an account: log in to talk to other players.") : "Not connected to the game server yet. Try again in a moment.") }); return; }
     try {
       const pic = await shrink(file);
       if (!pic) { add({ sys: 1, text: "That picture could not be made small enough." }); return; }
@@ -119,7 +119,7 @@ const Chat = (() => {
     const input = $c("chat-input"), text = input.value.trim();
     input.value = "";
     if (!text) { closeChat(); return; }   // Enter on an empty line closes the chat
-    if (!Online.connected) add({ sys: 1, text: (Account.demo ? "Chat needs an account: log in to talk to other players." : "Not connected to the game server yet. Try again in a moment.") });
+    if (!Online.connected) add({ sys: 1, text: (Account.demo ? Account.why("Chat needs an account: log in to talk to other players.") : "Not connected to the game server yet. Try again in a moment.") });
     else send({ t: "chat", text });
     input.focus();                          // stay open, so you can keep on messaging (Esc or an empty Enter closes it)
   }

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Time Machine for teachers</title>
+  <meta name="description" content="Make a class link for Time Machine: students open it and play at once, with no login, no saving and no other players.">
+  <style>
+    :root { --bg: #1c1610; --ink: #f1ead8; --muted: #c9bd9f; --gold: #e2b955; --card: #2a2118; --line: rgba(226,185,85,.35); }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    main { max-width: 720px; margin: 0 auto; padding: 28px 16px 56px; }
+    h1 { margin: 0 0 6px; font: 700 1.9rem Georgia, serif; }
+    h2 { margin: 28px 0 8px; font: 700 1.25rem Georgia, serif; color: var(--gold); }
+    p, li { color: var(--ink); }
+    .muted { color: var(--muted); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+    label { display: grid; gap: 4px; font-weight: 600; }
+    label small { font-weight: 400; color: var(--muted); }
+    input[type=text], select { font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: #14100b; color: var(--ink); }
+    .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; }
+    .check input { margin-top: 5px; width: 18px; height: 18px; }
+    .check small { display: block; font-weight: 400; color: var(--muted); }
+    .link { word-break: break-all; padding: 12px; border-radius: 8px; background: #14100b; border: 1px dashed var(--gold); font-family: ui-monospace, monospace; font-size: .9rem; }
+    button, .btn { font: 700 1rem system-ui; cursor: pointer; padding: 10px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); text-decoration: none; display: inline-block; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    kbd { background: #14100b; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font-family: ui-monospace, monospace; }
+    a { color: var(--gold); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Time Machine for teachers</h1>
+  <p class="muted">Walk ancient Rome (and Old Delhi, Cancún and Beijing) in 3D, in the browser. Make a link, give it to the class: students open it and play at once.</p>
+
+  <h2>1. Make your class link</h2>
+  <div class="card">
+    <label>Class name <small>(only shown on the screen, at the bottom)</small>
+      <input type="text" id="c-name" maxlength="30" value="Latin 7">
+    </label>
+    <label class="check"><input type="checkbox" id="c-latin" checked><span>Latin names for ancient Rome<small>Landmarks, shops, shopkeepers and what they say, in Latin with the English beside it; the shop signs are Latin only. Students can switch it off in the bar at the bottom.</small></span></label>
+    <label class="check"><input type="checkbox" id="c-fights" checked><span>Gladiator fights allowed<small>Untick to close the arena (the games, the lion and the animal hunt).</small></span></label>
+    <label>Start in <small>(the students make a character first)</small>
+      <select id="c-city"><option value="rome">Rome</option><option value="delhi">Old Delhi</option><option value="cancun">Cancún (Chichén Itzá)</option><option value="beijing">Beijing</option></select>
+    </label>
+    <label>Start in the era
+      <select id="c-era"><option value="ancient">Ancient (Rome in 128 AD)</option><option value="modern">Today</option></select>
+    </label>
+    <label>Language of the menus
+      <select id="c-lang"><option value="en">English</option><option value="es">Español</option><option value="it">Italiano</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select>
+    </label>
+    <div>
+      <div class="link" id="c-link"></div>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="c-copy">Copy link</button>
+        <a class="btn" id="c-open" href="#" target="_blank" rel="noopener">Try it</a>
+        <span id="c-msg" class="muted" role="status"></span>
+      </div>
+    </div>
+  </div>
+
+  <h2>2. What students get</h2>
+  <ul>
+    <li><b>No login.</b> They open the link and make a character (a name and a class).</li>
+    <li><b>Nothing is saved.</b> Each student starts fresh, and the game keeps nothing on the computer after the tab is closed.</li>
+    <li><b>No other players, no chat.</b> Class mode is offline: nobody from outside the class can appear.</li>
+    <li><b>No time limit</b> and no limit on denarii (the game's play money).</li>
+    <li>Works in Chrome, Edge, Firefox and Safari on a laptop. The game needs a keyboard and mouse.</li>
+  </ul>
+
+  <h2>3. Controls</h2>
+  <table>
+    <tr><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>walk (hold <kbd>Shift</kbd> to run)</td></tr>
+    <tr><td>mouse (drag), or <kbd>Q</kbd> <kbd>E</kbd></td><td>look around</td></tr>
+    <tr><td><kbd>C</kbd></td><td>change the camera (first person, behind you, from above)</td></tr>
+    <tr><td><kbd>K</kbd></td><td>switch between ancient and modern</td></tr>
+    <tr><td><kbd>G</kbd></td><td>guide me to the nearest sight I have not seen</td></tr>
+    <tr><td><kbd>F</kbd></td><td>talk to a shopkeeper, sit on a stool, press the button at a place</td></tr>
+    <tr><td><kbd>M</kbd></td><td>the map</td></tr>
+  </table>
+  <p class="muted">Walk up to a shop door and it opens by itself. Every shop has a keeper to talk to (<kbd>F</kbd>), who sells, buys, gives errands and tells you where the nearest sight is.</p>
+
+  <h2>4. Ideas for a lesson</h2>
+  <ul>
+    <li>Find the <b>Forum</b>, the <b>Pantheon</b> and the <b>Colosseum</b>. Read the Pantheon's inscription (<i>M·AGRIPPA·L·F·COS·TERTIVM·FECIT</i>) and translate it.</li>
+    <li>With Latin names on, walk into the shops and read what the keepers say. Translate each line, then check it against the English.</li>
+    <li>Press <kbd>K</kbd> at the same spot to compare the ancient city and today's.</li>
+    <li>Find the places named in a text the class is reading (the Rostra, the Temple of Vesta, the Circus Maximus).</li>
+  </ul>
+  <p class="muted">The Latin in the game is the author's own: please check it before you use it with a class, and tell us what to correct.</p>
+
+  <p><a href="./">← Back to the game</a></p>
+</main>
+<script src="class.js?v=487"></script>
+</body>
+</html>

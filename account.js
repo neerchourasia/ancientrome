@@ -23,7 +23,7 @@ const Account = (() => {
   // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
   let gateOpen = false, gateDone = null, leaving = false;
   // The demo: play without an account. Nothing is saved to an account and the online parts (other players, chat, friends) stay off until someone logs in.
-  let demo = false, demoOver = false, demoTimer = 0, capNoted = 0;
+  let demo = false, demoOver = false, demoTimer = 0, capNoted = 0, classMode = false;
   const DEMO_MS = 10 * 60 * 1000, DEMO_COINS = 1000, DEMO_KEY = "rome-demo-end";
   const GATE_TEXT = "You need an account to play. Log in, or create one in a few seconds: your game is saved to it and follows you to any device.";
   const DEMO_OVER_TEXT = "Your demo has ended. Log in, or create a free account in a few seconds, to keep playing: your game is saved to it and follows you to any device.";
@@ -394,6 +394,14 @@ const Account = (() => {
     renderAccount();
     return true;
   }
+  // Class mode (classmode.js): the demo's offline state without its timer or its limit on denarii, started by a teacher's link. Nothing is saved to an account, there is no login, and the other
+  // players, chat and the game server stay off.
+  function startClass(c) {
+    demo = true; classMode = true; demoOver = false; clearInterval(demoTimer);
+    const bar = $a("demo-bar"), t = c && c.name ? (typeof I18n !== "undefined" ? I18n.t("Class mode: {0} · not saved · other players are off").replace("{0}", c.name) : `Class mode: ${c.name} · not saved · other players are off`) : (typeof I18n !== "undefined" ? I18n.t("Class mode · not saved · other players are off") : "Class mode · not saved · other players are off");
+    $a("demo-text").textContent = t; $a("demo-login").hidden = true; $a("btn-account").hidden = true; bar.hidden = false;
+    return true;
+  }
   function demoCapped() {
     if (Date.now() - capNoted < 20000) return;
     capNoted = Date.now();
@@ -453,7 +461,9 @@ const Account = (() => {
   }
 
   return {
-    configured, bind, open, saveNow, gate, startDemo, demoCapped, DEMO_COINS,
+    configured, bind, open, saveNow, gate, startDemo, startClass, demoCapped, DEMO_COINS,
+    get classMode() { return classMode && !session; },
+    why: (text) => (classMode ? (typeof I18n !== "undefined" ? I18n.t("Other players and the game server are off in class mode.") : "Other players and the game server are off in class mode.") : text),
     get demo() { return demo && !session; },
     get locked() { return gateOpen && configured && !session; },
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),
