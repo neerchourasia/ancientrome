@@ -383,21 +383,22 @@ const Online = (() => {
   }
   // Tell the game server that someone opened the site (once per page load): the admins' visitor list shows when, what kind of device, and the character name if there is one
   function visit() {
-    if (!URL || !visitorId()) return;
+    if (!URL || !visitorId() || classroom()) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
     try { fetch(`${http}/visit?v=${visitorId()}&n=${encodeURIComponent(Character.exists ? Character.name : "")}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   // Tell the game server a few things the visitor did on this visit (the admins' User journey): short lines like "went to Delhi", no chat and nothing typed
   function journey(sid, events) {
-    if (!URL || !visitorId() || !events.length) return;
+    if (!URL || !visitorId() || !events.length || classroom()) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
     try { fetch(`${http}/journey?v=${visitorId()}&s=${sid}&n=${encodeURIComponent(Character.exists ? Character.name : "")}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   // Is this name allowed? The game server checks (and asks an AI as well, when it has one); if it cannot be reached the name is let through here and checked when you connect
+  const classroom = () => typeof CLASSMODE !== "undefined" && CLASSMODE.on;       // class mode (classmode.js): nothing is sent to the game server, not even a character's name
   async function checkName(name) {
-    if (!URL) return { ok: true };
+    if (!URL || classroom()) return { ok: true };
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, ""), ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
     try {
       const r = await fetch(`${http}/name?n=${encodeURIComponent(name)}`, { signal: ctl.signal });

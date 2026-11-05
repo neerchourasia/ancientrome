@@ -102,6 +102,7 @@ const Robbery = (() => {
   // ---------------------------------------------------------------- the door
 
   function at(x, z, feet = 0) {
+    if (typeof CLASSMODE !== "undefined" && CLASSMODE.on) return null;                // (no robbing houses in a class)
     if (feet > 3 || typeof city === "undefined" || city !== "rome" || heist) return null;
     for (let i = 0; i < houses.length; i++) {
       const h = houses[i];

@@ -18,12 +18,12 @@ const Latin = (() => {
   const SHOPS = { "Bakery": "Pistrinum", "Tavern": "Caupona", "Workshop": "Officina", "Cloth shop": "Taberna vestiaria", "Oil seller": "Taberna olearia", "Potter": "Figlina" };
   const KEEPERS = { "The baker": "Pistor", "The innkeeper": "Caupo", "The smith": "Faber", "The clothier": "Vestiarius", "The merchant": "Mercator", "The potter": "Figulus", "The shopkeeper": "Tabernarius" };
   const LINES = {
-    "Fresh bread, friend! Come back when you are hungry.": "Panis recens, amice! Redi, cum esurieris.",
+    "Fresh bread, friend! Come back when you are hungry.": "Panis recens est, amice! Redi, si esuris.",
     "Wine from the hills and a warm seat. Sit as long as you like.": "Vinum e collibus et sedes tepida. Sede quamdiu vis.",
-    "Mind the tools. Everything here is made by hand.": "Cave instrumenta. Omnia hic manu facta sunt.",
-    "Wool, linen and the best dyes in the district.": "Lana, linum et optimi colores huius regionis.",
-    "Olive oil by the jar. Taste it: you will not find better.": "Oleum in amphoris. Gusta: meliorem non invenies.",
-    "Jars, lamps and cups. Every one is different.": "Ollae, lucernae, pocula. Singula diversa sunt.",
+    "Mind the tools. Everything here is made by hand.": "Cave instrumenta! Faber omnia manu facit.",
+    "Wool, linen and the best dyes in the district.": "Lana, linum et colores optimi hic sunt.",
+    "Olive oil by the jar. Taste it: you will not find better.": "Oleum optimum hic est. Gusta!",
+    "Jars, lamps and cups. Every one is different.": "Ollae, lucernae, pocula hic sunt. Singula diversa sunt.",
   };
   // goods of the Roman shops and the words on the shopkeeper's menu (shown with the English in brackets)
   const WORDS = {

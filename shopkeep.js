@@ -232,9 +232,10 @@ const Shopkeep = (() => {
       }
       rows.push(back());
     } else if (view === "table") {
-      rows.push(el("h3", tr("At the table")), purse(), el("p", T_("Dice against {0}: the higher total wins (the keeper wins ties; doubles pay double).", tr(shop.keeper).toLowerCase()), "dnote"));
+      rows.push(el("h3", tr("At the table")), purse());
+      if (!classroom) rows.push(el("p", T_("Dice against {0}: the higher total wins (the keeper wins ties; doubles pay double).", tr(shop.keeper).toLowerCase()), "dnote"));
       const bets = el("div", undefined, "sk-menu");
-      for (const bet of [5, 10, 25, 50]) bets.append(btn(T_("🎲 Bet {0}", bet), () => dice(bet), Vitals.coins < bet));
+      if (!classroom) for (const bet of [5, 10, 25, 50]) bets.append(btn(T_("🎲 Bet {0}", bet), () => dice(bet), Vitals.coins < bet));
       bets.append(btn(tr("♟️ A game of xiangqi (practice)"), () => { closePanels(); if (typeof Online !== "undefined") Online.playXiangqi(); }), btn(tr("👋 Goodbye"), closePanels));
       rows.push(bets);
     }
@@ -320,8 +321,9 @@ const Shopkeep = (() => {
   }
 
   // dice at the table: two dice each, the higher total wins your bet back; the keeper wins ties; doubles pay double
+  const classroom = typeof CLASSMODE !== "undefined" && CLASSMODE.on;                  // (no betting in a class)
   function dice(bet) {
-    if (Vitals.coins < bet) return;
+    if (classroom || Vitals.coins < bet) return;
     const d = () => 1 + Math.floor(Math.random() * 6), me = [d(), d()], ke = [d(), d()], ms = me[0] + me[1], ks = ke[0] + ke[1], face = (a) => a.map((v) => FACES[v - 1]).join(" ");
     Sfx.play("rattle");
     let result;
