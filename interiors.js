@@ -310,7 +310,8 @@ const Interiors = (() => {
         if (mode === "walk" && open) {
           Sfx.play("bell");
           const hi = typeof Shopkeep !== "undefined" ? Shopkeep.greet(info(p).id, p.kind) : null;
-          toast(hi || `${tr(p.kind.name)}: "${tr(p.kind.line)}" (${tr(p.kind.keeper)})`);
+          const sal = typeof Latin !== "undefined" && Latin.active ? "Salve! " : "";                            // (a Roman greeting, with the Latin names on)
+          toast(sal + (hi || `${tr(p.kind.name)}: "${tr(p.kind.line)}" (${tr(p.kind.keeper)})`));
         }
       } else if (!inside && p.inside) p.inside = false;
       if (p.inside && open && p.customers) {                                                                 // a murmur of talk while there are customers

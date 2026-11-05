@@ -917,3 +917,11 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 #tape-bar button { min-width: 40px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 #tape-bar .tp-time { margin-left: 6px; font-variant-numeric: tabular-nums; color: #fff3cf; font-size: .9rem; }
 #class-latin.on { background: #fff; border-color: #fff; }
+#hunt-hud { position: fixed; left: 12px; top: 176px; z-index: 4; max-width: 300px; padding: 8px 12px; font-size: .85rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; cursor: default; }
+#hunt-hud[hidden] { display: none; }
+#hunt-hud ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+#hunt-hud li.got { color: #8fd49a; }
+#hd-body p { margin: 6px 0; font-size: 1.05rem; }
+.hd-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 2px; }
+#huntdone .dbtns button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
+@media print { body > *:not(#huntdone) { display: none !important; } #huntdone { position: static !important; display: block !important; } #huntdone .dclose, #huntdone .dbtns { display: none !important; } }

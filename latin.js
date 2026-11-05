@@ -14,6 +14,7 @@ const Latin = (() => {
     ["Temple of Saturn", "Aedes Saturni"], ["Temple of Castor and Pollux", "Aedes Castoris et Pollucis"], ["Temple of Vesta", "Aedes Vestae"], ["The Golden Milestone", "Milliarium Aureum"],
     ["The Palatine Hill", "Mons Palatinus"], ["Temple of Jupiter Optimus Maximus", "Aedes Iovis Optimi Maximi"], ["Trajan's Column", "Columna Traiani"], ["Servian Wall", "Murus Servianus"],
   ];
+  // Latin spelling notes: aedes (a temple), Iovis (of Jupiter), V for U on signs only.
   const SHOPS = { "Bakery": "Pistrinum", "Tavern": "Caupona", "Workshop": "Officina", "Cloth shop": "Taberna vestiaria", "Oil seller": "Taberna olearia", "Potter": "Figlina" };
   const KEEPERS = { "The baker": "Pistor", "The innkeeper": "Caupo", "The smith": "Faber", "The clothier": "Vestiarius", "The merchant": "Mercator", "The potter": "Figulus", "The shopkeeper": "Tabernarius" };
   const LINES = {
@@ -23,6 +24,16 @@ const Latin = (() => {
     "Wool, linen and the best dyes in the district.": "Lana, linum et optimi colores huius regionis.",
     "Olive oil by the jar. Taste it: you will not find better.": "Oleum in amphoris. Gusta: meliorem non invenies.",
     "Jars, lamps and cups. Every one is different.": "Ollae, lucernae, pocula. Singula diversa sunt.",
+  };
+  // goods of the Roman shops and the words on the shopkeeper's menu (shown with the English in brackets)
+  const WORDS = {
+    "Box of iron nails": "Capsa clavorum", "Smith's hammer": "Malleus fabri", "Bronze mirror": "Speculum aeneum", "Olive oil jar": "Amphora olei", "Lamp oil": "Oleum lucernae",
+    "Scented soap": "Sapo odoratus", "Clay lamp": "Lucerna fictilis", "Painted cup": "Poculum pictum", "Fine amphora": "Amphora optima", "Perfumed lamp": "Lucerna odorata",
+    "Engraved mirror": "Speculum caelatum", "Saffron oil": "Oleum crocinum", "Saffron": "Crocus", "Black pepper": "Piper", "Silver ring": "Anulus argenteus", "Gold bangle": "Armilla aurea",
+    "Pearl strand": "Monile margaritarum",
+    "🛒 Buy": "🛒 Emere", "💰 Sell your goods": "💰 Vendere merces", "📊 Price board": "📊 Tabula pretiorum", "🗣️ Ask about the neighbourhood": "🗣️ Quid novi?",
+    "📦 Any work for me?": "📦 Habesne aliquid negotii mihi?", "👋 Goodbye": "👋 Vale", "← Back": "← Redi", "For sale": "Venalia", "Your goods": "Merces tuae", "The news": "Nuntii",
+    "Errands": "Mandata", "At the table": "Ad mensam", "🏪 Manage your shop": "🏪 Tabernam tuam administrare",
   };
   const longest = NAMES.slice().sort((a, b) => b[0].length - a[0].length);
   let on = false;
@@ -34,6 +45,7 @@ const Latin = (() => {
     if (!active()) return undefined;
     for (const table of [SHOPS, KEEPERS]) if (table[key]) return `${table[key]} (${key})`;
     if (LINES[key]) return `${LINES[key]} (${key})`;
+    if (WORDS[key]) return `${WORDS[key]} (${key.replace(/^[^A-Za-z]+/, "")})`;                  // (the emoji of a button is not repeated in the brackets)
     for (const [en, la] of NAMES) if (key === en) return `${la} (${en})`;
     let out = key, hit = false;
     for (const [en, la] of longest) if (out.includes(en) && !out.includes(la)) { out = out.split(en).join(`${la} (${en})`); hit = true; }

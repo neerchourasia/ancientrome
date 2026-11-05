@@ -24,8 +24,14 @@
     .check small { display: block; font-weight: 400; color: var(--muted); }
     .link { word-break: break-all; padding: 12px; border-radius: 8px; background: #14100b; border: 1px dashed var(--gold); font-family: ui-monospace, monospace; font-size: .9rem; }
     button, .btn { font: 700 1rem system-ui; cursor: pointer; padding: 10px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); text-decoration: none; display: inline-block; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .big { font-size: 1.15rem; padding: 14px 26px; box-shadow: 0 0 0 3px rgba(226,185,85,.35), 0 4px 14px rgba(0,0,0,.45); }
+    .big:hover, .big:focus-visible { box-shadow: 0 0 0 4px rgba(226,185,85,.7), 0 4px 14px rgba(0,0,0,.45); outline: none; }
+    .try { background: transparent; color: var(--gold); border: 2px solid var(--gold); }
+    #students li b { text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+    #students li.box { list-style: none; margin-left: -4px; padding: 4px 8px; border: 1px solid var(--ink); border-radius: 3px; }
     table { border-collapse: collapse; width: 100%; }
+    details { margin: 6px 0; } summary { cursor: pointer; font-weight: 600; } .hunt-grid { display: grid; gap: 2px 14px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); padding: 6px 0; } .hunt-grid label { font-weight: 400; display: flex; gap: 6px; align-items: flex-start; } .hunt-grid input { margin-top: 5px; }
     td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
     kbd { background: #14100b; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font-family: ui-monospace, monospace; }
     a { color: var(--gold); }
@@ -52,23 +58,33 @@
     <label>Language of the menus
       <select id="c-lang"><option value="en">English</option><option value="es">Español</option><option value="it">Italiano</option><option value="hi">हिन्दी</option><option value="zh">中文</option></select>
     </label>
+    <label>Start at a sight <small>(optional: the class begins there, in front of it)</small>
+      <select id="c-at"><option value="">Where the city begins</option></select>
+    </label>
+    <label>Time of day <small>(optional: the sun and the shops follow it)</small>
+      <select id="c-hour"><option value="">As the game has it</option><option value="8">Morning (8:00)</option><option value="12">Noon (12:00)</option><option value="18">Evening (18:00)</option><option value="22">Night (22:00)</option></select>
+    </label>
+    <div>
+      <b>Scavenger hunt</b> <small class="muted">(optional: tick the sights the students must find. A checklist shows on their screen, and when they have found them all they get a finished screen with their name, the time and a code to show you.)</small>
+      <div id="c-hunt"></div>
+    </div>
     <div>
       <div class="link" id="c-link"></div>
       <div class="row" style="margin-top:10px">
-        <button type="button" id="c-copy">Copy link</button>
-        <a class="btn" id="c-open" href="#" target="_blank" rel="noopener">Try it</a>
+        <button type="button" id="c-copy" class="big">📋 Copy link</button>
+        <a class="btn big try" id="c-open" href="#" target="_blank" rel="noopener">▶ Try it</a>
         <span id="c-msg" class="muted" role="status"></span>
       </div>
     </div>
   </div>
 
   <h2>2. What students get</h2>
-  <ul>
+  <ul id="students">
     <li><b>No login.</b> They open the link and make a character (a name and a class).</li>
     <li><b>Nothing is saved.</b> Each student starts fresh, and the game keeps nothing on the computer after the tab is closed.</li>
     <li><b>No other players, no chat.</b> Class mode is offline: nobody from outside the class can appear.</li>
     <li><b>No time limit</b> and no limit on denarii (the game's play money).</li>
-    <li>Works in Chrome, Edge, Firefox and Safari on a laptop. The game needs a keyboard and mouse.</li>
+    <li class="box">Works in Chrome, Edge, Firefox and Safari on a laptop. The game needs a keyboard and mouse.</li>
   </ul>
 
   <h2>3. Controls</h2>

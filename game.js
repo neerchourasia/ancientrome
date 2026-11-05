@@ -311,6 +311,7 @@ function wireInput(canvas) {
   for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
   for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startDemo()) begin(); else Account.gate(begin); });
   $("#demo-login").addEventListener("click", () => Account.open());
+  $("#hd-close").addEventListener("click", closePanels); $("#hd-print").addEventListener("click", () => window.print()); $("#hunt-hud").addEventListener("click", () => Hunt.reopen());
   // class mode: a teacher's link (classmode.js) starts the game at once, with no login; the options in the link are applied once the student has made a character
   if (window.CLASSMODE && CLASSMODE.on) {
     Account.startClass(CLASSMODE); begin();
@@ -321,8 +322,14 @@ function wireInput(canvas) {
       if (++tries > 600) { clearInterval(iv); return; }
       if (!started || !Character.exists || creatorOpen) return;
       clearInterval(iv);
-      if (CLASSMODE.era === "modern" && era !== "modern") toggleEra();
-      if (CLASSMODE.city !== "rome") arriveIn(CLASSMODE.city, null);
+      const sight = CLASSMODE.at ? ALL_LANDMARKS.find((l) => l.id === CLASSMODE.at && !l.game) : null;
+      if (CLASSMODE.era !== era) toggleEra();                                             // (the era in the link, whatever this tab had before)
+      if (sight && sight.only && sight.only !== era) toggleEra();                          // (a sight that exists in only one era)
+      const home = sight ? (sight.id.startsWith("d-") ? "delhi" : sight.id.startsWith("c-") ? "cancun" : sight.id.startsWith("b-") ? "beijing" : "rome") : CLASSMODE.city;
+      if (home !== "rome") arriveIn(home, null);
+      if (sight) setTimeout(() => placeAt(sight.stand[0], sight.stand[1], 0), 800);         // (after the city has been built)
+      if (CLASSMODE.hour !== null) { Time.set(CLASSMODE.hour); sky.setHour(Time.hour, true); }
+      if (CLASSMODE.hunt.length) Hunt.start(CLASSMODE.hunt);
     }, 500);
   }
   $("#btn-dgames").addEventListener("click", () => DGames.open());
@@ -1832,6 +1839,7 @@ function tick(dt) {
   Doors.update(dt);
   Interiors.update(dt);
   Shopkeep.update(dt);
+  Hunt.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

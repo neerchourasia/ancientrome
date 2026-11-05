@@ -546,6 +546,14 @@ const I18n = (() => {
     ["🏛️ Latin names", "🏛️ Nombres en latín", "🏛️ Nomi in latino", "🏛️ लैटिन नाम", "🏛️ 拉丁语名称"],
     ["Other players and the game server are off in class mode.", "Los otros jugadores y el servidor del juego están desactivados en el modo clase.", "Gli altri giocatori e il server di gioco sono disattivati nella modalità classe.", "कक्षा मोड में दूसरे खिलाड़ी और गेम सर्वर बंद हैं।", "课堂模式下其他玩家和游戏服务器都已关闭。"],
     ["The arena fights are switched off in this class.", "Los combates de la arena están desactivados en esta clase.", "I combattimenti nell'arena sono disattivati in questa classe.", "इस कक्षा में अखाड़े की लड़ाइयाँ बंद हैं।", "本课堂已关闭竞技场战斗。"],
+    // the class scavenger hunt
+    ["Sights to find: {0} of {1}", "Lugares por encontrar: {0} de {1}", "Luoghi da trovare: {0} su {1}", "खोजने वाली जगहें: {1} में से {0}", "要找的景点:{0} / {1}"],
+    ["Time: {0}", "Tiempo: {0}", "Tempo: {0}", "समय: {0}", "用时:{0}"],
+    ["Check code: {0}", "Código de verificación: {0}", "Codice di controllo: {0}", "जाँच कोड: {0}", "核对码:{0}"],
+    ["Finished!", "¡Terminado!", "Finito!", "पूरा हुआ!", "完成了!"],
+    ["Show this screen to your teacher.", "Enseña esta pantalla a tu profesor.", "Mostra questa schermata al tuo insegnante.", "यह स्क्रीन अपने शिक्षक को दिखाएँ।", "把这个画面给老师看。"],
+    ["Print", "Imprimir", "Stampa", "प्रिंट करें", "打印"],
+    ["Keep playing", "Seguir jugando", "Continua a giocare", "खेलते रहें", "继续玩"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [

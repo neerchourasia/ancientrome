@@ -4,7 +4,7 @@
 // own) goes into sessionStorage instead of localStorage, so every student starts fresh, a shared computer keeps nothing from the lesson once the tab is closed, and a real player's saved
 // game on the same computer is never touched. The rest of the game reads window.CLASSMODE (account.js starts the offline "class" state, game.js applies the options, fight.js closes
 // the arena when fights=0, latin.js shows Latin names). Options: class (any name: it only appears on the screen), latin=1 (Latin names for Rome), era=ancient|modern, city=rome|delhi|cancun|beijing,
-// fights=0 (no gladiator fights), lang=en|es|it|hi|zh. The teacher page (class.html) builds these links. ?latin=1 on its own also works for any player, without class mode.
+// fights=0 (no gladiator fights), lang=en|es|it|hi|zh, at=<sight id> (start there), hour=<0-24> (start at that hour), hunt=<sight ids, comma separated> (a scavenger hunt: hunt.js). The teacher page (class.html) builds these links. ?latin=1 on its own also works for any player, without class mode.
 
 (() => {
   const q = new URLSearchParams(location.search);
@@ -15,6 +15,9 @@
     latin: q.get("latin") === "1" || q.get("la") === "1",
     era: pick(q.get("era"), ["ancient", "modern"], "ancient"), city: pick(q.get("city"), ["rome", "delhi", "cancun", "beijing"], "rome"),
     fights: q.get("fights") !== "0", lang: pick(q.get("lang"), ["en", "es", "it", "hi", "zh"], "en"), shared: false,
+    at: /^[a-z0-9-]{1,24}$/.test(q.get("at") || "") ? q.get("at") : "",                                                   // start at this sight (its id in landmarks.js)
+    hour: Number.isFinite(parseFloat(q.get("hour"))) ? Math.max(0, Math.min(24, parseFloat(q.get("hour")))) % 24 : null,   // start at this hour of the day
+    hunt: (q.get("hunt") || "").split(",").filter((s) => /^[a-z0-9-]{1,24}$/.test(s)).slice(0, 12),                       // the sights to find (the class scavenger hunt: hunt.js)
   };
   window.CLASSMODE = C;
   if (!C.on) return;
