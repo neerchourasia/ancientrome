@@ -44,7 +44,7 @@
       if (r.status === 403) { $("msg").textContent = "The server does not accept this key. Open the dashboard from the teacher page again."; $("msg").className = "err"; return; }
       if (!r.ok) throw new Error(String(r.status));
       students = (await r.json()).students || [];
-      $("msg").textContent = students.length ? "" : "Waiting for students: they appear here as soon as they start playing with your link.";
+      $("msg").textContent = students.length ? "" : "Waiting for students. They appear here once they open a class link made with \"Let me watch what each student does\" ticked, and have made their character. (The bar at the bottom of their screen then says \"your teacher can see your progress\". A link or code made without it ticked, or before you pressed \"Start a new class\", does not show up here.)";
       $("msg").className = "muted";
       render();
     } catch (e) { $("msg").textContent = "Cannot reach the game server just now. Trying again..."; $("msg").className = "err"; }
