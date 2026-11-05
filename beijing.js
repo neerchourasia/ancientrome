@@ -565,6 +565,7 @@ const Beijing = (() => {
     buildXiangqiPavilion();
     buildWall();
     buildCBD();
+    if (typeof Interiors !== "undefined") for (const [x, z, kind] of [[18026, -245, "Tea house"], [18052, 560, "Silk shop"]]) Interiors.addHouse({ x, z, w: 12, d: 9, h: 3.8, kinds: "beijingHall", kind, idKind: "beijingHallx", parent: root, color: 0xa8281f, roof: "chinese", roofColor: 0x45454a });   // a tea pavilion by the great hall and a silk stall at the Temple of Heaven
     buildPeople();
     Stalls.build(root, X(250), 110, "beijing");
     setEra(false);

@@ -31,6 +31,14 @@ const Thieves = (() => {
       return;
     }
   }
+  // a pickpocket who slips into a shop at (x, z) (shopkeep.js): he goes for you at once
+  function spawnAt(x, z) {
+    if (thief) return false;
+    const fig = createFigure(); dress(fig); fig.g.position.set(x, groundAt(x, z), z); scene.add(fig.g);
+    thief = { fig, x, z, yaw: 0, state: "stalk", left: FLEE_TIME, phase: 0, loot: 0, life: 45 };
+    wait = GAP[0] + Math.random() * (GAP[1] - GAP[0]);
+    return true;
+  }
   function remove() { if (!thief) return; scene.remove(thief.fig.g); thief = null; if (mark) mark.visible = false; }
 
   function step(dt, tx, tz, speed) {                       // walk towards (tx, tz) at `speed`, turning aside from walls
@@ -62,15 +70,15 @@ const Thieves = (() => {
       step(dt, player.x, player.z, 3.4);
       if (d0 < TOUCH && !Jail.active && Vitals.coins >= MIN_COINS) {
         const n = Math.max(10, Math.min(MAX_STEAL, Math.round((Vitals.coins * 0.1) / 5) * 5));
-        Vitals.coins -= n; t.loot = n; t.state = "flee"; t.left = FLEE_TIME; Sfx.play("oof");
+        Vitals.coins -= n; t.loot = n; t.state = "flee"; t.left = FLEE_TIME; t.grace = 1.2; Sfx.play("oof");      // (he gets a head start: otherwise you would catch him in the same moment)
         const back = typeof PetPerks !== "undefined" ? PetPerks.recover(n) : 0; if (back) { Vitals.coins += back; t.loot = n - back; }
         toast(`${back ? `Your monkey grabbed ${back} back! ` : ""}A thief grabbed ${n} denarii! Catch him (he runs from you, the red ! shows where he is) before he gets away.`);
       }
     } else {
-      t.left -= dt;
+      t.left -= dt; t.grace = (t.grace || 0) - dt;
       const away = player.x - t.x, awayZ = player.z - t.z;
       step(dt, t.x - away * 5, t.z - awayZ * 5, 6.4);
-      if (d0 < TOUCH + 0.4) {
+      if (d0 < TOUCH + 0.4 && t.grace <= 0) {
         Vitals.coins += t.loot + BOUNTY; Sfx.play("coin"); toast(`You caught the thief! Your ${t.loot} denarii are back, and the city pays a ${BOUNTY} denarii bounty.`);
         caught++; try { localStorage.setItem("rome-thieves-caught", String(caught)); } catch (e) { /* ignore */ }
         remove(); return;
@@ -86,5 +94,5 @@ const Thieves = (() => {
     if (t.state === "flee" && hudEl && !Quests.active) { hudEl.hidden = false; hudEl.textContent = `🥷 Catch the thief! ${Math.max(0, Math.ceil(t.left))} s · ${Math.round(d0)} m away · +${t.loot + BOUNTY}`; }
   }
 
-  return { update, get caught() { return caught; }, get active() { return thief ? thief.state : null; }, _spawn: spawn, _thief: () => thief };
+  return { update, get caught() { return caught; }, get active() { return thief ? thief.state : null; }, spawnAt, _spawn: spawn, _thief: () => thief };
 })();

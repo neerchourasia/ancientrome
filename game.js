@@ -1683,11 +1683,11 @@ function updateDeath(dt) {
 
 let sleepT = 0, slept = false, sleepCollapse = false, lastStage = 0, wasHome = false, lastClock = "";
 
-function startSleep(collapse) {
+function startSleep(collapse, inn) {
   if (sleepT > 0 || deathT > 0) return;           // not while you are dying: the two black screens would pile up
   sleepT = 0.001; slept = false; sleepCollapse = collapse;
   Vitals.stopRest(); Nav.clear && Nav.clear();
-  toast(collapse ? "You are so tired that you collapse..." : "You lie down in your bed...");
+  toast(collapse ? "You are so tired that you collapse..." : inn ? "You lie down in the room you paid for..." : "You lie down in your bed...");
 }
 
 function wakeUp() {
@@ -1817,7 +1817,7 @@ function tick(dt) {
   Cage.update(dt);
   Doors.update(dt);
   Interiors.update(dt);
-  Shopkeep.update();
+  Shopkeep.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

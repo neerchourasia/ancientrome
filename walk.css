@@ -876,6 +876,10 @@ button[aria-label="Close"]:focus-visible, button.dclose:focus-visible { outline:
 .sk-menu { display: grid; gap: 8px; }
 #sk-body > button, .sk-menu button { font: 700 .95rem inherit; cursor: pointer; padding: 9px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); text-align: left; }
 #sk-body > button:disabled, .sk-menu button:disabled { opacity: .45; cursor: not-allowed; }
+.sk-recipe { display: grid; gap: 4px; padding: 8px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 10px; }
+.sk-recipe small { opacity: .8; }
+.sk-recipe button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); justify-self: start; }
+.sk-recipe button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* phones: buttons for the games that need a keyboard (see pvpgames.js) */
 #mini-touch { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 9; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 22px; pointer-events: none; }

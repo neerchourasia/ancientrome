@@ -42,6 +42,16 @@ const Achievements = (() => {
     ["story3", "📚", "Chronicler", "Finish the stories of all four cities.", "Chronicler", 600, () => typeof Story !== "undefined" && Story.finished >= 4],
     ["fest1", "🎊", "Festival-goer", "Find all eight festival tokens in one festival hunt.", "Reveller", 100, () => typeof FestHunt !== "undefined" && FestHunt.found >= 1],
     ["thief", "🥷", "Thief taker", "Catch a pickpocket.", "", 20, () => typeof Thieves !== "undefined" && Thieves.caught >= 1],
+    ["shop1", "🛍️", "Window shopper", "Walk into 10 different shops.", "", 25, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.visited >= 10],
+    ["shop2", "🏘️", "Shop crawl", "Walk into 50 different shops.", "", 150, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.visited >= 50],
+    ["shop3", "⭐", "Regular", "Become a regular customer (three stars) at a shop.", "", 40, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.regulars >= 1],
+    ["shop4", "📦", "Odd jobs", "Finish 10 errands for shopkeepers.", "", 100, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.done >= 10],
+    ["shop5", "⚖️", "Merchant", "Make 500 denarii of profit selling goods in another city.", "Trader", 200, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.profit >= 500],
+    ["shop6", "🏪", "Shop owner", "Buy a shop.", "", 50, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.owned >= 1],
+    ["shop7", "🏬", "Shopkeeper", "Own 3 shops.", "Shopkeeper", 300, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.owned >= 3],
+    ["shop8", "🛠️", "Craftsman", "Craft 10 goods at the keepers' workbenches.", "", 100, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.crafted >= 10],
+    ["shop9", "🎲", "Lucky roller", "Win 10 games of dice at a table.", "", 60, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.diceWins >= 10],
+    ["shop10", "🛏️", "Travelling guest", "Spend a night in an inn.", "", 20, () => typeof Shopkeep !== "undefined" && Shopkeep.stats.inn >= 1],
     ["thief2", "🚔", "Lawman", "Catch 10 pickpockets.", "Lawman", 150, () => typeof Thieves !== "undefined" && Thieves.caught >= 10],
   ];
   let state = { done: {}, title: "" };

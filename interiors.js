@@ -80,6 +80,8 @@ const Interiors = (() => {
       if (near ? i % 3 === 0 : i % 9 === 0) picked.push({ i, b, kind: KINDS[made.rome++ % KINDS.length], built: false, inside: false, g: null, keeper: null });
     });
     setEra(typeof era !== "undefined" && era === "modern");
+    // three more near the sights: a tavern by the Forum, a potter by the Pantheon and a baker by the Circus Maximus (small buildings of their own, in both eras)
+    for (const [x, z, kind, c] of [[51, 6, "Tavern", 0xe0cfa8], [-480, -346, "Potter", 0xd8c6a0], [-208, 430, "Bakery", 0xe4d4b0]]) addHouse({ x, z, w: 12, d: 9, h: 3.8, kinds: "rome", kind, idKind: "romex", parent: worldScene, color: c, roof: "hip", roofColor: 0xa0452c });
   }
 
   // A building of another city becomes a shop (built the first time you come within 110 m).
@@ -87,10 +89,27 @@ const Interiors = (() => {
     const list = LISTS[s.kinds] || KINDS, n = made[s.kinds] || 0;
     made[s.kinds] = n + 1;
     const b = { x: s.x, z: s.z, w: s.w, d: s.d, h: s.h, blk: s.blk || null, ci: 0 };
-    const p = { i: n + 7, b, kind: list[n % list.length], built: false, inside: false, g: null, keeper: null, ext: s };
+    const named = s.kind ? list.find((k) => k.name === s.kind) : null;
+    const p = { i: n + 7, idk: s.idKind || s.kinds, b, kind: named || list[n % list.length], built: false, inside: false, g: null, keeper: null, ext: s };
     p.wallMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x2a2014 });
     p.wallMat.color.set(s.tint ? s.tint(modern) : 0xcccccc);
     picked.push(p);
+  }
+
+  // A new little building for a shop: a solid block with a roof, and the shop inside it. spec: { x, z, w, d, h, kinds, side, parent, era, color, roof ("hip", "chinese" or "flat"), roofColor }
+  function addHouse(s) {
+    const g = s.parent, color = s.color || 0xe4dcc3, mat = new THREE.MeshLambertMaterial({ color }), hh = s.h || 3.6;
+    const mesh = new THREE.Mesh(BOX, mat); mesh.scale.set(s.w, hh, s.d); mesh.position.set(s.x, hh / 2, s.z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
+    const blk = addBlockerBox(s.x - s.w / 2, s.x + s.w / 2, s.z - s.d / 2, s.z + s.d / 2, 0, hh, s.era ? { era: s.era } : undefined);
+    const rm = new THREE.MeshLambertMaterial({ color: s.roofColor || 0x8a5a2b });
+    if (s.roof === "flat") { const r = new THREE.Mesh(BOX, rm); r.scale.set(s.w + 0.8, 0.5, s.d + 0.8); r.position.set(s.x, hh + 0.25, s.z); g.add(r); }
+    else {
+      const slab = new THREE.Mesh(BOX, rm); slab.scale.set(s.w + 2, 0.5, s.d + 2); slab.position.set(s.x, hh + 0.2, s.z); slab.castShadow = true; g.add(slab);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), rm), k = s.roof === "chinese" ? 1.5 : 1.2; cone.scale.set(s.w * 0.78 + 1.6, s.roof === "chinese" ? 3.4 : 2.8, s.d * 0.78 + 1.6); cone.rotation.y = Math.PI / 4;
+      cone.position.set(s.x, hh + 0.45 + cone.scale.y / 2, s.z); cone.castShadow = true; g.add(cone); void k;
+    }
+    register({ x: s.x, z: s.z, w: s.w, d: s.d, h: hh, kinds: s.kinds, kind: s.kind, idKind: s.idKind, side: s.side, signY: s.signY, parent: g, era: s.era, blk, tint: () => color, hide: () => { mesh.visible = false; } });
+    return mesh;
   }
 
   const box = (g, x0, x1, y0, y1, z0, z1, mat, solid) => {
@@ -285,8 +304,19 @@ const Interiors = (() => {
       if (p.open !== open || p.night !== night) setOpen(p, open, night);                                     // (a shop you can see from the street is lit or dark as it should be)
       if (dist > 40) continue;
       const inside = Math.abs(player.x - b.x) < b.w / 2 - T && Math.abs(player.z - b.z) < b.d / 2 - T && player.feet < 2;
-      if (inside && !p.inside) { p.inside = true; if (mode === "walk" && open) toast(`${tr(p.kind.name)}: "${tr(p.kind.line)}" (${tr(p.kind.keeper)})`); }
-      else if (!inside && p.inside) p.inside = false;
+      if (inside && !p.inside) {
+        p.inside = true;
+        if (typeof Shopkeep !== "undefined") Shopkeep.visit(info(p).id);
+        if (mode === "walk" && open) {
+          Sfx.play("bell");
+          const hi = typeof Shopkeep !== "undefined" ? Shopkeep.greet(info(p).id, p.kind) : null;
+          toast(hi || `${tr(p.kind.name)}: "${tr(p.kind.line)}" (${tr(p.kind.keeper)})`);
+        }
+      } else if (!inside && p.inside) p.inside = false;
+      if (p.inside && open && p.customers) {                                                                 // a murmur of talk while there are customers
+        p.murmur = (p.murmur || 0) - dt;
+        if (p.murmur <= 0) { p.murmur = 3.5 + Math.random() * 3; if (p.customers.some((c) => c.state === "here")) Sfx.play("murmur"); }
+      }
       if (p.door) p.door.locked = !open && !p.inside;                                                        // a shut shop stays shut (unless you are still inside: then you can leave)
       if (slow && !open && !p.inside && p.doorPos && mode === "walk" && Math.hypot(player.x - p.doorPos[0], player.z - p.doorPos[1]) < 3.6 && now - (p.told || -99) > 45) {
         p.told = now; toast(tr("The {0} is shut for the night. Come back in the morning.").replace("{0}", tr(p.kind.name).toLowerCase()));
@@ -310,7 +340,8 @@ const Interiors = (() => {
     }
     return null;
   }
-  const info = (p) => ({ p, id: (p.ext ? p.ext.kinds : "rome") + "#" + p.i, name: p.kind.name, keeper: p.kind.keeper, line: p.kind.line, trade: p.kind.trade, city: CITY_OF[p.ext ? p.ext.kinds : "rome"] });
+  const insideShop = () => { const p = picked.find((q) => q.built && q.inside && q.open); return p ? info(p) : null; };       // the open shop you are in, if any
+  const info = (p) => ({ p, id: (p.ext ? p.idk : "rome") + "#" + p.i, name: p.kind.name, keeper: p.kind.keeper, line: p.kind.line, trade: p.kind.trade, city: CITY_OF[p.ext ? p.ext.kinds : "rome"] });
   // the kinds of shop there are in a city in the era you are in (for the errands the keepers ask of you)
   const kindsHere = (c) => picked.filter((p) => CITY_OF[p.ext ? p.ext.kinds : "rome"] === c && !(p.ext && p.ext.era && (p.ext.era === "modern") !== modern)).map((p) => p.kind.name);
   // the free stool nearest to you, if one is within reach
@@ -324,5 +355,5 @@ const Interiors = (() => {
     return best;
   }
 
-  return { setup, register, update, setEra, picked: () => picked, keeperNear, seatNear, kindsHere, kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
+  return { setup, register, addHouse, update, setEra, picked: () => picked, keeperNear, seatNear, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
 })();

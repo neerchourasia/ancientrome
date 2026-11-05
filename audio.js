@@ -167,6 +167,10 @@ const Sfx = (() => {
     jump: () => { tone(300, 0.12, "triangle", 0.18, 520); puff(0.08, 900, 1, 0.12); },
     horn: () => { tone(196, 0.9, "sawtooth", 0.16); tone(294, 0.9, "sawtooth", 0.11); tone(392, 0.9, "sawtooth", 0.07); },
     discover: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.55, "sine", 0.16, null, null, i * 0.11)); },
+    bell: () => { tone(2093, 0.9, "sine", 0.09); tone(2637, 0.7, "sine", 0.06, null, null, 0.05); },                                         // the little bell over a shop door
+    murmur: () => puff(1.4, 650, 0.5, 0.07, null, "bandpass", 0.5),                                                                         // customers talking in a shop
+    rattle: () => { for (let i = 0; i < 5; i++) puff(0.05, 1800 + Math.random() * 1500, 2, 0.18, null, "bandpass", 0.005, i * 0.07); },    // dice
+    clink: () => { tone(2900, 0.12, "triangle", 0.1); tone(3700, 0.1, "triangle", 0.07, null, null, 0.04); },
     coin: () => { tone(1320, 0.09, "sine", 0.16); tone(1760, 0.16, "sine", 0.14, null, null, 0.07); },
     firework: () => { puff(0.9, 220, 0.6, 0.35, null, "lowpass", 0.01); tone(95, 0.7, "sine", 0.35, 45); for (let i = 0; i < 6; i++) tone(1800 + Math.random() * 1800, 0.09, "square", 0.04, 800, null, 0.15 + i * 0.07); },
     hail: () => { tone(2300 + Math.random() * 1600, 0.05, "square", 0.07, 1400); puff(0.05, 3200, 2, 0.12); },

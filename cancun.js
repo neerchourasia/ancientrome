@@ -439,6 +439,8 @@ const Cancun = (() => {
       const roof = new T.Mesh(new T.ConeGeometry(1, 1, 4), C.thatch); roof.scale.set(w * 0.83, 3.0, d * 0.88); roof.position.set(X(x), h + 1.5, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof);
       if (typeof Interiors !== "undefined") Interiors.register({ x: X(x), z, w, d, h, kinds: "cancunMaya", side: "N", parent: g, era: "ancient", blk: hut.userData.blk, tint: () => 0xe4dcc3, hide: () => { hut.visible = false; } });
     });
+    // and by the great sights, in both eras: a cacao seller at El Castillo, an obsidian trader by the Ball Court, a weaver at the Sacred Cenote
+    if (typeof Interiors !== "undefined") for (const [x, z, kind] of [[12040, 0, "Cacao seller"], [11884, -35, "Obsidian trader"], [12044, -223, "Maya weaver"]]) Interiors.addHouse({ x, z, w: 12, d: 9, h: 3.8, kinds: "cancunMaya", kind, idKind: "cancunMayax", parent: root, color: 0xe4dcc3, roof: "hip", roofColor: 0xb08a4a });
   }
 
   // ---------- the sea floor, the coral reef and its fish; the cenote swimming pond; snorkelling ----------

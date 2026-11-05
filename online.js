@@ -258,10 +258,10 @@ const Online = (() => {
       peers.set(id, { id, fig, pet, name, x: null, z: null, tx: 0, tz: 0, yaw: 0, tyaw: 0, spd: 0, ph: 0 });
       toast(`${name || "A player"} is nearby`);
     }
-    for (const [id, x, z, yaw, spd, veh, park, alt, roll] of m.p || []) {
+    for (const [id, x, z, yaw, spd, veh, park, alt, roll, sit] of m.p || []) {
       const p = peers.get(id);
       if (!p) continue;
-      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd; p.veh = veh || null; p.parkAt = park || null; p.talt = alt || 0; p.troll = roll || 0;
+      p.tx = x; p.tz = z; p.tyaw = yaw; p.spd = spd; p.veh = veh || null; p.parkAt = park || null; p.talt = alt || 0; p.troll = roll || 0; p.sit = !!sit;
       if (p.alt === undefined) { p.alt = p.talt; p.roll = p.troll; }
       if (p.x === null) { p.x = x; p.z = z; p.yaw = yaw; }
     }
@@ -289,6 +289,7 @@ const Online = (() => {
       p.ph += dt * (p.spd / 5.5) * 6.2;
       const sw = p.spd > 0.3 ? Math.sin(p.ph) * Math.min(1, p.spd / 8.5) * 0.7 : 0, a = p.fig.parts;
       a.armL.rotation.x = sw; a.armR.rotation.x = -sw; a.legL.rotation.x = -sw; a.legR.rotation.x = sw;
+      if (p.sit && !p.veh) { a.legL.rotation.x = a.legR.rotation.x = 1.45; a.armL.rotation.x = a.armR.rotation.x = -0.5; g.position.y -= 0.1; }      // sitting on a stool in a shop
       if (p.emote) Emotes.peer(p, dt);
       vehicleUpdate(p, dt, show);
       if (p.pet) petUpdate(p, dt, show && !p.vm);
@@ -413,7 +414,7 @@ const Online = (() => {
     if (!ws || ws.readyState !== 1 || !welcome || duel || !started) return;
     if (mode !== "walk" && mode !== "drive") return;
     const share = Car.share();
-    send({ t: "walk", tp: (typeof lastTeleport !== "undefined" && performance.now() - lastTeleport < 2000) ? 1 : undefined, c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house, a: Math.round(Car.state() ? Car.state().alt : 0), d: Math.round(Vitals.coins), r: +(Car.state() ? Car.state().roll : 0).toFixed(2) });
+    send({ t: "walk", tp: (typeof lastTeleport !== "undefined" && performance.now() - lastTeleport < 2000) ? 1 : undefined, c: city, x: +player.x.toFixed(1), z: +player.z.toFixed(1), yaw: +player.yaw.toFixed(2), s: +(Car.speed || Math.hypot(player.vx || 0, player.vz || 0)).toFixed(1), v: share.veh || undefined, k: share.park || undefined, h: Market.house, q: typeof Shopkeep !== "undefined" && Shopkeep.seated ? 1 : undefined, a: Math.round(Car.state() ? Car.state().alt : 0), d: Math.round(Vitals.coins), r: +(Car.state() ? Car.state().roll : 0).toFixed(2) });
   }
 
   function bind() {

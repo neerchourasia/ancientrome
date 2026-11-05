@@ -1048,6 +1048,7 @@ const Delhi = (() => {
     buildPalaces();
     buildFortGardens();
     buildChandniChowk();
+    if (typeof Interiors !== "undefined") for (const [x, z, kind] of [[5771, 289, "Attar seller"], [6280, -66, "Chai stall"]]) Interiors.addHouse({ x, z, w: 12, d: 9, h: 4, kinds: "delhi", kind, parent: scene, color: 0xdcb27c, roof: "flat", roofColor: 0x7a3a2a });   // beside the Jama Masjid and in the Red Fort
     buildTown();
     buildJamaMasjid();
     buildFatehpuri();
