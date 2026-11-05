@@ -2,13 +2,7 @@
 // The teacher page (class.html): builds the class link from the options and copies it.
 (() => {
   const $ = (id) => document.getElementById(id);
-  // the sights (id, name), by city; "m" = only in the modern city, "a" = only in the ancient one
-  const SIGHTS = {
-    "Rome": [["forum", "The Roman Forum"], ["colosseum", "The Colosseum"], ["pantheon", "The Pantheon"], ["rostra", "The Rostra"], ["curia", "Curia Julia"], ["julia", "Basilica Julia"], ["saturn", "Temple of Saturn"], ["castor", "Temple of Castor and Pollux"], ["vesta", "Temple of Vesta"], ["titus", "Arch of Titus"], ["milestone", "The Golden Milestone"], ["capitolium", "Temple of Jupiter Optimus Maximus"], ["palatine", "The Palatine Hill"], ["circus", "Circus Maximus"], ["trajan", "Trajan's Column"], ["colossus", "Colossus of the Sun"], ["carcer", "The Carcer (Mamertine Prison)"], ["hercules", "Temple of Hercules Victor"], ["pompey", "Theatre of Pompey"], ["servian", "Servian Wall"], ["aqua-claudia", "The Aqua Claudia"], ["domus-severiana", "Domus Severiana"], ["severus-arches", "The Arches of Severus"]],
-    "Old Delhi": [["d-lahori", "Lahori Gate"], ["d-chhatta", "Chhatta Chowk and the Naubat Khana"], ["d-diwanaam", "Diwan-i-Aam"], ["d-diwankhas", "Diwan-i-Khas"], ["d-rangmahal", "Rang Mahal and the Stream of Paradise"], ["d-burj", "Muthamman Burj"], ["d-chandni", "Chandni Chowk"], ["d-serai", "Begum ki Serai"], ["d-katra", "Katra Neel"], ["d-fatehpuri", "Fatehpuri Masjid"], ["d-jama", "Jama Masjid"], ["d-indiagate", "India Gate (today)"], ["d-kartavya", "Kartavya Path (today)"], ["d-metro", "Chandni Chowk Metro Station (today)"]],
-    "Cancún and Chichén Itzá": [["c-castillo", "El Castillo (Temple of Kukulcán)"], ["c-ballcourt", "The Great Ball Court"], ["c-warriors", "Temple of the Warriors"], ["c-columns", "Group of the Thousand Columns"], ["c-caracol", "El Caracol"], ["c-cenote", "The Sacred Cenote"], ["c-sacbe", "The Sacbé (the white road)"], ["c-venus", "Platform of Venus"], ["c-tzompantli", "The Tzompantli"], ["c-tulum", "Tulum (Maya days)"], ["c-hotelzone", "Cancún Hotel Zone (today)"], ["c-beach", "The Caribbean beach"], ["c-reef", "The Coral Reef"], ["c-azul", "Cenote Azul"]],
-    "Beijing": [["b-tiananmen", "Tiananmen, the Gate of Heavenly Peace"], ["b-meridian", "The Meridian Gate"], ["b-harmony", "Hall of Supreme Harmony"], ["b-jingshan", "Jingshan Hill"], ["b-heaven", "Temple of Heaven"], ["b-drum", "The Drum Tower"], ["b-bell", "The Bell Tower"], ["b-hutong", "The Hutongs"], ["b-summer", "The Summer Palace"], ["b-lake", "Kunming Lake"], ["b-bridge", "The Seventeen-Arch Bridge"], ["b-wall", "The Great Wall at Badaling"], ["b-square", "Tiananmen Square (today)"], ["b-cbd", "The CBD towers (today)"]],
-  };
+  const SIGHTS = ClassCode.GROUPS;                                   // (the sights, by city: classcode.js)
   for (const [city, list] of Object.entries(SIGHTS)) {
     const grp = document.createElement("optgroup"); grp.label = city;
     for (const [id, name] of list) { const o = document.createElement("option"); o.value = id; o.textContent = name; grp.append(o); }
@@ -24,6 +18,9 @@
     det.append(grid); $("c-hunt").append(det);
   }
 
+  function options() {
+    return { latin: $("c-latin").checked, fights: $("c-fights").checked, city: $("c-city").value, era: $("c-era").value, lang: $("c-lang").value, at: $("c-at").value, hour: $("c-hour").value === "" ? null : Number($("c-hour").value), hunt: [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12) };
+  }
   function link() {
     const p = new URLSearchParams();
     p.set("class", $("c-name").value.trim() || "Class");
@@ -42,12 +39,16 @@
     const n = document.querySelectorAll(".c-hunt-box:checked").length;
     for (const b of document.querySelectorAll(".c-hunt-box:not(:checked)")) b.disabled = n >= 12;        // (up to 12 sights)
     const l = link(); $("c-link").textContent = l; $("c-open").href = l; $("c-msg").textContent = "";
+    $("c-code").textContent = ClassCode.encode(options());
   }
   for (const id of ["c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
   $("c-copy").addEventListener("click", async () => {
     const l = link();
     try { await navigator.clipboard.writeText(l); $("c-msg").textContent = "Copied."; }
     catch (e) { const r = document.createRange(); r.selectNodeContents($("c-link")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("c-msg").textContent = "Select the link and copy it (Ctrl+C)."; }
+  });
+  $("c-copycode").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("c-code").textContent); $("c-msg").textContent = "Code copied."; } catch (e) { $("c-msg").textContent = "Select the code and copy it (Ctrl+C)."; }
   });
   show();
 })();

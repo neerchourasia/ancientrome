@@ -925,3 +925,10 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .hd-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 2px; }
 #huntdone .dbtns button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
 @media print { body > *:not(#huntdone) { display: none !important; } #huntdone { position: static !important; display: block !important; } #huntdone .dclose, #huntdone .dbtns { display: none !important; } }
+
+.class-code { margin-top: 14px; display: grid; gap: 6px; justify-items: start; font-size: .95rem; }
+.class-code label { font-weight: 700; }
+.cc-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.class-code input { font: 600 1rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 9px 12px; width: 15em; max-width: 100%; border-radius: 8px; border: 1px solid rgba(226,185,85,.5); background: rgba(20,16,11,.85); color: var(--ink, #f1ead8); }
+.class-code button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold, #e2b955); }
+#class-code-msg { color: #f0a090; min-height: 1.2em; }

@@ -554,6 +554,10 @@ const I18n = (() => {
     ["Show this screen to your teacher.", "Enseña esta pantalla a tu profesor.", "Mostra questa schermata al tuo insegnante.", "यह स्क्रीन अपने शिक्षक को दिखाएँ।", "把这个画面给老师看。"],
     ["Print", "Imprimir", "Stampa", "प्रिंट करें", "打印"],
     ["Keep playing", "Seguir jugando", "Continua a giocare", "खेलते रहें", "继续玩"],
+    // the class code box
+    ["Have a class code?", "¿Tienes un código de clase?", "Hai un codice della classe?", "क्या आपके पास कक्षा का कोड है?", "有课堂代码吗?"],
+    ["Join class", "Unirse a la clase", "Unisciti alla classe", "कक्षा में शामिल हों", "加入课堂"],
+    ["That code does not look right. Check it and try again.", "Ese código no parece correcto. Revísalo e inténtalo de nuevo.", "Quel codice non sembra giusto. Controllalo e riprova.", "यह कोड सही नहीं लगता। जाँचकर फिर से कोशिश करें।", "这个代码好像不对。请检查后再试一次。"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [
