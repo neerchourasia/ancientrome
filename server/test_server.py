@@ -3505,6 +3505,86 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
         self.assertEqual(top["gain"][0][1], 10 ** 12)                                                    # (a gain is never more than they hold, and is cut to the limit)
 
+    async def test_the_player_market_sells_auctions_refunds_and_returns(self):
+        server.MKT["list"].clear(); server.MKT["mail"].clear(); server.MKT["seq"] = 0
+        self.addCleanup(lambda: (server.MKT["list"].clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        for c, coins in ((ann, 100), (bob, 500), (cy, 900)):
+            c.send({"t": "walk", "c": "rome", "x": 1, "z": 1, "yaw": 0, "s": 0, "d": coins})            # (the denarii a browser says it has)
+        await asyncio.sleep(0.3)
+        mail = lambda c, pred=lambda m: True: c.until(lambda m: m["t"] == "mkt" and m["a"] == "mail" and pred(m["mail"]))
+        # Ann sells a clay lamp for 60: Bob buys it; Ann gets 95%, Bob's money goes and the lamp arrives by mail
+        ann.send({"t": "social", "a": "m_list", "item": "lamp", "ik": "good", "n": 3, "price": 60, "sale": "fixed", "label": "Clay lamp <b>"})
+        board = await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "board" and m["list"])
+        L = board["list"][0]
+        self.assertEqual((L["item"], L["n"], L["price"], L["sale"], L["mine"], L["label"]), ("lamp", 3, 60, "fixed", True, "Clay lamp b"))
+        ann.send({"t": "social", "a": "m_buy", "id": L["id"]})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "err"))["text"], "That is not for sale any more.")      # not your own
+        bob.send({"t": "social", "a": "m_buy", "id": L["id"]})
+        bought = (await mail(bob))["mail"]
+        self.assertEqual((bought["coins"], bought["item"], bought["n"]), (-60, "lamp", 3))
+        sold = (await mail(ann, lambda x: x["coins"] > 0))["mail"]
+        self.assertEqual(sold["coins"], 57)
+        bob.send({"t": "social", "a": "m_buy", "id": L["id"]})
+        await bob.until(lambda m: m["t"] == "mkt" and m["a"] == "err")                                                                  # already sold
+        # mail stays until the browser says it has it, and comes again when it asks
+        bob.send({"t": "social", "a": "m_ack", "ids": [bought["id"]]}); await asyncio.sleep(0.2)
+        self.assertEqual(server.MKT["mail"][bob.welcome and server.fid_of("u-bob")], [])
+        self.assertEqual(len(server.MKT["mail"][server.fid_of("u-ann")]), 1)
+        # a buyer without the money is refused
+        ann.send({"t": "social", "a": "m_list", "item": "sword", "ik": "item", "price": 700, "sale": "fixed", "label": "Sword"})
+        sw = (await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "board" and len(m["list"]) == 1))["list"][0]
+        bob.send({"t": "social", "a": "m_buy", "id": sw["id"]})
+        self.assertIn("700", (await bob.until(lambda m: m["t"] == "mkt" and m["a"] == "err"))["text"])
+        ann.send({"t": "social", "a": "m_cancel", "id": sw["id"]})                                                                  # (Ann takes it back)
+        back = (await mail(ann, lambda x: x.get("item") == "sword"))["mail"]
+        self.assertEqual(back["n"], 1)
+        # an auction: Bob bids 80 (the start price), Cy outbids him (at least 5% more): Bob is refunded; nobody can take it back with a bid on it
+        ann.send({"t": "social", "a": "m_list", "item": "vase", "ik": "item", "price": 80, "sale": "auction", "hours": 6, "label": "Vase"})
+        au = (await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "board" and len(m["list"]) == 1))["list"][0]
+        bob.send({"t": "social", "a": "m_bid", "id": au["id"], "amt": 70})
+        self.assertIn("80", (await bob.until(lambda m: m["t"] == "mkt" and m["a"] == "err"))["text"])
+        bob.send({"t": "social", "a": "m_bid", "id": au["id"], "amt": 80})
+        self.assertEqual((await mail(bob, lambda x: x["coins"] == -80))["mail"]["coins"], -80)
+        cy.send({"t": "social", "a": "m_bid", "id": au["id"], "amt": 82})
+        self.assertIn("84", (await cy.until(lambda m: m["t"] == "mkt" and m["a"] == "err"))["text"])                                # 80 + 5% = 84
+        cy.send({"t": "social", "a": "m_bid", "id": au["id"], "amt": 120})
+        await mail(cy, lambda x: x["coins"] == -120)
+        self.assertEqual((await mail(bob, lambda x: x["coins"] == 80))["mail"]["coins"], 80)                                        # refunded
+        ann.send({"t": "social", "a": "m_cancel", "id": au["id"]})
+        await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "err")
+        # the auction ends: Cy gets the vase, Ann is paid 95% of 120
+        server.MKT["list"][au["id"]]["ends"] = time.time() - 1
+        server.mkt_tick()
+        won = (await mail(cy, lambda x: x.get("item") == "vase"))["mail"]
+        self.assertEqual(won["n"], 1)
+        self.assertEqual((await mail(ann, lambda x: x["coins"] == 114))["mail"]["coins"], 114)
+        # a listing nobody wants comes back; five at a time is the limit, and the sixth goes straight back
+        ann.send({"t": "social", "a": "m_list", "item": "cup", "ik": "good", "n": 1, "price": 5, "sale": "fixed", "label": "Cup"})
+        await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "board" and len(m["list"]) == 1)
+        server.MKT["list"][next(iter(server.MKT["list"]))]["ends"] = time.time() - 1
+        server.mkt_tick()
+        await mail(ann, lambda x: x.get("item") == "cup")
+        refill = lambda: [setattr(c, "social_n", 8.0) for c in server.CONNS]               # (the server only takes a message a second from a player: this test is in a hurry)
+        for i in range(5):
+            refill()
+            ann.send({"t": "social", "a": "m_list", "item": "cup", "ik": "good", "n": 1, "price": 5, "sale": "fixed", "label": "Cup %d" % i})
+            await asyncio.sleep(0.15)
+        refill()
+        ann.send({"t": "social", "a": "m_list", "item": "bowl", "ik": "good", "n": 2, "price": 9, "sale": "fixed", "label": "Bowl"})
+        back = (await mail(ann, lambda x: x.get("item") == "bowl"))["mail"]
+        self.assertEqual(back["n"], 2)
+        refill()
+        ann.send({"t": "social", "a": "m_list", "item": "BAD ID", "ik": "good", "price": 5, "sale": "fixed"})                       # silly input is refused
+        await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "err")
+        # the market is saved with the world and comes back
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.MKT["list"].clear(); server.MKT["mail"].clear()
+        server.world_apply(snap)
+        self.assertEqual(len(server.MKT["list"]), 5)
+        self.assertTrue(server.MKT["mail"])
+
     async def test_guilds_share_a_chat_and_a_treasury_the_leader_controls(self):
         server.GUILDS.clear(); server.GUILD_OF.clear()
         self.accounts("ann", "bob", "cy")

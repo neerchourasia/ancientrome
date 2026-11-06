@@ -2816,6 +2816,8 @@ async def world_loop():
             if n % 4 == 0:
                 tourney_tick()
                 trade_tick()
+            if n % 40 == 0:
+                mkt_tick()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
                 season_roll()
@@ -3673,6 +3675,8 @@ def send_social(conn):
     PENDING_GIFTS[conn.fid] = [g for g in PENDING_GIFTS.get(conn.fid, []) if t - g["t"] < 7 * 86400]
     for g in PENDING_GIFTS[conn.fid]:                  # gifts that were never confirmed (the friend's page was old, or they were away) arrive now
         conn.send({"t": "fr_gift", "id": g["id"], "fid": g["fid"], "name": g["from"], "n": g["n"]})
+    for mail in MKT["mail"].get(conn.fid, []):         # market mail that has not been taken yet
+        conn.send({"t": "mkt", "a": "mail", "mail": mail})
 
 
 def presence(conn, online):
@@ -3883,6 +3887,134 @@ def on_stats(conn, m):
     gain = min(int(num(m.get("gain"), -10 ** 12, 10 ** 12, 0)), coins) if m.get("wk") == leader_week() else 0      # (only a gain counted in this week, and never more than they hold)
     LEADERS[conn.fid] = {"name": conn.name, "coins": coins, "relics": int(num(m.get("relics"), 0, 12, 0)), "houses": int(num(m.get("houses"), 0, 30, 0)), "gain": gain, "wk": leader_week(), "t": time.time()}
 
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# the player market: players with an account sell goods and things they own to each other, at a price or by auction. The browsers hold the things and the money, so the server is the go-between and
+# everything that moves is a piece of MAIL (money in or out, and perhaps an item) that stays in the player's mailbox until their browser says it has it (m_ack): nothing is lost if the buyer's page
+# is closed. The browser takes an item out of its own pack before it lists it (and gets it back by mail if the listing is refused or does not sell); the money is taken from the buyer's browser when the
+# mail arrives (the server checks the denarii the browser last reported). A 5% fee comes off every sale. A bid takes its money at once (and is refunded by mail when somebody bids more). The listings and the
+# mail are saved with the rest of the world.
+MKT = {"seq": 0, "list": {}, "mail": {}}        # list: id -> listing; mail: friend id -> [mail]
+MKT_FEE, MKT_MAX_LISTINGS, MKT_MAX_PRICE, MKT_FIXED_LIFE, MKT_MAIL_MAX = 0.05, 5, 10 ** 7, 3 * 86400, 100
+MKT_HOURS = (1, 6, 24)
+
+
+def mkt_next():
+    MKT["seq"] += 1
+    return "m%d" % MKT["seq"]
+
+
+def mkt_mail(fid, **mail):
+    """Something for a player: coins (plus or minus), an item (item, ik, n) and a line to show them."""
+    mail["id"] = mkt_next()
+    mail["text"] = class_clean(mail.get("text", ""), 140)
+    box = MKT["mail"].setdefault(fid, [])
+    box.append(mail)
+    del box[:-MKT_MAIL_MAX]
+    for c in conns_of(fid):
+        c.send({"t": "mkt", "a": "mail", "mail": mail})
+    world_soon()
+
+
+def mkt_err(conn, text):
+    conn.send({"t": "mkt", "a": "err", "text": text})
+
+
+def mkt_view(conn):
+    t = time.time()
+    rows = []
+    for L in sorted(MKT["list"].values(), key=lambda L: -L["t"])[:150]:
+        rows.append({"id": L["id"], "sale": L["sale"], "item": L["item"], "ik": L["ik"], "n": L["n"], "label": L["label"], "price": L["price"], "seller": L["name"], "mine": L["fid"] == conn.fid,
+                     "bid": L["bid"]["amt"] if L["bid"] else 0, "bidder": L["bid"]["name"] if L["bid"] else "", "left": max(0, int(L["ends"] - t))})
+    return {"t": "mkt", "a": "board", "list": rows, "fee": MKT_FEE, "max": MKT_MAX_LISTINGS}
+
+
+def mkt_item(m):
+    item, ik = str(m.get("item", "")), m.get("ik")
+    return (item, ik) if re.fullmatch(r"[a-z0-9_]{2,24}", item) and ik in ("item", "good") else (None, None)
+
+
+def on_market(conn, a, m):
+    t = time.time()
+    if a == "m_board":
+        return conn.send(mkt_view(conn))
+    if a == "m_mail":                                                # (the browser asks for what is waiting: when it opens the market, and after a while)
+        for mail in MKT["mail"].get(conn.fid, []):
+            conn.send({"t": "mkt", "a": "mail", "mail": mail})
+        return
+    if a == "m_ack":
+        ids = set(str(x) for x in (m.get("ids") if isinstance(m.get("ids"), list) else [])[:100])
+        MKT["mail"][conn.fid] = [x for x in MKT["mail"].get(conn.fid, []) if x["id"] not in ids]
+        world_soon()
+        return
+    if a == "m_list":
+        item, ik = mkt_item(m)
+        if not item:
+            return mkt_err(conn, "That cannot be sold.")
+        n = 1 if ik == "item" else int(num(m.get("n"), 1, 99, 1))
+        price, sale = int(num(m.get("price"), 0, MKT_MAX_PRICE, 0)), "auction" if m.get("sale") == "auction" else "fixed"
+        hours = int(num(m.get("hours"), 1, 24, 24)) if int(num(m.get("hours"), 1, 24, 24)) in MKT_HOURS else 24
+        label = class_clean(m.get("label"), 40) or item
+        if price < 1 or sum(1 for L in MKT["list"].values() if L["fid"] == conn.fid) >= MKT_MAX_LISTINGS:
+            mkt_err(conn, "Name a price, and keep to %d listings at a time." % MKT_MAX_LISTINGS)
+            return mkt_mail(conn.fid, item=item, ik=ik, n=n, text="Your %s is back with you." % label)
+        lid = mkt_next()
+        MKT["list"][lid] = {"id": lid, "fid": conn.fid, "name": conn.name, "item": item, "ik": ik, "n": n, "label": label, "price": price, "sale": sale, "t": t, "ends": t + (hours * 3600 if sale == "auction" else MKT_FIXED_LIFE), "bid": None}
+        world_soon()
+        return conn.send(mkt_view(conn))
+    L = MKT["list"].get(str(m.get("id", "")))
+    if a == "m_buy":
+        if not L or L["sale"] != "fixed" or L["fid"] == conn.fid:
+            return mkt_err(conn, "That is not for sale any more.")
+        if (conn.coins or 0) < L["price"]:
+            return mkt_err(conn, "You need %d denarii for that." % L["price"])
+        del MKT["list"][L["id"]]
+        conn.coins = max(0, (conn.coins or 0) - L["price"])
+        mkt_mail(conn.fid, coins=-L["price"], item=L["item"], ik=L["ik"], n=L["n"], text="You bought %s for %d denarii." % (L["label"], L["price"]))
+        got = int(L["price"] * (1 - MKT_FEE))
+        mkt_mail(L["fid"], coins=got, text="%s bought your %s: you receive %d denarii (the market took 5%%)." % (conn.name, L["label"], got))
+        return conn.send(mkt_view(conn))
+    if a == "m_bid":
+        if not L or L["sale"] != "auction" or t >= L["ends"] or L["fid"] == conn.fid:
+            return mkt_err(conn, "That auction is over.")
+        top = L["bid"]["amt"] if L["bid"] else 0
+        need = L["price"] if not top else top + max(1, int(top * 0.05))
+        amt = int(num(m.get("amt"), 0, MKT_MAX_PRICE, 0))
+        if amt < need:
+            return mkt_err(conn, "The lowest bid now is %d denarii." % need)
+        if (conn.coins or 0) < amt:
+            return mkt_err(conn, "You need %d denarii for that bid." % amt)
+        if L["bid"]:
+            mkt_mail(L["bid"]["fid"], coins=L["bid"]["amt"], text="You were outbid on %s: your %d denarii are back." % (L["label"], L["bid"]["amt"]))
+        L["bid"] = {"fid": conn.fid, "name": conn.name, "amt": amt}
+        conn.coins = max(0, (conn.coins or 0) - amt)
+        if L["ends"] - t < 120:                                      # (a bid in the last two minutes gives two minutes more, so nobody is beaten in the last second)
+            L["ends"] = t + 120
+        mkt_mail(conn.fid, coins=-amt, text="Your bid of %d denarii on %s is in: it ends %s." % (amt, L["label"], "soon" if L["ends"] - t < 3600 else "later"))
+        return conn.send(mkt_view(conn))
+    if a == "m_cancel":
+        if not L or L["fid"] != conn.fid or (L["sale"] == "auction" and L["bid"]):
+            return mkt_err(conn, "That cannot be taken back.")
+        del MKT["list"][L["id"]]
+        mkt_mail(conn.fid, item=L["item"], ik=L["ik"], n=L["n"], text="Your %s is back with you." % L["label"])
+        return conn.send(mkt_view(conn))
+
+
+def mkt_tick():
+    """Listings that have run out: an auction goes to the highest bidder (and the seller is paid), anything else goes back to its seller."""
+    t = time.time()
+    for L in list(MKT["list"].values()):
+        if t < L["ends"]:
+            continue
+        del MKT["list"][L["id"]]
+        if L["sale"] == "auction" and L["bid"]:
+            b = L["bid"]
+            mkt_mail(b["fid"], item=L["item"], ik=L["ik"], n=L["n"], text="You won the auction: %s is yours." % L["label"])
+            got = int(b["amt"] * (1 - MKT_FEE))
+            mkt_mail(L["fid"], coins=got, text="Your %s sold at auction to %s for %d denarii: you receive %d (the market took 5%%)." % (L["label"], b["name"], b["amt"], got))
+        else:
+            mkt_mail(L["fid"], item=L["item"], ik=L["ik"], n=L["n"], text="Your %s did not sell: it is back with you." % L["label"])
 
 
 # ---- guilds: a few players with accounts who share a name, a chat and a treasury. Kept in memory only (a restart empties them), like the friends lists.
@@ -5528,6 +5660,8 @@ def on_social(conn, m):
         return on_trade(conn, a, m)
     if a == "stats":
         return on_stats(conn, m)
+    if a in ("m_board", "m_list", "m_buy", "m_bid", "m_cancel", "m_ack", "m_mail"):
+        return on_market(conn, a, m)
     if a == "title":
         return on_title(conn, m)
     if a == "ev_time":
@@ -6165,7 +6299,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
@@ -6209,6 +6343,22 @@ def world_apply(rows):
             if clean_fid(f) and isinstance(lst, list):
                 PRIZES[f] = [{"id": str(p.get("id"))[:12], "week": int(num(p.get("week"), 0, 1e6, 0)), "theme": str(p.get("theme", ""))[:40], "rank": int(num(p.get("rank"), 1, 1e6, 1)),
                               "coins": int(num(p.get("coins"), 0, 1e6, 0)), "pts": int(num(p.get("pts"), 0, 1e6, 0)), **({"tour": 1} if p.get("tour") else {}), **({"quest": 1} if p.get("quest") else {})} for p in lst[:8] if isinstance(p, dict)]
+    mk = rows.get("market")
+    if isinstance(mk, dict):
+        MKT["seq"] = int(num(mk.get("seq"), 0, 10 ** 9, 0))
+        MKT["list"].clear()
+        MKT["mail"].clear()
+        for lid, L in list((mk.get("list") if isinstance(mk.get("list"), dict) else {}).items())[:3000]:
+            if isinstance(L, dict) and clean_fid(L.get("fid")) and re.fullmatch(r"[a-z0-9_]{2,24}", str(L.get("item", ""))) and L.get("ik") in ("item", "good") and L.get("sale") in ("fixed", "auction"):
+                b = L.get("bid")
+                MKT["list"][str(lid)[:12]] = {"id": str(lid)[:12], "fid": L["fid"], "name": class_clean(L.get("name"), 16), "item": L["item"], "ik": L["ik"], "n": int(num(L.get("n"), 1, 99, 1)), "label": class_clean(L.get("label"), 40),
+                                              "price": int(num(L.get("price"), 1, MKT_MAX_PRICE, 1)), "sale": L["sale"], "t": float(num(L.get("t"), 0, 1e12, 0)), "ends": float(num(L.get("ends"), 0, 1e12, 0)),
+                                              "bid": {"fid": b["fid"], "name": class_clean(b.get("name"), 16), "amt": int(num(b.get("amt"), 1, MKT_MAX_PRICE, 1))} if isinstance(b, dict) and clean_fid(b.get("fid")) else None}
+        for f, box in list((mk.get("mail") if isinstance(mk.get("mail"), dict) else {}).items())[:5000]:
+            if clean_fid(f) and isinstance(box, list):
+                MKT["mail"][f] = [{"id": str(x.get("id"))[:12], "coins": int(num(x.get("coins"), -10 ** 9, 10 ** 9, 0)), "text": class_clean(x.get("text"), 140),
+                                   **({"item": x["item"], "ik": x["ik"], "n": int(num(x.get("n"), 1, 99, 1))} if re.fullmatch(r"[a-z0-9_]{2,24}", str(x.get("item", ""))) and x.get("ik") in ("item", "good") else {})}
+                                  for x in box[-MKT_MAIL_MAX:] if isinstance(x, dict)]
     dl = rows.get("daily")
     if isinstance(dl, dict):
         DAILY.clear()

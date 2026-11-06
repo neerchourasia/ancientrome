@@ -951,3 +951,11 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .wd-list li { padding: 5px 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; }
 .wd-list em { color: var(--muted); font-size: .8rem; }
 .wd-hidden { cursor: pointer; opacity: .5; }
+
+.pm-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.pm-tabs button { font: 700 .9rem system-ui; cursor: pointer; padding: 7px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: var(--ink); background: transparent; }
+.pm-tabs button.on { background: var(--gold); color: #2a2118; border-color: var(--gold); }
+.pm-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.pm-form select, .pm-form input, .pm-amt, #pm-body input[type=search] { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(226,185,85,.5); background: rgba(20,16,11,.85); color: var(--ink); }
+.pm-form input[type=number] { width: 6em; } .pm-amt { width: 6em; margin-left: auto; }
+.pm-form button { font: 700 .95rem system-ui; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }

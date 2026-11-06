@@ -462,6 +462,9 @@ const Shopkeep = (() => {
     get seated() { return !!seated; },
     get stats() { return { visited: st.visited.length, done: st.done, profit: st.profit, owned: Object.keys(st.shops).length, crafted: st.crafted, diceWins: st.dice.w, inn: st.inn, regulars: Object.values(st.rep).filter((v) => level(v) >= 3).length }; },
     ownsShop: (id) => !!st.shops[id],
+    // the player market (playermarket.js): goods put up for sale leave your pack, and come back (or arrive) by mail
+    give(id, n = 1) { if (GOODS[id] && n > 0) { st.inv[id] = Math.min(99, owns(id) + Math.floor(n)); save(); } },
+    take(id, n = 1) { if (!GOODS[id] || owns(id) < n) return false; st.inv[id] = owns(id) - n; if (!st.inv[id]) delete st.inv[id]; save(); return true; },
     get errand() { return st.errand; },
     snapshot: () => JSON.parse(JSON.stringify(st)),
     restore: (r) => restore(r),
