@@ -6,7 +6,7 @@
 const FestHunt = (() => {
   const T = THREE;
   const KEY = "rome-festhunt", COUNT = 8, EACH = 15, BONUS = 100, REACH = 2.4;
-  const TINT = { floralia: 0xf28fb0, saturnalia: 0xc0262b, diwali: 0xffb347, holi: 0xe23b8a, equinox: 0x2f8f4a, muertos: 0xf29a1b };
+  const TINT = { floralia: 0xf28fb0, saturnalia: 0xc0262b, diwali: 0xffb347, holi: 0xe23b8a, equinox: 0x2f8f4a, muertos: 0xf29a1b, midautumn: 0xffd36b, springfest: 0xd8262b };
   const group = new T.Group();
   let set = [], builtKey = "", got = {}, added = false;
   try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") got = v; } catch (e) { /* storage unavailable */ }

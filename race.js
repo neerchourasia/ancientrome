@@ -447,7 +447,7 @@ const Race = (() => {
     Crowd.setCheer(true);
     closePanels();
     updateHud();
-    msg(derby ? "Chariot derby! Ram the others. The last chariot running wins." : "Racing real people. Ave!", 2400);
+    msg(derby ? "Chariot derby! Ram the others. The last chariot running wins." : "Racing real people. Euge!", 2400);
   }
 
   function stepRemote(c, dt) {

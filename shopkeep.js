@@ -351,6 +351,7 @@ const Shopkeep = (() => {
     if (mode !== "walk" || panelOpen) return;
     shop = { id: k.id, name: k.name, keeper: k.keeper, line: k.line, trade: k.trade, city: k.city, kindName: k.name };
     view = v || "main"; note = "";
+    if (typeof Journal !== "undefined") Journal.menu();
     openPanel("#shopkeep"); render();
   }
 

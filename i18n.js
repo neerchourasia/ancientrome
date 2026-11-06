@@ -568,6 +568,10 @@ const I18n = (() => {
     ["The class is paused.", "La clase está en pausa.", "La classe è in pausa.", "कक्षा रुकी हुई है।", "课堂已暂停。"],
     ["Your teacher will start it again in a moment.", "Tu profesor la reanudará en un momento.", "Il tuo insegnante la riprenderà tra poco.", "आपके शिक्षक इसे थोड़ी देर में फिर शुरू करेंगे।", "老师马上会继续。"],
     ["Biggest gain", "Mayor ganancia", "Maggior guadagno", "सबसे बड़ी कमाई", "最大增长"],
+    // the Latin word journal
+    ["📖 Latin words", "📖 Palabras latinas", "📖 Parole latine", "📖 लैटिन शब्द", "📖 拉丁语单词"],
+    ["Hide the English (test yourself)", "Ocultar el inglés (pruébate)", "Nascondi l'inglese (mettiti alla prova)", "अंग्रेज़ी छिपाएँ (खुद को परखें)", "隐藏英文(自我测试)"],
+    ["No words yet.", "Aún no hay palabras.", "Ancora nessuna parola.", "अभी कोई शब्द नहीं।", "还没有单词。"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [

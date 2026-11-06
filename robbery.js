@@ -1,5 +1,5 @@
 "use strict";
-// The Via Domus and house robberies (online). Every player who is online has a house on this street in Rome, so you can walk
+// The Via Domorum and house robberies (online). Every player who is online has a house on this street in Rome, so you can walk
 // along it and see their names. Walk up to someone else's door and press F to break in and take 100 denarii. You then pick a
 // getaway vehicle (or run on foot) and must get away before the owner catches you: caught, you lose 100 denarii to them;
 // away (230 m, or 80 seconds), you keep 100 of theirs. The owner is told at once and shown where you are. The server decides
@@ -148,7 +148,7 @@ const Robbery = (() => {
     } else {
       toast(`${m.other} is robbing your house! Catch them!`);
       Narrator.say(`${m.other} is robbing your house. Catch them.`, { interrupt: true });
-      Chat.add({ sys: 1, text: `⚠ ${m.other} is robbing your house on the Via Domus!` });
+      Chat.add({ sys: 1, text: `⚠ ${m.other} is robbing your house on the Via Domorum!` });
       Sfx.play("horn");
       openGetaway(true);          // you can give chase on foot or in one of your own vehicles
     }
@@ -310,7 +310,7 @@ const Robbery = (() => {
         h.id = "npc:" + n.plot; h.g.visible = true; setLabel(h, n.name); h.tiers.forEach((t, k) => { t.visible = n.tier > k; }); h.blockers.forEach((b) => { b.off = false; }); h.tier = n.tier;
       });
     },
-    // visit a friend's house on the Via Domus (in Rome): where it stands while the owner is online
+    // visit a friend's house on the Via Domorum (in Rome): where it stands while the owner is online
     visit(name) {
       const row = list.find((r) => r[2] === name);
       if (!row) return false;

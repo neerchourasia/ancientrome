@@ -22,7 +22,7 @@ const ClassReport = (() => {
     if (base === null) { base = coins; try { localStorage.setItem("rome-cbase", String(base)); } catch (e) { /* ignore */ } }      // (the money they started the lesson with: the gain is measured from it)
     return {
       city, era, coins, gain: coins - base, sights: [...discovered].slice(0, 80), shops: st.visited || 0, errands: st.done || 0, crafted: st.crafted || 0,
-      ach: typeof Achievements !== "undefined" ? Achievements.count : 0, hunt: typeof Hunt !== "undefined" ? Hunt.progress : null,
+      ach: typeof Achievements !== "undefined" ? Achievements.count : 0, words: typeof Journal !== "undefined" ? Journal.count : 0, hunt: typeof Hunt !== "undefined" ? Hunt.progress : null,
     };
   }
   function tick() {

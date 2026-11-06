@@ -22,7 +22,7 @@ const Character = (() => {
       mods: { melee: 1.25, taken: 0.9, racespeed: 0.97 },
     },
     charioteer: {
-      name: "Charioteer", blurb: "A star of the Circus Maximus.",
+      name: "Auriga", blurb: "A star of the Circus Maximus.",
       perks: ["Horses tire 20% slower", "Chariot a little faster (+3%)", "Weaker sword (-10%), takes 5% more damage"],
       mods: { tire: 0.8, racespeed: 1.03, melee: 0.9, taken: 1.05 },
     },
@@ -32,12 +32,12 @@ const Character = (() => {
       mods: { arrow: 1.3, melee: 0.9 },
     },
     merchant: {
-      name: "Merchant", blurb: "Makes money wherever there is a crowd.",
+      name: "Mercator", blurb: "Makes money wherever there is a crowd.",
       perks: ["+25% denarii from purses and prizes", "Race entry 25% cheaper", "Weaker sword (-15%), takes 10% more damage"],
       mods: { coin: 1.25, fee: 0.75, melee: 0.85, taken: 1.1 },
     },
     legionary: {
-      name: "Legionary", blurb: "A soldier of Rome, hard to hurt.",
+      name: "Legionarius", blurb: "A soldier of Rome, hard to hurt.",
       perks: ["20% less damage taken", "+10% sword damage", "Chariot a little slower (-5%)"],
       mods: { taken: 0.8, melee: 1.1, racespeed: 0.95 },
     },

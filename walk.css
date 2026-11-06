@@ -946,3 +946,8 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 #class-pause span { font-size: 4rem; display: block; } #class-pause p { margin: 6px 0; } #class-pause small { font-weight: 400; font-size: 1rem; color: var(--muted, #c9bd9f); }
 #class-board { position: fixed; left: 12px; bottom: 64px; z-index: 4; max-width: 260px; padding: 8px 12px; font-size: .85rem; color: var(--ink, #f1ead8); background: rgba(28,22,16,.9); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; }
 #class-board h3 { margin: 0 0 4px; font-size: .95rem; } #class-board ol { list-style: none; margin: 2px 0 6px; padding: 0; } #class-board li.me { font-weight: 700; color: #8fd49a; }
+
+.wd-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.wd-list li { padding: 5px 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; }
+.wd-list em { color: var(--muted); font-size: .8rem; }
+.wd-hidden { cursor: pointer; opacity: .5; }

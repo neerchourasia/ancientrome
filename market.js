@@ -202,6 +202,12 @@ const Market = (() => {
     f_mithaim: FD("Mithai box (gulab jamun)", 14, 24, "Syrup-soaked sweets for Diwali.", ["delhi", "modern"], "diwali"),
     f_thandai: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "ancient"], "holi"),
     f_thandaim: FD("Thandai", 10, 16, "A cold spiced milk drink for Holi.", ["delhi", "modern"], "holi"),
+    f_mooncake: FD("Moon cake", 12, 20, "A round pastry filled with lotus seed paste and a salted egg yolk, for the Mid-Autumn Festival.", ["beijing", "ancient"], "midautumn"),
+    f_mooncakem: FD("Moon cake", 12, 20, "A round pastry filled with lotus seed paste and a salted egg yolk, for the Mid-Autumn Festival.", ["beijing", "modern"], "midautumn"),
+    f_newyearjiaozi: FD("New Year dumplings", 14, 24, "Jiaozi shaped like old gold ingots: eat them for luck in the new year.", ["beijing", "ancient"], "springfest"),
+    f_newyearjiaozim: FD("New Year dumplings", 14, 24, "Jiaozi shaped like old gold ingots: eat them for luck in the new year.", ["beijing", "modern"], "springfest"),
+    f_niangao: FD("Nian gao", 9, 14, "Sticky rice cake, sweet and chewy: a rise in the new year.", ["beijing", "ancient"], "springfest"),
+    f_niangaom: FD("Nian gao", 9, 14, "Sticky rice cake, sweet and chewy: a rise in the new year.", ["beijing", "modern"], "springfest"),
   });
   // medicines from the healer: each cures some illnesses (see disease.js); where: the city that sells it
   const CURES = {

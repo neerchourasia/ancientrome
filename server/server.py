@@ -2507,7 +2507,7 @@ PLACES = {
     ('Theatre of Pompey', -690, -125, 70),
     ('The Circus Office', -205, 98, 14),
     ('The Harbour (Portus)', 50, 82, 40),
-    ('The Via Domus', 250, -40, 30),
+    ('The Via Domorum', 250, -40, 30),
     ('The Hypogeum Jobs', 318, 66, 16),
     ('The Market', 170, 62, 26),
     ('a house by the Colosseum road', 255, 50, 9),
@@ -2824,7 +2824,7 @@ async def world_loop():
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# houses and robberies: everyone online has a house plot on the Via Domus in Rome. You can break into someone else's house
+# houses and robberies: everyone online has a house plot on the Via Domorum in Rome. You can break into someone else's house
 # (they must be online and in Rome), run with the loot, and the owner chases you. Caught, you lose 100 denarii (to the owner);
 # get away and you keep 100 denarii of theirs. Coins are kept by the browsers; the server only decides who got caught.
 
@@ -5925,7 +5925,7 @@ def class_report(cid, sid, name, data, events):
     d = data if isinstance(data, dict) else {}
     st["city"] = d.get("city") if d.get("city") in WORLD_CITIES else None
     st["era"] = d.get("era") if d.get("era") in ("ancient", "modern") else None
-    for k in ("coins", "shops", "errands", "crafted", "ach"):
+    for k in ("coins", "shops", "errands", "crafted", "ach", "words"):
         st[k] = int(num(d.get(k), 0, 10 ** 9, 0))
     st["gain"] = int(num(d.get("gain"), -10 ** 9, 10 ** 9, 0))       # (money now minus the money they started the lesson with)
     sights = d.get("sights") if isinstance(d.get("sights"), list) else []
@@ -5950,7 +5950,7 @@ def class_view(cid, key):
         if t - st["t"] > CLASS_TTL:
             continue
         out.append({"id": sid[:6], "name": st["name"], "ago": int(t - st["t"]), "since": int(t - st["t0"]), "city": st["city"], "era": st["era"], "coins": st["coins"], "shops": st["shops"],
-                    "errands": st["errands"], "crafted": st["crafted"], "ach": st["ach"], "sights": st["sights"], "hunt": st["hunt"], "gain": st.get("gain", 0), "events": [{"ago": int(t - at), "text": tx} for at, tx in st["ev"]]})
+                    "errands": st["errands"], "crafted": st["crafted"], "ach": st["ach"], "words": st.get("words", 0), "sights": st["sights"], "hunt": st["hunt"], "gain": st.get("gain", 0), "events": [{"ago": int(t - at), "text": tx} for at, tx in st["ev"]]})
     cl = CLASSES.get(cid)
     return {"students": out, "msg": cl["msg"]["text"] if cl else "", "paused": bool(cl and cl["paused"]), "board": bool(cl and cl["board"])}
 

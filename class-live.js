@@ -18,12 +18,12 @@
       const live = s.ago < 30, tr = el("tr", undefined, "row");
       const hunt = s.hunt ? (s.hunt.done ? `✓ ${Math.floor(s.hunt.done / 60)}:${String(s.hunt.done % 60).padStart(2, "0")}` : `${s.hunt.n} of ${s.hunt.of}`) : "-";
       const latest = s.events.length ? s.events[s.events.length - 1].text : "";
-      const cells = [[s.name, ""], [ago(s.ago), live ? "live" : "idle"], [`${CITY[s.city] || "?"}${s.era === "modern" ? " (today)" : ""}`, ""], [String(s.sights.length), ""], [hunt, ""], [String(s.shops), ""], [String(s.errands), ""], [String(s.coins), ""], [latest, ""]];
+      const cells = [[s.name, ""], [ago(s.ago), live ? "live" : "idle"], [`${CITY[s.city] || "?"}${s.era === "modern" ? " (today)" : ""}`, ""], [String(s.sights.length), ""], [hunt, ""], [String(s.shops), ""], [String(s.errands), ""], [String(s.words || 0), ""], [String(s.coins), ""], [latest, ""]];
       for (const [t, cls] of cells) tr.append(el("td", t, cls));
       tr.addEventListener("click", () => { open.has(s.id) ? open.delete(s.id) : open.add(s.id); render(); });
       rows.append(tr);
       if (open.has(s.id)) {
-        const more = el("tr", undefined, "more"), td = el("td"); td.colSpan = 9;
+        const more = el("tr", undefined, "more"), td = el("td"); td.colSpan = 10;
         td.append(el("div", `Time in the game: ${ago(s.since).replace(" ago", "")} · goods made: ${s.crafted} · achievements: ${s.ach}`, "sights"));
         td.append(el("div", `Sights: ${s.sights.join(", ") || "none yet"}`, "sights"));
         const ul = el("ul"); for (const e of s.events.slice().reverse()) ul.append(el("li", `${e.text} (${ago(e.ago)})`)); td.append(ul);
@@ -59,8 +59,8 @@
 
   $("csv").addEventListener("click", () => {
     const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-    const lines = [["Student", "Last seen (s ago)", "City", "Era", "Sights found", "Hunt", "Shops", "Errands", "Goods made", "Achievements", "Money", "Gain this lesson", "What they did"].map(q).join(",")];
-    for (const s of students) lines.push([s.name, s.ago, CITY[s.city] || "", s.era || "", s.sights.length, s.hunt ? (s.hunt.done ? `finished in ${s.hunt.done} s` : `${s.hunt.n} of ${s.hunt.of}`) : "", s.shops, s.errands, s.crafted, s.ach, s.coins, s.gain || 0, s.events.map((e) => e.text).join("; ")].map(q).join(","));
+    const lines = [["Student", "Last seen (s ago)", "City", "Era", "Sights found", "Hunt", "Shops", "Errands", "Latin words", "Goods made", "Achievements", "Money", "Gain this lesson", "What they did"].map(q).join(",")];
+    for (const s of students) lines.push([s.name, s.ago, CITY[s.city] || "", s.era || "", s.sights.length, s.hunt ? (s.hunt.done ? `finished in ${s.hunt.done} s` : `${s.hunt.n} of ${s.hunt.of}`) : "", s.shops, s.errands, s.words || 0, s.crafted, s.ach, s.coins, s.gain || 0, s.events.map((e) => e.text).join("; ")].map(q).join(","));
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); a.download = "class.csv"; a.click();
   });
   $("print").addEventListener("click", () => window.print());

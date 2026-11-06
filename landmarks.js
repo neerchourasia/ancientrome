@@ -37,7 +37,7 @@ const LANDMARKS = [
     fact: "Rome's real harbours were downriver on the Tiber at Ostia and, from 112 AD, at Portus, the great hexagonal basin built by Claudius and Trajan, through which most of the city's grain arrived.",
   },
   {
-    id: "domus", game: true, name: "The Via Domus", sub: "A street of houses: every player online has one",
+    id: "domus", game: true, name: "The Via Domorum", sub: "A street of houses: every player online has one",
     x: 250, z: -40, r: 30, stand: [160, -40],
     text: "A street of houses east of the Forum. Everyone who is online has a house here, with their name over the door. Walk up to someone else's door and press F to break in: you take 100 denarii, pick a getaway vehicle and run before the owner catches you. If they do, you lose 100 denarii to them. You need to be online (Play online) and the owner must be in Rome.",
     fact: "Wealthy Romans lived in a domus, a single-family town house built round an atrium. Most people lived in crowded apartment blocks (insulae).",

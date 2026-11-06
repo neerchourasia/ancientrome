@@ -1,28 +1,69 @@
 "use strict";
-// Festivals. The year has 28 days; on certain days a festival is held and the city dresses up for it:
-//   Rome:  Floralia (days 4-6, spring: flower garlands and flower-sellers' cries) and Saturnalia (days 25-28, midwinter:
-//          red, green and gold lanterns along the Via Sacra, "Io Saturnalia!" everywhere).
-//   Delhi: Diwali (days 9-12: strings of lamps along Chandni Chowk, fireworks over the sky at night, sweets) and Holi
-//          (days 17-18: clouds of coloured powder, flags and "Holi hai!").
-// While a festival lasts, food costs a quarter less, jobs pay a quarter more, there are festival dishes at the food stall,
-// people shout greetings and the music is brighter. Depends on game.js (scene, Time, city), tax.js (Speech) and music.js.
+// Festivals, on the real calendar: the city dresses up on the real days of each festival.
+//   Rome:    Floralia (28 April to 3 May: flower garlands, flower-sellers' cries) and Saturnalia (17 to 23 December: lanterns along the Via Sacra, "Io Saturnalia!").
+//   Delhi:   Diwali (five days around the main night, which moves: 8 November 2026, 29 October 2027...: lamps along Chandni Chowk, rows of diyas, rangoli, fireworks, sweets) and Holi (coloured powder).
+//   Cancún:  the Equinox of Kukulcán (around 20 March and 22 September: the serpent of light) and Día de Muertos (31 October to 2 November: marigolds, candles).
+//   Beijing: the Mid-Autumn Festival (moon cakes, lanterns) and the Spring Festival (Chinese New Year: red lanterns, fireworks, dumplings).
+// The days of the festivals that move with the moon are listed for 2026 to 2030 (`moving`); the others are the same every year (`fixed`). A link with ?feast=diwali (or any festival's name) holds
+// that festival in its city whatever the date, for trying it out. While a festival lasts, food costs a quarter less, jobs pay a quarter more, there are festival dishes at the food stall, people shout
+// greetings and the music is brighter. When a festival is on in a city you are not in, the game tells you so. Depends on game.js (scene, Time, city), tax.js (Speech) and music.js.
 
 const Festival = (() => {
   const T = THREE;
+  // fixed: [month, day, month, day] windows that come every year; moving: { year: [month, day, month, day] }
   const FEASTS = {
-    floralia: { city: "rome", name: "Floralia", icon: "🌸", from: 4, to: 6, note: "flower garlands, cheaper food, better pay", say: ["Io Floralia!", "Flowers for the goddess!", "Happy Floralia!"] },
-    saturnalia: { city: "rome", name: "Saturnalia", icon: "🕯", from: 25, to: 28, note: "lanterns, cheaper food, better pay", say: ["Io Saturnalia!", "Happy Saturnalia!", "Masters serve the slaves today!", "Let the feast begin!"] },
-    diwali: { city: "delhi", name: "Diwali", icon: "🪔", from: 9, to: 12, note: "lamps, fireworks at night, sweets, cheaper food, better pay", say: ["Shubh Deepavali!", "Happy Diwali!", "Light the diyas!", "Have some mithai!"] },
-    equinox: { city: "cancun", name: "Equinox of Kukulcán", icon: "🐍", from: 1, to: 3, note: "the serpent of light slides down El Castillo, flags, cheaper food, better pay", say: ["Kukulcán descends!", "¡Feliz equinoccio!", "Look, the serpent is coming down!", "Let the feast begin!"] },
-    muertos: { city: "cancun", name: "Día de Muertos", icon: "💀", from: 21, to: 23, note: "marigolds, candles, sugar skulls, cheaper food, better pay", say: ["¡Feliz Día de Muertos!", "Pan de muerto, ¡pruébalo!", "For our ancestors!", "Light a candle for them!"] },
-    holi: { city: "delhi", name: "Holi", icon: "🎨", from: 17, to: 18, note: "coloured powder, cheaper food, better pay", say: ["Holi hai!", "Bura na mano, Holi hai!", "Happy Holi!", "Come, play with colours!"] },
+    floralia: { city: "rome", name: "Floralia", icon: "🌸", fixed: [[4, 28, 5, 3]], note: "flower garlands, cheaper food, better pay", say: ["Io Floralia!", "Flowers for the goddess!", "Happy Floralia!"] },
+    saturnalia: { city: "rome", name: "Saturnalia", icon: "🕯", fixed: [[12, 17, 12, 23]], note: "lanterns, cheaper food, better pay", say: ["Io Saturnalia!", "Happy Saturnalia!", "Masters serve the slaves today!", "Let the feast begin!"] },
+    diwali: { city: "delhi", name: "Diwali", icon: "🪔", moving: { 2026: [11, 6, 11, 10], 2027: [10, 27, 10, 31], 2028: [10, 15, 10, 19], 2029: [11, 3, 11, 7], 2030: [10, 24, 10, 28] }, peak: { 2026: [11, 8], 2027: [10, 29], 2028: [10, 17], 2029: [11, 5], 2030: [10, 26] },
+      note: "lamps, rangoli, fireworks at night, sweets, cheaper food, better pay", say: ["Shubh Deepavali!", "Happy Diwali!", "Light the diyas!", "Have some mithai!", "Lakshmi ji ki jai!"] },
+    holi: { city: "delhi", name: "Holi", icon: "🎨", moving: { 2026: [3, 3, 3, 4], 2027: [3, 21, 3, 22], 2028: [3, 10, 3, 11], 2029: [2, 28, 3, 1], 2030: [3, 19, 3, 20] }, note: "coloured powder, cheaper food, better pay", say: ["Holi hai!", "Bura na mano, Holi hai!", "Happy Holi!", "Come, play with colours!"] },
+    equinox: { city: "cancun", name: "Equinox of Kukulcán", icon: "🐍", fixed: [[3, 19, 3, 22], [9, 20, 9, 23]], note: "the serpent of light slides down El Castillo, flags, cheaper food, better pay", say: ["Kukulcán descends!", "¡Feliz equinoccio!", "Look at the serpent of light!", "Come to the pyramid!"] },
+    muertos: { city: "cancun", name: "Día de Muertos", icon: "💀", fixed: [[10, 31, 11, 2]], note: "marigolds, candles, sugar skulls, cheaper food, better pay", say: ["¡Feliz Día de Muertos!", "Pan de muerto, ¡pruébalo!", "For our ancestors!", "Marigolds light the way home!"] },
+    midautumn: { city: "beijing", name: "Mid-Autumn Festival", icon: "🥮", moving: { 2026: [9, 24, 9, 26], 2027: [9, 14, 9, 16], 2028: [10, 2, 10, 4], 2029: [9, 21, 9, 23], 2030: [9, 11, 9, 13] }, note: "lanterns, moon cakes, the full moon, cheaper food, better pay", say: ["Happy Mid-Autumn!", "Look at the moon!", "Have a moon cake!", "中秋快乐!"] },
+    springfest: { city: "beijing", name: "Spring Festival", icon: "🧧", moving: { 2026: [2, 16, 2, 23], 2027: [2, 5, 2, 12], 2028: [1, 25, 2, 1], 2029: [2, 12, 2, 19], 2030: [2, 2, 2, 9] }, note: "red lanterns, fireworks at night, dumplings, cheaper food, better pay", say: ["Happy New Year!", "新年快乐!", "Gong xi fa cai!", "Have a dumpling!"] },
   };
-  const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b], equinox: [0x2f8f4a, 0x27a3c2, 0xf2c21b, 0xffffff], muertos: [0xff9a1f, 0xffb800, 0xb04fd0, 0xffffff, 0xe84a8a] };
-  let clock = 0, lanterns = [], diyas = [], rdiyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, glowTex = null, lastBadge = "";
+  const COLORS = { diwali: [0xffb347, 0xffd36b, 0xff7a3a, 0xff5a8a], saturnalia: [0xc0262b, 0x2f8f4a, 0xe2b955, 0xf1ead8], floralia: [0xf28fb0, 0xf5d547, 0xffffff, 0xb08be0], holi: [0xe23b8a, 0xf2c21b, 0x2c7fe0, 0x27a35a, 0xf26a1b], equinox: [0x2f8f4a, 0x27a3c2, 0xf2c21b, 0xffffff], muertos: [0xff9a1f, 0xffb800, 0xb04fd0, 0xffffff, 0xe84a8a], midautumn: [0xffd36b, 0xfff3d0, 0xff9a4a, 0xffe9a8], springfest: [0xd8262b, 0xe2b955, 0xd8262b, 0xff7a3a] };
+  let clock = 0, lanterns = [], diyas = [], rdiyas = [], tinted = [], shotCd = 0, hits = 0, lastKey = "", scene = null, deco = {}, parts = [], cur = null, curKey = null, sayT = 8, boomT = 3, dustT = 0, curDay = { n: 0, of: 0, peak: false }, told = new Set(), newsT = 6, lastCity = "", glowTex = null, lastBadge = "";
   const mats = {};
 
-  const dayOfYear = () => ((Math.floor(Time.day) - 1) % 28 + 28) % 28 + 1;
-  function find(c) { const d = dayOfYear(); for (const [k, f] of Object.entries(FEASTS)) if (f.city === c && d >= f.from && d <= f.to) return k; return null; }
+  // the real calendar (the date on this computer). ?feast=<name> holds that festival on whatever the date, in its city (for trying a festival out).
+  let forced = ""; try { forced = new URLSearchParams(location.search).get("feast") || ""; } catch (e) { /* ignore */ }
+  const windows = (f, y) => (f.fixed ? f.fixed : f.moving && f.moving[y] ? [f.moving[y]] : []);
+  function inWindow(f, now) {
+    const md = (now.getMonth() + 1) * 100 + now.getDate();
+    return windows(f, now.getFullYear()).some(([m1, d1, m2, d2]) => { const a = m1 * 100 + d1, b = m2 * 100 + d2; return a <= b ? md >= a && md <= b : md >= a || md <= b; });
+  }
+  function find(c, now = new Date()) {
+    if (FEASTS[forced] && FEASTS[forced].city === c) return forced;
+    for (const [k, f] of Object.entries(FEASTS)) if (f.city === c && inWindow(f, now)) return k;
+    return null;
+  }
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  // "6 to 10 November": when the festival is on this year (the window that is on now, or the next one)
+  function dates(f, now = new Date()) {
+    const w = windows(f, now.getFullYear())[0];
+    if (!w) return "";
+    return w[0] === w[2] ? `${w[1]} to ${w[3]} ${MONTHS[w[2] - 1]}` : `${w[1]} ${MONTHS[w[0] - 1]} to ${w[3]} ${MONTHS[w[2] - 1]}`;
+  }
+  // how many days until a festival begins (0 when it is on today, null when it has no window this year)
+  function startsIn(f, now = new Date()) {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); let best = null;
+    for (const [m1, d1, m2, d2] of windows(f, now.getFullYear())) {
+      const a = new Date(now.getFullYear(), m1 - 1, d1), b = new Date(now.getFullYear(), m2 - 1, d2), n = Math.round((a - today) / 86400000);
+      if (today >= a && today <= b) return 0;
+      if (n > 0 && (best === null || n < best)) best = n;
+    }
+    return best;
+  }
+  // which day of a festival it is (1 to n) and whether it is the main day: Diwali's main night is the middle of its five days
+  function dayOf(key, now = new Date()) {
+    const f = FEASTS[key]; if (!f) return { n: 0, of: 0, peak: false };
+    const y = now.getFullYear(), w = windows(f, y).find(([m1, d1, m2, d2]) => { const md = (now.getMonth() + 1) * 100 + now.getDate(); return md >= m1 * 100 + d1 && md <= m2 * 100 + d2; }) || windows(f, y)[0];
+    if (!w) return { n: 0, of: 0, peak: false };
+    const t0 = new Date(y, w[0] - 1, w[1]), t1 = new Date(y, w[2] - 1, w[3]), of = Math.round((t1 - t0) / 86400000) + 1, n = Math.min(of, Math.max(1, Math.round((new Date(y, now.getMonth(), now.getDate()) - t0) / 86400000) + 1));
+    const pk = f.peak && f.peak[y];
+    return { n, of, peak: pk ? now.getMonth() + 1 === pk[0] && now.getDate() === pk[1] : false };
+  }
 
   // ---------------------------------------------------------------- the decorations
 
@@ -46,6 +87,29 @@ const Festival = (() => {
     return g;
   }
 
+  // Diwali: two rows of little clay lamps (diyas) all along Chandni Chowk, and rangoli (patterns of coloured powder) on the ground
+  function diwaliExtras(g, DX) {
+    const spots = [];
+    for (let x = -560; x <= -60; x += 4) for (const z of [-12.5, 12.5]) spots.push([DX + x + (z > 0 ? 2 : 0), z]);
+    const bowls = new T.InstancedMesh(new T.CylinderGeometry(0.2, 0.13, 0.11, 8), new T.MeshLambertMaterial({ color: 0xb5593a }), spots.length), o = new T.Object3D();
+    const pos = new Float32Array(spots.length * 3);
+    spots.forEach(([x, z], i) => { o.position.set(x, 0.06, z); o.updateMatrix(); bowls.setMatrixAt(i, o.matrix); pos.set([x, 0.4, z], i * 3); });
+    bowls.instanceMatrix.needsUpdate = true; bowls.frustumCulled = false; g.add(bowls);
+    const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.BufferAttribute(pos, 3));
+    const flames = new T.PointsMaterial({ map: glowTex, color: 0xffb347, size: 1.5, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false, opacity: 0.9 });
+    const pts = new T.Points(geo, flames); pts.frustumCulled = false; g.add(pts); g.userData.flames = flames;
+    // rangoli: rings of petals in the colours of the festival, drawn once on a canvas
+    const c = document.createElement("canvas"); c.width = c.height = 256; const cx = c.getContext("2d"), pal = ["#e23b8a", "#ffb347", "#ffffff", "#27a35a", "#2c7fe0", "#ff7a3a"];
+    cx.clearRect(0, 0, 256, 256);
+    for (let ring = 5; ring >= 0; ring--) {
+      const r = 18 + ring * 20, n = 8 + ring * 4;
+      for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 + ring * 0.2; cx.fillStyle = pal[(i + ring) % pal.length]; cx.beginPath(); cx.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 8 + (5 - ring) * 0.6, 0, 7); cx.fill(); }
+    }
+    cx.fillStyle = "#ffd36b"; cx.beginPath(); cx.arc(128, 128, 14, 0, 7); cx.fill();
+    const tex = new T.CanvasTexture(c), mat = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide });
+    [[-500, 7.5], [-420, -7.5], [-340, 7.5], [-260, -7.5], [-180, 7.5], [-110, -7.5], [-60, 7.5]].forEach(([x, z]) => { const m = new T.Mesh(new T.CircleGeometry(3.2, 40), mat); m.rotation.x = -Math.PI / 2; m.position.set(DX + x, 0.07, z); g.add(m); });        // (on the paving beside the canal)
+  }
+
   function build(key) {
     if (deco[key]) return deco[key];
     const DX = typeof DELHI_X !== "undefined" ? DELHI_X : 6000;
@@ -54,13 +118,18 @@ const Festival = (() => {
       const CX = typeof CANCUN_X !== "undefined" ? CANCUN_X : 12000, lines = [[CX - 110, -45, CX + 110, -45], [CX - 110, 45, CX + 110, 45], [CX - 70, 128, CX + 70, 128], [CX - 70, 172, CX + 70, 172]];
       for (let x = -100; x <= 100; x += 50) lines.push([CX + x, -45, CX + x, 45]);
       g = strings(key, lines, 6.0, 2.8);
+    } else if (key === "midautumn" || key === "springfest") {         // Beijing: strings of lanterns across the great avenue, along the square and over the market
+      const BX = typeof BEIJING_X !== "undefined" ? BEIJING_X : 18000, lines = [[BX - 170, -40, BX + 170, -40], [BX - 170, 20, BX + 170, 20], [BX - 120, 110, BX + 130, 110], [BX + 190, 92, BX + 310, 92], [BX + 190, 128, BX + 310, 128]];
+      for (let x = -150; x <= 150; x += 75) lines.push([BX + x, -40, BX + x, 20]);
+      g = strings(key, lines, 6.4, 2.6);
     } else if (key === "diwali" || key === "holi") {
       const lines = [];
       for (let x = -560; x <= -60; x += 100) lines.push([DX + x, -11, DX + x, 11]);               // across the avenue
       lines.push([DX - 560, -11, DX - 40, -11], [DX - 560, 11, DX - 40, 11], [DX - 100, 56, DX - 20, 56], [DX - 90, 74, DX - 10, 74]);   // along both sides, and over the market square
       g = strings(key, lines, 6.2, key === "holi" ? 3.4 : 2.6);
+      if (key === "diwali") diwaliExtras(g, DX);
     } else {
-      const lines = [[40, -9, 255, -9], [40, 9, 255, 9], [150, 54, 190, 54], [150, 74, 190, 74], [185, -62, 315, -62], [185, -18, 315, -18]];   // the Via Sacra, the market and the Via Domus
+      const lines = [[40, -9, 255, -9], [40, 9, 255, 9], [150, 54, 190, 54], [150, 74, 190, 74], [185, -62, 315, -62], [185, -18, 315, -18]];   // the Via Sacra, the market and the Via Domorum
       for (let x = 60; x <= 240; x += 60) lines.push([x, -9, x, 9]);
       g = strings(key, lines, 5.6, 2.8);
     }
@@ -86,7 +155,9 @@ const Festival = (() => {
   // ---------------------------------------------------------------- things to do: lanterns (Diwali, Saturnalia), colours (Holi, Floralia)
 
   const LANT_COLORS = [0xff7a3a, 0xffd36b, 0xe23b8a, 0x5ac8ff, 0xa6ff7a, 0xffffff];
-  const can = (k) => cur && ((k === "KeyL" && (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos")) || (k === "KeyU" && (curKey === "holi" || curKey === "floralia")));
+  const LANTERN_FEASTS = ["diwali", "saturnalia", "muertos", "midautumn", "springfest"];             // (the festivals with lanterns to light: L)
+  const isLantern = () => LANTERN_FEASTS.includes(curKey);
+  const can = (k) => cur && ((k === "KeyL" && isLantern()) || (k === "KeyU" && (curKey === "holi" || curKey === "floralia")));
 
   function lanternMesh(col) {
     const g = new T.Group(), paper = new T.MeshBasicMaterial({ color: col });
@@ -132,7 +203,7 @@ const Festival = (() => {
       toast(`${flowers ? "🌸" : "🎨"} ${m.n} threw ${flowers ? "flowers" : "colour"} at you!`); Chat.add({ sys: 1, text: `${flowers ? "🌸" : "🎨"} ${m.n} threw ${flowers ? "flowers" : "colour"} at you!` }); Sfx.play("splash");
       return;
     }
-    if (!cur || m.c !== city || !(curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos")) return;
+    if (!cur || m.c !== city || !isLantern()) return;
     const add = (x, z) => {
       if (rdiyas.some((d) => Math.abs(d.position.x - x) < 0.05 && Math.abs(d.position.z - z) < 0.05)) return;
       rdiyas.push(makeDiya(x, z));
@@ -184,7 +255,7 @@ const Festival = (() => {
     openPanel("#lantern");
     const row = document.getElementById("ln-colors"); row.replaceChildren();
     LANT_COLORS.forEach((c, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "sy-sw" + (i === (openLantern.sel || 0) ? " on" : ""); b.style.background = "#" + c.toString(16).padStart(6, "0"); b.setAttribute("aria-label", `colour ${i + 1}`); b.addEventListener("click", () => { openLantern.sel = i; for (const x of row.children) x.classList.remove("on"); b.classList.add("on"); }); row.append(b); });
-    document.getElementById("ln-title").textContent = curKey === "diwali" ? "🪔 Make a lantern for Diwali" : curKey === "muertos" ? "🕯 Light a candle for the Day of the Dead" : "🕯 Light a lantern for Saturnalia";
+    document.getElementById("ln-title").textContent = { diwali: "🪔 Make a lantern for Diwali", muertos: "🕯 Light a candle for the Day of the Dead", midautumn: "🏮 Release a lantern for the Mid-Autumn Festival", springfest: "🏮 Release a lantern for the Spring Festival" }[curKey] || "🕯 Light a lantern for Saturnalia";
   }
   function key(k) {
     if (!can(k)) return false;
@@ -199,7 +270,7 @@ const Festival = (() => {
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new T.CanvasTexture(c);
     document.getElementById("ln-release").addEventListener("click", () => { const w = document.getElementById("ln-wish").value.replace(/[<>]/g, "").slice(0, 60).trim(); closePanels(); release(LANT_COLORS[openLantern.sel || 0], w); document.getElementById("ln-wish").value = ""; });
     document.getElementById("ln-diya").addEventListener("click", () => { closePanels(); placeDiya(); });
-    document.getElementById("fest-act").addEventListener("click", () => { if (curKey === "equinox") { toast("🐍 Walk to El Castillo, the big pyramid, and look at its north stairway: the serpent of light is coming down."); return; } if (mode === "walk" && !panelOpen) key(cur && (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos") ? "KeyL" : "KeyU"); });
+    document.getElementById("fest-act").addEventListener("click", () => { if (curKey === "equinox") { toast("🐍 Walk to El Castillo, the big pyramid, and look at its north stairway: the serpent of light is coming down."); return; } if (mode === "walk" && !panelOpen) key(cur && isLantern() ? "KeyL" : "KeyU"); });
   }
 
   // ---------------------------------------------------------------- each frame
@@ -207,22 +278,44 @@ const Festival = (() => {
   function badge() {
     const el = document.getElementById("fest-badge");
     if (!el) return;
-    const text = cur ? `${cur.icon} ${cur.name}: ${cur.note}` : "";
-    if (text !== lastBadge) { lastBadge = text; el.textContent = text; el.title = cur ? `${cur.name} (days ${cur.from}-${cur.to} of the year)` : ""; }
+    const text = cur ? `${cur.icon} ${cur.name}${curDay.of > 1 ? ` (day ${curDay.n} of ${curDay.of})` : ""}: ${cur.note}` : "";
+    if (text !== lastBadge) { lastBadge = text; el.textContent = text; el.title = cur ? `${cur.name}: ${dates(cur)}` : ""; }
+  }
+
+  // a festival that is on in another city: you are told once (a few seconds after you arrive somewhere), with a hint on how to get there
+  const CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
+  function news(dt, c) {
+    if (c !== lastCity) { lastCity = c; newsT = 6; }
+    newsT -= dt; if (newsT > 0 || mode !== "walk" || typeof started === "undefined" || !started) return;
+    newsT = 1e9;
+    for (const oc of Object.keys(CITY_NAMES)) {
+      if (oc === c) continue;
+      const k = find(oc); if (!k || told.has(k)) continue;
+      told.add(k); const f = FEASTS[k];
+      toast(`${f.icon} ${f.name} is on in ${CITY_NAMES[oc]} (${dates(f)}). Press the city button (Travel) to go there.`);
+      return;
+    }
+    for (const [k, f] of Object.entries(FEASTS)) {                                     // one that starts in the next three days (this city's too)
+      const n = startsIn(f); if (!n || n > 3 || told.has(k + "-soon")) continue;
+      told.add(k + "-soon");
+      toast(`${f.icon} ${f.name} starts ${n === 1 ? "tomorrow" : `in ${n} days`} in ${CITY_NAMES[f.city]} (${dates(f)}).`);
+      return;
+    }
   }
 
   function update(dt) {
     if (!scene) return;
     const c = typeof city !== "undefined" ? city : "rome", key = find(c);
     if (key !== curKey) {
-      curKey = key; cur = key ? FEASTS[key] : null;
+      curKey = key; cur = key ? FEASTS[key] : null; curDay = key ? dayOf(key) : { n: 0, of: 0, peak: false };
       for (const [k, g] of Object.entries(deco)) g.visible = k === key;
       for (const l of lanterns.splice(0)) scene.remove(l.g); for (const d of diyas.splice(0)) scene.remove(d); for (const d of rdiyas.splice(0)) scene.remove(d); restoreTints();
       if (typeof Cancun !== "undefined") Cancun.setEquinox(key === "equinox");     // the serpent of light on El Castillo
-      if (key) { sync(); build(key).visible = true; toast(`${cur.icon} ${cur.name}! ${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
+      if (key) { sync(); build(key).visible = true; toast(`${cur.icon} ${cur.name}${curDay.of > 1 ? `, day ${curDay.n} of ${curDay.of}` : ""}! ${curDay.peak ? "Tonight is the main night. " : ""}${cur.note[0].toUpperCase()}${cur.note.slice(1)}.`); Narrator.say(`${cur.name} is being held today.`, { interrupt: false }); }
       badge();
-      const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = (curKey === "diwali" || curKey === "saturnalia" || curKey === "muertos") ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : curKey === "muertos" ? "🕯 Light a candle (L)" : "🕯 Light a lantern (L)") : curKey === "equinox" ? "🐍 Watch the serpent" : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
+      const fa = document.getElementById("fest-act"); if (fa) { fa.hidden = !cur; if (cur) fa.textContent = isLantern() ? (curKey === "diwali" ? "🪔 Make a lantern (L)" : curKey === "muertos" ? "🕯 Light a candle (L)" : (curKey === "midautumn" || curKey === "springfest") ? "🏮 Release a lantern (L)" : "🕯 Light a lantern (L)") : curKey === "equinox" ? "🐍 Watch the serpent" : (curKey === "holi" ? "🎨 Shoot colours (U)" : "🌸 Throw flowers (U)"); }
     }
+    news(dt, c);
     if (!cur) { for (const p of parts.splice(0)) { scene.remove(p.s); p.s.material.dispose(); } return; }
     shotCd = Math.max(0, shotCd - dt);
     for (let i = lanterns.length - 1; i >= 0; i--) {   // sky lanterns drift up and away
@@ -232,6 +325,7 @@ const Festival = (() => {
       if (l.g.position.y > 200) { scene.remove(l.g); lanterns.splice(i, 1); }
     }
     for (const d of diyas.concat(rdiyas)) d.children[1].scale.setScalar(1.0 + Math.sin(clock * 9 + d.position.x) * 0.12);
+    if (curKey === "diwali" && deco.diwali && deco.diwali.userData.flames) deco.diwali.userData.flames.opacity = 0.78 + Math.sin(clock * 7) * 0.14;        // (the rows of lamps flicker)
     clock += dt;
     // people wish you well
     sayT -= dt;
@@ -242,11 +336,11 @@ const Festival = (() => {
       for (const p of list) { const d = Math.hypot(p.x - player.x, p.z - player.z); if (d < bd && Math.random() < 0.4) { best = p; bd = d; } }
       if (best) Speech.say(best, cur.say[Math.floor(Math.random() * cur.say.length)], 3);
     }
-    // fireworks at night on Diwali; clouds of powder all day on Holi
-    if (curKey === "diwali" && (Time.isNight || Time.hour > 18) ) {
+    // fireworks at night on Diwali (more of them on its main night) and the Spring Festival; clouds of powder all day on Holi
+    if ((curKey === "diwali" || curKey === "springfest") && (Time.isNight || Time.hour > 18)) {
       boomT -= dt;
       if (boomT <= 0) {
-        boomT = 2.2 + Math.random() * 3;
+        boomT = (curDay.peak ? 0.8 : 2.2) + Math.random() * (curDay.peak ? 1.4 : 3);
         const a = Math.random() * 6.28, r = 80 + Math.random() * 90, pal = [[0xff5a5a, 0xffd36b], [0x5ac8ff, 0xffffff], [0xa6ff7a, 0xffe14a], [0xff8ae0, 0xffd36b]][Math.floor(Math.random() * 4)];
         burst(player.x + Math.cos(a) * r, 70 + Math.random() * 50, player.z + Math.sin(a) * r, pal, 46, 22, 2.4, 6, true, 7);
         if (typeof Sfx !== "undefined") setTimeout(() => Sfx.play("firework"), 350);
@@ -268,13 +362,13 @@ const Festival = (() => {
   }
 
   return {
-    init, update, FEASTS, key, release, shoot, remote, sync,
+    init, update, FEASTS, key, release, shoot, remote, sync, find, dates, dayOf, startsIn,
+    get day() { return curDay; },
     get active() { return !!cur; },
     get id() { return curKey; },
     get name() { return cur ? cur.name : ""; },
     get foodMul() { return cur ? 0.75 : 1; },       // food costs a quarter less
     get payMul() { return cur ? 1.25 : 1; },        // jobs pay a quarter more
     line: () => (cur ? cur.say[Math.floor(Math.random() * cur.say.length)] : null),
-    debugDay: dayOfYear,
   };
 })();
