@@ -108,6 +108,7 @@ const Account = (() => {
         furniture: typeof Furnish !== "undefined" ? Furnish.snapshot() : {},
         friends: typeof Lives !== "undefined" ? Lives.snapshot() : {},
         mystery: typeof Mystery !== "undefined" ? Mystery.snapshot() : {},
+        seasons: typeof Seasons !== "undefined" ? Seasons.snapshot() : {},
         tax: Tax.snapshot(),
         jobs: Jobs.snapshot(),
         ships: Shipyard.snapshot(),
@@ -150,6 +151,7 @@ const Account = (() => {
     if (p.furniture && typeof p.furniture === "object" && typeof Furnish !== "undefined") Furnish.restore(p.furniture);
     if (p.friends && typeof p.friends === "object" && typeof Lives !== "undefined") Lives.restore(p.friends);
     if (p.mystery && typeof p.mystery === "object" && typeof Mystery !== "undefined") Mystery.restore(p.mystery);
+    if (p.seasons && typeof p.seasons === "object" && typeof Seasons !== "undefined") Seasons.restore(p.seasons);
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
     if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);

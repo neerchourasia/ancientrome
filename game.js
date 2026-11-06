@@ -72,7 +72,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); Seasons.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -1783,7 +1783,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Lives.update(dt); Ventures.update(dt); Events.update(dt); Thieves.update(dt); PetPerks.update(dt); Fishing.update(dt); TreasureMaps.update(); Story.update(); Mystery.update(); FestHunt.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Lives.update(dt); Ventures.update(dt); Events.update(dt); Thieves.update(dt); PetPerks.update(dt); Fishing.update(dt); TreasureMaps.update(); Story.update(); Mystery.update(); Seasons.update(dt); FestHunt.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, seated: Shopkeep.seated || Furnish.seated, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: (Furnish.inside() ? Furnish.comfort() : 1) * (city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : city === "beijing" ? (Beijing.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z)) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();

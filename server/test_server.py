@@ -3463,9 +3463,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         bob.send({"t": "social", "a": "trade_yes", "fid": req["fid"]})
         await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open"); await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "open")
         # offers: each sees the other's, bad ids are dropped, and changing an offer unlocks both
-        ann.send({"t": "social", "a": "trade_offer", "items": ["r_ring", "bad id!", "r_ring", "hound"], "coins": 50})
+        ann.send({"t": "social", "a": "trade_offer", "items": ["r_ring", "bad id!", "r_ring", "hound"], "coins": 50, "goods": {"lamp": 2, "bad id!": 3}, "furn": {"rug": 1, "RUG": 4}})
         seen = await bob.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
         self.assertEqual((seen["items"], seen["coins"]), (["r_ring", "hound"], 50))
+        self.assertEqual((seen["goods"], seen["furn"]), ({"lamp": 2}, {"rug": 1}))
         bob.send({"t": "social", "a": "trade_offer", "items": ["wreath"], "coins": 0})
         await ann.until(lambda m: m["t"] == "fr_trade" and m["s"] == "theirs")
         ann.send({"t": "social", "a": "trade_ok"})
@@ -3523,6 +3524,42 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("mars", m["placed"])
         cy.send({"t": "social", "a": "f_get", "fid": fa})
         self.assertEqual((await cy.until(lambda m: m["t"] == "furn"))["a"], "none")
+
+    async def test_guestbook_gifts_and_parties_between_friends(self):
+        server.FURN.clear(); server.PARTIES.clear(); server.LEFT.clear(); server.MKT["mail"].clear()
+        self.addCleanup(lambda: (server.FURN.clear(), server.PARTIES.clear(), server.LEFT.clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        fa, fb = server.fid_of("u-ann"), server.fid_of("u-bob")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        ann.send({"t": "walk", "c": "rome", "x": 1, "z": 1, "yaw": 0, "s": 0, "d": 100})
+        ann.send({"t": "social", "a": "f_set", "placed": {"rome": [{"id": "rug", "x": 256, "z": 52, "yaw": 0}]}, "water": 0})
+        await asyncio.sleep(0.3)
+        # a friend leaves a note (cleaned) and a gift; a stranger cannot
+        bob.send({"t": "social", "a": "f_note", "fid": fa, "text": "Lovely <b>house</b>!"})
+        seen = await ann.until(lambda m: m["t"] == "furn" and m["a"] == "note")
+        self.assertEqual((seen["name"], seen["text"]), ("Bob", "Lovely bhouseb!"))
+        cy.send({"t": "social", "a": "f_note", "fid": fa, "text": "hi"})
+        self.assertEqual((await cy.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["a"], "no")
+        bob.send({"t": "social", "a": "f_gift", "fid": fa, "item": "lamp", "ik": "good", "n": 2, "label": "Clay lamp"})
+        self.assertEqual((await bob.until(lambda m: m["t"] == "furn" and m["a"] == "gift_ok"))["n"], 2)
+        gift = server.MKT["mail"][fa][-1]
+        self.assertEqual((gift["item"], gift["ik"], gift["n"], gift.get("coins", 0)), ("lamp", "good", 2, 0))
+        # the owner sees the book; a visitor does not
+        ann.send({"t": "social", "a": "f_get", "fid": fa})
+        self.assertEqual([b["text"] for b in (await ann.until(lambda m: m["t"] == "furn" and m["a"] == "layout"))["book"]], ["Lovely bhouseb!"])
+        bob.send({"t": "social", "a": "f_get", "fid": fa})
+        self.assertNotIn("book", await bob.until(lambda m: m["t"] == "furn" and m["a"] == "layout"))
+        # a party: Ann pays 50, Bob is asked, and when he visits both are paid once
+        ann.send({"t": "social", "a": "f_party"})
+        self.assertEqual((await bob.until(lambda m: m["t"] == "furn" and m["a"] == "party"))["name"], "Ann")
+        bob.send({"t": "social", "a": "f_get", "fid": fa})
+        lay = await bob.until(lambda m: m["t"] == "furn" and m["a"] == "layout")
+        self.assertGreater(lay.get("party", 0), 0)
+        bob.send({"t": "social", "a": "f_get", "fid": fa}); await asyncio.sleep(0.3)
+        coins = sorted(x["coins"] for x in server.MKT["mail"][fa] if x.get("coins"))
+        self.assertEqual(coins, [-50, 20])                                                                 # (the second visit paid nothing more)
 
     async def test_furniture_can_be_sold_on_the_player_market(self):
         server.MKT["list"].clear(); server.MKT["mail"].clear(); server.MKT["seq"] = 0

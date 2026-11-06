@@ -1,10 +1,12 @@
 "use strict";
 // Companions bought in the Market: a hound, a cat, a monkey, a lion cub or a peacock that follow you, or an eagle, an owl or a parrot that circle above you.
-// They are only for show: they never block you and other players do not see them. Hidden during fights, races and duels.
+// They are only for show: they never block you and other players do not see them. Hidden during fights, races and duels. In your own house, when you stand still for a few seconds, a walking pet goes
+// and curls up on your cushions, bed or rug, and a flying pet perches on a lamp stand, vase, statue or plant (furnish.js, petSpot).
 
 const Pets = (() => {
-  let kind = null, pet = null, t = 0;
+  let kind = null, pet = null, t = 0, still = 0, lx = 0, lz = 0, told = false;
 
+  const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
   const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
 
@@ -98,8 +100,18 @@ const Pets = (() => {
     pet.g.visible = show;
     if (!show) return;
     t += dt;
+    if (Math.hypot(player.x - lx, player.z - lz) < 0.05) still += dt; else { still = 0; told = false; }
+    lx = player.x; lz = player.z;
+    const spot = still > 3 && typeof Furnish !== "undefined" ? Furnish.petSpot(!!pet.fly) : null;                          // (somewhere in your house to settle: furnish.js)
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
 
+    if (pet.fly && spot) {                                                                         // a bird perches on the piece
+      const tgt = new THREE.Vector3(spot.x, groundAt(spot.x, spot.z) + spot.y, spot.z);
+      pet.g.position.lerp(tgt, Math.min(1, dt * 2.2)); pet.g.rotation.y = spot.yaw;
+      const flap = Math.sin(t * 0.8) * 0.06; pet.wings[0].rotation.z = flap; pet.wings[1].rotation.z = -flap;
+      if (!told && pet.g.position.distanceTo(tgt) < 0.3) { told = true; toast(`🐾 ${tr("Your pet perches on the")} ${tr(spot.label).toLowerCase()}.`); }
+      return;
+    }
     if (pet.fly) {
       pet.a += dt * pet.fly.rate;
       const px = player.x + Math.cos(pet.a) * pet.fly.r, pz = player.z + Math.sin(pet.a) * pet.fly.r;
@@ -111,7 +123,7 @@ const Pets = (() => {
     }
 
     // the hound: trots to a spot behind you and to the right, never through a wall
-    const tx = player.x - fx * 2.0 + rx * 1.1, tz = player.z - fz * 2.0 + rz * 1.1;
+    const tx = spot ? spot.x : player.x - fx * 2.0 + rx * 1.1, tz = spot ? spot.z : player.z - fz * 2.0 + rz * 1.1;
     const dx = tx - pet.x, dz = tz - pet.z, d = Math.hypot(dx, dz);
     let moved = 0;
     if (d > 0.25) {
@@ -130,6 +142,12 @@ const Pets = (() => {
       pet.stuck = 0;
     }
     const speed = moved / Math.max(dt, 0.001);
+    if (spot && d < 0.5 && speed < 0.6) {                                                            // curled up on the piece
+      pet.yaw = spot.yaw; pet.g.position.set(pet.x, groundAt(pet.x, pet.z) + spot.y - 0.18, pet.z); pet.g.rotation.y = pet.yaw;
+      pet.legs.forEach((l) => { l.rotation.x = 1.3; }); pet.tail.rotation.y = Math.sin(t * 1.4) * 0.3;
+      if (!told) { told = true; toast(`🐾 ${tr("Your pet curls up on the")} ${tr(spot.label).toLowerCase()}.`); }
+      return;
+    }
     const want = speed > 0.6 ? Math.atan2(-dx, -dz) : player.yaw;
     let dy = want - pet.yaw; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
     pet.yaw += dy * Math.min(1, dt * 8);

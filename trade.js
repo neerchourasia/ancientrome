@@ -42,6 +42,7 @@ const Trade = (() => {
   hold = sanitizeHold(hold);
 
   const where = () => (typeof city !== "undefined" ? city : "rome");
+  const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const ancient = () => typeof era !== "undefined" && era === "ancient";
   const vehicle = () => (ancient() ? "caravan" : Car.current);                         // what carries the crates: a vehicle's hold, or the caravan on foot
   const capOf = (vid) => (vid === "caravan" ? 4 + (typeof Market !== "undefined" ? Market.snapshot().items : []).reduce((n, id) => n + (PACK[id] || 0), 0) : CAP[vid] || 0);
@@ -87,8 +88,8 @@ const Trade = (() => {
       const k = `${where()}-${gd.id}`; impact.map[k] = Math.min(0.4, (impact.map[k] || 0) + IMPACT);
       (hold[vid] = hold[vid] || {})[gd.id] = (hold[vid][gd.id] || 0) + 1;
     }
-    if (got) { save(); Sfx.play("coin"); toast(`You buy ${got} crate${got === 1 ? "" : "s"} of ${gd.name.toLowerCase()} for ${cost} denarii.`); }
-    else toast(used(vid) >= cap ? "Your hold is full." : "You cannot afford that.");
+    if (got) { save(); Sfx.play(vid === "caravan" ? "camelbell" : "coin"); toast(`${tr("You buy")} ${got} ${tr(got === 1 ? "crate of" : "crates of")} ${tr(gd.name).toLowerCase()} ${tr("for")} ${cost} ${tr("denarii")}.`); }
+    else toast(tr(used(vid) >= cap ? "Your hold is full." : "You cannot afford that."));
     render();
   }
   function sell(gd, n) {
@@ -99,7 +100,7 @@ const Trade = (() => {
       Vitals.coins += p; got += p; sold++;
       const k = `${where()}-${gd.id}`; impact.map[k] = Math.max(-0.4, (impact.map[k] || 0) - IMPACT);
     }
-    if (sold) { hold[vid][gd.id] -= sold; if (hold[vid][gd.id] <= 0) delete hold[vid][gd.id]; if (!Object.keys(hold[vid]).length) delete hold[vid]; save(); Sfx.play("coin"); toast(`You sell ${sold} crate${sold === 1 ? "" : "s"} of ${gd.name.toLowerCase()} for ${got} denarii.`); }
+    if (sold) { hold[vid][gd.id] -= sold; if (hold[vid][gd.id] <= 0) delete hold[vid][gd.id]; if (!Object.keys(hold[vid]).length) delete hold[vid]; save(); Sfx.play("coin"); toast(`${tr("You sell")} ${sold} ${tr(sold === 1 ? "crate of" : "crates of")} ${tr(gd.name).toLowerCase()} ${tr("for")} ${got} ${tr("denarii")}.`); }
     render();
   }
 
@@ -114,17 +115,17 @@ const Trade = (() => {
   function render() {
     if (!el) return;
     const vid = vehicle(), cap = capOf(vid), here = where();
-    el.querySelector("#tr-title").textContent = `${vid === "caravan" ? "Caravan" : "Trading depot"} · ${CITY_NAMES[here] || here}`;
-    el.querySelector("#tr-purse").innerHTML = `Your purse: <b>${Vitals.coins}</b> denarii.`;
-    el.querySelector("#tr-hold").textContent = `Your ${vname(vid)} holds ${used(vid)} of ${cap} crates.`;
+    el.querySelector("#tr-title").textContent = `${tr(vid === "caravan" ? "Caravan" : "Trading depot")} · ${tr(CITY_NAMES[here] || here)}`;
+    el.querySelector("#tr-purse").textContent = `${tr("Your purse:")} ${Vitals.coins} ${tr("denarii")}.`;
+    el.querySelector("#tr-hold").textContent = `${tr("Your")} ${tr(vname(vid))} ${tr("holds")} ${used(vid)} ${tr("of")} ${cap} ${tr("crates.")}`;
     const ul = el.querySelector("#tr-list"); ul.replaceChildren();
     for (const gd of GOODS) {
       const p = price(gd), b = Math.round(p * (1 + SPREAD)), s = Math.round(p * (1 - SPREAD)), have = (hold[vid] || {})[gd.id] || 0, rel = p / avg(gd);
       const li = document.createElement("li"), txt = document.createElement("span"), name = document.createElement("strong"), note = document.createElement("small"), btns = document.createElement("span");
-      name.textContent = `${gd.icon} ${gd.name}${rel < 0.85 ? "  ▼ cheap here" : rel > 1.15 ? "  ▲ dear here" : ""}`;
-      note.textContent = `Buy ${b} · Sell ${s} per crate · you carry ${have}`;
+      name.textContent = `${gd.icon} ${tr(gd.name)}${rel < 0.85 ? `  ▼ ${tr("cheap here")}` : rel > 1.15 ? `  ▲ ${tr("dear here")}` : ""}`;
+      note.textContent = `${tr("Buy")} ${b} · ${tr("Sell")} ${s} ${tr("per crate")} · ${tr("you carry")} ${have}`;
       btns.style.cssText = "display:flex;flex-direction:row;gap:6px";
-      const mk = (label, fn, dis) => { const x = document.createElement("button"); x.type = "button"; x.textContent = label; x.disabled = !!dis; x.addEventListener("click", fn); btns.append(x); };
+      const mk = (label, fn, dis) => { const x = document.createElement("button"); x.type = "button"; x.textContent = tr(label); x.disabled = !!dis; x.addEventListener("click", fn); btns.append(x); };
       mk("Buy 1", () => buy(gd, 1), used(vid) >= cap || Vitals.coins < b);
       mk("Buy max", () => buy(gd, 9999), used(vid) >= cap || Vitals.coins < b);
       mk("Sell all", () => sell(gd, 9999), !have);
@@ -133,7 +134,7 @@ const Trade = (() => {
   }
   function open() {
     if (ancient() && !canTrade()) {
-      toast(mode !== "walk" ? "Get out of your vehicle first: a caravan is loaded on foot." : !nearDepot() ? "Go to the market of the city (within about 250 m) to load or sell your caravan." : `Your caravan is in ${CITY_NAMES[caravanAt] || caravanAt}: sail it on from there, or go back to it.`);
+      toast(mode !== "walk" ? tr("Get out of your vehicle first: a caravan is loaded on foot.") : !nearDepot() ? tr("Go to the market of the city (within about 250 m) to load or sell your caravan.") : `${tr("Your caravan is in")} ${tr(CITY_NAMES[caravanAt] || caravanAt)}${tr(": sail it on from there, or go back to it.")}`);
       return false;
     }
     if (!canTrade()) { const h = hint(); toast(h ? h.replace(/<[^>]+>/g, "") : era !== "modern" ? "Trading depots only work in the modern cities." : !Car.driving ? "Get in a vehicle first: goods travel in your vehicle." : !CAP[Car.current] ? "This vehicle cannot carry goods." : "Stop on the ground within about 250 m of the market to trade."); return false; }
@@ -148,7 +149,7 @@ const Trade = (() => {
   function lose() { const vid = Car.current; if (vid && hold[vid]) { delete hold[vid]; save(); toast("Your cargo was lost in the crash!"); } }
 
   // the caravan sails: it is in the city you arrive in. Pirates take part of it; a storm costs a crate
-  function caravanMoved(to) { if (used("caravan")) { caravanAt = to; save(); toast(`Your caravan is in ${CITY_NAMES[to] || to}. Go to the market to sell it.`); } else caravanAt = null; }
+  function caravanMoved(to) { if (used("caravan")) { caravanAt = to; save(); toast(`${tr("Your caravan is in")} ${tr(CITY_NAMES[to] || to)}. ${tr("Go to the market to sell it.")}`); } else caravanAt = null; }
   function caravanLoss(frac, why) {
     const h = hold.caravan; if (!h) return 0;
     let lost = 0, total = used("caravan"), n = Math.max(1, Math.round(total * frac));

@@ -45,7 +45,7 @@ const Voyage = (() => {
     if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
     if (Vitals.coins < ROAD_FARE) { toast(`The caravan road costs ${ROAD_FARE} denarii.`); return; }
     closePanels(); travelBusy = true; Vitals.stopRest(); Nav.clear();
-    coins(-ROAD_FARE); Sfx.play("horn");
+    coins(-ROAD_FARE); Sfx.play("camelbell");
     if (!box) build();
     logEl.replaceChildren(); progress(0); $v("vy-title").textContent = `On the Silk Road to ${ROAD[to]}`; box.hidden = false;
     try {

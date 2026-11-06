@@ -40,6 +40,7 @@ const Story = (() => {
   const clean = (raw) => { const o = { rome: 0, delhi: 0, cancun: 0, beijing: 0 }; if (raw && typeof raw === "object") for (const c of Object.keys(o)) o[c] = Math.max(0, Math.min(STORIES[c].ch.length, Math.floor(Number(raw[c])) || 0)); return o; };
   try { prog = clean(JSON.parse(localStorage.getItem(KEY) || "null")); } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prog)); } catch (e) { /* ignore */ } };
+  const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const $s = (id) => document.getElementById(id);
   const lmOf = (id) => LANDMARKS.find((l) => l.id === id);
   const done = (c) => prog[c] >= STORIES[c].ch.length;
@@ -48,14 +49,14 @@ const Story = (() => {
 
   function render() {
     const st = STORIES[city] || STORIES.rome, c = STORIES[city] ? city : "rome", n = prog[c];
-    $s("st-title").textContent = `📖 ${st.name} (${n} of ${st.ch.length})`;
+    $s("st-title").textContent = `📖 ${tr(st.name)} (${n} ${tr("of")} ${st.ch.length})`;
     const box = $s("st-text"); box.replaceChildren();
     for (let i = 0; i < Math.min(n + 1, st.ch.length); i++) {
-      const p = document.createElement("p"); p.className = i < n ? "st-old" : "st-now"; p.textContent = `${i + 1}. ${st.ch[i][1]}`; box.append(p);
+      const p = document.createElement("p"); p.className = i < n ? "st-old" : "st-now"; p.textContent = `${i + 1}. ${tr(st.ch[i][1])}`; box.append(p);
     }
     const go = $s("st-go"), lm = n < st.ch.length ? lmOf(st.ch[n][0]) : null;
-    go.hidden = !lm; if (lm) go.textContent = `Show me the way to ${lm.name}`;
-    $s("st-done").hidden = n < st.ch.length; $s("st-done").textContent = n >= st.ch.length ? `You have finished this story (the reward was ${st.end} denarii).` : "";
+    go.hidden = !lm; if (lm) go.textContent = `${tr("Show me the way to")} ${tr(lm.name)}`;
+    $s("st-done").hidden = n < st.ch.length; $s("st-done").textContent = n >= st.ch.length ? `${tr("You have finished this story")} (${tr("the reward was")} ${st.end} ${tr("denarii")}).` : "";
   }
   function open() { render(); openPanel("#story"); }
 
@@ -70,8 +71,8 @@ const Story = (() => {
     prog[city] = n + 1; save(); Vitals.coins += reward; Sfx.play("discover");
     if (prog[city] >= st.ch.length) {
       Vitals.coins += st.end; Sfx.play("medal");
-      say(`${st.ch[n][1]} The story "${st.name}" is finished: +${reward + st.end} denarii!`);
-    } else say(`${st.ch[Math.min(n + 1, st.ch.length - 1)][1]} (+${reward} denarii)`);
+      say(`${tr(st.ch[n][1])} ${tr("The story is finished:")} +${reward + st.end} ${tr("denarii")}!`);
+    } else say(tr(st.ch[Math.min(n + 1, st.ch.length - 1)][1]));
     if ($s("story").classList.contains("show")) render();
   }
 

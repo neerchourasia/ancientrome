@@ -191,6 +191,12 @@ const Sfx = (() => {
     ring: () => { [1319, 1760, 2349].forEach((f, i) => tone(f, 0.7, "sine", 0.14, null, null, i * 0.08)); puff(0.2, 3000, 1.5, 0.15); },   // the ball goes through the stone ring
     chime: () => { tone(988, 0.22, "sine", 0.16); tone(1319, 0.5, "sine", 0.16, null, null, 0.16); },               // someone challenges you
     whistle: () => tone(2100, 0.45, "sine", 0.12, 2700),
+    creak: () => { tone(140, 0.35, "sawtooth", 0.06, 105); tone(190, 0.28, "sawtooth", 0.045, 145, null, 0.14); puff(0.22, 520, 1, 0.05); },        // a bed or a stool taking your weight
+    sizzle: () => { puff(1.3, 4600, 0.8, 0.1, null, "highpass", 0.12); puff(0.6, 1800, 1, 0.05, null, "bandpass", 0.1, 0.2); },                    // something cooking
+    pop: () => { puff(0.07, 1900, 1.5, 0.5); tone(640, 0.12, "sine", 0.3, 190); puff(0.5, 5200, 0.8, 0.12, null, "bandpass", 0.08, 0.06); },        // a party popper
+    page: () => { puff(0.22, 3300, 1, 0.12, null, "bandpass", 0.02); puff(0.14, 2400, 1, 0.08, null, "bandpass", 0.01, 0.12); },                    // a page turned, a note written
+    camelbell: () => { tone(740, 0.9, "sine", 0.07); tone(932, 0.8, "sine", 0.05, null, null, 0.14); tone(554, 1, "sine", 0.06, null, null, 0.3); },    // a caravan's bells
+    thud: () => { puff(0.1, 320, 0.8, 0.4); tone(92, 0.16, "sine", 0.4, 60); },                                                                    // a piece of furniture set down
     gong: () => { tone(82, 2.2, "sine", 0.5); tone(164, 1.6, "sine", 0.2); puff(0.3, 900, 0.5, 0.2); },
   };
 

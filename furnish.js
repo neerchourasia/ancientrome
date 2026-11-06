@@ -4,6 +4,10 @@
 // that city. Pieces can be walked through (a rug is a rug) and are kept in the browser (rome-furn) and in the saved game (account.js). Depends on world.js (worldScene), market.js (Vitals) and the houses.
 // Friends can visit: 🏠 Visit beside a friend in the Friends box takes you to your own house in the city where they have the most furniture and shows THEIR furniture there (yours is hidden) until you walk
 // out. The server keeps each player's layout (server.py, "furnished houses") and gives it only to mutual friends. Furniture can also be sold to other players in the player market (playermarket.js).
+// A guest can leave a NOTE in the host's guestbook (📖 in the furniture box) or one GIFT (a good or a piece of furniture, by mail); the host can throw a PARTY for 50 denarii: the online friends are asked, and
+// each of up to five who come is paid 10 denarii and the host 20.
+// COOKING: at your table, besides the plain meal, cook dishes from the goods you carry (a dish uses up its ingredients and heals and fills you more); on a festival day there is also that festival's dish,
+// which heals half as much again and can be cooked only that day.
 // Some pieces do something when you press F beside them in your house: the BED lets you sleep at night (or rest by day), the TABLE sets a meal (15 denarii, twice a day), the CHEST keeps goods for
 // you (60 at most), a STOOL or CUSHIONS let you sit and rest, and a PLANT grows a little for every day you water it. Every different kind of piece in the house also makes you heal 5% faster at home.
 
@@ -15,8 +19,19 @@ const Furnish = (() => {
     bed: ["Bed", 90], plant: ["Potted plant", 20], vase: ["Tall vase", 45], statue: ["Small statue", 120], cushions: ["Floor cushions", 25], screen: ["Folding screen", 80],
   };
   const IDS = Object.keys(PIECES);
-  const ACTIONS = { bed: "F: lie down on your bed", table: "F: set a meal on the table (15 denarii)", chest: "F: open your chest", stool: "F: sit down", cushions: "F: sit on the cushions", plant: "F: water the plant" };
+  const ACTIONS = { bed: "F: lie down on your bed", table: "F: cook or eat at your table", chest: "F: open your chest", stool: "F: sit down", cushions: "F: sit on the cushions", plant: "F: water the plant" };
   const MEAL = 15, MEALS_A_DAY = 2, CHEST_MAX = 60;
+  // dishes: [name, {ingredient good: how many}, heal, fill]; and the dishes of festival days (festival key -> dish), cooked only on that feast
+  const RECIPES = [
+    ["Olive oil flatbread", { oliveoil: 1, pepper: 1 }, 22, 55], ["Spiced lentils", { cumin: 1, pepper: 1 }, 25, 60], ["Saffron rice", { saffron: 1, cumin: 1 }, 35, 70], ["Hot chocolate", { cacao: 1, honey: 1 }, 28, 50],
+    ["Vanilla pudding", { vanilla: 1, honey: 1 }, 30, 55], ["Jasmine tea and snacks", { jasmine: 1, snacks: 1 }, 18, 35], ["Tea-smoked supper", { longjing: 1, oliveoil: 1 }, 30, 60],
+  ];
+  const FEAST_DISHES = {
+    diwali: ["Kheer for Diwali", { saffron: 1, honey: 1 }, 55, 85], holi: ["Gujiya for Holi", { saffron: 1, honey: 1 }, 55, 85], saturnalia: ["Saturnalia honey cake", { honey: 1, oliveoil: 1 }, 50, 80], floralia: ["Floralia flower bread", { honey: 1, oliveoil: 1 }, 50, 80],
+    muertos: ["Pan de muerto", { cacao: 1, vanilla: 1, honey: 1 }, 60, 90], equinox: ["Equinox maize cake", { cacao: 1, honey: 1 }, 55, 85], midautumn: ["Mooncake", { honey: 1, jasmine: 1 }, 55, 85], springfest: ["New Year jiaozi", { snacks: 1, jasmine: 1 }, 55, 85],
+  };
+  const dishes = () => { const f = typeof Festival !== "undefined" && Festival.active && FEAST_DISHES[Festival.id]; return f ? RECIPES.concat([[...f, true]]) : RECIPES; };
+  const canCook = (r) => Object.entries(r[1]).every(([id, n]) => Shopkeep.owns(id) >= n);
   // the colours of each city's furniture: main, accent, wood
   const PAL = {
     rome: { main: 0x8a2f2a, accent: 0xd9b44a, wood: 0x6b4a2b }, delhi: { main: 0xd9831f, accent: 0x8a1f4a, wood: 0x5a3a1f },
@@ -115,6 +130,14 @@ const Furnish = (() => {
     Online.navalSend({ t: "social", a: "f_get", fid }); toast(`${tr("Asking to visit")} ${name || ""}...`);
   }
   function onServer(m) {
+    if (m.a === "party") { Sfx.play("chime"); Dialog.confirm(`${m.name} ${tr("invites you to a party at their house. Go?")}`).then((yes) => { if (yes) visit(m.fid, m.name); }); return; }
+    if (m.a === "party_on") { partyLeft = m.secs; Sfx.play("pop"); Sfx.play("cheer"); toast(tr("🎉 Your party has begun! Your friends have been asked.")); return; }
+    if (m.a === "guest") { Sfx.play("pop"); Sfx.play("cheer"); toast(`🎉 ${m.name} ${tr("came to your party: +20 denarii.")}`); return; }
+    if (m.a === "note") { Sfx.play("page"); toast(`📝 ${m.name} ${tr("left a note in your guestbook:")} ${m.text}`); return; }
+    if (m.a === "note_ok") { Sfx.play("page"); note = tr("Your note is in the guestbook."); render(); return; }
+    if (m.a === "gift_ok") { if (m.ik === "good") Shopkeep.take(m.item, m.n); else Furnish.take(m.item, m.n); toast(tr("Your gift is on its way.")); render(); return; }
+    if (m.a === "no") { note = tr(m.text); render(); toast(tr(m.text)); return; }
+    if (m.a === "layout" && m.book !== undefined) { book = m.book; view = "book"; render(); openPanel("#furnish"); return; }
     if (m.a !== "layout") { toast(tr("You cannot visit that house: only friends can.")); return; }
     const placed = {}, counts = Object.keys(PAL).map((c) => [c, (m.placed[c] || []).length]).sort((a, b) => b[1] - a[1]);
     if (!counts[0][1]) { toast(`${m.name}${tr(" has not furnished a house yet.")}`); return; }
@@ -122,17 +145,29 @@ const Furnish = (() => {
     endGuest();
     if (c !== here()) arriveIn(c);
     if (c === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (c === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else if (c === "beijing") { const h = Beijing.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0);
-    guest = { name: m.name, city: c, water: +m.water || 0 };
+    guest = { name: m.name, city: c, water: +m.water || 0, fid: m.fid };
     make.water = guest.water;
     guestGroup = new THREE.Group();
     for (const p of clean({ placed: m.placed }).placed[c]) { const o = make(p.id, c); o.position.set(p.x, FLOOR[c], p.z); o.rotation.y = p.yaw; guestGroup.add(o); }
     make.water = undefined;
     worldScene.add(guestGroup); applyVisibility(); away = 0;
-    toast(`🏠 ${tr("You are visiting")} ${m.name}${tr("'s house. Walk out of the door to go home.")}`);
+    toast(`🏠 ${tr("You are visiting")} ${m.name}${tr("'s house. Walk out of the door to go home.")} ${tr("Open 🛋️ Furnish house to leave a note or a gift.")}${m.party ? ` 🎉 ${tr("A party!")}` : ""}`);
+  }
+
+  // where a pet settles in your house (pets.js): a walking pet on cushions, the bed or a rug, a bird on a lamp stand, vase, statue or plant; the nearest of the best kind within nine steps
+  function petSpot(flies) {
+    if (guest || !inHouse()) return null;
+    const want = flies ? { lamp: 1.7, statue: 1.7, vase: 1.2, plant: 1.1 } : { cushions: 0.3, bed: 0.62, rug: 0.1 }, order = Object.keys(want);
+    let best = null, bs = 1e9;
+    for (const p of st.placed[here()] || []) {
+      const k = order.indexOf(p.id); if (k < 0) continue;
+      const score = Math.hypot(p.x - player.x, p.z - player.z) + k * 3; if (score < bs && score < 12) { bs = score; best = p; }
+    }
+    return best ? { x: best.x, z: best.z, y: want[best.id], yaw: best.yaw, name: PIECES[best.id][0].toLowerCase(), label: PIECES[best.id][0] } : null;
   }
 
   // ---------------------------------------------------------------- what the pieces do
-  let sat = null, view = "shop";
+  let sat = null, view = "shop", book = [], partyLeft = 0;
   const today = () => (typeof Payroll !== "undefined" ? Payroll.epoch() : 0);
   const comfort = (c = here()) => 1 + 0.05 * new Set((st.placed[c] || []).map((p) => p.id)).size;       // (heal faster at home for each kind of piece: Vitals restBoost)
   function actNear() {
@@ -144,24 +179,31 @@ const Furnish = (() => {
   const promptText = () => { const p = actNear(); return p ? tr(ACTIONS[p.id]) : ""; };
   const at = () => !!actNear();
   function sitAt(p, text) {
-    player.x = p.x; player.z = p.z; player.vx = player.vz = 0; Vitals.startRest(); sat = { x: p.x, z: p.z }; toast(text);
+    player.x = p.x; player.z = p.z; player.vx = player.vz = 0; Vitals.startRest(); sat = { x: p.x, z: p.z }; Sfx.play("creak"); toast(text);
   }
   function act() {
     const p = actNear(); if (!p) return;
     if (p.id === "bed") {
-      if (typeof Time !== "undefined" && Time.bedtime && typeof startSleep === "function") { player.x = p.x; player.z = p.z; startSleep(false); }
+      if (typeof Time !== "undefined" && Time.bedtime && typeof startSleep === "function") { player.x = p.x; player.z = p.z; Sfx.play("creak"); startSleep(false); }
       else sitAt(p, tr("It is not bedtime yet: you rest a while. Move to get up."));
     } else if (p.id === "stool" || p.id === "cushions") sitAt(p, tr("You sit down. Move to stand up."));
-    else if (p.id === "table") {
-      if (st.meals.day !== today()) st.meals = { day: today(), n: 0 };
-      if (st.meals.n >= MEALS_A_DAY) { toast(tr("You have eaten enough for today.")); return; }
-      if (Vitals.coins < MEAL) { toast(tr("A meal costs 15 denarii.")); return; }
-      Vitals.coins -= MEAL; Vitals.eat(20, 50); st.meals.n++; save(); Sfx.play("coin"); toast(tr("You eat a good meal at your table."));
-    } else if (p.id === "chest") { view = "chest"; note = ""; render(); openPanel("#furnish"); }
+    else if (p.id === "table") { view = "cook"; note = ""; render(); openPanel("#furnish"); }
+    else if (p.id === "chest") { view = "chest"; note = ""; render(); openPanel("#furnish"); }
     else if (p.id === "plant") {
       if (st.water.day === today()) { toast(tr("The plant has been watered today.")); return; }
       st.water = { day: today(), n: st.water.n + 1 }; save(); refresh(); Sfx.play("splash"); toast(tr("You water the plant. It grows a little."));
     }
+  }
+  function plainMeal() {
+    if (st.meals.day !== today()) st.meals = { day: today(), n: 0 };
+    if (st.meals.n >= MEALS_A_DAY) { note = tr("You have eaten enough for today."); render(); return; }
+    if (Vitals.coins < MEAL) { note = tr("A meal costs 15 denarii."); render(); return; }
+    Vitals.coins -= MEAL; Vitals.eat(20, 50); st.meals.n++; save(); Sfx.play("coin"); note = tr("You eat a good meal at your table."); render();
+  }
+  function cook(r) {
+    if (!canCook(r)) return;
+    for (const [id, n] of Object.entries(r[1])) Shopkeep.take(id, n);
+    Vitals.eat(r[2], r[3]); Sfx.play("sizzle"); setTimeout(() => Sfx.play("clink"), 900); note = `${tr(r[0])}: ${tr("delicious!")} (+${r[2]})`; render();
   }
   const stash = (id, n) => { const room = CHEST_MAX - Object.values(st.chest).reduce((a, b) => a + b, 0), k = Math.min(n, room, Shopkeep.owns(id)); if (k > 0 && Shopkeep.take(id, k)) { st.chest[id] = (st.chest[id] || 0) + k; save(); } else if (room <= 0) note = tr("The chest is full."); render(); };
   const fetchOut = (id, n) => { const k = Math.min(n, st.chest[id] || 0); if (k > 0) { Shopkeep.give(id, k); st.chest[id] -= k; if (!st.chest[id]) delete st.chest[id]; save(); } render(); };
@@ -180,7 +222,7 @@ const Furnish = (() => {
     if (st.placed[c].length >= MAX) { note = tr("The house is full: pick something up first."); render(); return; }
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), x = player.x + fx * 1.4, z = player.z + fz * 1.4;
     st.placed[c].push({ id, x: +x.toFixed(2), z: +z.toFixed(2), yaw: +(player.yaw + Math.PI).toFixed(2) });
-    save(); refresh(); note = `${tr(PIECES[id][0])}: ${tr("placed in front of you.")}`; render();
+    save(); refresh(); Sfx.play("thud"); note = `${tr(PIECES[id][0])}: ${tr("placed in front of you.")}`; render();
   }
   // the nearest piece in this house, within three steps
   function nearest() {
@@ -209,6 +251,42 @@ const Furnish = (() => {
   function render() {
     const body = $p("fn-body"); if (!body) return;
     const rows = [], c = here();
+    if (guest) {                                                                                  // a guest: leave a note or a gift
+      const mk = (label, f, dis) => { const b = el("button", label); b.type = "button"; b.disabled = !!dis; b.addEventListener("click", f); return b; };
+      rows.push(el("h3", `${tr("You are visiting")} ${guest.name}`));
+      if (note) rows.push(el("p", note, "sk-note"));
+      rows.push(el("h3", tr("Leave a note")));
+      const t = el("input"); t.type = "text"; t.maxLength = 80; t.placeholder = tr("Write a few words..."); rows.push(t, mk(tr("Leave the note"), () => { if (t.value.trim()) Online.navalSend({ t: "social", a: "f_note", fid: guest.fid, text: t.value.trim() }); }));
+      rows.push(el("h3", tr("Leave a gift")));
+      const sel = el("select"), opts = [];
+      for (const id of Shopkeep.IDS) if (Shopkeep.owns(id) > 0) opts.push(["good", id, Shopkeep.GOODS[id][0]]);
+      for (const id of IDS) if (free(id) > 0) opts.push(["furn", id, PIECES[id][0]]);
+      for (const [ik, id, name] of opts) { const o = el("option", tr(name)); o.value = `${ik}:${id}`; sel.append(o); }
+      if (opts.length) rows.push(sel, mk(tr("Leave 1 as a gift"), () => { const [ik, id] = sel.value.split(":"); Online.navalSend({ t: "social", a: "f_gift", fid: guest.fid, item: id, ik, n: 1, label: tr(ik === "good" ? Shopkeep.GOODS[id][0] : PIECES[id][0]) }); }));
+      else rows.push(el("p", tr("You have nothing to give: buy goods in the shops, or furniture here."), "dnote"));
+      body.replaceChildren(...rows); return;
+    }
+    if (view === "cook") {
+      const mk = (label, f, dis) => { const b = el("button", label); b.type = "button"; b.disabled = !!dis; b.addEventListener("click", f); return b; };
+      rows.push(el("h3", tr("Your table")), el("p", tr("You have {0} denarii.").replace("{0}", Math.round(Vitals.coins)), "dnote"));
+      if (note) rows.push(el("p", note, "sk-note"));
+      const ul = el("ul", undefined, "mk-items");
+      const plain = el("li"), pt = el("span"); pt.append(el("strong", tr("A plain meal")), el("small", `${MEAL} ${tr("denarii")} · ${tr("twice a day")}`)); plain.append(pt, mk(tr("Eat"), plainMeal)); ul.append(plain);
+      for (const r of dishes()) {
+        const li = el("li"), tx = el("span"), need = Object.entries(r[1]).map(([id, n]) => `${n} × ${tr(Shopkeep.GOODS[id][0])} (${Shopkeep.owns(id)})`).join(" + ");
+        tx.append(el("strong", `${r[4] ? "🎉 " : ""}${tr(r[0])}`), el("small", `${need} → +${r[2]} ${tr("health")}${r[4] ? ` · ${tr("today only")}` : ""}`)); li.append(tx, mk(tr("Cook"), () => cook(r), !canCook(r))); ul.append(li);
+      }
+      rows.push(ul, el("p", tr("Dishes use up the goods you carry: buy them in the shops of the cities. On a festival day there is a festival dish."), "dnote"));
+      body.replaceChildren(...rows); return;
+    }
+    if (view === "book") {
+      rows.push(el("h3", tr("📖 Your guestbook")));
+      const ul = el("ul", undefined, "mk-items");
+      for (const b of book.slice().reverse()) { const li = el("li"), txt = el("span"); txt.append(el("strong", b.name), el("small", b.text)); li.append(txt); ul.append(li); }
+      rows.push(ul.children.length ? ul : el("p", tr("Nobody has written in your guestbook yet. Friends who visit your house can leave a note."), "dnote"));
+      const back = el("button", tr("← Back")); back.type = "button"; back.addEventListener("click", () => { view = "shop"; render(); }); rows.push(back);
+      body.replaceChildren(...rows); return;
+    }
     if (view === "chest") {
       const total = Object.values(st.chest).reduce((a, b) => a + b, 0), mk = (label, f, dis) => { const b = el("button", label); b.type = "button"; b.disabled = !!dis; b.addEventListener("click", f); return b; };
       rows.push(el("h3", tr("Your chest")), el("p", `${total} / ${CHEST_MAX} ${tr("goods")}`, "dnote"));
@@ -226,6 +304,10 @@ const Furnish = (() => {
     }
     rows.push(el("p", tr("You have {0} denarii.").replace("{0}", Math.round(Vitals.coins)), "dnote"));
     if (note) rows.push(el("p", note, "sk-note"));
+    const extra = el("div", undefined, "sk-menu");
+    const gb = el("button", tr("📖 Guestbook")); gb.type = "button"; gb.addEventListener("click", () => Online.navalSend({ t: "social", a: "f_get", fid: "me" }));
+    const pb = el("button", tr("🎉 Throw a party (50 denarii)")); pb.type = "button"; pb.disabled = Vitals.coins < 50 || partyLeft > 0; pb.addEventListener("click", () => { if (guest) return; Online.navalSend({ t: "social", a: "f_party" }); });
+    if (typeof Account !== "undefined" && Account.loggedIn) { extra.append(gb, pb); rows.push(extra); }
     const inside = inHouse();
     rows.push(el("p", inside ? tr("You are in your house: stand where you want a piece and press Place.") : tr("Go inside your own house to place furniture (the house you own in this city)."), "dnote"));
     if (inside) {
@@ -259,6 +341,7 @@ const Furnish = (() => {
   function bind() {
     const b = $p("btn-furn"); if (b) b.addEventListener("click", open);
     setInterval(() => { refresh(); if (sat && !Vitals.resting) sat = null; const p = $p("furnish"); if (p && p.classList.contains("show")) render(); }, 2000);
+    setInterval(() => { if (partyLeft > 0) partyLeft -= 1; }, 1000);
     setInterval(() => {                                                                           // (your layout goes to the server for your friends; a guest goes home when they walk out)
       if (dirty && typeof Online !== "undefined" && Online.connected && typeof Account !== "undefined" && Account.loggedIn) { dirty = false; Online.navalSend({ t: "social", a: "f_set", placed: st.placed, water: st.water.n }); }
       if (guest) { away = inHouse() && here() === guest.city ? 0 : away + 0.5; if (away > 3) endGuest(); }
@@ -268,5 +351,5 @@ const Furnish = (() => {
   const snapshot = () => JSON.parse(JSON.stringify(st));
   function restore(r) { st = clean(r); save(); refresh(); }
 
-  return { guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
+  return { petSpot, guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
 })();

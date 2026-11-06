@@ -246,7 +246,8 @@ const Interiors = (() => {
 
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);                            // the shop's words in the language of the game
   const hash = (a, b) => { let h = Math.imul(a + 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x7f4a7c15, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
-  const shopOpen = (p, night) => !night || !!p.kind.late;                                                // most shops shut at night (20:30 to 5:30); taverns, food stalls, hotels and corner shops stay open
+  const stormy = () => typeof Weather !== "undefined" && ["storm", "blizzard", "tornado", "cyclone", "hail"].includes(Weather.kind);   // (in a storm the shops shut, except the inns and food stalls that stay open at night, and any shop you are standing in)
+  const shopOpen = (p, night) => (!night || !!p.kind.late) && (!stormy() || !!p.kind.late || !!p.inside);                                                // most shops shut at night (20:30 to 5:30); taverns, food stalls, hotels and corner shops stay open
 
   // what changes when a shop opens or shuts: the keeper (home for the night), the lamp, the windows, the customers
   function setOpen(p, open, night) {

@@ -2,7 +2,8 @@
 // Citizens with daily lives. Every citizen walking about has a name, a job at one of the shops near where they live, and a day: at home in the early morning and at night, walking to work, at work,
 // at lunch, and in the evening at an inn or a food stall (or a sight, where there is none). Walk up and press F to talk: it shows who they are and what they are doing now. The first chat of a game
 // day with a citizen makes you better friends (stranger, acquaintance, friend, close friend), and each new step brings a small gift. Friends are kept in the browser (rome-friends) and the saved game.
-// Depends on city.js and the other cities (peopleHere), interiors.js (the shops), home.js (Time), payroll.js (the day), and the globals of game.js (player, LANDMARKS).
+// Weather changes the day: in rain, snow, hail or a storm the citizens go to shelter (at work, at the inn or at home), the ones still out hold umbrellas in the rain, the ground fills with puddles that dry up
+// in the hours after the rain, and the shops shut in a storm (interiors.js). Depends on city.js and the other cities (peopleHere), interiors.js (the shops), home.js (Time), payroll.js (the day), weather.js, and the globals of game.js (player, LANDMARKS, worldScene, groundAt, canMove).
 
 const Lives = (() => {
   const REACH = 3.2, KEY = "rome-friends", LEVELS = [0, 2, 5, 9], LEVEL_NAMES = ["Stranger", "Acquaintance", "Friend", "Close friend"], GIFTS = [0, 10, 25, 50];
@@ -30,7 +31,10 @@ const Lives = (() => {
   const COMMON = ["Have you heard? Something is going on in the city today.", "I walk this way every day. I know every stone of it.", "The weather has been strange lately, has it not?", "You look like you are not from here. Welcome.", "If you want to know the city, talk to the people who work in it."];
 
   const people = new WeakMap();                           // person -> { i, name, job, home, work, eat, v0, skip, lx, lz, lt }
-  let friends = {}, shopsAt = [], shopsKey = "", cur = null, steerT = 0, clock = 0;
+  let friends = {}, shopsAt = [], shopsKey = "", cur = null, steerT = 0, clock = 0, wet = 0, brolly = null, puddles = null, tmp = null;
+  const wx = () => (typeof Weather !== "undefined" ? Weather : { kind: "clear", rain: 0, snow: 0 });
+  const bad = () => { const w = wx(); return w.rain > 0.35 || w.snow > 0.5 || ["storm", "hail", "blizzard", "tornado", "cyclone"].includes(w.kind); };
+  const badWord = () => { const k = wx().kind; return k === "storm" || k === "tornado" || k === "cyclone" ? "the storm" : k === "hail" ? "the hail" : k === "snow" || k === "blizzard" ? "the snow" : "the rain"; };
   try { const r = JSON.parse(localStorage.getItem(KEY) || "{}"); if (r && typeof r === "object" && !Array.isArray(r)) for (const k of Object.keys(r).slice(0, 2000)) if (r[k] && Number.isFinite(+r[k].n)) friends[k] = { n: Math.min(999, Math.max(0, Math.floor(+r[k].n))), day: Number.isFinite(+r[k].day) ? +r[k].day : -1, lv: Math.min(3, Math.max(0, Math.floor(+r[k].lv || 0))) }; } catch (e) { /* storage unavailable */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(friends)); } catch (e) { /* ignore */ } };
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
@@ -61,6 +65,7 @@ const Lives = (() => {
   // what a citizen is doing at an hour of the day
   function plan(o, hour) {
     const h = (hour + o.jit + 24) % 24;
+    if (bad() && h >= 5.5 && h < 21) { const at = o.work || o.eat || o.home; return { key: "shelter", at, text: `sheltering from ${badWord()}` }; }
     if (h < 5.5 || h >= 21) return { key: "sleep", at: o.home, text: "at home for the night" };
     if (h < 7.5) return { key: "home", at: o.home, text: "having breakfast at home" };
     if (h < 8.5) return o.work ? { key: "commute", at: o.work, text: `walking to work at the ${o.workName}` } : { key: "stroll", at: null, text: "out for a walk" };
@@ -70,10 +75,47 @@ const Lives = (() => {
     return o.eat ? { key: "evening", at: o.eat, text: o.eatName ? `spending the evening at the ${o.eatName}` : "spending the evening out" } : { key: "stroll", at: null, text: "out for a walk" };
   }
 
+  // umbrellas over the heads of the people near you in the rain, and puddles on the ground that stay a while after it stops
+  function weatherLook(dt, list) {
+    const w = wx(), raining = w.rain > 0.25 && w.snow < 0.3;
+    wet = raining ? Math.min(1, wet + dt * 0.08) : Math.max(0, wet - dt * 0.012);          // (a wet day: puddles come in a few seconds of rain and last about a game hour afterwards)
+    if (typeof worldScene === "undefined" || !worldScene) return;
+    if (!brolly) {
+      brolly = new THREE.InstancedMesh(new THREE.ConeGeometry(0.62, 0.34, 10), new THREE.MeshLambertMaterial({ color: 0xffffff }), 80);
+      brolly.frustumCulled = false; brolly.instanceMatrix.setUsage(THREE.DynamicDrawUsage); worldScene.add(brolly);
+      const cols = [0x2a4a8a, 0xb03030, 0x2a7a4a, 0x7a2a7a, 0xc8a030, 0x303030]; for (let i = 0; i < 80; i++) brolly.setColorAt(i, new THREE.Color(cols[i % cols.length]));
+      brolly.instanceColor.needsUpdate = true;
+      puddles = new THREE.Group(); const pm = new THREE.MeshBasicMaterial({ color: 0x3f5666, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+      for (let i = 0; i < 60; i++) { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 14), pm); m.rotation.x = -Math.PI / 2; m.visible = false; puddles.add(m); }
+      puddles.userData.mat = pm; worldScene.add(puddles);
+    }
+    if (!tmp) tmp = { m4: new THREE.Matrix4(), v: new THREE.Vector3(), q: new THREE.Quaternion(), sc: new THREE.Vector3(), zero: new THREE.Matrix4().makeScale(0, 0, 0) };
+    const { m4, v, q, sc, zero } = tmp;
+    let n = 0;
+    if (raining && !(typeof Interiors !== "undefined" && Interiors.inside())) {
+      for (let i = 0; i < list.length && n < 80; i++) { const p = list[i]; if (Math.abs(p.x - player.x) > 70 || Math.abs(p.z - player.z) > 70 || (p.down || 0) > 0) continue; v.set(p.x, groundAt(p.x, p.z) + 1.95, p.z); sc.set(1.35, 1.35, 1.35); m4.compose(v, q, sc); brolly.setMatrixAt(n++, m4); }
+    }
+    for (let i = n; i < 80; i++) brolly.setMatrixAt(i, zero);
+    brolly.instanceMatrix.needsUpdate = true;
+    // puddles: a ring of cells round you, each with its own place and size
+    const cell = 14, ci = Math.floor(player.x / cell), cj = Math.floor(player.z / cell); let k = 0;
+    puddles.userData.mat.opacity = 0.55 * Math.min(1, wet * 1.6);
+    if (wet > 0.05 && !(typeof Interiors !== "undefined" && Interiors.inside())) {
+      for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3 && k < 60; b++) {
+        const i = ci + a, j = cj + b, hh = hash(i * 7919 + 13, j * 104729 + 7); if (hh > 0.55 + 0.4 * (1 - wet) * 0) continue;
+        const x = (i + hash(i, j)) * cell, z = (j + hash(j + 5, i + 11)) * cell, r = 1.0 + hash(i + 3, j + 9) * 1.8;
+        if (!canMove(x, z, x + 0.1, z) || hh > 0.25 + 0.3 * wet) continue;
+        const mm = puddles.children[k++]; mm.visible = true; mm.position.set(x, groundAt(x, z) + 0.04, z); mm.scale.set(r * (0.6 + 0.4 * wet), r * (0.6 + 0.4 * wet), 1);
+      }
+    }
+    for (; k < 60; k++) puddles.children[k].visible = false;
+  }
+
   // the people near you steer to where the day takes them (and walk a little faster to get there); when they are stuck at a wall they wander for a moment
   function update(dt) {
     if (typeof started === "undefined" || !started || typeof Time === "undefined") return;
-    clock += dt; steerT -= dt; if (steerT > 0) return;
+    clock += dt; try { weatherLook(dt, peopleHere()); } catch (e) { /* weather look is only decoration */ }
+    steerT -= dt; if (steerT > 0) return;
     const step = 0.25; steerT = step;
     const list = peopleHere(), hour = Time.hour, now = clock;
     for (let i = 0; i < list.length; i++) {

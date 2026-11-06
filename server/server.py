@@ -3718,7 +3718,16 @@ TRADE_STRANGER = collections.defaultdict(list)     # fid -> when its stranger tr
 
 def clean_offer(m, stranger=False):
     items = [i for i in (m.get("items") or []) if isinstance(i, str) and re.fullmatch(r"[a-z0-9_]{2,24}", i)] if isinstance(m.get("items"), list) else []
-    return {"items": list(dict.fromkeys(items))[:TRADE_STRANGER_ITEMS if stranger else TRADE_ITEMS], "coins": int(num(m.get("coins"), 0, TRADE_STRANGER_COINS if stranger else TRADE_COINS, 0)), "ok": False}
+    def stacks(raw, pat):                                   # goods and furniture (id -> how many), between friends only
+        out = {}
+        if isinstance(raw, dict) and not stranger:
+            for k, v in list(raw.items())[:8]:
+                if isinstance(k, str) and re.fullmatch(pat, k):
+                    n = int(num(v, 0, 40, 0))
+                    if n > 0:
+                        out[k] = n
+        return out
+    return {"items": list(dict.fromkeys(items))[:TRADE_STRANGER_ITEMS if stranger else TRADE_ITEMS], "coins": int(num(m.get("coins"), 0, TRADE_STRANGER_COINS if stranger else TRADE_COINS, 0)), "goods": stacks(m.get("goods"), r"[a-z0-9_]{2,24}"), "furn": stacks(m.get("furn"), r"[a-z]{2,12}"), "ok": False}
 
 
 def stranger_block(conn):
@@ -3738,7 +3747,7 @@ def trade_complete(tr):
     mine, theirs = tr["o"][id(a)], tr["o"][id(b)]
     for c, give, get in ((a, mine, theirs), (b, theirs, mine)):
         c.trade = None
-        c.send({"t": "fr_trade", "s": "done", "get": {"items": get["items"], "coins": get["coins"]}, "give": {"items": give["items"], "coins": give["coins"]}})
+        c.send({"t": "fr_trade", "s": "done", "get": {"items": get["items"], "coins": get["coins"], "goods": get.get("goods", {}), "furn": get.get("furn", {})}, "give": {"items": give["items"], "coins": give["coins"], "goods": give.get("goods", {}), "furn": give.get("furn", {})}})
     if tr.get("stranger"):
         for c in (a, b):
             TRADE_STRANGER[c.fid].append(time.time())
@@ -3834,7 +3843,7 @@ def on_trade(conn, a, m):
         tr["o"][id(conn)] = clean_offer(m, tr.get("stranger"))
         tr["o"][id(other)]["ok"] = False
         tr["done_at"] = None                                                  # (a change during the ten seconds starts everything again)
-        other.send({"t": "fr_trade", "s": "theirs", "items": tr["o"][id(conn)]["items"], "coins": tr["o"][id(conn)]["coins"], "ok": False})
+        other.send({"t": "fr_trade", "s": "theirs", "items": tr["o"][id(conn)]["items"], "coins": tr["o"][id(conn)]["coins"], "goods": tr["o"][id(conn)].get("goods", {}), "furn": tr["o"][id(conn)].get("furn", {}), "ok": False})
         conn.send({"t": "fr_trade", "s": "unlock"})
         return
     if a == "trade_ok":
@@ -3900,9 +3909,12 @@ MKT_FEE, MKT_MAX_LISTINGS, MKT_MAX_PRICE, MKT_FIXED_LIFE, MKT_MAIL_MAX = 0.05, 5
 MKT_HOURS = (1, 6, 24)
 
 
+MKT_BOOT = "".join(random.choices("abcdefghjkmnpqrstuvwxyz", k=3))       # (ids differ after every start, so a server that lost its saved state never reuses an id a browser has already seen)
+
+
 def mkt_next():
     MKT["seq"] += 1
-    return "m%d" % MKT["seq"]
+    return "m%d%s" % (MKT["seq"], MKT_BOOT)
 
 
 def mkt_mail(fid, **mail):
@@ -3949,18 +3961,84 @@ def furn_clean(raw):
     return out
 
 
+BOOK_MAX = 30                # notes in a guestbook
+GIFT_PER_HOUR = 10           # gifts and notes a player may leave in an hour
+PARTY_LIFE, PARTY_COST, PARTY_GUESTS = 1200.0, 50, 5
+PARTIES = {}                 # host friend id -> {"until", "name", "guests": [friend ids]}
+LEFT = {}                    # friend id -> [when] of the notes and gifts they left lately
+
+
+def furn_limit(conn):
+    t = time.time()
+    recent = [x for x in LEFT.get(conn.fid, []) if t - x < 3600]
+    LEFT[conn.fid] = recent
+    if len(recent) >= GIFT_PER_HOUR:
+        return False
+    recent.append(t)
+    return True
+
+
 def on_furn(conn, a, m):
     if a == "f_set":
         f = furn_clean(m)
         f["name"] = conn.name
+        f["book"] = FURN.get(conn.fid, {}).get("book", [])
         FURN[conn.fid] = f
         world_soon()
         return
-    fid = clean_fid(m.get("fid"))
+    if a == "f_party":                                                           # the host throws a party: 50 denarii, and their online friends are asked
+        if (conn.coins or 0) < PARTY_COST:
+            return conn.send({"t": "furn", "a": "no", "text": "A party costs %d denarii." % PARTY_COST})
+        old = PARTIES.get(conn.fid)
+        if old and old["until"] > time.time():
+            return conn.send({"t": "furn", "a": "no", "text": "Your party is still going."})
+        PARTIES[conn.fid] = {"until": time.time() + PARTY_LIFE, "name": conn.name, "guests": []}
+        conn.coins = max(0, (conn.coins or 0) - PARTY_COST)
+        mkt_mail(conn.fid, coins=-PARTY_COST, text="You threw a party! Your friends have been asked.")
+        for f in sorted(CLAIMS.get(conn.fid, ())):
+            if mutual(conn.fid, f):
+                for c in conns_of(f):
+                    c.send({"t": "furn", "a": "party", "fid": conn.fid, "name": conn.name, "secs": int(PARTY_LIFE)})
+        return conn.send({"t": "furn", "a": "party_on", "secs": int(PARTY_LIFE)})
+    fid = conn.fid if m.get("fid") == "me" else clean_fid(m.get("fid"))
+    if a in ("f_note", "f_gift"):
+        if not fid or fid == conn.fid or not mutual(conn.fid, fid):
+            return conn.send({"t": "furn", "a": "no", "text": "Only friends can leave you things."})
+        if not furn_limit(conn):
+            return conn.send({"t": "furn", "a": "no", "text": "You have left enough for this hour."})
+        if a == "f_note":
+            text = class_clean(m.get("text"), 80)
+            if not text:
+                return
+            f = FURN.setdefault(fid, dict(furn_clean(None), name=NAMES.get(fid, "")))
+            f.setdefault("book", []).append({"name": conn.name, "text": text, "t": int(time.time())})
+            del f["book"][:-BOOK_MAX]
+            world_soon()
+            for c in conns_of(fid):
+                c.send({"t": "furn", "a": "note", "name": conn.name, "text": text})
+            return conn.send({"t": "furn", "a": "note_ok"})
+        item, ik = str(m.get("item", "")), m.get("ik")
+        if ik not in ("good", "furn") or not re.fullmatch(r"[a-z0-9_]{2,24}", item):
+            return
+        n = int(num(m.get("n"), 1, 5, 1))
+        mkt_mail(fid, item=item, ik=ik, n=n, text="%s left you a gift: %s." % (conn.name, class_clean(m.get("label"), 30) or item))
+        return conn.send({"t": "furn", "a": "gift_ok", "item": item, "ik": ik, "n": n})
     if not fid or not (fid == conn.fid or mutual(conn.fid, fid)) or fid not in FURN:
         return conn.send({"t": "furn", "a": "none", "fid": fid or ""})
     f = FURN[fid]
-    conn.send({"t": "furn", "a": "layout", "fid": fid, "name": NAMES.get(fid) or f.get("name") or "A friend", "placed": f["placed"], "water": f["water"]})
+    msg = {"t": "furn", "a": "layout", "fid": fid, "name": NAMES.get(fid) or f.get("name") or "A friend", "placed": f["placed"], "water": f["water"]}
+    if fid == conn.fid:
+        msg["book"] = f.get("book", [])
+    p = PARTIES.get(fid)
+    if fid != conn.fid and p and p["until"] > time.time():                       # a guest at a party: the host and the guest are each paid for the visit (up to five guests)
+        msg["party"] = int(p["until"] - time.time())
+        if conn.fid not in p["guests"] and len(p["guests"]) < PARTY_GUESTS:
+            p["guests"].append(conn.fid)
+            mkt_mail(conn.fid, coins=10, text="You enjoyed %s's party: +10 denarii." % p["name"])
+            mkt_mail(fid, coins=20, text="%s came to your party: +20 denarii." % conn.name)
+            for c in conns_of(fid):
+                c.send({"t": "furn", "a": "guest", "name": conn.name})
+    conn.send(msg)
 
 
 def mkt_item(m):
@@ -5736,7 +5814,7 @@ def on_social(conn, m):
         return on_stats(conn, m)
     if a in ("m_board", "m_list", "m_buy", "m_bid", "m_cancel", "m_ack", "m_mail"):
         return on_market(conn, a, m)
-    if a in ("f_set", "f_get"):
+    if a in ("f_set", "f_get", "f_note", "f_gift", "f_party"):
         return on_furn(conn, a, m)
     if a == "title":
         return on_title(conn, m)
@@ -6387,6 +6465,7 @@ def world_apply(rows):
             if clean_fid(fid) and isinstance(f, dict):
                 c = furn_clean(f)
                 c["name"] = class_clean(f.get("name"), 20)
+                c["book"] = [{"name": class_clean(b.get("name"), 20), "text": class_clean(b.get("text"), 80), "t": int(num(b.get("t"), 0, 4e9, 0))} for b in (f.get("book") if isinstance(f.get("book"), list) else [])[-BOOK_MAX:] if isinstance(b, dict)]
                 FURN[fid] = c
     g = rows.get("guilds")
     if isinstance(g, dict) and isinstance(g.get("guilds"), dict) and isinstance(g.get("of"), dict):

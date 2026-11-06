@@ -476,6 +476,25 @@ const I18n = (() => {
     ["Thank you! Here are {0} denarii. Errands done: {1}", "¡Gracias! Aquí tienes {0} denarios. Encargos hechos: {1}", "Grazie! Ecco {0} denari. Incarichi svolti: {1}", "धन्यवाद! ये लो {0} दीनार। पूरे किए काम: {1}", "谢谢!这是{0}第纳尔。已完成差事:{1}"],
     ["Have you seen the {0}? It is about {1} {2} to the {3}.", "¿Has visto {0}? Está a unos {1} {2} al {3}.", "Hai visto {0}? Si trova a circa {1} {2} a {3}.", "क्या आपने {0} देखा है? यह लगभग {1} {2} दूर {3} की ओर है।", "你见过{0}吗?它在{3}约{1}{2}处。"],
     ["F: talk to {0}", "F: hablar con {0}", "F: parla con {0}", "F: {0} से बात करें", "F:和{0}交谈"],
+    // guestbook, gifts and parties (AI-written, not reviewed by native speakers)
+    ["invites you to a party at their house. Go?", "te invita a una fiesta en su casa. ¿Vas?", "ti invita a una festa a casa sua. Vai?", "आपको अपने घर पर पार्टी में बुलाता है। जाएँगे?", "邀请你去他家参加派对。去吗?"],
+    ["🎉 Your party has begun! Your friends have been asked.", "🎉 ¡Tu fiesta ha empezado! Se ha avisado a tus amigos.", "🎉 La tua festa è iniziata! Gli amici sono stati invitati.", "🎉 आपकी पार्टी शुरू हो गई! दोस्तों को बुलाया गया है।", "🎉 你的派对开始了!已邀请你的朋友。"],
+    ["came to your party: +20 denarii.", "vino a tu fiesta: +20 denarios.", "è venuto alla tua festa: +20 denari.", "आपकी पार्टी में आया: +20 दीनार।", "来参加了你的派对:+20第纳尔。"],
+    ["left a note in your guestbook:", "dejó una nota en tu libro de visitas:", "ha lasciato un messaggio nel tuo libro degli ospiti:", "ने आपकी अतिथि-पुस्तिका में संदेश छोड़ा:", "在你的留言簿里留了言:"],
+    ["Your note is in the guestbook.", "Tu nota está en el libro de visitas.", "Il tuo messaggio è nel libro degli ospiti.", "आपका संदेश अतिथि-पुस्तिका में है।", "你的留言已写入留言簿。"],
+    ["Your gift is on its way.", "Tu regalo va en camino.", "Il tuo regalo è in arrivo.", "आपका उपहार रास्ते में है।", "你的礼物已在路上。"],
+    ["Open 🛋️ Furnish house to leave a note or a gift.", "Abre 🛋️ Amueblar la casa para dejar una nota o un regalo.", "Apri 🛋️ Arreda la casa per lasciare un messaggio o un regalo.", "संदेश या उपहार छोड़ने के लिए 🛋️ घर सजाएँ खोलिए।", "打开 🛋️ 布置房屋 来留言或留下礼物。"],
+    ["A party!", "¡Una fiesta!", "Una festa!", "पार्टी!", "派对!"],
+    ["Leave a note", "Dejar una nota", "Lascia un messaggio", "संदेश छोड़ें", "留言"],
+    ["Write a few words...", "Escribe unas palabras...", "Scrivi qualche parola...", "कुछ शब्द लिखिए...", "写几句话……"],
+    ["Leave the note", "Dejar la nota", "Lascia il messaggio", "संदेश छोड़ें", "留下留言"],
+    ["Leave a gift", "Dejar un regalo", "Lascia un regalo", "उपहार छोड़ें", "留下礼物"],
+    ["Leave 1 as a gift", "Dejar 1 de regalo", "Lascia 1 in regalo", "1 उपहार में छोड़ें", "留下1个作为礼物"],
+    ["You have nothing to give: buy goods in the shops, or furniture here.", "No tienes nada que dar: compra mercancías en las tiendas o muebles aquí.", "Non hai nulla da dare: compra merci nei negozi o mobili qui.", "देने के लिए कुछ नहीं है: दुकानों से सामान या यहाँ से फ़र्नीचर खरीदिए।", "你没有可送的东西:去商店买货,或在这里买家具。"],
+    ["📖 Your guestbook", "📖 Tu libro de visitas", "📖 Il tuo libro degli ospiti", "📖 आपकी अतिथि-पुस्तिका", "📖 你的留言簿"],
+    ["Nobody has written in your guestbook yet. Friends who visit your house can leave a note.", "Nadie ha escrito aún en tu libro de visitas. Los amigos que visiten tu casa pueden dejar una nota.", "Nessuno ha ancora scritto nel tuo libro degli ospiti. Gli amici che visitano la tua casa possono lasciare un messaggio.", "अभी किसी ने आपकी अतिथि-पुस्तिका में नहीं लिखा। आपके घर आने वाले दोस्त संदेश छोड़ सकते हैं।", "还没有人在你的留言簿上留言。来你家做客的朋友可以留言。"],
+    ["📖 Guestbook", "📖 Libro de visitas", "📖 Libro degli ospiti", "📖 अतिथि-पुस्तिका", "📖 留言簿"],
+    ["🎉 Throw a party (50 denarii)", "🎉 Dar una fiesta (50 denarios)", "🎉 Dai una festa (50 denari)", "🎉 पार्टी दें (50 दीनार)", "🎉 办派对(50第纳尔)"],
     // visiting houses (AI-written, not reviewed by native speakers)
     ["Visiting needs an account and the game server: log in and wait to be connected.", "Visitar necesita una cuenta y el servidor del juego: inicia sesión y espera a conectarte.", "Visitare richiede un account e il server di gioco: accedi e attendi la connessione.", "मिलने जाने के लिए खाता और गेम सर्वर चाहिए: लॉग इन करें और जुड़ने का इंतज़ार करें।", "拜访需要账号和游戏服务器:请登录并等待连接。"],
     ["Stop what you are doing first.", "Termina primero lo que estás haciendo.", "Prima smetti quello che stai facendo.", "पहले जो कर रहे हैं उसे रोकिए।", "请先停下手头的事。"],
@@ -847,5 +866,11 @@ const I18n = (() => {
     set(saved);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-  return { set, refresh, t: translate, get lang() { return lang; }, rows: ROWS.length };
+  // more phrases and patterns from other files (i18n-stories.js: the story chapters, the mysteries, the seasons): add([[en, es, it, hi, zh], ...], [[/regex/, { es, it, hi, zh }], ...])
+  function add(rows, patterns) {
+    for (const row of rows || []) for (const l of Object.keys(IDX)) if (row[IDX[l]] !== undefined) maps[l].set(row[0], row[IDX[l]]);
+    for (const p of patterns || []) PATTERNS.push(p);
+    if (typeof refresh === "function") refresh();
+  }
+  return { set, refresh, add, t: translate, get lang() { return lang; }, rows: ROWS.length };
 })();
