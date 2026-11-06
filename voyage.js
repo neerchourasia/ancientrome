@@ -28,8 +28,50 @@ const Voyage = (() => {
     if (Math.random() < 0.55) { coins(90); say("You beat the pirates off and found 90 denarii in their boat!"); } else { coins(-70); say("The pirates won the fight and took 70 denarii."); const gone = typeof Trade !== "undefined" ? Trade.caravanLoss(0.5) : 0; if (gone) say(`They also took ${gone} crate${gone === 1 ? "" : "s"} of your caravan's goods.`); }
   }
 
+  // the Silk Road: Beijing and Old Delhi are joined by a caravan road (40 denarii, about 35 seconds): sandstorms, oases and bandits on the way; a caravan of goods can go this way too (trade.js)
+  const ROAD = { beijing: "Beijing", delhi: "Old Delhi" }, ROAD_FARE = 40, ROAD_KEY = "rome-roads";
+  let roads = [];
+  try { const r = JSON.parse(localStorage.getItem(ROAD_KEY) || "[]"); if (Array.isArray(r)) roads = r.filter((c) => ROAD[c]); } catch (e) { /* storage unavailable */ }
+  async function bandits() {
+    const pay = await Dialog.confirm("Bandits block the road! OK: pay them 40 denarii to let you through. Cancel: fight them.");
+    if (pay) { coins(-40); say("You paid the bandits 40 denarii and they stepped aside."); return; }
+    if (Math.random() < 0.55) { coins(80); say("You drove the bandits off and found 80 denarii in their camp!"); }
+    else { coins(-70); say("The bandits won the fight and took 70 denarii."); const gone = typeof Trade !== "undefined" ? Trade.caravanLoss(0.5) : 0; if (gone) say(`They also took ${gone} crate${gone === 1 ? "" : "s"} of your caravan's goods.`); }
+  }
+  async function road(to) {
+    const from = typeof city !== "undefined" ? city : "";
+    if (!ROAD[to] || !ROAD[from] || to === from) { toast("The Silk Road joins Beijing and Old Delhi."); return; }
+    if (mode !== "walk" || sleepT > 0 || !started || travelBusy) { toast("Stop what you are doing first to set off."); return; }
+    if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
+    if (Vitals.coins < ROAD_FARE) { toast(`The caravan road costs ${ROAD_FARE} denarii.`); return; }
+    closePanels(); travelBusy = true; Vitals.stopRest(); Nav.clear();
+    coins(-ROAD_FARE); Sfx.play("horn");
+    if (!box) build();
+    logEl.replaceChildren(); progress(0); $v("vy-title").textContent = `On the Silk Road to ${ROAD[to]}`; box.hidden = false;
+    try {
+      say(`You join a caravan (${ROAD_FARE} denarii). The camels' bells ring and the city falls behind.`); await sleep(3500); progress(0.2);
+      const r = Math.random(); Sfx.play("bell");
+      if (r < 0.35) say("A clear road and good grass for the animals.");
+      else if (r < 0.6) { coins(20); say("An oasis! The caravan rests, and you sell a little water for 20 denarii."); }
+      else if (r < 0.85) { coins(-25); say("A sandstorm! You shelter behind the camels, and the lost tent costs you 25 denarii."); if (typeof Trade !== "undefined" && Trade.caravanLoss(0.001)) say("One crate of your caravan's goods was buried in the sand."); }
+      else { coins(10); say("Merchants from a passing caravan trade news with you (+10 denarii)."); }
+      await sleep(6000); progress(0.55);
+      const q = Math.random();
+      if (q < 0.3) await bandits();
+      else if (q < 0.6) { coins(30); say("You sleep at a caravanserai and sell a map of the road for 30 denarii."); }
+      else say("The road winds on through red hills.");
+      await sleep(5000); progress(0.9);
+      say(`${ROAD[to]} rises out of the dust.`); await sleep(2500); progress(1);
+    } catch (err) { console.error(err); }
+    box.hidden = true;
+    try { arriveIn(to); } catch (err) { console.error(err); toast("Could not arrive"); }
+    travelBusy = false;
+    if (typeof Trade !== "undefined") Trade.caravanMoved(to);
+    if (!roads.includes(to)) { roads.push(to); try { localStorage.setItem(ROAD_KEY, JSON.stringify(roads)); } catch (e) { /* ignore */ } coins(BONUS); Sfx.play("cheer"); toast(`You arrived by the Silk Road for the first time: bonus +${BONUS} denarii!`); }
+  }
+
   async function sail(to) {
-    if (typeof city !== "undefined" && city === "beijing") { toast("Beijing is far from the sea: use the Travel button (B) to leave."); return; }
+    if (typeof city !== "undefined" && city === "beijing") { toast("Beijing is far from the sea: take the Silk Road to Delhi (🐪 in the Travel box), or use the Travel button (B)."); return; }
     if (!NAMES[to] || to === city) { toast("You are already there."); return; }
     if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
     if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
@@ -64,6 +106,11 @@ const Voyage = (() => {
       const b = document.createElement("button"); b.type = "button"; b.textContent = `⛵ ${NAMES[c]}`; b.dataset.sea = c;
       b.addEventListener("click", () => sail(c)); host.append(b);
     }
+    for (const c of Object.keys(ROAD)) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = `🐪 ${ROAD[c]} by the Silk Road`; b.dataset.road = c; b.hidden = true;
+      b.addEventListener("click", () => road(c)); host.append(b);
+    }
+    setInterval(() => { for (const b of host.querySelectorAll("[data-road]")) b.hidden = !(typeof city !== "undefined" && ROAD[city] && city !== b.dataset.road); }, 1000);
   }
-  return { bind, sail, FARE, get count() { return done.length; } };
+  return { bind, sail, road, FARE, get count() { return done.length; } };
 })();
