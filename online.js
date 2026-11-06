@@ -81,6 +81,7 @@ const Online = (() => {
       case "hall": case "season": Hall.on(m); break;
       case "daily": Daily.on(m); break;
       case "mkt": PlayerMarket.on(m); break;
+      case "furn": Furnish.onServer(m); break;
       case "profile": case "replay": Profile.on(m); break;
       case "notice": Bulletin.on(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }

@@ -3930,9 +3930,42 @@ def mkt_view(conn):
     return {"t": "mkt", "a": "board", "list": rows, "fee": MKT_FEE, "max": MKT_MAX_LISTINGS}
 
 
+# ---------------------------------------------------------------- furnished houses: a player's layout (furnish.js) is kept so friends can visit it
+
+FURN = {}                 # friend id -> {"placed": {city: [{id, x, z, yaw}]}, "water": n, "name": the name they have}
+FURN_CITIES = ("rome", "delhi", "cancun", "beijing")
+
+
+def furn_clean(raw):
+    out = {"placed": {c: [] for c in FURN_CITIES}, "water": 0}
+    if not isinstance(raw, dict):
+        return out
+    out["water"] = int(num(raw.get("water"), 0, 999, 0))
+    pl = raw.get("placed") if isinstance(raw.get("placed"), dict) else {}
+    for c in FURN_CITIES:
+        for p in (pl.get(c) if isinstance(pl.get(c), list) else [])[:30]:
+            if isinstance(p, dict) and re.fullmatch(r"[a-z]{2,12}", str(p.get("id", ""))):
+                out["placed"][c].append({"id": p["id"], "x": round(num(p.get("x"), -1e5, 1e5, 0), 2), "z": round(num(p.get("z"), -1e5, 1e5, 0), 2), "yaw": round(num(p.get("yaw"), -7, 7, 0), 2)})
+    return out
+
+
+def on_furn(conn, a, m):
+    if a == "f_set":
+        f = furn_clean(m)
+        f["name"] = conn.name
+        FURN[conn.fid] = f
+        world_soon()
+        return
+    fid = clean_fid(m.get("fid"))
+    if not fid or not (fid == conn.fid or mutual(conn.fid, fid)) or fid not in FURN:
+        return conn.send({"t": "furn", "a": "none", "fid": fid or ""})
+    f = FURN[fid]
+    conn.send({"t": "furn", "a": "layout", "fid": fid, "name": NAMES.get(fid) or f.get("name") or "A friend", "placed": f["placed"], "water": f["water"]})
+
+
 def mkt_item(m):
     item, ik = str(m.get("item", "")), m.get("ik")
-    return (item, ik) if re.fullmatch(r"[a-z0-9_]{2,24}", item) and ik in ("item", "good") else (None, None)
+    return (item, ik) if re.fullmatch(r"[a-z0-9_]{2,24}", item) and ik in ("item", "good", "furn") else (None, None)
 
 
 def on_market(conn, a, m):
@@ -5703,6 +5736,8 @@ def on_social(conn, m):
         return on_stats(conn, m)
     if a in ("m_board", "m_list", "m_buy", "m_bid", "m_cancel", "m_ack", "m_mail"):
         return on_market(conn, a, m)
+    if a in ("f_set", "f_get"):
+        return on_furn(conn, a, m)
     if a == "title":
         return on_title(conn, m)
     if a == "ev_time":
@@ -6340,11 +6375,19 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
     """Takes what was saved ({key: data}) and puts it back, ignoring anything that does not look right."""
+    fu = rows.get("furn")
+    if isinstance(fu, dict):
+        FURN.clear()
+        for fid, f in list(fu.items())[:5000]:
+            if clean_fid(fid) and isinstance(f, dict):
+                c = furn_clean(f)
+                c["name"] = class_clean(f.get("name"), 20)
+                FURN[fid] = c
     g = rows.get("guilds")
     if isinstance(g, dict) and isinstance(g.get("guilds"), dict) and isinstance(g.get("of"), dict):
         GUILDS.clear()
@@ -6390,7 +6433,7 @@ def world_apply(rows):
         MKT["list"].clear()
         MKT["mail"].clear()
         for lid, L in list((mk.get("list") if isinstance(mk.get("list"), dict) else {}).items())[:3000]:
-            if isinstance(L, dict) and clean_fid(L.get("fid")) and re.fullmatch(r"[a-z0-9_]{2,24}", str(L.get("item", ""))) and L.get("ik") in ("item", "good") and L.get("sale") in ("fixed", "auction"):
+            if isinstance(L, dict) and clean_fid(L.get("fid")) and re.fullmatch(r"[a-z0-9_]{2,24}", str(L.get("item", ""))) and L.get("ik") in ("item", "good", "furn") and L.get("sale") in ("fixed", "auction"):
                 b = L.get("bid")
                 MKT["list"][str(lid)[:12]] = {"id": str(lid)[:12], "fid": L["fid"], "name": class_clean(L.get("name"), 16), "item": L["item"], "ik": L["ik"], "n": int(num(L.get("n"), 1, 99, 1)), "label": class_clean(L.get("label"), 40),
                                               "price": int(num(L.get("price"), 1, MKT_MAX_PRICE, 1)), "sale": L["sale"], "t": float(num(L.get("t"), 0, 1e12, 0)), "ends": float(num(L.get("ends"), 0, 1e12, 0)),
@@ -6398,7 +6441,7 @@ def world_apply(rows):
         for f, box in list((mk.get("mail") if isinstance(mk.get("mail"), dict) else {}).items())[:5000]:
             if clean_fid(f) and isinstance(box, list):
                 MKT["mail"][f] = [{"id": str(x.get("id"))[:12], "coins": int(num(x.get("coins"), -10 ** 9, 10 ** 9, 0)), "text": class_clean(x.get("text"), 140),
-                                   **({"item": x["item"], "ik": x["ik"], "n": int(num(x.get("n"), 1, 99, 1))} if re.fullmatch(r"[a-z0-9_]{2,24}", str(x.get("item", ""))) and x.get("ik") in ("item", "good") else {})}
+                                   **({"item": x["item"], "ik": x["ik"], "n": int(num(x.get("n"), 1, 99, 1))} if re.fullmatch(r"[a-z0-9_]{2,24}", str(x.get("item", ""))) and x.get("ik") in ("item", "good", "furn") else {})}
                                   for x in box[-MKT_MAIL_MAX:] if isinstance(x, dict)]
     dl = rows.get("daily")
     if isinstance(dl, dict):

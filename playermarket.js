@@ -13,7 +13,7 @@ const PlayerMarket = (() => {
   const send = (a, o = {}) => Online.navalSend({ t: "social", a, ...o });
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
-  const nameOf = (id, ik) => (ik === "good" ? (Shopkeep.GOODS[id] ? Shopkeep.GOODS[id][0] : id) : Market.itemName(id));
+  const nameOf = (id, ik) => (ik === "good" ? (Shopkeep.GOODS[id] ? Shopkeep.GOODS[id][0] : id) : ik === "furn" ? (Furnish.PIECES[id] ? tr(Furnish.PIECES[id][0]) : id) : Market.itemName(id));
   const left = (s) => (s <= 0 ? tr("ended") : s < 3600 ? `${Math.ceil(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`);
 
   // ---------------------------------------------------------------- mail: money and things that have come to you
@@ -22,6 +22,7 @@ const PlayerMarket = (() => {
     let ok = true;
     if (mail.item) {
       if (mail.ik === "good") Shopkeep.give(mail.item, mail.n || 1);
+      else if (mail.ik === "furn") Furnish.give(mail.item, mail.n || 1);
       else if (!Market.grant(mail.item)) ok = false;                                     // (you already own that one: the money is not taken)
     }
     if (ok && mail.coins) Vitals.coins = Math.max(0, Vitals.coins + mail.coins);
@@ -40,7 +41,8 @@ const PlayerMarket = (() => {
   function mineSellable() {
     const goods = Shopkeep.IDS.filter((id) => Shopkeep.owns(id) > 0).map((id) => ({ id, ik: "good", n: Shopkeep.owns(id), name: Shopkeep.GOODS[id][0] }));
     const items = Market.snapshot().items.filter((id) => TYPES.has(Market.typeOf(id))).map((id) => ({ id, ik: "item", n: 1, name: Market.itemName(id) }));
-    return goods.concat(items);
+    const furn = Object.keys(Furnish.PIECES).filter((id) => Furnish.free(id) > 0).map((id) => ({ id, ik: "furn", n: Furnish.free(id), name: tr(Furnish.PIECES[id][0]) }));
+    return goods.concat(furn, items);
   }
   function render() {
     const body = $p("pm-body"); if (!body) return;
@@ -72,18 +74,18 @@ const PlayerMarket = (() => {
       if (!list.length) rows.push(el("p", tr("You have nothing to sell yet: buy goods in the shops, or earn outfits, pets and treasures."), "dnote"));
       else {
         const sel = el("select"), qty = el("input"), price = el("input"), sale = el("select"), hours = el("select"), go = el("button", tr("List it"));
-        for (const it of list) { const o = el("option", `${it.name}${it.ik === "good" ? ` (${it.n})` : ""}`); o.value = `${it.ik}:${it.id}`; sel.append(o); }
+        for (const it of list) { const o = el("option", `${it.name}${it.ik !== "item" ? ` (${it.n})` : ""}`); o.value = `${it.ik}:${it.id}`; sel.append(o); }
         qty.type = "number"; qty.min = 1; qty.value = 1; price.type = "number"; price.min = 1; price.placeholder = tr("Price"); price.value = "";
         for (const [v, t] of [["fixed", "At a price"], ["auction", "Auction"]]) { const o = el("option", tr(t)); o.value = v; sale.append(o); }
         for (const h of [1, 6, 24]) { const o = el("option", `${h} h`); o.value = String(h); hours.append(o); } hours.value = "24";
         go.type = "button";
-        const sync = () => { const [ik] = sel.value.split(":"); qty.hidden = ik !== "good"; hours.hidden = sale.value !== "auction"; };
+        const sync = () => { const [ik] = sel.value.split(":"); qty.hidden = ik === "item"; hours.hidden = sale.value !== "auction"; };
         sel.addEventListener("change", sync); sale.addEventListener("change", sync); sync();
         go.addEventListener("click", () => {
-          const [ik, id] = sel.value.split(":"), n = ik === "good" ? Math.max(1, Math.min(Shopkeep.owns(id), Math.floor(Number(qty.value) || 1))) : 1, p = Math.floor(Number(price.value));
+          const [ik, id] = sel.value.split(":"), n = ik === "good" ? Math.max(1, Math.min(Shopkeep.owns(id), Math.floor(Number(qty.value) || 1))) : ik === "furn" ? Math.max(1, Math.min(Furnish.free(id), Math.floor(Number(qty.value) || 1))) : 1, p = Math.floor(Number(price.value));
           if (!(p >= 1)) { note = tr("Name a price."); render(); return; }
           if (mine().length >= max) { note = tr("You can have up to {0} listings at a time.").replace("{0}", max); render(); return; }
-          const ok = ik === "good" ? Shopkeep.take(id, n) : Market.take(id);                    // (out of your pack first: it is in the listing now, and comes back by mail if it does not sell)
+          const ok = ik === "good" ? Shopkeep.take(id, n) : ik === "furn" ? Furnish.take(id, n) : Market.take(id);                    // (out of your pack first: it is in the listing now, and comes back by mail if it does not sell)
           if (!ok) return;
           send("m_list", { item: id, ik, n, price: p, sale: sale.value, hours: Number(hours.value), label: nameOf(id, ik) });
           note = tr("Listed."); tab = "mine"; render();

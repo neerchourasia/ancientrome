@@ -3506,6 +3506,39 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
         self.assertEqual(top["gain"][0][1], 10 ** 12)                                                    # (a gain is never more than they hold, and is cut to the limit)
 
+    async def test_a_friend_can_see_your_furnished_house_but_a_stranger_cannot(self):
+        server.FURN.clear()
+        self.addCleanup(server.FURN.clear)
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        fa, fb = server.fid_of("u-ann"), server.fid_of("u-bob")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        ann.send({"t": "social", "a": "f_set", "placed": {"rome": [{"id": "rug", "x": 256, "z": 52, "yaw": 3.1}, {"id": "<b>", "x": 1, "z": 1, "yaw": 0}], "mars": [{"id": "rug", "x": 1, "z": 1, "yaw": 0}]}, "water": 3})
+        await asyncio.sleep(0.2)
+        bob.send({"t": "social", "a": "f_get", "fid": fa})
+        m = await bob.until(lambda m: m["t"] == "furn")
+        self.assertEqual((m["a"], m["name"], m["water"]), ("layout", "Ann", 3))
+        self.assertEqual(m["placed"]["rome"], [{"id": "rug", "x": 256.0, "z": 52.0, "yaw": 3.1}])
+        self.assertNotIn("mars", m["placed"])
+        cy.send({"t": "social", "a": "f_get", "fid": fa})
+        self.assertEqual((await cy.until(lambda m: m["t"] == "furn"))["a"], "none")
+
+    async def test_furniture_can_be_sold_on_the_player_market(self):
+        server.MKT["list"].clear(); server.MKT["mail"].clear(); server.MKT["seq"] = 0
+        self.addCleanup(lambda: (server.MKT["list"].clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        for c, coins in ((ann, 10), (bob, 300)):
+            c.send({"t": "walk", "c": "rome", "x": 1, "z": 1, "yaw": 0, "s": 0, "d": coins})
+        await asyncio.sleep(0.3)
+        ann.send({"t": "social", "a": "m_list", "item": "rug", "ik": "furn", "n": 2, "price": 50, "sale": "fixed", "label": "Rug"})
+        L = (await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "board" and m["list"]))["list"][0]
+        self.assertEqual((L["ik"], L["item"], L["n"]), ("furn", "rug", 2))
+        bob.send({"t": "social", "a": "m_buy", "id": L["id"]})
+        mail = (await bob.until(lambda m: m["t"] == "mkt" and m["a"] == "mail"))["mail"]
+        self.assertEqual((mail["ik"], mail["item"], mail["n"], mail["coins"]), ("furn", "rug", 2, -50))
+
     async def test_dice_at_a_tavern_table_moves_the_stake_by_mail(self):
         server.MKT["mail"].clear()
         self.addCleanup(lambda: server.MKT["mail"].clear())

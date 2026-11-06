@@ -2,11 +2,13 @@
 // Furnish your house: 🛋️ Furnish house in the menu. Buy rugs, tables, chests, lamps, plants and more with your denarii, then stand where you want a piece inside your own house (in Rome, Old Delhi,
 // Cancún or Beijing) and press Place. The piece stands in front of you; Turn it, or Pick it up again (the nearest piece, within three steps). Each city's house has its own furniture, in the colours of
 // that city. Pieces can be walked through (a rug is a rug) and are kept in the browser (rome-furn) and in the saved game (account.js). Depends on world.js (worldScene), market.js (Vitals) and the houses.
+// Friends can visit: 🏠 Visit beside a friend in the Friends box takes you to your own house in the city where they have the most furniture and shows THEIR furniture there (yours is hidden) until you walk
+// out. The server keeps each player's layout (server.py, "furnished houses") and gives it only to mutual friends. Furniture can also be sold to other players in the player market (playermarket.js).
 // Some pieces do something when you press F beside them in your house: the BED lets you sleep at night (or rest by day), the TABLE sets a meal (15 denarii, twice a day), the CHEST keeps goods for
 // you (60 at most), a STOOL or CUSHIONS let you sit and rest, and a PLANT grows a little for every day you water it. Every different kind of piece in the house also makes you heal 5% faster at home.
 
 const Furnish = (() => {
-  const KEY = "rome-furn", MAX = 30, OWN_MAX = 20;
+  const KEY = "rome-furn", MAX = 30, OWN_MAX = 40;
   // id: [name, price, what it looks like]
   const PIECES = {
     rug: ["Rug", 40], table: ["Low table", 60], stool: ["Stool", 15], chest: ["Storage chest", 70], lamp: ["Lamp stand", 35],
@@ -39,7 +41,8 @@ const Furnish = (() => {
     return o;
   }
   try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && r.v === 1) st = clean(r); } catch (e) { /* storage unavailable */ }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, ...st })); } catch (e) { /* ignore */ } };
+  let dirty = true, guest = null, guestGroup = null, away = 0;
+  const save = () => { dirty = true; try { localStorage.setItem(KEY, JSON.stringify({ v: 1, ...st })); } catch (e) { /* ignore */ } };
 
   const $p = (id) => document.getElementById(id);
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
@@ -74,7 +77,7 @@ const Furnish = (() => {
       case "stool": cyl(0.24, 0.24, 0.06, 0, 0.44, 0, pal.main); for (const a of [0, 2.1, 4.2]) box(0.05, 0.42, 0.05, Math.cos(a) * 0.15, 0.21, Math.sin(a) * 0.15, pal.wood); break;
       case "chest": box(0.95, 0.5, 0.55, 0, 0.25, 0, pal.wood); box(0.97, 0.12, 0.57, 0, 0.56, 0, pal.main); box(0.1, 0.62, 0.58, 0.28, 0.31, 0, pal.accent); box(0.1, 0.62, 0.58, -0.28, 0.31, 0, pal.accent); ball(0.045, 0, 0.5, -0.29, pal.accent); break;
       case "lamp": cyl(0.2, 0.25, 0.06, 0, 0.03, 0, pal.wood); cyl(0.03, 0.03, 1.4, 0, 0.73, 0, pal.wood); { const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 9), new THREE.MeshBasicMaterial({ color: 0xffd27a })); b.position.set(0, 1.5, 0); g.add(b); } break;
-      case "plant": { cyl(0.22, 0.16, 0.32, 0, 0.16, 0, 0xa95a2c); const gr = 0.7 + Math.min(10, st.water.n) * 0.06; for (const [x, y, z, r] of [[0, 0.55, 0, 0.26], [0.14, 0.75, 0.06, 0.2], [-0.12, 0.72, -0.08, 0.2], [0.02, 0.92, 0.04, 0.15]]) ball(r * gr, x * gr, 0.32 + (y - 0.32) * gr, z * gr, 0x3f8a3a); } break;
+      case "plant": { cyl(0.22, 0.16, 0.32, 0, 0.16, 0, 0xa95a2c); const gr = 0.7 + Math.min(10, make.water === undefined ? st.water.n : make.water) * 0.06; for (const [x, y, z, r] of [[0, 0.55, 0, 0.26], [0.14, 0.75, 0.06, 0.2], [-0.12, 0.72, -0.08, 0.2], [0.02, 0.92, 0.04, 0.15]]) ball(r * gr, x * gr, 0.32 + (y - 0.32) * gr, z * gr, 0x3f8a3a); } break;
       case "bed": box(1.05, 0.3, 2.0, 0, 0.15, 0, pal.wood); box(0.95, 0.16, 1.9, 0, 0.38, 0, 0xe9e4d8); box(0.97, 0.1, 1.1, 0, 0.45, 0.4, pal.main); box(0.6, 0.14, 0.3, 0, 0.52, -0.75, 0xf3efe6); break;
       case "vase": cyl(0.13, 0.2, 0.2, 0, 0.1, 0, pal.main); cyl(0.26, 0.13, 0.45, 0, 0.42, 0, pal.main); cyl(0.12, 0.26, 0.3, 0, 0.78, 0, pal.main); cyl(0.14, 0.1, 0.1, 0, 1.0, 0, pal.accent); cyl(0.275, 0.275, 0.05, 0, 0.5, 0, pal.accent); break;
       case "statue": box(0.5, 0.7, 0.5, 0, 0.35, 0, 0xcfc8b8); box(0.55, 0.06, 0.55, 0, 0.73, 0, 0xb8b0a0); cyl(0.16, 0.2, 0.55, 0, 1.05, 0, 0xe9e4d8); ball(0.13, 0, 1.46, 0, 0xe9e4d8); break;
@@ -99,12 +102,41 @@ const Furnish = (() => {
     }
   }
 
+  // ---------------------------------------------------------------- visiting a friend's house
+  function applyVisibility() { for (const c of Object.keys(groups)) groups[c].visible = !(guest && guest.city === c); }
+  function endGuest() {
+    if (!guest) return;
+    if (guestGroup && worldScene) { worldScene.remove(guestGroup); guestGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    guestGroup = null; guest = null; away = 0; applyVisibility(); toast(tr("You are home again."));
+  }
+  function visit(fid, name) {
+    if (typeof Online === "undefined" || !Online.connected || typeof Account === "undefined" || !Account.loggedIn) { toast(tr("Visiting needs an account and the game server: log in and wait to be connected.")); return; }
+    if (mode !== "walk") { toast(tr("Stop what you are doing first.")); return; }
+    Online.navalSend({ t: "social", a: "f_get", fid }); toast(`${tr("Asking to visit")} ${name || ""}...`);
+  }
+  function onServer(m) {
+    if (m.a !== "layout") { toast(tr("You cannot visit that house: only friends can.")); return; }
+    const placed = {}, counts = Object.keys(PAL).map((c) => [c, (m.placed[c] || []).length]).sort((a, b) => b[1] - a[1]);
+    if (!counts[0][1]) { toast(`${m.name}${tr(" has not furnished a house yet.")}`); return; }
+    const c = (m.placed[here()] || []).length ? here() : counts[0][0];
+    endGuest();
+    if (c !== here()) arriveIn(c);
+    if (c === "delhi") { const h = Delhi.homeSpot(); placeAt(h.x, h.z, 0); } else if (c === "cancun") { const h = Cancun.homeSpot(); placeAt(h.x, h.z, 0); } else if (c === "beijing") { const h = Beijing.homeSpot(); placeAt(h.x, h.z, 0); } else placeAt(Home.X, Home.Z - 2.5, 0);
+    guest = { name: m.name, city: c, water: +m.water || 0 };
+    make.water = guest.water;
+    guestGroup = new THREE.Group();
+    for (const p of clean({ placed: m.placed }).placed[c]) { const o = make(p.id, c); o.position.set(p.x, FLOOR[c], p.z); o.rotation.y = p.yaw; guestGroup.add(o); }
+    make.water = undefined;
+    worldScene.add(guestGroup); applyVisibility(); away = 0;
+    toast(`🏠 ${tr("You are visiting")} ${m.name}${tr("'s house. Walk out of the door to go home.")}`);
+  }
+
   // ---------------------------------------------------------------- what the pieces do
   let sat = null, view = "shop";
   const today = () => (typeof Payroll !== "undefined" ? Payroll.epoch() : 0);
   const comfort = (c = here()) => 1 + 0.05 * new Set((st.placed[c] || []).map((p) => p.id)).size;       // (heal faster at home for each kind of piece: Vitals restBoost)
   function actNear() {
-    if (typeof started === "undefined" || !started || mode !== "walk" || panelOpen || !inHouse()) return null;
+    if (guest || typeof started === "undefined" || !started || mode !== "walk" || panelOpen || !inHouse()) return null;
     let best = null, bd = 1.9;
     for (const p of st.placed[here()] || []) { if (!ACTIONS[p.id]) continue; const d = Math.hypot(p.x - player.x, p.z - player.z); if (d < bd) { bd = d; best = p; } }
     return best;
@@ -142,6 +174,7 @@ const Furnish = (() => {
   }
   function place(id) {
     if (free(id) < 1) return;
+    if (guest) { note = tr("You are a guest: you cannot move the furniture here."); render(); return; }
     if (!inHouse()) { note = tr("Go inside your own house to put furniture down."); render(); return; }
     const c = here();
     if (st.placed[c].length >= MAX) { note = tr("The house is full: pick something up first."); render(); return; }
@@ -163,6 +196,9 @@ const Furnish = (() => {
     const p = nearest(); if (!p) { note = tr("Stand beside a piece of furniture."); render(); return; }
     const arr = st.placed[here()]; arr.splice(arr.indexOf(p), 1); save(); refresh(); note = `${tr(PIECES[p.id][0])}: ${tr("back in your pack.")}`; render();
   }
+  // the player market (playermarket.js): a piece you do not have placed goes into a listing, and comes back (or arrives from a buyer) by mail
+  const take = (id, n = 1) => { if (!PIECES[id] || free(id) < n) return false; st.own[id] = owned(id) - n; if (!st.own[id]) delete st.own[id]; save(); if ($p("furnish") && $p("furnish").classList.contains("show")) render(); return true; };
+  const give = (id, n = 1) => { if (!PIECES[id]) return false; st.own[id] = Math.min(OWN_MAX, owned(id) + n); save(); return true; };
   function sell(id) {
     if (free(id) < 1) return;
     st.own[id] = owned(id) - 1; if (!st.own[id]) delete st.own[id];
@@ -223,10 +259,14 @@ const Furnish = (() => {
   function bind() {
     const b = $p("btn-furn"); if (b) b.addEventListener("click", open);
     setInterval(() => { refresh(); if (sat && !Vitals.resting) sat = null; const p = $p("furnish"); if (p && p.classList.contains("show")) render(); }, 2000);
+    setInterval(() => {                                                                           // (your layout goes to the server for your friends; a guest goes home when they walk out)
+      if (dirty && typeof Online !== "undefined" && Online.connected && typeof Account !== "undefined" && Account.loggedIn) { dirty = false; Online.navalSend({ t: "social", a: "f_set", placed: st.placed, water: st.water.n }); }
+      if (guest) { away = inHouse() && here() === guest.city ? 0 : away + 0.5; if (away > 3) endGuest(); }
+    }, 500);
     refresh();
   }
   const snapshot = () => JSON.parse(JSON.stringify(st));
   function restore(r) { st = clean(r); save(); refresh(); }
 
-  return { bind, open, act, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
+  return { guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
 })();

@@ -476,6 +476,16 @@ const I18n = (() => {
     ["Thank you! Here are {0} denarii. Errands done: {1}", "¡Gracias! Aquí tienes {0} denarios. Encargos hechos: {1}", "Grazie! Ecco {0} denari. Incarichi svolti: {1}", "धन्यवाद! ये लो {0} दीनार। पूरे किए काम: {1}", "谢谢!这是{0}第纳尔。已完成差事:{1}"],
     ["Have you seen the {0}? It is about {1} {2} to the {3}.", "¿Has visto {0}? Está a unos {1} {2} al {3}.", "Hai visto {0}? Si trova a circa {1} {2} a {3}.", "क्या आपने {0} देखा है? यह लगभग {1} {2} दूर {3} की ओर है।", "你见过{0}吗?它在{3}约{1}{2}处。"],
     ["F: talk to {0}", "F: hablar con {0}", "F: parla con {0}", "F: {0} से बात करें", "F:和{0}交谈"],
+    // visiting houses (AI-written, not reviewed by native speakers)
+    ["Visiting needs an account and the game server: log in and wait to be connected.", "Visitar necesita una cuenta y el servidor del juego: inicia sesión y espera a conectarte.", "Visitare richiede un account e il server di gioco: accedi e attendi la connessione.", "मिलने जाने के लिए खाता और गेम सर्वर चाहिए: लॉग इन करें और जुड़ने का इंतज़ार करें।", "拜访需要账号和游戏服务器:请登录并等待连接。"],
+    ["Stop what you are doing first.", "Termina primero lo que estás haciendo.", "Prima smetti quello che stai facendo.", "पहले जो कर रहे हैं उसे रोकिए।", "请先停下手头的事。"],
+    ["Asking to visit", "Pidiendo visitar a", "Chiedo di visitare", "मिलने जाने का अनुरोध", "请求拜访"],
+    ["You cannot visit that house: only friends can.", "No puedes visitar esa casa: solo los amigos pueden.", "Non puoi visitare quella casa: solo gli amici possono.", "आप उस घर में नहीं जा सकते: केवल दोस्त जा सकते हैं।", "你不能拜访那座房子:只有朋友可以。"],
+    [" has not furnished a house yet.", " aún no ha amueblado su casa.", " non ha ancora arredato la casa.", " ने अभी तक घर नहीं सजाया है।", "还没有布置房子。"],
+    ["You are visiting", "Estás visitando la casa de", "Stai visitando la casa di", "आप जा रहे हैं", "你正在拜访"],
+    ["'s house. Walk out of the door to go home.", ". Sal por la puerta para volver a casa.", ". Esci dalla porta per tornare a casa.", "के घर में। घर लौटने के लिए दरवाज़े से बाहर जाइए।", "的家。走出门就回家了。"],
+    ["You are home again.", "Estás de vuelta en casa.", "Sei di nuovo a casa.", "आप फिर घर पर हैं।", "你回到自己家了。"],
+    ["You are a guest: you cannot move the furniture here.", "Eres un invitado: no puedes mover los muebles aquí.", "Sei un ospite: non puoi spostare i mobili qui.", "आप मेहमान हैं: यहाँ फ़र्नीचर नहीं हिला सकते।", "你是客人:不能在这里移动家具。"],
     // furniture that does things (AI-written, not reviewed by native speakers)
     ["Bed", "Cama", "Letto", "बिस्तर", "床"],
     ["F: lie down on your bed", "F: acostarte en tu cama", "F: sdraiati sul tuo letto", "F: अपने बिस्तर पर लेटें", "F:躺到你的床上"],
