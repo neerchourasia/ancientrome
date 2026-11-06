@@ -262,7 +262,7 @@ const Interiors = (() => {
     const per = p.kind.late && night ? 0.55 : p.customers.length > 2 ? 0.7 : 0.55;
     p.customers.forEach((c, ci) => {
       const slot = Math.floor(t / (25 + ci * 9)), seatTaken = c.seat >= 0 && p.seats[c.seat].by === "player";
-      const want = p.open && !seatTaken && hash(p.i * 17 + ci, slot) < per;
+      const want = p.open && !seatTaken && (c.force || hash(p.i * 17 + ci, slot) < per);
       const f = c.fig, P = (a, d) => { const [x, z] = p.at(a, d); return { x, z }; };
       if (c.state === "away" && want) {
         c.path = [P(0, 0.3), P(0, 1.4), P(c.along, 1.4), P(c.along, c.depth)]; c.pi = 0; c.state = "in";
@@ -352,6 +352,31 @@ const Interiors = (() => {
   // the kinds of shop there are in a city in the era you are in (for the errands the keepers ask of you)
   const kindsHere = (c) => picked.filter((p) => CITY_OF[p.ext ? p.ext.kinds : "rome"] === c && !(p.ext && p.ext.era && (p.ext.era === "modern") !== modern)).map((p) => p.kind.name);
   // the free stool nearest to you, if one is within reach
+  // the regulars at the tables: a seated customer has a name, and you can ask one to join you at your table (shopkeep.js: dice and xiangqi with a bot)
+  const REGULARS = {
+    rome: ["Gaius", "Lucia", "Marcus", "Julia", "Titus", "Livia", "Quintus", "Cornelia"], delhi: ["Arjun", "Meera", "Rohan", "Priya", "Kabir", "Anita", "Vikram", "Sana"],
+    cancun: ["Mateo", "Lucía", "Diego", "Camila", "Santiago", "Ximena", "Emiliano", "Valeria"], beijing: ["Wei", "Mei", "Jun", "Lan", "Hao", "Xiu", "Bo", "Yan"],
+  };
+  const nameOf = (p, c) => { const list = REGULARS[CITY_OF[p.ext ? p.ext.kinds : "rome"]] || REGULARS.rome; return list[Math.floor(hash(p.i * 31 + p.customers.indexOf(c), 7) * list.length)]; };
+  // who sits at the other stool of the table where seat i is: [{ name, bot: true }]
+  function tableMates(p, i) {
+    const mate = i ^ 1;
+    return p.customers.filter((c) => c.sit && c.seat === mate && c.state === "here").map((c) => ({ name: nameOf(p, c), bot: true, seat: mate }));
+  }
+  // ask a regular to sit at the other stool of your table (one who is away walks in; the shop's two seated regulars are taken from other tables if need be); release() lets them go again
+  function invite(p, i) {
+    const mate = i ^ 1;
+    if (!p.open || !p.customers || p.seats.length < 4) return;
+    let c = p.customers.find((x) => x.sit && x.seat === mate);
+    if (!c) {
+      c = p.customers.find((x) => x.sit && x.state === "away") || p.customers.find((x) => x.sit && x.seat !== i);
+      if (!c) return;
+      if (c.state !== "away") { c.fig.g.visible = false; c.state = "away"; if (p.seats[c.seat].by === "npc") p.seats[c.seat].by = null; }
+      const st = p.seats[mate]; c.seat = mate; c.along = st.along; c.depth = st.depth; c.yaw = st.yaw;
+    }
+    c.force = true;
+  }
+  function release(p) { if (p && p.customers) for (const c of p.customers) c.force = false; }
   function seatNear(x, z, feet = 0) {
     if (feet > 2) return null;
     let best = null, bd = 1.7;
@@ -362,5 +387,5 @@ const Interiors = (() => {
     return best;
   }
 
-  return { setup, register, addHouse, refreshSigns, update, setEra, picked: () => picked, keeperNear, seatNear, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
+  return { setup, register, addHouse, refreshSigns, update, setEra, picked: () => picked, keeperNear, seatNear, tableMates, invite, release, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
 })();

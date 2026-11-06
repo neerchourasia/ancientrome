@@ -476,6 +476,18 @@ const I18n = (() => {
     ["Thank you! Here are {0} denarii. Errands done: {1}", "¡Gracias! Aquí tienes {0} denarios. Encargos hechos: {1}", "Grazie! Ecco {0} denari. Incarichi svolti: {1}", "धन्यवाद! ये लो {0} दीनार। पूरे किए काम: {1}", "谢谢!这是{0}第纳尔。已完成差事:{1}"],
     ["Have you seen the {0}? It is about {1} {2} to the {3}.", "¿Has visto {0}? Está a unos {1} {2} al {3}.", "Hai visto {0}? Si trova a circa {1} {2} a {3}.", "क्या आपने {0} देखा है? यह लगभग {1} {2} दूर {3} की ओर है।", "你见过{0}吗?它在{3}约{1}{2}处。"],
     ["F: talk to {0}", "F: hablar con {0}", "F: parla con {0}", "F: {0} से बात करें", "F:和{0}交谈"],
+    // tavern tables (AI-written, not reviewed by native speakers)
+    ["At your table", "En tu mesa", "Al tuo tavolo", "आपकी मेज़ पर", "在你的桌旁"],
+    ["{0}, a regular, sits across from you.", "{0}, un cliente habitual, se sienta frente a ti.", "{0}, un habitué, siede di fronte a te.", "{0}, एक नियमित ग्राहक, आपके सामने बैठा है।", "常客{0}坐在你对面。"],
+    ["{0} sits across from you.", "{0} se sienta frente a ti.", "{0} siede di fronte a te.", "{0} आपके सामने बैठा है।", "{0}坐在你对面。"],
+    ["🎲 Dice with {0} · {1}", "🎲 Dados con {0} · {1}", "🎲 Dadi con {0} · {1}", "🎲 {0} के साथ पासे · {1}", "🎲 与{0}掷骰子 · {1}"],
+    ["♟️ Xiangqi with {0}", "♟️ Xiangqi con {0}", "♟️ Xiangqi con {0}", "♟️ {0} के साथ शियांगची", "♟️ 与{0}下象棋"],
+    ["A tie: nobody pays.", "Empate: nadie paga.", "Pareggio: nessuno paga.", "बराबरी: कोई भुगतान नहीं करता।", "平局:谁也不用付钱。"],
+    ["You rolled {0} ({1}); {2} rolled {3} ({4}).", "Sacaste {0} ({1}); {2} sacó {3} ({4}).", "Hai tirato {0} ({1}); {2} ha tirato {3} ({4}).", "आपने {0} ({1}) फेंका; {2} ने {3} ({4}) फेंका।", "你掷出{0}({1});{2}掷出{3}({4})。"],
+    ["You asked {0}. Waiting for an answer...", "Se lo pediste a {0}. Esperando respuesta...", "Hai chiesto a {0}. In attesa di risposta...", "आपने {0} से पूछा। जवाब का इंतज़ार है...", "你邀请了{0}。等待回答……"],
+    ["You rolled {0}; {1} rolled {2}.", "Sacaste {0}; {1} sacó {2}.", "Hai tirato {0}; {1} ha tirato {2}.", "आपने {0} फेंका; {1} ने {2} फेंका।", "你掷出{0};{1}掷出{2}。"],
+    ["You win!", "¡Ganas!", "Hai vinto!", "आप जीत गए!", "你赢了!"],
+    ["You lose.", "Pierdes.", "Hai perso.", "आप हार गए।", "你输了。"],
     // the player market (AI-written, not reviewed by native speakers)
     ["🏷️ Player market", "🏷️ Mercado de jugadores", "🏷️ Mercato dei giocatori", "🏷️ खिलाड़ी बाज़ार", "🏷️ 玩家市场"],
     ["🛒 Browse", "🛒 Explorar", "🛒 Sfoglia", "🛒 देखें", "🛒 浏览"],

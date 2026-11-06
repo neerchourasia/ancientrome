@@ -45,7 +45,7 @@ const Vitals = (() => {
     startRest() { resting = true; },
     stopRest() { resting = false; },
 
-    // ctx: { mode, atStables }. Nothing heals while you are in a game.
+    // ctx: { mode, atStables, seated }. Nothing heals while you are in a game.
     update(dt, ctx) {
       if (ctx.mode === "walk" || ctx.mode === "watch") {
         const rest = resting && ctx.mode === "walk";
@@ -53,7 +53,7 @@ const Vitals = (() => {
         // From 20 health: about 55 s resting, or about 3.5 minutes just walking around. Horses are slower: about 90 s from 30 to full resting at the stables, and many minutes on their own.
         s.hp = clamp(s.hp + (rest ? 1.45 * (ctx.restBoost || 1) : 0.38) * (s.hunger < 20 ? 0 : fed > 0 ? 1.8 : 1) * (ctx.regenMul || 1) * dt); // a better house heals you faster, and so does a good meal
         s.horses = clamp(s.horses + (rest && ctx.atStables ? 0.8 : 0.06) * dt);
-        if (rest && s.hp >= 99.5 && (!ctx.atStables || s.horses >= 99.5)) { resting = false; return "refreshed"; }
+        if (rest && s.hp >= 99.5 && !ctx.seated && (!ctx.atStables || s.horses >= 99.5)) { resting = false; return "refreshed"; }
       }
       if (fed > 0) fed = Math.max(0, fed - dt);
       // hunger: food is a must. It runs down while you play; at empty you stop healing and starve

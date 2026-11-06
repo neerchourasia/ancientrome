@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import struct
 import sys
 import time
@@ -3504,6 +3505,40 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         top = await ann.until(lambda m: m["t"] == "leaders")
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
         self.assertEqual(top["gain"][0][1], 10 ** 12)                                                    # (a gain is never more than they hold, and is cut to the limit)
+
+    async def test_dice_at_a_tavern_table_moves_the_stake_by_mail(self):
+        server.MKT["mail"].clear()
+        self.addCleanup(lambda: server.MKT["mail"].clear())
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        for c, coins in ((ann, 100), (bob, 8)):
+            c.send({"t": "walk", "c": "rome", "x": 1, "z": 1, "yaw": 0, "s": 0, "d": coins})
+        await asyncio.sleep(0.3)
+        bob_id = next(c for c in server.CONNS if c.name == "Bob").id
+        ann_id = next(c for c in server.CONNS if c.name == "Ann").id
+        # a stake Bob cannot cover is refused for the one who asks
+        bob.send({"t": "challenge", "a": "send", "id": ann_id, "game": "dice", "bet": 25})
+        self.assertIn("25", (await bob.until(lambda m: m["t"] == "chal" and m["a"] == "no"))["msg"])
+        await asyncio.sleep(4.2)
+        # Ann asks Bob for 5 (Bob has 8): fixed seeds make the roll known
+        random.seed(3)
+        ann.send({"t": "challenge", "a": "send", "id": bob_id, "game": "dice", "bet": 5})
+        inc = await bob.until(lambda m: m["t"] == "chal" and m["a"] == "in")
+        self.assertEqual(inc["game"], "dice")
+        self.assertIn("5 denarii", inc["what"])
+        bob.send({"t": "challenge", "a": "accept", "from": inc["from"]})
+        ra = await ann.until(lambda m: m["t"] == "chal" and m["a"] == "dice")
+        rb = await bob.until(lambda m: m["t"] == "chal" and m["a"] == "dice")
+        self.assertEqual((ra["you"], ra["them"]), (rb["them"], rb["you"]))
+        self.assertEqual(ra["won"], -rb["won"])
+        if ra["won"]:
+            self.assertEqual(ra["gain"], rb["gain"])
+            winner, loser = ("u-ann", "u-bob") if ra["won"] > 0 else ("u-bob", "u-ann")
+            w, l = server.MKT["mail"][server.fid_of(winner)], server.MKT["mail"][server.fid_of(loser)]
+            self.assertEqual(([x["coins"] for x in w], [x["coins"] for x in l]), ([ra["gain"]], [-ra["gain"]]))
+            self.assertIn(ra["gain"], (5, 10))
+        else:
+            self.assertEqual(ra["gain"], 0)
 
     async def test_the_player_market_sells_auctions_refunds_and_returns(self):
         server.MKT["list"].clear(); server.MKT["mail"].clear(); server.MKT["seq"] = 0

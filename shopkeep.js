@@ -238,6 +238,20 @@ const Shopkeep = (() => {
       if (!classroom) for (const bet of [5, 10, 25, 50]) bets.append(btn(T_("🎲 Bet {0}", bet), () => dice(bet), Vitals.coins < bet));
       bets.append(btn(tr("♟️ A game of xiangqi (practice)"), () => { closePanels(); if (typeof Online !== "undefined") Online.playXiangqi(); }), btn(tr("👋 Goodbye"), closePanels));
       rows.push(bets);
+      const mates = tableMates();
+      if (mates.length) rows.push(el("h3", tr("At your table")));
+      for (const m of mates) {
+        rows.push(el("p", m.bot ? T_("{0}, a regular, sits across from you.", m.name) : T_("{0} sits across from you.", m.name), "dnote"));
+        const row = el("div", undefined, "sk-menu");
+        if (m.bot) {
+          if (!classroom) for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => diceWithRegular(bet, m.name), Vitals.coins < bet));
+          row.append(btn(T_("♟️ Xiangqi with {0}", m.name), () => { closePanels(); if (typeof Online !== "undefined") Online.playXiangqi(); }));
+        } else {
+          if (!classroom) for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => askPlayer(m, "dice", bet), Vitals.coins < bet || !loggedIn()));
+          row.append(btn(T_("♟️ Xiangqi with {0}", m.name), () => askPlayer(m, "xiangqi"), !loggedIn()));
+        }
+        rows.push(row);
+      }
     }
     body.replaceChildren(...rows);
   }
@@ -333,6 +347,33 @@ const Shopkeep = (() => {
     save(); say(`${T_("You rolled {0} ({1}); the keeper rolled {2} ({3}).", face(me), ms, face(ke), ks)} ${result}`);
   }
 
+  // dice with a regular who sits across from you: two dice each, the higher total wins the stake (a tie is a draw; doubles pay double)
+  function diceWithRegular(bet, name) {
+    if (classroom || Vitals.coins < bet) return;
+    const d = () => 1 + Math.floor(Math.random() * 6), me = [d(), d()], he = [d(), d()], ms = me[0] + me[1], hs = he[0] + he[1], face = (a) => a.map((v) => FACES[v - 1]).join(" ");
+    Sfx.play("rattle");
+    let result;
+    if (ms === hs) result = T_("A tie: nobody pays.");
+    else if (ms > hs) { const gain = bet * (me[0] === me[1] ? 2 : 1); Vitals.coins += gain; st.dice.w++; result = T_("You win {0} denarii!", gain); }
+    else { const lose = bet * (he[0] === he[1] ? 2 : 1); Vitals.coins = Math.max(0, Vitals.coins - lose); st.dice.l++; result = T_("You lose {0} denarii.", lose); }
+    save(); say(`${T_("You rolled {0} ({1}); {2} rolled {3} ({4}).", face(me), ms, name, face(he), hs)} ${result}`);
+  }
+  // the people sitting near you at the table: the shop's regulars (bots) and friends online (they show as sitting: online.js)
+  const loggedIn = () => typeof Account !== "undefined" && Account.loggedIn && !Account.demo && typeof Online !== "undefined" && Online.connected;
+  // is a friend (online, sitting) on this stool? then no regular takes it
+  const humanAt = (seat) => !!seat && typeof Online !== "undefined" && !!Online.peerList && Online.peerList().some((p) => p.sit && p.x !== null && Math.hypot(p.x - seat.x, p.z - seat.z) < 1.8);
+  function tableMates() {
+    if (!seated) return [];
+    const out = humanAt(seated.p.seats[seated.i ^ 1]) ? [] : Interiors.tableMates(seated.p, seated.i).map((m) => ({ name: m.name, bot: true }));
+    if (typeof Online !== "undefined" && Online.peerList) for (const p of Online.peerList()) if (p.sit && p.x !== null && Math.hypot(p.x - player.x, p.z - player.z) < 3.6) out.push({ name: p.name || "Someone", bot: false, id: p.id });
+    return out;
+  }
+  function askPlayer(m, game, bet) {
+    if (!loggedIn()) return;
+    Online.navalSend({ t: "challenge", a: "send", id: m.id, game, bet });
+    note = T_("You asked {0}. Waiting for an answer...", m.name); render();
+  }
+
   // what the keeper tells you: two lines of local news, a tip, and the nearest sight you have not seen
   function gossip() {
     const c = cityNow(), e = typeof era !== "undefined" ? era : "ancient", pool = GOSSIP[`${c}-${e}`] || [], out = [];
@@ -376,13 +417,13 @@ const Shopkeep = (() => {
   }
   function sit(s) {
     if (s.seat.by) { toast(tr("This seat is taken")); return; }
-    s.seat.by = "player"; seated = s; seenSit = new Set();
+    s.seat.by = "player"; seated = s; seenSit = new Set(); if (!humanAt(s.p.seats[s.i ^ 1])) Interiors.invite(s.p, s.i);
     player.x = s.seat.x; player.z = s.seat.z; player.vx = player.vz = 0; player.yaw = s.seat.yaw;
     Vitals.startRest();
     toast(tr("You sit down. Press F for dice and games, or move to stand up."));
   }
   function update(dt) {
-    if (seated && !Vitals.resting) { if (seated.seat.by === "player") seated.seat.by = null; seated = null; }
+    if (seated && !Vitals.resting) { if (seated.seat.by === "player") seated.seat.by = null; Interiors.release(seated.p); seated = null; }
     if (seated && typeof Online !== "undefined" && Online.peerList) {                                         // a friend sits down near you
       for (const p of Online.peerList()) if (p.sit && p.x !== null && !seenSit.has(p.id) && Math.hypot(p.x - player.x, p.z - player.z) < 3.6) { seenSit.add(p.id); toast(T_("{0} sits at your table.", p.name || "Someone")); }
     }

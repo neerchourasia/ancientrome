@@ -93,7 +93,7 @@ const Online = (() => {
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
       case "watch": Mini.onWatch(m); break;
       case "cheer": Mini.onCheer(m); break;
-      case "match": waiting = false; setMsg(""); if (m.watch) { if (m.mode === "ball") toCity("cancun"); else if (m.mode === "dragon") toCity("beijing"); Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { toCity("beijing"); Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (m.watch) { if (m.mode === "ball") toCity("cancun"); else if (m.mode === "dragon") toCity("beijing"); Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { if (!(m.mode === "xiangqi" && typeof Shopkeep !== "undefined" && Shopkeep.seated)) toCity("beijing"); Mini.start(m); }          // (xiangqi at a tavern table is played where you sit) else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;
@@ -165,6 +165,11 @@ const Online = (() => {
     else if (m.a === "sent") toast(`Challenge sent to ${m.name}. Waiting for them to answer (45 seconds)...`);
     else if (m.a === "declined") toast(`${m.name} said no.`);
     else if (m.a === "no") toast(m.msg || "The challenge did not work.");
+    else if (m.a === "dice") {                                                                              // dice at a tavern table: the money comes by mail (playermarket.js)
+      const F = "⚀⚁⚂⚃⚄⚅", face = (a) => `${a.map((v) => F[v - 1]).join(" ")} (${a[0] + a[1]})`;
+      Sfx.play("rattle");
+      toast(`🎲 ${I18n.t("You rolled {0}; {1} rolled {2}.").replace("{0}", face(m.you)).replace("{1}", m.name).replace("{2}", face(m.them))} ${m.won > 0 ? I18n.t("You win!") : m.won < 0 ? I18n.t("You lose.") : I18n.t("A tie: nobody pays.")}`);
+    }
     else if (m.a === "in") {
       if (mode !== "walk" || duel || typeof started === "undefined" || !started) { send({ t: "challenge", a: "decline", from: m.from }); return; }   // busy: the challenger is told no
       Sfx.play("chime");

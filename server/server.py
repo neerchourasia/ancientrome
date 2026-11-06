@@ -5541,8 +5541,8 @@ SHOVE_RANGE = 3.4        # metres between them (a little more than the 2.1 m the
 
 CHALLENGES = {}          # challenger's connection id -> {"to": the other connection's id, "t": when}
 CHAL_TTL = 45.0
-CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon", "wushu", "xiangqi")      # what the challenger can pick
-CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race", "wushu": "a wushu bout", "xiangqi": "a game of xiangqi (Chinese chess)"}
+CHAL_GAMES = ("duel", "brawl", "derby", "kushti", "kites", "ball", "dragon", "wushu", "xiangqi", "dice")      # what the challenger can pick
+CHAL_NAMES = {"duel": "a ranked duel in the arena", "brawl": "an arena brawl", "derby": "a chariot derby", "kushti": "a kushti wrestling bout", "kites": "a kite fight", "ball": "a game of pok-ta-pok", "dragon": "a dragon boat race", "wushu": "a wushu bout", "xiangqi": "a game of xiangqi (Chinese chess)", "dice": "a game of dice at the table"}
 
 
 def chal_room(game, a, b):
@@ -5558,6 +5558,34 @@ def chal_room(game, a, b):
         DuelRoom([a, b], ranked=True, mode="wushu")
     else:
         {"kushti": KushtiRoom, "kites": KiteRoom, "ball": BallRoom, "xiangqi": XiangqiRoom}[game](game, [a, b])
+
+
+DICE_BETS = (5, 10, 25, 50)
+
+
+def dice_table(a, b, bet):
+    """Two players at a tavern table: two dice each, the higher total wins the stake (doubles pay double, ties are rolled again, three ties are a draw). The money moves by mail."""
+    if (a.coins or 0) < bet or (b.coins or 0) < bet or not a.fid or not b.fid or a.city != b.city:
+        for c in (a, b):
+            c.send({"t": "chal", "a": "no", "msg": "The dice game fell through: someone cannot cover the bet."})
+        return
+    d = lambda: [random.randint(1, 6), random.randint(1, 6)]
+    ra = rb = None
+    for _ in range(3):
+        ra, rb = d(), d()
+        if sum(ra) != sum(rb):
+            break
+    win = 0 if sum(ra) == sum(rb) else (1 if sum(ra) > sum(rb) else -1)
+    gain = 0
+    if win:
+        w, l, dw = (a, b, ra) if win > 0 else (b, a, rb)
+        gain = min(bet * (2 if dw[0] == dw[1] else 1), l.coins or 0)
+        mkt_mail(w.fid, coins=gain, text="Dice with %s: you won %d denarii." % (l.name, gain))
+        mkt_mail(l.fid, coins=-gain, text="Dice with %s: you lost %d denarii." % (w.name, gain))
+        w.coins = (w.coins or 0) + gain
+        l.coins = max(0, (l.coins or 0) - gain)
+    a.send({"t": "chal", "a": "dice", "you": ra, "them": rb, "name": b.name, "won": win, "gain": gain})
+    b.send({"t": "chal", "a": "dice", "you": rb, "them": ra, "name": a.name, "won": -win, "gain": gain})
 
 
 def conn_by_id(cid):
@@ -5598,10 +5626,21 @@ def on_challenge(conn, m):
         if target is None or target is conn or not chal_free(target):
             return conn.send({"t": "chal", "a": "no", "msg": "They are not free right now."})
         game = m.get("game") if m.get("game") in CHAL_GAMES else "duel"
+        bet = 0
+        if game == "dice":                                  # dice at a tavern table: both need an account and the money; the stake moves by mail (see the player market)
+            bet = int(num(m.get("bet"), 0, 1000, 10))
+            if bet not in DICE_BETS:
+                bet = 10
+            if not conn.fid or not target.fid:
+                return conn.send({"t": "chal", "a": "no", "msg": "Dice for money is between players with an account."})
+            if (conn.coins or 0) < bet:
+                return conn.send({"t": "chal", "a": "no", "msg": "You do not have %d denarii." % bet})
+            if conn.city != target.city:
+                return conn.send({"t": "chal", "a": "no", "msg": "They are in another city."})
         chal_clear(conn)
         conn.chal_t = t
-        CHALLENGES[conn.id] = {"to": target.id, "t": t, "game": game}
-        target.send({"t": "chal", "a": "in", "from": conn.id, "name": conn.name, "r": rating_of(conn)["r"], "game": game, "what": CHAL_NAMES[game]})
+        CHALLENGES[conn.id] = {"to": target.id, "t": t, "game": game, "bet": bet}
+        target.send({"t": "chal", "a": "in", "from": conn.id, "name": conn.name, "r": rating_of(conn)["r"], "game": game, "what": CHAL_NAMES[game] + (" for %d denarii" % bet if bet else "")})
         return conn.send({"t": "chal", "a": "sent", "name": target.name})
     challenger = conn_by_id(str(m.get("from"))[:16])
     ch = CHALLENGES.get(challenger.id) if challenger else None
@@ -5616,6 +5655,8 @@ def on_challenge(conn, m):
         del CHALLENGES[challenger.id]
         if t - ch["t"] > CHAL_TTL or not chal_free(challenger) or not chal_free(conn):
             return conn.send({"t": "chal", "a": "no", "msg": "That challenge has run out."})
+        if ch.get("game") == "dice":
+            return dice_table(challenger, conn, ch.get("bet", 10))
         leave_queue(challenger)
         leave_queue(conn)
         chal_room(ch.get("game", "duel"), challenger, conn)
