@@ -387,5 +387,5 @@ const Interiors = (() => {
     return best;
   }
 
-  return { setup, register, addHouse, refreshSigns, update, setEra, picked: () => picked, keeperNear, seatNear, tableMates, invite, release, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
+  return { setup, register, addHouse, refreshSigns, update, setEra, picked: () => picked, keeperNear, seatNear, tableMates, invite, release, kindsHere, inside: insideShop, infoOf: (p) => info(p), doorOf: (p) => (p.at ? p.at(0, 1.4) : null), kinds: LISTS, get count() { return picked.length; }, get built() { return picked.filter((p) => p.built).length; }, shops: () => picked.map((p) => ({ x: p.b.x, z: p.b.z, name: p.kind.name, late: !!p.kind.late, trade: p.kind.trade, era: (p.ext && p.ext.era) || "", built: p.built, door: p.doorPos || null, keeper: p.keeperW || null, open: p.open, seats: p.seats ? p.seats.length : 0 })) };
 })();

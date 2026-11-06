@@ -88,7 +88,7 @@ const Quests = (() => {
       let j = Math.floor(rnd() * list.length), tries = 0;
       while ((list[j] === g.p || Math.hypot(list[j].x - g.p.x, list[j].z - g.p.z) < 90) && tries++ < 40) j = Math.floor(rnd() * list.length);
       const d = Math.hypot(list[j].x - g.p.x, list[j].z - g.p.z);
-      q = { kind: "letter", target: list[j], targetName: nameOf(j + 3), reward: Math.min(160, Math.round((30 + d / 8) / 5) * 5), text: `${giverName}: Please take this letter to ${nameOf(j + 3)}. Look for the blue ? floating over their head, then press F beside them.` };
+      q = { kind: "letter", target: list[j], targetName: nameOf(j), reward: Math.min(160, Math.round((30 + d / 8) / 5) * 5), text: `${giverName}: Please take this letter to ${nameOf(j)}. Look for the blue ? floating over their head, then press F beside them.` };
     } else {
       const lms = LANDMARKS.filter((l) => !l.home && !l.game && Math.hypot(l.x - g.p.x, l.z - g.p.z) > 80), lm = lms[Math.floor(rnd() * lms.length)] || LANDMARKS[0];
       const d = Math.hypot(lm.x - g.p.x, lm.z - g.p.z);

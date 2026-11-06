@@ -106,6 +106,7 @@ const Account = (() => {
         owned: Market.snapshot(),
         goods: Shopkeep.snapshot(),
         furniture: typeof Furnish !== "undefined" ? Furnish.snapshot() : {},
+        friends: typeof Lives !== "undefined" ? Lives.snapshot() : {},
         tax: Tax.snapshot(),
         jobs: Jobs.snapshot(),
         ships: Shipyard.snapshot(),
@@ -146,6 +147,7 @@ const Account = (() => {
     if (p.owned && typeof p.owned === "object") Market.restore(p.owned);
     if (p.goods && typeof p.goods === "object") Shopkeep.restore(p.goods);
     if (p.furniture && typeof p.furniture === "object" && typeof Furnish !== "undefined") Furnish.restore(p.furniture);
+    if (p.friends && typeof p.friends === "object" && typeof Lives !== "undefined") Lives.restore(p.friends);
     if (p.tax && typeof p.tax === "object") Tax.restore(p.tax);
     if (p.jobs && typeof p.jobs === "object") Jobs.restore(p.jobs);
     if (p.ships && typeof p.ships === "object") Shipyard.restore(p.ships);

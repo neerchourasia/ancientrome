@@ -72,7 +72,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Shopkeep.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Shopkeep.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -207,6 +207,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Cage.at(player.x, player.z, player.feet)) Cage.open();
       else if (k === "KeyF" && Robbery.at(player.x, player.z, player.feet)) Robbery.act();
       else if (k === "KeyF" && Harbour.at(player.x, player.z, player.feet)) Harbour.board();
+      else if (k === "KeyF" && Lives.at()) Lives.open();
       else if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
@@ -278,6 +279,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "fish") { Fishing.act(); return; }
     if ($("#prompt").dataset.kind === "dig") { TreasureMaps.act(); return; }
     if ($("#prompt").dataset.kind === "quest") { Quests.open(); return; }
+    if ($("#prompt").dataset.kind === "citizen") { Lives.open(); return; }
     if ($("#prompt").dataset.kind === "ride") { Ride.tryBoard(); return; }
     if (mode !== "walk" || !canStart() || era === "modern") return;
     if (inArena(player.x, player.z)) Fight.start();
@@ -1352,6 +1354,7 @@ function updatePrompt() {
     if (!text && Garage.at(player.x, player.z, player.feet)) { text = "F: open your garage"; p.dataset.kind = "garage"; }
     if (!text && Car.nearby()) { text = `Press X to ${Car.verb} your ${Car.MODELS[Car.current].name.toLowerCase()}`; p.dataset.kind = "car"; }
     if (!text) { const rt = Ride.promptText(); if (rt) { text = rt; p.dataset.kind = "ride"; } }
+    if (!text) { const lt = Lives.promptText(); if (lt) { text = lt; p.dataset.kind = "citizen"; } }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";
   }
@@ -1777,7 +1780,7 @@ function tick(dt) {
   updateTime(dt);
   updateDeath(dt);
   Weather.update(dt);
-  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Ventures.update(dt); Events.update(dt); Thieves.update(dt); PetPerks.update(dt); Fishing.update(dt); TreasureMaps.update(); Story.update(); FestHunt.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
+  Tax.update(dt); Speech.update(dt); Stalls.update(dt); Jail.update(dt); Guards.update(dt); Police.update(dt); Treasure.update(dt); Journey.update(dt); Subway.update(dt); Estate.update(dt); Relics.update(dt); Quests.update(dt); Lives.update(dt); Ventures.update(dt); Events.update(dt); Thieves.update(dt); PetPerks.update(dt); Fishing.update(dt); TreasureMaps.update(); Story.update(); FestHunt.update(dt); Fares.update(dt); Trade.update(dt); Disease.update(dt); Jobs.update(dt); Garage.update(dt); Robbery.update(dt); Festival.update(dt);
   // condition: passive recovery, resting, and the HUD
   Vitals.update(dt, { mode, seated: Shopkeep.seated, regenMul: Disease.regenMul * Character.mod("regen"), atStables: inCircusArea(player.x, player.z), restBoost: city === "delhi" ? (Delhi.inPlot(player.x, player.z) ? Market.houseRest() : 1) : city === "cancun" ? (Cancun.inHome(player.x, player.z) ? Market.houseRest() : 1) : city === "beijing" ? (Beijing.inHome(player.x, player.z) ? Market.houseRest() : 1) : Home.restBoost(player.x, player.z) }) === "refreshed" && toast("You feel refreshed");
   if (mode !== "walk") Vitals.stopRest();
