@@ -932,3 +932,8 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .class-code input { font: 600 1rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 9px 12px; width: 15em; max-width: 100%; border-radius: 8px; border: 1px solid rgba(226,185,85,.5); background: rgba(20,16,11,.85); color: var(--ink, #f1ead8); }
 .class-code button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold, #e2b955); }
 #class-code-msg { color: #f0a090; min-height: 1.2em; }
+
+.ac-google { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; font: 600 .95rem system-ui; cursor: pointer; padding: 10px 14px; border: 1px solid #dadce0; border-radius: 8px; color: #3c4043; background: #fff; }
+.ac-google:hover { background: #f7f8f8; }
+.ac-or { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: .85rem; opacity: .8; }
+.ac-or::before, .ac-or::after { content: ""; flex: 1; border-top: 1px solid rgba(255,255,255,.25); }

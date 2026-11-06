@@ -210,7 +210,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(server.CLASSES.clear)
         key = "0123456789abcdef0123456789abcdef"
         cid = hashlib.sha256(key.encode()).hexdigest()[:8]
-        data = json.dumps({"city": "rome", "era": "ancient", "coins": 120, "shops": 3, "errands": 1, "crafted": 0, "ach": 2, "sights": ["forum", "pantheon", "x" * 60], "hunt": {"n": 1, "of": 3, "done": 0}})
+        data = json.dumps({"city": "rome", "era": "ancient", "coins": 120, "gain": -30, "shops": 3, "errands": 1, "crafted": 0, "ach": 2, "sights": ["forum", "pantheon", "x" * 60], "hunt": {"n": 1, "of": 3, "done": 0}})
         ev = json.dumps(["found The Pantheon", "walked into Pistrinum <script>"])
         q = lambda sid, name, d=data, e=ev: "/class/report?c=%s&s=%s&n=%s&d=%s&e=%s" % (cid, sid, urllib.parse.quote(name), urllib.parse.quote(d), urllib.parse.quote(e))
         self.assertIn("204", await self.http_get(q("a" * 12, "Maria")))
@@ -221,6 +221,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([s["name"] for s in view["students"]], ["Ben", "Maria"])
         maria = view["students"][1]
         self.assertEqual((maria["city"], maria["coins"], maria["shops"], maria["hunt"]), ("rome", 120, 3, {"n": 1, "of": 3, "done": 0}))
+        self.assertEqual(maria["gain"], -30)
         self.assertEqual(maria["sights"][:2], ["forum", "pantheon"])
         self.assertEqual(len(maria["sights"][2]), 24)                                      # long values are cut
         self.assertEqual([e["text"] for e in maria["events"]], ["found The Pantheon", "walked into Pistrinum script"])   # odd characters are stripped
@@ -3456,21 +3457,24 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.LEADERS.clear()
         self.accounts("ann", "bob")
         ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
-        ann.send({"t": "social", "a": "stats", "coins": 5000, "relics": 3, "houses": 1})
-        bob.send({"t": "social", "a": "stats", "coins": 9000, "relics": 0, "houses": 4})
+        wk = server.leader_week()
+        ann.send({"t": "social", "a": "stats", "coins": 5000, "relics": 3, "houses": 1, "gain": 800, "wk": wk})
+        bob.send({"t": "social", "a": "stats", "coins": 9000, "relics": 0, "houses": 4, "gain": 100, "wk": wk - 1})      # (a gain from another week does not count)
         await asyncio.sleep(0.2)
         ann.send({"t": "social", "a": "leaders"})
         top = await ann.until(lambda m: m["t"] == "leaders")
         self.assertEqual(top["coins"], [["Bob", 9000], ["Ann", 5000]])
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 3]], [["Bob", 4], ["Ann", 1]]))        # a zero is not listed
+        self.assertEqual(top["gain"], [["Ann", 800]])                                                    # the money gained this week: Bob's is from another week
         bob.send({"t": "social", "a": "stats", "hide": 1}); await asyncio.sleep(0.2)                           # Bob switches himself off
         ann.send({"t": "social", "a": "leaders"})
         top = await ann.until(lambda m: m["t"] == "leaders")
         self.assertEqual(top["coins"], [["Ann", 5000]])
-        ann.send({"t": "social", "a": "stats", "coins": 10 ** 15, "relics": 99, "houses": -5}); await asyncio.sleep(0.2)   # silly numbers are clamped
+        ann.send({"t": "social", "a": "stats", "coins": 10 ** 15, "relics": 99, "houses": -5, "gain": 10 ** 20, "wk": wk}); await asyncio.sleep(0.2)   # silly numbers are clamped
         ann.send({"t": "social", "a": "leaders"})
         top = await ann.until(lambda m: m["t"] == "leaders")
         self.assertEqual((top["relics"], top["houses"]), ([["Ann", 12]], []))
+        self.assertEqual(top["gain"][0][1], 10 ** 12)                                                    # (a gain is never more than they hold, and is cut to the limit)
 
     async def test_guilds_share_a_chat_and_a_treasury_the_leader_controls(self):
         server.GUILDS.clear(); server.GUILD_OF.clear()

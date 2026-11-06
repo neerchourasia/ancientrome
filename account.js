@@ -19,6 +19,13 @@ const Account = (() => {
     const h = new URLSearchParams(location.hash.replace(/^#/, ""));
     if (h.get("type") === "recovery" && h.get("access_token")) { recoveryToken = h.get("access_token"); history.replaceState(null, "", location.pathname + location.search); }
   } catch (e) { /* ignore */ }
+  // Arriving from "Continue with Google": Supabase sends the browser back here with the login in the address (after the #), or with an error
+  let oauth = null, oauthError = "";
+  try {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (h.get("access_token") && h.get("refresh_token") && h.get("type") !== "recovery") { oauth = { access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: Number(h.get("expires_in")) || 3600 }; history.replaceState(null, "", location.pathname + location.search); }
+    else if (h.get("error") && !recoveryToken) { oauthError = h.get("error_description") || h.get("error"); history.replaceState(null, "", location.pathname + location.search); }
+  } catch (e) { /* ignore */ }
   let session = null, lastSaved = "", listeners = [], busy = false;
   // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
   let gateOpen = false, gateDone = null, leaving = false;
@@ -291,6 +298,7 @@ const Account = (() => {
     if (!validEmail(email)) return say("Please enter a valid email address.", true);
     if (password.length < 8) return say("Your password needs at least 8 characters.", true);
     if (kind === "up" && !$a("ac-age").checked) return say("Please confirm you are 13 or older and agree to the Terms and Privacy Policy.", true);
+    if (kind === "up") { try { localStorage.setItem("rome-consent", "1"); } catch (e) { /* ignore */ } }
     busy = true; say(kind === "up" ? "Creating your account..." : "Logging in...");
     try {
       if (kind === "up") {
@@ -308,6 +316,35 @@ const Account = (() => {
     } catch (e) {
       say(/invalid login/i.test(e.message) ? "That email and password don't match." : /already/i.test(e.message) ? "That email already has an account. Try logging in." : e.message, true);
     } finally { busy = false; }
+  }
+
+  // "Continue with Google". Whoever signs in with Google for the first time gets an account (so the 13-or-older box must be ticked once on this device), and an existing account is simply logged in.
+  // Supabase must have Google switched on (Authentication > Providers > Google in its dashboard): until it is, a friendly message is shown instead of an error page.
+  const consented = () => { try { return localStorage.getItem("rome-consent") === "1"; } catch (e) { return false; } };
+  async function googleLogin() {
+    if (busy) return;
+    const say = (t, bad) => { const m = $a("ac-msg"); m.textContent = t; m.classList.toggle("bad", !!bad); };
+    if (!$a("ac-age").checked && !consented()) return say("Please confirm you are 13 or older and agree to the Terms and Privacy Policy (the box below), then press Continue with Google again.", true);
+    busy = true; say("Opening Google...");
+    try {
+      const st = await api("/auth/v1/settings");
+      if (!st || !st.external || !st.external.google) { say("Google sign-in is not switched on for this site yet. Log in with your email and password for now.", true); return; }
+      try { localStorage.setItem("rome-consent", "1"); } catch (e) { /* ignore */ }
+      location.assign(`${base}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`);
+    } catch (e) { say("Could not reach the sign-in service. Try again in a moment.", true); } finally { busy = false; }
+  }
+  // back from Google: ask Supabase who this is, keep the login, load the saved game
+  async function finishGoogle() {
+    if (!oauth) return;
+    const t = oauth; oauth = null;
+    const say = (m, bad) => { const el = $a("ac-msg"); el.textContent = m; el.classList.toggle("bad", !!bad); };
+    try {
+      const u = await api("/auth/v1/user", { token: t.access_token });
+      if (!u || !u.id) throw new Error("Could not read your Google account");
+      storeSession({ access_token: t.access_token, refresh_token: t.refresh_token, expires_at: Math.floor(Date.now() / 1000) + t.expires_in, id: u.id, email: u.email || (u.user_metadata && u.user_metadata.email) || "" });
+      say(""); changed();
+      try { await sync(); } finally { unlock(); }
+    } catch (e) { say("Google sign-in did not work: " + e.message, true); open(); }
   }
 
   // "Forgot your password?": Supabase emails a link that brings you back here to choose a new one.
@@ -431,6 +468,7 @@ const Account = (() => {
     $a("account").addEventListener("click", (e) => { if (e.target.id === "account") closePanels(); });
     $a("ac-login").addEventListener("click", () => submit("in"));
     $a("ac-signup").addEventListener("click", () => submit("up"));
+    $a("ac-google").addEventListener("click", googleLogin);
     // the eye: show what you typed in a password box, or hide it again
     for (const eye of document.querySelectorAll("#account .pw-eye")) {
       const box = eye.parentElement.querySelector("input");
@@ -450,6 +488,8 @@ const Account = (() => {
     if (recoveryToken) { const iv = setInterval(() => { if (typeof started !== "undefined" && started && !panelOpen) { clearInterval(iv); open(); toast("Choose your new password"); } }, 800); }
     $a("ac-logout").addEventListener("click", logOut);
     renderAccount();
+    if (oauth) finishGoogle();
+    else if (oauthError) { const iv = setInterval(() => { if (typeof started !== "undefined" && started && !panelOpen) { clearInterval(iv); open(); const m = $a("ac-msg"); m.textContent = "Google sign-in did not work: " + oauthError; m.classList.add("bad"); } }, 600); setTimeout(() => clearInterval(iv), 60000); }
     // a device that is already logged in looks at the saved game first (it may have been played on another computer), and only then starts saving
     if (session) freshToken().then(async (t) => {
       try { if (t) await pull(false); } catch (e) { /* offline: the game carries on with what this device has */ }

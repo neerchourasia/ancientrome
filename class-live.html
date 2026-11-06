@@ -21,6 +21,10 @@
     tr.row { cursor: pointer; }
     tr.row:hover { background: rgba(255,255,255,.04); }
     .live { color: var(--ok); } .idle { color: var(--idle); }
+    .boards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 0 0 16px; }
+    .board { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+    .board h2 { margin: 0 0 6px; font: 700 1.05rem Georgia, serif; color: var(--gold); }
+    .board ol { margin: 0; padding-left: 22px; } .board li { padding: 1px 0; } .board li span { color: var(--muted); }
     .more td { background: #14100b; }
     .more ul { margin: 0; padding-left: 18px; }
     .sights { color: var(--muted); font-size: .85rem; }
@@ -30,7 +34,7 @@
   </style>
 </head>
 <body>
-<main>
+<main id="t-app" hidden>
   <h1>Class dashboard</h1>
   <p class="muted" id="sub">Everything the students in your class do, as it happens. Click a student to see what they did.</p>
   <div class="bar">
@@ -41,13 +45,18 @@
     <button type="button" id="print">Print</button>
   </div>
   <p id="msg" class="muted" role="status"></p>
+  <div class="boards">
+    <div class="board"><h2>🥇 Richest</h2><ol id="lb-rich"></ol></div>
+    <div class="board"><h2>📈 Biggest gain</h2><ol id="lb-gain"></ol></div>
+  </div>
   <table>
     <thead><tr><th>Student</th><th>Last seen</th><th>Where</th><th>Sights found</th><th>Hunt</th><th>Shops</th><th>Errands</th><th>Money</th><th>Latest</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
   <p class="muted" style="margin-top:18px">Students' names are the ones they chose for their character. The game keeps this in memory on its server for at most ten hours after the last report and never saves it. Closing this page does not end the class.</p>
 </main>
-<script src="config.js?v=494"></script>
-<script src="class-live.js?v=494"></script>
+<script src="config.js?v=495"></script>
+<script src="teacher-auth.js?v=495"></script>
+<script src="class-live.js?v=495"></script>
 </body>
 </html>

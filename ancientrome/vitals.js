@@ -1,0 +1,49 @@
+"use strict";
+// Your condition: health, and the fitness of your racing horses. Games wear both down and rest restores them,
+// so you can't just keep playing. Saved in the browser between visits.
+
+const Vitals = (() => {
+  const KEY = "rome-vitals";
+  const MIN_FIGHT_HP = 35, MIN_RACE_HORSES = 40, RACE_ENTRY = 20;
+  const s = { hp: 100, horses: 100, coins: 100 };
+  let resting = false, saveT = 0;
+
+  const clamp = (v) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 100));
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (v) { s.hp = clamp(v.hp); s.horses = clamp(v.horses); s.coins = Number.isFinite(v.coins) ? Math.max(0, v.coins) : 100; }
+  } catch (e) { /* storage unavailable */ }
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } }
+
+  return {
+    get hp() { return s.hp; }, set hp(v) { s.hp = clamp(v); },
+    get horses() { return s.horses; }, set horses(v) { s.horses = clamp(v); },
+    get coins() { return s.coins; }, set coins(v) { s.coins = Math.max(0, Math.round(v)); },
+    get resting() { return resting; },
+    MIN_FIGHT_HP, MIN_RACE_HORSES, RACE_ENTRY,
+    canFight: () => s.hp >= MIN_FIGHT_HP,
+    canRace: () => s.horses >= MIN_RACE_HORSES,
+    needsRest: (atStables) => s.hp < 90 || (atStables && s.horses < 90),
+
+    startRest() { resting = true; },
+    stopRest() { resting = false; },
+
+    // ctx: { mode, atStables }. Nothing heals while you are in a game.
+    update(dt, ctx) {
+      if (ctx.mode === "walk" || ctx.mode === "watch") {
+        const rest = resting && ctx.mode === "walk";
+        // You always recover a little while you are not in a game; resting is about four times faster.
+        // From 20 health: about 55 s resting, or about 3.5 minutes just walking around. Horses are slower: about 90 s from 30 to full resting at the stables, and many minutes on their own.
+        s.hp = clamp(s.hp + (rest ? 1.45 : 0.38) * dt);
+        s.horses = clamp(s.horses + (rest && ctx.atStables ? 0.8 : 0.06) * dt);
+        if (rest && s.hp >= 99.5 && (!ctx.atStables || s.horses >= 99.5)) { resting = false; return "refreshed"; }
+      }
+      saveT += dt;
+      if (saveT > 2) { saveT = 0; save(); }
+      return null;
+    },
+    save,
+    reset() { s.hp = 100; s.horses = 100; s.coins = 100; save(); },
+  };
+})();

@@ -3850,8 +3850,14 @@ def on_trade(conn, a, m):
 # leaderboards: players with an account tell the server a few numbers (denarii, treasures, houses) every minute; the server keeps the top ten of each (memory only).
 # The numbers come from each browser, so they are only as honest as the players; anyone can switch themselves off the boards.
 
-LEADERS = {}               # friend id -> {"name", "coins", "relics", "houses", "t"}
+LEADERS = {}               # friend id -> {"name", "coins", "relics", "houses", "gain", "wk", "t"}
 LEADER_LIFE = 7 * 86400.0
+LEADER_WEEK = 7 * 86400
+
+
+def leader_week():
+    """The number of the current week (the browsers work it out the same way): the 'gain' board starts again every week."""
+    return int(time.time() // LEADER_WEEK)
 
 
 def top_boards():
@@ -3861,6 +3867,9 @@ def top_boards():
     for key in ("coins", "relics", "houses"):
         best = sorted((r for r in rows if r[key] > 0), key=lambda r: r[key], reverse=True)[:10]
         out[key] = [[r["name"], r[key]] for r in best]
+    wk = leader_week()                                  # who has gained the most money this week (what they hold now minus what they held when the week began: buying and selling in circles adds nothing)
+    best = sorted((r for r in rows if r.get("wk") == wk and r.get("gain", 0) > 0), key=lambda r: r["gain"], reverse=True)[:10]
+    out["gain"] = [[r["name"], r["gain"]] for r in best]
     return out
 
 
@@ -3870,7 +3879,9 @@ def on_stats(conn, m):
         return
     if len(LEADERS) >= 5000 and conn.fid not in LEADERS:
         return
-    LEADERS[conn.fid] = {"name": conn.name, "coins": int(num(m.get("coins"), 0, 1e12, 0)), "relics": int(num(m.get("relics"), 0, 12, 0)), "houses": int(num(m.get("houses"), 0, 30, 0)), "t": time.time()}
+    coins = int(num(m.get("coins"), 0, 1e12, 0))
+    gain = min(int(num(m.get("gain"), -10 ** 12, 10 ** 12, 0)), coins) if m.get("wk") == leader_week() else 0      # (only a gain counted in this week, and never more than they hold)
+    LEADERS[conn.fid] = {"name": conn.name, "coins": coins, "relics": int(num(m.get("relics"), 0, 12, 0)), "houses": int(num(m.get("houses"), 0, 30, 0)), "gain": gain, "wk": leader_week(), "t": time.time()}
 
 
 
@@ -5873,6 +5884,7 @@ def class_report(cid, sid, name, data, events):
     st["era"] = d.get("era") if d.get("era") in ("ancient", "modern") else None
     for k in ("coins", "shops", "errands", "crafted", "ach"):
         st[k] = int(num(d.get(k), 0, 10 ** 9, 0))
+    st["gain"] = int(num(d.get("gain"), -10 ** 9, 10 ** 9, 0))       # (money now minus the money they started the lesson with)
     sights = d.get("sights") if isinstance(d.get("sights"), list) else []
     st["sights"] = [x for x in (class_clean(i, 24) for i in sights[:80]) if x]
     h = d.get("hunt")
@@ -5895,7 +5907,7 @@ def class_view(cid, key):
         if t - st["t"] > CLASS_TTL:
             continue
         out.append({"id": sid[:6], "name": st["name"], "ago": int(t - st["t"]), "since": int(t - st["t0"]), "city": st["city"], "era": st["era"], "coins": st["coins"], "shops": st["shops"],
-                    "errands": st["errands"], "crafted": st["crafted"], "ach": st["ach"], "sights": st["sights"], "hunt": st["hunt"], "events": [{"ago": int(t - at), "text": tx} for at, tx in st["ev"]]})
+                    "errands": st["errands"], "crafted": st["crafted"], "ach": st["ach"], "sights": st["sights"], "hunt": st["hunt"], "gain": st.get("gain", 0), "events": [{"ago": int(t - at), "text": tx} for at, tx in st["ev"]]})
     return {"students": out}
 
 

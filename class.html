@@ -38,7 +38,7 @@
   </style>
 </head>
 <body>
-<main>
+<main id="t-app" hidden>
   <h1>Time Machine for teachers</h1>
   <p class="muted">Walk ancient Rome (and Old Delhi, Cancún and Beijing) in 3D, in the browser. Make a link, give it to the class: students open it and play at once.</p>
 
@@ -72,7 +72,7 @@
       <div id="c-watch-box" hidden style="margin-top:10px;display:grid;gap:8px">
         <p class="muted" style="margin:0">Students see "your teacher can see your progress" at the bottom of their screen. What is sent: the name they chose for their character, the city, their money, the sights found, a few counts and short lines like "found the Pantheon". Never chat and never anything typed. It is kept in memory on the game server for at most ten hours and never saved. <b>If you teach children, check that your school allows this before you turn it on.</b></p>
         <div class="row"><a class="btn big" id="c-dash" href="#" target="_blank" rel="noopener">📊 Open the class dashboard</a><button type="button" id="c-newclass">Start a new class</button></div>
-        <p class="muted" style="margin:0"><small>The dashboard link holds your secret key: keep it to yourself. Opening it again later, on this computer, shows the same class. "Start a new class" makes a fresh key, so students of the old link are no longer shown.</small></p>
+        <p class="muted" style="margin:0"><small>Your class is tied to your account, so the dashboard shows the same class on any computer once you log in. "Start a new class" makes a fresh class, so students of the old link are no longer shown.</small></p>
       </div>
     </div>
     <div>
@@ -125,7 +125,9 @@
 
   <p><a href="./">← Back to the game</a></p>
 </main>
-<script src="classcode.js?v=494"></script>
-<script src="class.js?v=494"></script>
+<script src="config.js?v=495"></script>
+<script src="teacher-auth.js?v=495"></script>
+<script src="classcode.js?v=495"></script>
+<script src="class.js?v=495"></script>
 </body>
 </html>

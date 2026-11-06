@@ -8,8 +8,9 @@
 const ClassReport = (() => {
   const on = () => typeof CLASSMODE !== "undefined" && CLASSMODE.on && !!CLASSMODE.cid;
   const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
-  let sid = "", queue = [], last = { city: "", era: "", ach: 0, sights: null, shops: 0 };
+  let sid = "", base = null, queue = [], last = { city: "", era: "", ach: 0, sights: null, shops: 0 };
   try { sid = localStorage.getItem("rome-csid") || ""; } catch (e) { /* storage unavailable */ }
+  try { const b = localStorage.getItem("rome-cbase"); if (b !== null && Number.isFinite(Number(b))) base = Number(b); } catch (e) { /* storage unavailable */ }
   if (!/^[0-9a-f]{12}$/.test(sid)) { sid = hex(6); try { localStorage.setItem("rome-csid", sid); } catch (e) { /* ignore */ } }
 
   let soon = 0;
@@ -17,9 +18,10 @@ const ClassReport = (() => {
   const nameOf = (id) => { try { const l = ALL_LANDMARKS.find((x) => x.id === id); return l ? l.name : id; } catch (e) { return id; } };
 
   function snapshot() {
-    const st = typeof Shopkeep !== "undefined" ? Shopkeep.stats : {};
+    const st = typeof Shopkeep !== "undefined" ? Shopkeep.stats : {}, coins = Math.round(Vitals.coins);
+    if (base === null) { base = coins; try { localStorage.setItem("rome-cbase", String(base)); } catch (e) { /* ignore */ } }      // (the money they started the lesson with: the gain is measured from it)
     return {
-      city, era, coins: Math.round(Vitals.coins), sights: [...discovered].slice(0, 80), shops: st.visited || 0, errands: st.done || 0, crafted: st.crafted || 0,
+      city, era, coins, gain: coins - base, sights: [...discovered].slice(0, 80), shops: st.visited || 0, errands: st.done || 0, crafted: st.crafted || 0,
       ach: typeof Achievements !== "undefined" ? Achievements.count : 0, hunt: typeof Hunt !== "undefined" ? Hunt.progress : null,
     };
   }

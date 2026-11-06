@@ -1,9 +1,9 @@
 "use strict";
-// The class dashboard (class-live.html): the teacher's page. The address has the class id and the secret key after the #, so they are never sent anywhere except to the game server, as the
-// key to read the class (server.py, "classes"). It asks the server every three seconds and shows every student's progress.
+// The class dashboard (class-live.html): the teacher's page. The teacher has to be logged in (teacher-auth.js); the class key comes from the teacher's account (never from the address), and goes only
+// to the game server, as the key to read the class (server.py, "classes"). It asks the server every three seconds and shows every student's progress.
 (() => {
   const $ = (id) => document.getElementById(id);
-  const h = new URLSearchParams(location.hash.slice(1)), cid = h.get("c") || "", key = h.get("k") || "";
+  let cid = "", key = "";                                             // (the class id and the class key of the logged-in teacher)
   const cfg = window.ROME_CONFIG || {}, isLocal = ["localhost", "127.0.0.1"].includes(location.hostname);
   const URL_ = isLocal ? "ws://localhost:8765/play" : (cfg.serverUrl || "");
   const http = URL_.replace(/^ws/, "http").replace(/\/play$/, "");
@@ -30,6 +30,13 @@
         more.append(td); rows.append(more);
       }
     }
+    const board = (id, key, min) => {
+      const ol = $(id); ol.replaceChildren();
+      const rows = students.filter((s) => s[key] > min).sort((a, b) => b[key] - a[key]).slice(0, 5);
+      if (!rows.length) { ol.append(el("li", "Nobody yet.", "muted")); return; }
+      rows.forEach((s, i) => { const li = el("li", `${["🥇", "🥈", "🥉"][i] || ""} ${s.name}`); li.append(el("span", `  ${key === "gain" ? "+" : ""}${s[key]}`)); ol.append(li); });
+    };
+    board("lb-rich", "coins", 0); board("lb-gain", "gain", 0);
     $("count").textContent = `${students.length} student${students.length === 1 ? "" : "s"}`;
     $("active").textContent = `${students.filter((s) => s.ago < 30).length} active now`;
     const hs = students.filter((s) => s.hunt), done = hs.filter((s) => s.hunt.done).length;
@@ -38,10 +45,10 @@
   }
 
   async function poll() {
-    if (!cid || !key || !http) { $("msg").textContent = "This link is missing its class key. Open the dashboard from the teacher page again."; $("msg").className = "err"; return; }
+    if (!cid || !key || !http) { $("msg").textContent = "Could not find your class key. Log in again, or open the dashboard from the teacher page."; $("msg").className = "err"; return; }
     try {
       const r = await fetch(`${http}/class/view?c=${encodeURIComponent(cid)}&k=${encodeURIComponent(key)}`, { cache: "no-store" });
-      if (r.status === 403) { $("msg").textContent = "The server does not accept this key. Open the dashboard from the teacher page again."; $("msg").className = "err"; return; }
+      if (r.status === 403) { $("msg").textContent = "The server does not accept your class key. Open the dashboard from the teacher page again."; $("msg").className = "err"; return; }
       if (!r.ok) throw new Error(String(r.status));
       students = (await r.json()).students || [];
       $("msg").textContent = students.length ? "" : "Waiting for students. They appear here once they open a class link made with \"Let me watch what each student does\" ticked, and have made their character. (The bar at the bottom of their screen then says \"your teacher can see your progress\". A link or code made without it ticked, or before you pressed \"Start a new class\", does not show up here.)";
@@ -52,10 +59,10 @@
 
   $("csv").addEventListener("click", () => {
     const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
-    const lines = [["Student", "Last seen (s ago)", "City", "Era", "Sights found", "Hunt", "Shops", "Errands", "Goods made", "Achievements", "Money", "What they did"].map(q).join(",")];
-    for (const s of students) lines.push([s.name, s.ago, CITY[s.city] || "", s.era || "", s.sights.length, s.hunt ? (s.hunt.done ? `finished in ${s.hunt.done} s` : `${s.hunt.n} of ${s.hunt.of}`) : "", s.shops, s.errands, s.crafted, s.ach, s.coins, s.events.map((e) => e.text).join("; ")].map(q).join(","));
+    const lines = [["Student", "Last seen (s ago)", "City", "Era", "Sights found", "Hunt", "Shops", "Errands", "Goods made", "Achievements", "Money", "Gain this lesson", "What they did"].map(q).join(",")];
+    for (const s of students) lines.push([s.name, s.ago, CITY[s.city] || "", s.era || "", s.sights.length, s.hunt ? (s.hunt.done ? `finished in ${s.hunt.done} s` : `${s.hunt.n} of ${s.hunt.of}`) : "", s.shops, s.errands, s.crafted, s.ach, s.coins, s.gain || 0, s.events.map((e) => e.text).join("; ")].map(q).join(","));
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); a.download = "class.csv"; a.click();
   });
   $("print").addEventListener("click", () => window.print());
-  poll(); setInterval(poll, 3000);
+  TeacherAuth.start(async (info) => { key = info.key; cid = await TeacherAuth.classId(key); poll(); setInterval(poll, 3000); });
 })();

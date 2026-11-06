@@ -1,13 +1,10 @@
 "use strict";
-// The teacher page (class.html): builds the class link from the options and copies it.
+// The teacher page (class.html): builds the class link from the options and copies it. A teacher has to be logged in (teacher-auth.js); the class key lives in the teacher's account.
 (() => {
   const $ = (id) => document.getElementById(id);
-  // the class key (secret: only the teacher's browser and the dashboard link have it) and the class id (the first 8 hex digits of its sha256: the server checks the key against it)
-  let key = "", cid = "";
-  try { key = localStorage.getItem("rome-class-key") || ""; } catch (e) { /* storage unavailable */ }
-  const newKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
-  const sha8 = async (k) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(k))), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 8);
-  async function setKey(k) { key = k; try { localStorage.setItem("rome-class-key", k); } catch (e) { /* ignore */ } cid = await sha8(k); show(); }
+  // the class id (the first 8 hex digits of the sha256 of the class key, which stays in the teacher's account: the server checks the key against the id)
+  let cid = "";
+  async function setKey(k) { cid = await TeacherAuth.classId(k); show(); }
   const SIGHTS = ClassCode.GROUPS;                                   // (the sights, by city: classcode.js)
   for (const [city, list] of Object.entries(SIGHTS)) {
     const grp = document.createElement("optgroup"); grp.label = city;
@@ -49,9 +46,9 @@
     const l = link(); $("c-link").textContent = l; $("c-open").href = l; $("c-msg").textContent = "";
     $("c-code").textContent = ClassCode.encode(options());
     $("c-watch-box").hidden = !$("c-watch").checked;
-    if (key && cid) $("c-dash").href = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}class-live.html#c=${cid}&k=${key}`;
+    $("c-dash").href = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}class-live.html`;          // (no key in the link: the dashboard asks the account for it)
   }
-  $("c-newclass").addEventListener("click", () => { setKey(newKey()); $("c-msg").textContent = "A new class has been started."; });
+  $("c-newclass").addEventListener("click", async () => { try { await setKey(await TeacherAuth.newKey()); $("c-msg").textContent = "A new class has been started."; } catch (e) { $("c-msg").textContent = "Could not start a new class: " + e.message; } });
   for (const id of ["c-cur", "c-watch", "c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
   $("c-copy").addEventListener("click", async () => {
     const l = link();
@@ -61,5 +58,5 @@
   $("c-copycode").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("c-code").textContent); $("c-msg").textContent = "Code copied."; } catch (e) { $("c-msg").textContent = "Select the code and copy it (Ctrl+C)."; }
   });
-  (async () => { if (!/^[0-9a-f]{32}$/.test(key)) { key = newKey(); try { localStorage.setItem("rome-class-key", key); } catch (e) { /* ignore */ } } cid = await sha8(key); show(); })();
+  TeacherAuth.start(async ({ key }) => { await setKey(key); });
 })();

@@ -560,6 +560,8 @@ const I18n = (() => {
     ["That code does not look right. Check it and try again.", "Ese código no parece correcto. Revísalo e inténtalo de nuevo.", "Quel codice non sembra giusto. Controllalo e riprova.", "यह कोड सही नहीं लगता। जाँचकर फिर से कोशिश करें।", "这个代码好像不对。请检查后再试一次。"],
     // the class report notice
     ["Class mode: {0} · your teacher can see your progress", "Modo clase: {0} · tu profesor puede ver tu progreso", "Modalità classe: {0} · il tuo insegnante può vedere i tuoi progressi", "कक्षा मोड: {0} · आपके शिक्षक आपकी प्रगति देख सकते हैं", "课堂模式:{0} · 老师可以看到你的进度"],
+    // the money leaderboard
+    ["Gained the most this week", "Más ganancia esta semana", "Più guadagno questa settimana", "इस हफ़्ते सबसे ज़्यादा कमाई", "本周赚得最多"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [
