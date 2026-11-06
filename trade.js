@@ -4,6 +4,9 @@
 // vehicle, stopped on the ground within 250 m of the city's market. A vehicle's hold is its own: how many crates it carries depends on the vehicle (a
 // bicycle one, a light plane twelve, a cargo freighter four hundred). Crashing loses the cargo. Prices drift every day, and the more you buy or sell the
 // worse the price gets for that day. Saved in the browser and in your account. Depends on car.js, stalls.js (SITES), home.js (Time) and vitals.js.
+// In the ancient cities there are no aircraft: a CARAVAN does the same job. Stand near the market of the city your caravan is in and press 🐪 Caravan in the menu: buy crates (your pack takes 4,
+// and every cart or animal you own adds more: a horse 4, a donkey 5, a camel 8, a cart 14, an elephant 20), carry them to another city BY SEA (the Voyage in the Travel box: pirates take half
+// the crates if they win, and a storm costs one) and sell them where they cost more. The caravan stays in its city if you travel any other way, until you sail it on.
 
 const Trade = (() => {
   const KEY = "rome-hold";
@@ -19,10 +22,12 @@ const Trade = (() => {
   const CAP = { bicycle: 1, scooter: 2, motorcycle: 3, rickshaw: 3, sportscar: 2, citycar: 6, taxi: 6, suv: 12, truck: 40, bus: 30, plane: 12, gyro: 3, glider: 0, balloon: 8, helicopter: 14, tiltrotor: 24,
     blimp: 60, vlj: 8, lightjet: 12, midjet: 16, supermid: 20, heavyjet: 30, airliner: 90, b777x: 200, a350: 180, a380: 250, cargo: 400, transport: 300, fighter: 2, bomber: 150,
     b737max: 100, b787: 220, b777: 240, b767f: 330, bbj: 10, vc25: 30, b52: 200, kc46: 200, p8: 40, a220: 70, a320neo: 100, a321xlr: 120, a330neo: 190, a350f: 420, a400m: 320, a330mrtt: 220, f15ex: 2, superhornet: 2, growler: 2, f47: 2, typhoon: 2, mq25: 10, mq28: 2, littlebird: 4, h125: 8, h145: 14, h160: 16, nh90: 30, apache: 2, chinook: 50 };
-  const ZONE = 250, SPREAD = 0.04, IMPACT = 0.006;
-  let hold = {}, impact = { day: -1, map: {} }, el = null, openNow = false;
-  try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") hold = v.hold && typeof v.hold === "object" ? v.hold : {}; } catch (e) { /* storage unavailable */ }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ hold })); } catch (e) { /* ignore */ } };
+  CAP.caravan = 400;                                                       // (the limit of the saved game: what a caravan really carries is capOf)
+  const ZONE = 250, SPREAD = 0.04, IMPACT = 0.006, CITY_NAMES = { rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" };
+  const PACK = { oxcart: 14, camel: 8, donkey: 5, horse: 4, elephant: 20, chariot: 2 };
+  let hold = {}, impact = { day: -1, map: {} }, el = null, openNow = false, caravanAt = null;
+  try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && typeof v === "object") { hold = v.hold && typeof v.hold === "object" ? v.hold : {}; caravanAt = typeof v.at === "string" ? v.at : null; } } catch (e) { /* storage unavailable */ }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ hold, at: caravanAt })); } catch (e) { /* ignore */ } };
   const day = () => Math.floor(Time.day);
   const rnd = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } h ^= h >>> 15; h = Math.imul(h, 2246822507); h ^= h >>> 13; return ((h >>> 0) % 10000) / 10000; };
   const sanitizeHold = (raw) => {
@@ -37,6 +42,10 @@ const Trade = (() => {
   hold = sanitizeHold(hold);
 
   const where = () => (typeof city !== "undefined" ? city : "rome");
+  const ancient = () => typeof era !== "undefined" && era === "ancient";
+  const vehicle = () => (ancient() ? "caravan" : Car.current);                         // what carries the crates: a vehicle's hold, or the caravan on foot
+  const capOf = (vid) => (vid === "caravan" ? 4 + (typeof Market !== "undefined" ? Market.snapshot().items : []).reduce((n, id) => n + (PACK[id] || 0), 0) : CAP[vid] || 0);
+  const vname = (vid) => (vid === "caravan" ? "caravan" : (Car.MODELS[vid] ? Car.MODELS[vid].name.toLowerCase() : "vehicle"));
   const used = (vid) => Object.values(hold[vid] || {}).reduce((a, b) => a + b, 0);
   // the price of a crate here today (the middle price, before the buying or selling margin)
   function price(gd, c = where()) {
@@ -45,11 +54,16 @@ const Trade = (() => {
   }
   const avg = (gd) => (gd.base.rome + gd.base.delhi + gd.base.cancun + gd.base.beijing) / 4;
   const nearDepot = () => {
-    const s = typeof Stalls !== "undefined" ? Stalls.SITES[where()] : null, st = Car.state();
+    const s = typeof Stalls !== "undefined" ? Stalls.SITES[where()] : null, st = ancient() ? player : Car.state();
     return !!s && !!st && Math.hypot(st.x - s.x, st.z - s.z) < ZONE;
   };
   // can you trade here and now?
   function canTrade() {
+    if (ancient()) {                                                                  // a caravan: on foot, at the market of the city it is in
+      if (mode !== "walk" || !nearDepot()) return false;
+      if (caravanAt === null || !used("caravan")) caravanAt = where();
+      return caravanAt === where();
+    }
     if (era !== "modern" || !Car.driving) return false;
     const st = Car.state();
     return !!st && st.alt < 0.8 && Math.abs(st.v) < 3 && !!CAP[Car.current] && nearDepot();
@@ -64,7 +78,7 @@ const Trade = (() => {
   }
 
   function buy(gd, n) {
-    const vid = Car.current, cap = CAP[vid];
+    const vid = vehicle(), cap = capOf(vid);
     let got = 0, cost = 0;
     for (let i = 0; i < n && used(vid) < cap; i++) {
       const p = Math.round(price(gd) * (1 + SPREAD));
@@ -78,7 +92,7 @@ const Trade = (() => {
     render();
   }
   function sell(gd, n) {
-    const vid = Car.current, have = (hold[vid] || {})[gd.id] || 0;
+    const vid = vehicle(), have = (hold[vid] || {})[gd.id] || 0;
     let sold = 0, got = 0;
     for (let i = 0; i < Math.min(n, have); i++) {
       const p = Math.round(price(gd) * (1 - SPREAD));
@@ -99,10 +113,10 @@ const Trade = (() => {
   }
   function render() {
     if (!el) return;
-    const vid = Car.current, M = Car.MODELS[vid], cap = CAP[vid] || 0, here = where();
-    el.querySelector("#tr-title").textContent = `Trading depot · ${{ rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" }[here] || here}`;
+    const vid = vehicle(), cap = capOf(vid), here = where();
+    el.querySelector("#tr-title").textContent = `${vid === "caravan" ? "Caravan" : "Trading depot"} · ${CITY_NAMES[here] || here}`;
     el.querySelector("#tr-purse").innerHTML = `Your purse: <b>${Vitals.coins}</b> denarii.`;
-    el.querySelector("#tr-hold").textContent = `Your ${M ? M.name.toLowerCase() : "vehicle"} holds ${used(vid)} of ${cap} crates.`;
+    el.querySelector("#tr-hold").textContent = `Your ${vname(vid)} holds ${used(vid)} of ${cap} crates.`;
     const ul = el.querySelector("#tr-list"); ul.replaceChildren();
     for (const gd of GOODS) {
       const p = price(gd), b = Math.round(p * (1 + SPREAD)), s = Math.round(p * (1 - SPREAD)), have = (hold[vid] || {})[gd.id] || 0, rel = p / avg(gd);
@@ -118,6 +132,10 @@ const Trade = (() => {
     }
   }
   function open() {
+    if (ancient() && !canTrade()) {
+      toast(mode !== "walk" ? "Get out of your vehicle first: a caravan is loaded on foot." : !nearDepot() ? "Go to the market of the city (within about 250 m) to load or sell your caravan." : `Your caravan is in ${CITY_NAMES[caravanAt] || caravanAt}: sail it on from there, or go back to it.`);
+      return false;
+    }
     if (!canTrade()) { const h = hint(); toast(h ? h.replace(/<[^>]+>/g, "") : era !== "modern" ? "Trading depots only work in the modern cities." : !Car.driving ? "Get in a vehicle first: goods travel in your vehicle." : !CAP[Car.current] ? "This vehicle cannot carry goods." : "Stop on the ground within about 250 m of the market to trade."); return false; }
     if (!el) build();
     openNow = true; el.classList.add("show"); render();
@@ -129,11 +147,22 @@ const Trade = (() => {
   // a crash (or dying) loses the goods of the vehicle you were in
   function lose() { const vid = Car.current; if (vid && hold[vid]) { delete hold[vid]; save(); toast("Your cargo was lost in the crash!"); } }
 
+  // the caravan sails: it is in the city you arrive in. Pirates take part of it; a storm costs a crate
+  function caravanMoved(to) { if (used("caravan")) { caravanAt = to; save(); toast(`Your caravan is in ${CITY_NAMES[to] || to}. Go to the market to sell it.`); } else caravanAt = null; }
+  function caravanLoss(frac, why) {
+    const h = hold.caravan; if (!h) return 0;
+    let lost = 0, total = used("caravan"), n = Math.max(1, Math.round(total * frac));
+    for (const id of Object.keys(h)) while (h[id] > 0 && n > 0) { h[id]--; n--; lost++; }
+    for (const id of Object.keys(h)) if (h[id] <= 0) delete h[id];
+    if (!Object.keys(h).length) delete hold.caravan;
+    save(); return lost;
+  }
+  const carrying = () => used("caravan");
   return {
-    open, close, update, hint, lose, canTrade,
+    open, close, update, hint, lose, canTrade, caravanMoved, caravanLoss, carrying, openCaravan: () => { if (!ancient()) { toast("Caravans are for the ancient cities: in the modern ones, trade from a vehicle at the market (press E)."); return false; } return open(); },
     get isOpen() { return openNow; },
-    snapshot: () => JSON.parse(JSON.stringify(hold)),
-    restore(raw) { hold = sanitizeHold(raw); save(); },
+    snapshot: () => ({ ...JSON.parse(JSON.stringify(hold)), _at: caravanAt }),
+    restore(raw) { hold = sanitizeHold(raw); caravanAt = raw && typeof raw._at === "string" && CITY_NAMES[raw._at] ? raw._at : null; save(); },
     debug: () => ({ hold, prices: GOODS.map((g) => [g.id, Math.round(price(g, "rome")), Math.round(price(g, "delhi")), Math.round(price(g, "cancun"))]) }),
   };
 })();

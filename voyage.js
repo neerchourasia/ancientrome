@@ -25,7 +25,7 @@ const Voyage = (() => {
   async function pirates() {
     const pay = await Dialog.confirm("Pirates! A black sail closes on you. OK: pay them 40 denarii to leave you alone. Cancel: fight them.");
     if (pay) { coins(-40); say("You paid the pirates 40 denarii and they sailed away."); return; }
-    if (Math.random() < 0.55) { coins(90); say("You beat the pirates off and found 90 denarii in their boat!"); } else { coins(-70); say("The pirates won the fight and took 70 denarii."); }
+    if (Math.random() < 0.55) { coins(90); say("You beat the pirates off and found 90 denarii in their boat!"); } else { coins(-70); say("The pirates won the fight and took 70 denarii."); const gone = typeof Trade !== "undefined" ? Trade.caravanLoss(0.5) : 0; if (gone) say(`They also took ${gone} crate${gone === 1 ? "" : "s"} of your caravan's goods.`); }
   }
 
   async function sail(to) {
@@ -42,7 +42,7 @@ const Voyage = (() => {
     try {
       say(`You board a ship (${FARE} denarii). The sails fill and the shore slips away.`); await sleep(3500); progress(0.2);
       const r = Math.random(); Sfx.play("splash");
-      if (r < 0.4) { say("Calm seas and a fair wind."); } else if (r < 0.65) { coins(15); say("Dolphins race the bow! The crew toss you 15 denarii for luck."); } else if (r < 0.85) { coins(-25); say("A storm! The ship is battered and the repairs cost you 25 denarii."); } else say("A long, lazy swell. You doze on the deck.");
+      if (r < 0.4) { say("Calm seas and a fair wind."); } else if (r < 0.65) { coins(15); say("Dolphins race the bow! The crew toss you 15 denarii for luck."); } else if (r < 0.85) { coins(-25); say("A storm! The ship is battered and the repairs cost you 25 denarii."); if (typeof Trade !== "undefined" && Trade.caravanLoss(0.001)) say("One crate of your caravan's goods went overboard."); } else say("A long, lazy swell. You doze on the deck.");
       await sleep(6000); progress(0.55);
       const q = Math.random();
       if (q < 0.3) await pirates();
@@ -54,6 +54,7 @@ const Voyage = (() => {
     box.hidden = true;
     try { arriveIn(to); } catch (err) { console.error(err); toast("Could not arrive"); }
     travelBusy = false;
+    if (typeof Trade !== "undefined") Trade.caravanMoved(to);
     if (!done.includes(to)) { done.push(to); save(); coins(BONUS); Sfx.play("cheer"); toast(`You arrived by sea for the first time: explorer's bonus +${BONUS} denarii!`); }
   }
 
