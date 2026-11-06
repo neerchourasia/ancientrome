@@ -21,6 +21,9 @@
     tr.row { cursor: pointer; }
     tr.row:hover { background: rgba(255,255,255,.04); }
     .live { color: var(--ok); } .idle { color: var(--idle); }
+    .controls { display: grid; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; }
+    .row2 { display: flex; gap: 8px; flex-wrap: wrap; } .row2 input { flex: 1 1 280px; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #14100b; color: var(--ink); }
+    .check { display: flex; gap: 8px; align-items: flex-start; } .check input { margin-top: 4px; width: 18px; height: 18px; } button.on { background: #f0a090; }
     .boards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 0 0 16px; }
     .board { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
     .board h2 { margin: 0 0 6px; font: 700 1.05rem Georgia, serif; color: var(--gold); }
@@ -36,6 +39,7 @@
 <body>
 <main id="t-app" hidden>
   <h1>Class dashboard</h1>
+  <label id="cl-wrap" hidden class="muted">Class <select id="cl-select"></select></label>
   <p class="muted" id="sub">Everything the students in your class do, as it happens. Click a student to see what they did.</p>
   <div class="bar">
     <span class="pill" id="count">0 students</span>
@@ -45,6 +49,12 @@
     <button type="button" id="print">Print</button>
   </div>
   <p id="msg" class="muted" role="status"></p>
+  <div class="controls">
+    <div class="ctl"><label for="cm-text"><b>📣 Message to the class</b> <small class="muted">(appears on every student's screen)</small></label>
+      <div class="row2"><input id="cm-text" type="text" maxlength="140" placeholder="e.g. Everyone go to the Pantheon" autocomplete="off"><button type="button" id="cm-send">Send to everyone</button></div></div>
+    <div class="ctl"><button type="button" id="cm-pause">⏸ Pause the class</button> <span id="cm-state" class="muted"></span></div>
+    <label class="ctl check"><input type="checkbox" id="cm-board"> <span>Show the leaderboard to the students <small class="muted">(they see the richest and the biggest gains, with names)</small></span></label>
+  </div>
   <div class="boards">
     <div class="board"><h2>🥇 Richest</h2><ol id="lb-rich"></ol></div>
     <div class="board"><h2>📈 Biggest gain</h2><ol id="lb-gain"></ol></div>
@@ -55,8 +65,8 @@
   </table>
   <p class="muted" style="margin-top:18px">Students' names are the ones they chose for their character. The game keeps this in memory on its server for at most ten hours after the last report and never saves it. Closing this page does not end the class.</p>
 </main>
-<script src="config.js?v=495"></script>
-<script src="teacher-auth.js?v=495"></script>
-<script src="class-live.js?v=495"></script>
+<script src="config.js?v=497"></script>
+<script src="teacher-auth.js?v=497"></script>
+<script src="class-live.js?v=497"></script>
 </body>
 </html>

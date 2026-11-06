@@ -50,7 +50,7 @@
       const r = await fetch(`${http}/class/view?c=${encodeURIComponent(cid)}&k=${encodeURIComponent(key)}`, { cache: "no-store" });
       if (r.status === 403) { $("msg").textContent = "The server does not accept your class key. Open the dashboard from the teacher page again."; $("msg").className = "err"; return; }
       if (!r.ok) throw new Error(String(r.status));
-      students = (await r.json()).students || [];
+      const view = await r.json(); students = view.students || []; showState(view);
       $("msg").textContent = students.length ? "" : "Waiting for students. They appear here once they open a class link made with \"Let me watch what each student does\" ticked, and have made their character. (The bar at the bottom of their screen then says \"your teacher can see your progress\". A link or code made without it ticked, or before you pressed \"Start a new class\", does not show up here.)";
       $("msg").className = "muted";
       render();
@@ -64,5 +64,43 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })); a.download = "class.csv"; a.click();
   });
   $("print").addEventListener("click", () => window.print());
-  TeacherAuth.start(async (info) => { key = info.key; cid = await TeacherAuth.classId(key); poll(); setInterval(poll, 3000); });
+
+  // what the teacher can do to the whole class: a message, pause and resume, show the leaderboard to the students (server.py, class_set)
+  let paused = false;
+  function showState(s) {
+    paused = !!s.paused;
+    $("cm-pause").textContent = paused ? "▶ Resume the class" : "⏸ Pause the class"; $("cm-pause").classList.toggle("on", paused);
+    $("cm-state").textContent = paused ? "The class is paused: every student sees a screen that says so." : "";
+    if (document.activeElement !== $("cm-board")) $("cm-board").checked = !!s.board;
+  }
+  async function control(params) {
+    if (!cid || !key || !http) return;
+    try {
+      const q = new URLSearchParams({ c: cid, k: key, ...params });
+      const r = await fetch(`${http}/class/set?${q}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      showState(await r.json());
+      return true;
+    } catch (e) { $("msg").textContent = "Could not reach the game server. Try again."; $("msg").className = "err"; }
+  }
+  $("cm-send").addEventListener("click", async () => { const t = $("cm-text").value.trim(); if (t && await control({ m: t })) { $("cm-text").value = ""; $("cm-send").textContent = "Sent ✓"; setTimeout(() => { $("cm-send").textContent = "Send to everyone"; }, 2000); } });
+  $("cm-text").addEventListener("keydown", (e) => { if (e.key === "Enter") $("cm-send").click(); });
+  $("cm-pause").addEventListener("click", () => control({ p: paused ? "0" : "1" }));
+  $("cm-board").addEventListener("change", () => control({ b: $("cm-board").checked ? "1" : "0" }));
+  // a teacher with several classes picks one here (the address can name one: class-live.html?class=<class id>)
+  TeacherAuth.start(async (info) => {
+    const want = new URLSearchParams(location.search).get("class") || "";
+    let idx = info.index;
+    for (let i = 0; want && i < info.classes.length; i++) if (await TeacherAuth.classId(info.classes[i].k) === want) idx = i;
+    const use = async (i) => {
+      key = info.classes[i].k; cid = await TeacherAuth.classId(key); students = []; open.clear(); await TeacherAuth.choose(i);
+      $("sub").textContent = `${info.classes[i].n}: everything the students in your class do, as it happens. Click a student to see what they did.`;
+      poll();
+    };
+    if (info.classes.length > 1) {
+      const sel = $("cl-select"); info.classes.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = c.n; sel.append(o); });
+      sel.value = String(idx); sel.addEventListener("change", () => use(Number(sel.value))); $("cl-wrap").hidden = false;
+    }
+    await use(idx); setInterval(poll, 3000);
+  });
 })();

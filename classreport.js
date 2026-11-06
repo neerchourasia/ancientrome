@@ -34,8 +34,49 @@ const ClassReport = (() => {
     if (d.era !== last.era) { last.era = d.era; note(`switched to ${d.era === "modern" ? "today" : "the ancient city"}`); }
     if (d.ach > last.ach) { last.ach = d.ach; note("earned an achievement"); }
     if (d.hunt && d.hunt.done && !last.huntDone) { last.huntDone = true; note(`finished the hunt in ${Math.floor(d.hunt.done / 60)}:${String(d.hunt.done % 60).padStart(2, "0")}`); }
-    Online.classReport(CLASSMODE.cid, sid, Character.name, d, queue.splice(0, 8));
+    Online.classReport(CLASSMODE.cid, sid, Character.name, d, queue.splice(0, 8), answer);
   }
+  // What the teacher can do to the whole class (the dashboard's controls): the answer to every report carries it. A message appears on the screen once, pausing freezes the game and puts a
+  // screen over it until the teacher resumes (the browser then asks every two seconds, so resuming is quick), and, if the teacher switched it on, the class leaderboard is shown.
+  const $c = (id) => document.getElementById(id);
+  const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
+  let seenMsg = 0, fast = 0;
+  try { seenMsg = Number(localStorage.getItem("rome-cmsg")) || 0; } catch (e) { /* storage unavailable */ }
+  const el = (tag, text) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; return e; };
+  function showMessage(text) {
+    const box = $c("class-msg"); if (!box) return;
+    const b = el("button", "×"); b.type = "button"; b.setAttribute("aria-label", "Close"); b.addEventListener("click", () => { box.hidden = true; });
+    box.replaceChildren(el("strong", tr("Your teacher:")), el("span", " " + text), b); box.hidden = false;
+    if (typeof Sfx !== "undefined") Sfx.play("discover");
+    clearTimeout(showMessage.t); showMessage.t = setTimeout(() => { box.hidden = true; }, 45000);
+  }
+  function setPaused(p) {
+    if (!!window.CLASS_PAUSED === p) return;
+    window.CLASS_PAUSED = p;
+    const o = $c("class-pause"); if (o) o.hidden = !p;
+    if (p) { if (document.pointerLockElement) document.exitPointerLock(); if (typeof keys !== "undefined") keys.clear(); }
+    if (p && !fast) fast = setInterval(tick, 2000); else if (!p && fast) { clearInterval(fast); fast = 0; }
+  }
+  function showBoard(b) {
+    const box = $c("class-board"); if (!box) return;
+    if (!b) { box.hidden = true; return; }
+    const me = typeof Character !== "undefined" ? Character.name : "";
+    const list = (title, rows, plus) => {
+      const h = el("strong", tr(title)), ol = el("ol");
+      if (!rows.length) ol.append(el("li", "-"));
+      rows.forEach(([name, n], i) => { const li = el("li", `${["🥇", "🥈", "🥉"][i] || ""} ${name} ${plus && n > 0 ? "+" : ""}${n}`); if (name === me) li.className = "me"; ol.append(li); });
+      const d = el("div"); d.append(h, ol); return d;
+    };
+    box.replaceChildren(el("h3", tr("🏆 Class leaderboard")), list("Richest", b.rich || [], false), list("Biggest gain", b.gain || [], true)); box.hidden = false;
+  }
+  function answer(a) {
+    if (a.msg && a.msg.id > seenMsg) { seenMsg = a.msg.id; try { localStorage.setItem("rome-cmsg", String(seenMsg)); } catch (e) { /* ignore */ } if (a.msg.text) showMessage(a.msg.text); }
+    setPaused(!!a.paused);
+    showBoard(a.board || null);
+  }
+  // while the class is paused nothing in the game gets the keys or the mouse
+  for (const type of ["keydown", "keyup", "mousedown", "mouseup", "wheel", "contextmenu", "click", "touchstart"]) addEventListener(type, (e) => { if (window.CLASS_PAUSED) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
   setInterval(tick, 5000);
   const first = setInterval(() => { if (typeof started !== "undefined" && started && Character.exists) { clearInterval(first); tick(); } }, 500);        // (the first report goes as soon as the character is made)
   addEventListener("pagehide", () => { if (on()) { note("left the page"); tick(); } });

@@ -2,7 +2,7 @@
 // Teacher login for class.html and class-live.html. Making class links and watching a class need an account (Google, or email and password): the page stays hidden until someone is logged in.
 // It uses the same Supabase accounts and the same saved login (localStorage "rome-session") as the game, so logging in on one logs in on the other. This file stands alone (account.js depends on
 // the game). Students never log in: class links and codes work without an account.
-// The class key (the secret that lets the dashboard read a class) is kept in the teacher's account (Supabase user_metadata.class_key), so it follows the teacher to any computer and never has to
+// The class keys (the secrets that let the dashboard read a class: one for each of the teacher's classes) are kept in the teacher's account (Supabase user_metadata.classes), so they follow the teacher to any computer and never have to
 // travel in a link. The first time, the key a browser already had (rome-class-key from before logins) is moved into the account, so class links already given out keep working.
 // "Continue with Google" needs Google to be switched on in the Supabase dashboard (Authentication > Providers > Google); until it is, a friendly message is shown.
 
@@ -54,18 +54,35 @@ const TeacherAuth = (() => {
   // ---------------------------------------------------------------- the class key
   const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
   const classId = async (k) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(k))), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 8);
-  async function saveKey(k) { await api("/auth/v1/user", { method: "PUT", token: await token(), body: { data: { class_key: k } } }); return k; }
-  async function classKey() {
-    const u = await api("/auth/v1/user", { token: await token() });
-    let k = u && u.user_metadata && u.user_metadata.class_key;
-    if (/^[0-9a-f]{32}$/.test(k || "")) { try { localStorage.removeItem(OLD_KEY); } catch (e) { /* ignore */ } return k; }
-    try { k = localStorage.getItem(OLD_KEY) || ""; } catch (e) { k = ""; }       // (the key this browser made before there were logins)
-    if (!/^[0-9a-f]{32}$/.test(k)) k = hex(16);
-    await saveKey(k);
+  // A teacher can have up to eight classes (a period 1, a period 2...): each has a name and its own secret key, kept in the account (user_metadata.classes = [{ n: name, k: key }]). The key the account
+  // had before there were several (user_metadata.class_key, or the one a browser made before logins) becomes the first class, so class links already given out keep working.
+  const MAX_CLASSES = 8, CUR_KEY = "rome-teacher-class";
+  let list = [];
+  const okKey = (k) => /^[0-9a-f]{32}$/.test(k || "");
+  async function saveList() { await api("/auth/v1/user", { method: "PUT", token: await token(), body: { data: { classes: list } } }); }
+  async function loadClasses() {
+    const u = await api("/auth/v1/user", { token: await token() }), md = (u && u.user_metadata) || {};
+    list = Array.isArray(md.classes) ? md.classes.filter((c) => c && okKey(c.k)).map((c) => ({ n: String(c.n || "Class").slice(0, 30), k: c.k })).slice(0, MAX_CLASSES) : [];
+    if (!list.length) {
+      let k = md.class_key;
+      if (!okKey(k)) { try { k = localStorage.getItem(OLD_KEY) || ""; } catch (e) { k = ""; } }      // (the key this browser made before there were logins)
+      if (!okKey(k)) k = hex(16);
+      list = [{ n: "My class", k }];
+      await saveList();
+    }
     try { localStorage.removeItem(OLD_KEY); } catch (e) { /* ignore */ }
-    return k;
+    return list;
   }
-  async function newKey() { return saveKey(hex(16)); }
+  // the class this browser last looked at (by its id), or the first
+  async function currentIndex() {
+    let want = ""; try { want = localStorage.getItem(CUR_KEY) || ""; } catch (e) { /* ignore */ }
+    for (let i = 0; i < list.length; i++) if (await classId(list[i].k) === want) return i;
+    return 0;
+  }
+  async function choose(i) { try { localStorage.setItem(CUR_KEY, await classId(list[i].k)); } catch (e) { /* ignore */ } }
+  async function addClass(name) { if (list.length >= MAX_CLASSES) throw new Error(`You can have up to ${MAX_CLASSES} classes.`); list.push({ n: String(name || `Class ${list.length + 1}`).slice(0, 30), k: hex(16) }); await saveList(); return list.length - 1; }
+  async function renameClass(i, name) { if (list[i]) { list[i].n = String(name || "Class").slice(0, 30); await saveList(); } }
+  async function removeClass(i) { if (list.length <= 1) throw new Error("Keep at least one class."); list.splice(i, 1); await saveList(); }
 
   // ---------------------------------------------------------------- the login box
   const consented = () => { try { return localStorage.getItem(CONSENT) === "1"; } catch (e) { return false; } };
@@ -144,7 +161,8 @@ const TeacherAuth = (() => {
   // logged in: show the page, with a bar to log out, and give the page its class key
   async function enter() {
     try {
-      const key = await classKey();
+      await loadClasses();
+      const idx = await currentIndex();
       showApp(true);
       if (!bar) {
         bar = document.createElement("div"); bar.id = "t-bar";
@@ -153,11 +171,11 @@ const TeacherAuth = (() => {
         out.addEventListener("click", () => { store(null); location.reload(); });
         bar.append(who, out); document.body.prepend(bar);
       }
-      if (onReady) { const f = onReady; onReady = null; await f({ email: session.email, key }); }
+      if (onReady) { const f = onReady; onReady = null; await f({ email: session.email, key: list[idx].k, classes: list, index: idx }); }
     } catch (e) { store(null); showApp(false); say("Could not load your account: " + e.message, true); }
   }
 
-  // the page calls this once: fn({ email, key }) runs when a teacher is logged in
+  // the page calls this once: fn({ email, key, classes, index }) runs when a teacher is logged in (key is the key of the class last looked at)
   async function start(fn) {
     onReady = fn;
     build();
@@ -173,5 +191,5 @@ const TeacherAuth = (() => {
     if (await token()) await enter();
   }
 
-  return { start, newKey, classId, get email() { return session ? session.email : ""; } };
+  return { start, classId, addClass, renameClass, removeClass, choose, get classes() { return list; }, MAX_CLASSES, get email() { return session ? session.email : ""; } };
 })();

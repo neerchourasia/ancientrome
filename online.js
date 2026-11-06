@@ -407,10 +407,10 @@ const Online = (() => {
   }
 
   // In class mode the one thing sent to the game server is the class report, when the teacher has switched on watching (classreport.js): a name the student chose and what the game knows of their progress
-  function classReport(cid, sid, name, data, events) {
+  function classReport(cid, sid, name, data, events, done) {
     if (!URL || !/^[0-9a-f]{8}$/.test(cid || "")) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
-    try { fetch(`${http}/class/report?c=${cid}&s=${sid}&n=${encodeURIComponent(name)}&d=${encodeURIComponent(JSON.stringify(data))}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
+    try { fetch(`${http}/class/report?c=${cid}&s=${sid}&n=${encodeURIComponent(name)}&d=${encodeURIComponent(JSON.stringify(data))}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && done) done(j); }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   function walkTick(dt) {

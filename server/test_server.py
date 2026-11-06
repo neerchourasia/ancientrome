@@ -213,8 +213,8 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         data = json.dumps({"city": "rome", "era": "ancient", "coins": 120, "gain": -30, "shops": 3, "errands": 1, "crafted": 0, "ach": 2, "sights": ["forum", "pantheon", "x" * 60], "hunt": {"n": 1, "of": 3, "done": 0}})
         ev = json.dumps(["found The Pantheon", "walked into Pistrinum <script>"])
         q = lambda sid, name, d=data, e=ev: "/class/report?c=%s&s=%s&n=%s&d=%s&e=%s" % (cid, sid, urllib.parse.quote(name), urllib.parse.quote(d), urllib.parse.quote(e))
-        self.assertIn("204", await self.http_get(q("a" * 12, "Maria")))
-        self.assertIn("204", await self.http_get(q("b" * 12, "Ben", data, "[]")))
+        self.assertIn("200 OK", await self.http_get(q("a" * 12, "Maria")))
+        self.assertIn("200 OK", await self.http_get(q("b" * 12, "Ben", data, "[]")))
         raw = await self.http_get("/class/view?c=%s&k=%s" % (cid, key))
         self.assertIn("200 OK", raw)
         view = json.loads(raw.split("\r\n\r\n", 1)[1])
@@ -238,7 +238,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(server.CLASSES[cid]["s"]["a" * 12]["coins"], 500)               # (too soon: ignored)
         # classes are forgotten after ten hours, and a class holds only so many students
         with mock.patch.object(server, "now", return_value=server.now() + server.CLASS_TTL + 10):
-            self.assertEqual(server.class_view(cid, key), {"students": []})
+            self.assertEqual(server.class_view(cid, key)["students"], [])
             server.class_prune(server.now())
             self.assertNotIn(cid, server.CLASSES)
         for i in range(server.CLASS_STUDENTS):
@@ -246,6 +246,35 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(server.class_report(cid, "f" * 12, "One more", {}, []))
         # nothing about a class is written to the saved world
         self.assertNotIn("class", json.dumps(list(server.world_snapshot().keys())))
+
+    async def test_a_teacher_can_message_pause_and_show_a_leaderboard_to_the_class(self):
+        server.CLASSES.clear(); server.CLASS_HITS.clear()
+        self.addCleanup(server.CLASSES.clear)
+        key = "0123456789abcdef0123456789abcdef"
+        cid = hashlib.sha256(key.encode()).hexdigest()[:8]
+        rep = lambda sid, name, coins, gain: "/class/report?c=%s&s=%s&n=%s&d=%s&e=%%5B%%5D" % (cid, sid, name, urllib.parse.quote(json.dumps({"coins": coins, "gain": gain})))
+        body = lambda raw: json.loads(raw.split("\r\n\r\n", 1)[1])
+        first = body(await self.http_get(rep("a" * 12, "Maria", 900, 400)))
+        self.assertEqual(first, {"msg": {"id": 0, "text": ""}, "paused": False})                      # nothing to say, not paused, no leaderboard
+        body(await self.http_get(rep("b" * 12, "Ben", 1200, 150)))
+        # only the teacher (the key) can set things
+        self.assertIn("403", await self.http_get("/class/set?c=%s&k=%s&p=1" % (cid, "f" * 32)))
+        s = body(await self.http_get("/class/set?c=%s&k=%s&m=%s&p=1&b=1" % (cid, key, urllib.parse.quote("Look at the Pantheon <b>now</b>!"))))
+        self.assertEqual((s["msg"]["id"], s["msg"]["text"], s["paused"]), (1, "Look at the Pantheon bnowb!", True))      # odd characters are stripped
+        self.assertEqual(s["board"], {"rich": [["Ben", 1200], ["Maria", 900]], "gain": [["Maria", 400], ["Ben", 150]]})
+        server.CLASSES[cid]["s"]["a" * 12]["at"] -= 5
+        again = body(await self.http_get(rep("a" * 12, "Maria", 950, 450)))                              # every student's answer carries it
+        self.assertEqual((again["msg"]["id"], again["paused"], again["board"]["rich"][0]), (1, True, ["Ben", 1200]))
+        # a message that is only odd characters changes nothing; resuming and hiding the board work; the teacher sees the state
+        s = body(await self.http_get("/class/set?c=%s&k=%s&m=%s&p=0&b=0" % (cid, key, urllib.parse.quote("<<>>"))))
+        self.assertEqual((s["msg"]["id"], s["paused"], "board" in s), (1, False, False))
+        view = body(await self.http_get("/class/view?c=%s&k=%s" % (cid, key)))
+        self.assertEqual((view["msg"], view["paused"], view["board"]), ("Look at the Pantheon bnowb!", False, False))
+        # the teacher can set up a class before any student has arrived
+        key2 = "fedcba9876543210fedcba9876543210"
+        cid2 = hashlib.sha256(key2.encode()).hexdigest()[:8]
+        body(await self.http_get("/class/set?c=%s&k=%s&p=1" % (cid2, key2)))
+        self.assertTrue(server.CLASSES[cid2]["paused"])
 
     async def test_user_journey_is_recorded_and_only_admins_can_read_it(self):
         vid = "c" * 32

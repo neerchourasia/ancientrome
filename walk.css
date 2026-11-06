@@ -937,3 +937,12 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .ac-google:hover { background: #f7f8f8; }
 .ac-or { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: .85rem; opacity: .8; }
 .ac-or::before, .ac-or::after { content: ""; flex: 1; border-top: 1px solid rgba(255,255,255,.25); }
+
+#class-msg { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 30; max-width: min(640px, 92vw); display: flex; gap: 8px; align-items: flex-start; padding: 12px 16px; font-size: 1.05rem; color: #2a2118; background: var(--gold, #e2b955); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+#class-msg[hidden], #class-board[hidden], #class-pause[hidden] { display: none; }
+#class-msg::before { content: "📣"; }
+#class-msg button { margin-left: auto; font: 700 1.1rem system-ui; background: transparent; border: 0; cursor: pointer; color: inherit; }
+#class-pause { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; text-align: center; color: var(--ink, #f1ead8); background: rgba(20,16,11,.82); backdrop-filter: blur(3px); font: 700 1.5rem system-ui; }
+#class-pause span { font-size: 4rem; display: block; } #class-pause p { margin: 6px 0; } #class-pause small { font-weight: 400; font-size: 1rem; color: var(--muted, #c9bd9f); }
+#class-board { position: fixed; left: 12px; bottom: 64px; z-index: 4; max-width: 260px; padding: 8px 12px; font-size: .85rem; color: var(--ink, #f1ead8); background: rgba(28,22,16,.9); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; }
+#class-board h3 { margin: 0 0 4px; font-size: .95rem; } #class-board ol { list-style: none; margin: 2px 0 6px; padding: 0; } #class-board li.me { font-weight: 700; color: #8fd49a; }

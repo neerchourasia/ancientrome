@@ -3,8 +3,16 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   // the class id (the first 8 hex digits of the sha256 of the class key, which stays in the teacher's account: the server checks the key against the id)
-  let cid = "";
-  async function setKey(k) { cid = await TeacherAuth.classId(k); show(); }
+  let cid = "", cur = 0, nameTimer = 0;
+  async function pick(i) {                                           // (the class being worked on: its name, its id)
+    cur = i; const c = TeacherAuth.classes[i];
+    cid = await TeacherAuth.classId(c.k); $("c-name").value = c.n; await TeacherAuth.choose(i); fillClasses(); show();
+  }
+  function fillClasses() {
+    const sel = $("c-class"); sel.replaceChildren();
+    TeacherAuth.classes.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = c.n; sel.append(o); });
+    sel.value = String(cur); $("c-delclass").disabled = TeacherAuth.classes.length <= 1; $("c-addclass").disabled = TeacherAuth.classes.length >= TeacherAuth.MAX_CLASSES;
+  }
   const SIGHTS = ClassCode.GROUPS;                                   // (the sights, by city: classcode.js)
   for (const [city, list] of Object.entries(SIGHTS)) {
     const grp = document.createElement("optgroup"); grp.label = city;
@@ -46,9 +54,17 @@
     const l = link(); $("c-link").textContent = l; $("c-open").href = l; $("c-msg").textContent = "";
     $("c-code").textContent = ClassCode.encode(options());
     $("c-watch-box").hidden = !$("c-watch").checked;
-    $("c-dash").href = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}class-live.html`;          // (no key in the link: the dashboard asks the account for it)
+    $("c-dash").href = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}class-live.html?class=${cid}`;          // (no key in the link: the dashboard asks the account for it; the id says which class)
   }
-  $("c-newclass").addEventListener("click", async () => { try { await setKey(await TeacherAuth.newKey()); $("c-msg").textContent = "A new class has been started."; } catch (e) { $("c-msg").textContent = "Could not start a new class: " + e.message; } });
+  $("c-class").addEventListener("change", () => pick(Number($("c-class").value)));
+  $("c-addclass").addEventListener("click", async () => { try { await pick(await TeacherAuth.addClass()); $("c-msg").textContent = "A new class was made: give it a name above."; $("c-name").focus(); $("c-name").select(); } catch (e) { $("c-msg").textContent = e.message; } });
+  let sure = 0;
+  $("c-delclass").addEventListener("click", async () => {
+    if (Date.now() - sure > 4000) { sure = Date.now(); $("c-delclass").textContent = "Sure? Delete it"; setTimeout(() => { $("c-delclass").textContent = "Delete this class"; }, 4000); return; }      // (a second click within four seconds)
+    sure = 0; $("c-delclass").textContent = "Delete this class";
+    try { await TeacherAuth.removeClass(cur); await pick(0); $("c-msg").textContent = "Class deleted."; } catch (e) { $("c-msg").textContent = e.message; }
+  });
+  $("c-name").addEventListener("input", () => { clearTimeout(nameTimer); nameTimer = setTimeout(async () => { try { await TeacherAuth.renameClass(cur, $("c-name").value.trim() || "Class"); fillClasses(); } catch (e) { /* ignore */ } }, 900); });
   for (const id of ["c-cur", "c-watch", "c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
   $("c-copy").addEventListener("click", async () => {
     const l = link();
@@ -58,5 +74,5 @@
   $("c-copycode").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("c-code").textContent); $("c-msg").textContent = "Code copied."; } catch (e) { $("c-msg").textContent = "Select the code and copy it (Ctrl+C)."; }
   });
-  TeacherAuth.start(async ({ key }) => { await setKey(key); });
+  TeacherAuth.start(async ({ index }) => { await pick(index); });
 })();

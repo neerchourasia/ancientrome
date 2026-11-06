@@ -1847,6 +1847,7 @@ function tick(dt) {
 }
 
 function loop(now) {
+  if (window.CLASS_PAUSED) { last = now; requestAnimationFrame(loop); return; }                       // the teacher has paused the class (classreport.js): the game stands still
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now; clock += dt;
   try {

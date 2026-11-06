@@ -562,6 +562,12 @@ const I18n = (() => {
     ["Class mode: {0} · your teacher can see your progress", "Modo clase: {0} · tu profesor puede ver tu progreso", "Modalità classe: {0} · il tuo insegnante può vedere i tuoi progressi", "कक्षा मोड: {0} · आपके शिक्षक आपकी प्रगति देख सकते हैं", "课堂模式:{0} · 老师可以看到你的进度"],
     // the money leaderboard
     ["Gained the most this week", "Más ganancia esta semana", "Più guadagno questa settimana", "इस हफ़्ते सबसे ज़्यादा कमाई", "本周赚得最多"],
+    // class controls (message, pause, leaderboard)
+    ["Your teacher:", "Tu profesor:", "Il tuo insegnante:", "आपके शिक्षक:", "老师说:"],
+    ["🏆 Class leaderboard", "🏆 Clasificación de la clase", "🏆 Classifica della classe", "🏆 कक्षा की लीडरबोर्ड", "🏆 班级排行榜"],
+    ["The class is paused.", "La clase está en pausa.", "La classe è in pausa.", "कक्षा रुकी हुई है।", "课堂已暂停。"],
+    ["Your teacher will start it again in a moment.", "Tu profesor la reanudará en un momento.", "Il tuo insegnante la riprenderà tra poco.", "आपके शिक्षक इसे थोड़ी देर में फिर शुरू करेंगे।", "老师马上会继续。"],
+    ["Biggest gain", "Mayor ganancia", "Maggior guadagno", "सबसे बड़ी कमाई", "最大增长"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [

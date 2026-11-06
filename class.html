@@ -44,6 +44,9 @@
 
   <h2>1. Make your class link</h2>
   <div class="card">
+    <div class="row"><label style="flex:1 1 220px">Your classes <small>(each has its own link, code and dashboard)</small>
+      <select id="c-class"></select></label>
+      <button type="button" id="c-addclass">＋ New class</button><button type="button" id="c-delclass">Delete this class</button></div>
     <label>Class name <small>(only shown on the screen, at the bottom)</small>
       <input type="text" id="c-name" maxlength="30" value="Latin 7">
     </label>
@@ -71,7 +74,7 @@
       <label class="check"><input type="checkbox" id="c-watch" checked><span>Let me watch what each student does<small>You get a dashboard that shows every student as they play: where they are, the sights they found, the hunt, and a list of what they did.</small></span></label>
       <div id="c-watch-box" hidden style="margin-top:10px;display:grid;gap:8px">
         <p class="muted" style="margin:0">Students see "your teacher can see your progress" at the bottom of their screen. What is sent: the name they chose for their character, the city, their money, the sights found, a few counts and short lines like "found the Pantheon". Never chat and never anything typed. It is kept in memory on the game server for at most ten hours and never saved. <b>If you teach children, check that your school allows this before you turn it on.</b></p>
-        <div class="row"><a class="btn big" id="c-dash" href="#" target="_blank" rel="noopener">📊 Open the class dashboard</a><button type="button" id="c-newclass">Start a new class</button></div>
+        <div class="row"><a class="btn big" id="c-dash" href="#" target="_blank" rel="noopener">📊 Open the class dashboard</a></div>
         <p class="muted" style="margin:0"><small>Your class is tied to your account, so the dashboard shows the same class on any computer once you log in. "Start a new class" makes a fresh class, so students of the old link are no longer shown.</small></p>
       </div>
     </div>
@@ -125,9 +128,9 @@
 
   <p><a href="./">← Back to the game</a></p>
 </main>
-<script src="config.js?v=495"></script>
-<script src="teacher-auth.js?v=495"></script>
-<script src="classcode.js?v=495"></script>
-<script src="class.js?v=495"></script>
+<script src="config.js?v=497"></script>
+<script src="teacher-auth.js?v=497"></script>
+<script src="classcode.js?v=497"></script>
+<script src="class.js?v=497"></script>
 </body>
 </html>
