@@ -1,5 +1,7 @@
 "use strict";
-// Furnish your house: 🛋️ Furnish house in the menu. Buy rugs, tables, chests, lamps, plants and more with your denarii, then stand where you want a piece inside your own house (in Rome, Old Delhi,
+// Furnish your house: the menu group "Home and furniture" (🛋️ Place furniture, 🛒 Buy furniture, ✋ Move, ↻ Turn and 🧺 Pick up the nearest piece, 🏪 stall, 🎉 party, 📖 guestbook, 🏆 contest and scores). PLACING: press Place beside a piece
+// you own and the box closes: a see-through copy of the piece follows your mouse over the floor of your house (green where it can go, red where it cannot); click to put it down, R to turn it, Esc (or Done)
+// to finish; if you have more of the same piece the next one follows at once. ✋ Move picks the nearest piece up the same way. (Older text:) 🛋️ Furnish house in the menu. Buy rugs, tables, chests, lamps, plants and more with your denarii, then stand where you want a piece inside your own house (in Rome, Old Delhi,
 // Cancún or Beijing) and press Place. The piece stands in front of you; Turn it, or Pick it up again (the nearest piece, within three steps). Each city's house has its own furniture, in the colours of
 // that city. Pieces can be walked through (a rug is a rug) and are kept in the browser (rome-furn) and in the saved game (account.js). Depends on world.js (worldScene), market.js (Vitals) and the houses.
 // Friends can visit: 🏠 Visit beside a friend in the Friends box takes you to your own house in the city where they have the most furniture and shows THEIR furniture there (yours is hidden) until you walk
@@ -80,8 +82,9 @@ const Furnish = (() => {
   const here = () => (typeof city !== "undefined" ? city : "rome");
 
   // are you inside your own house? (Rome: the room; the other cities: their house rooms)
-  function inHouse() {
-    const c = here(), x = player.x, z = player.z;
+  const inHouse = () => insideAt(player.x, player.z);
+  function insideAt(x, z) {
+    const c = here();
     if (c === "rome") return typeof Home !== "undefined" && Home.inside(x, z);
     if (c === "delhi") return typeof Delhi !== "undefined" && Delhi.built && Delhi.homeInside(x, z);
     if (c === "cancun") return typeof Cancun !== "undefined" && Cancun.built && Cancun.homeInside(x, z);
@@ -196,7 +199,7 @@ const Furnish = (() => {
   }
 
   // ---------------------------------------------------------------- what the pieces do
-  let sat = null, view = "shop", book = [], partyLeft = 0, garden = null, stallMe = [], contest = null, board = [], boardKey = "mys", pollN = 0;
+  let sat = null, view = "mine", tab = "mine", book = [], partyLeft = 0, garden = null, stallMe = [], contest = null, board = [], boardKey = "mys", pollN = 0;
   const today = () => (typeof Payroll !== "undefined" ? Payroll.epoch() : 0);
   const comfort = (c = here()) => 1 + 0.05 * new Set((st.placed[c] || []).map((p) => p.id)).size;       // (heal faster at home for each kind of piece: Vitals restBoost)
   function actNear() {
@@ -328,7 +331,7 @@ const Furnish = (() => {
       const sug = () => { price.value = sel.value && Shopkeep.GOODS[sel.value] ? Math.max(1, Math.round(Shopkeep.GOODS[sel.value][1] * 1.2)) : ""; }; sel.addEventListener("change", sug); sug();
       if (sel.options.length) { const row = el("p"); row.append(sel, " ", qty, " × ", price, " ", mk(tr("Put out"), () => { const n = Math.floor(+qty.value), p = Math.floor(+price.value); if (n >= 1 && p >= 1 && n <= Shopkeep.owns(sel.value)) Online.navalSend({ t: "social", a: "f_sput", item: sel.value, n, price: p }); else { note = tr("Check the amount and the price."); render(); } })); rows.push(row); }
       else rows.push(el("p", tr("You carry no goods."), "dnote"));
-      rows.push(mk(tr("← Back"), () => { view = "shop"; note = ""; render(); }));
+      rows.push(mk(tr("← Back"), () => { view = tab; note = ""; render(); }));
       body.replaceChildren(...rows); return;
     }
     if (view === "contest") {
@@ -349,7 +352,7 @@ const Furnish = (() => {
           rows.push(ul);
         } else rows.push(el("p", tr("Nobody has entered yet."), "dnote"));
       }
-      rows.push(mk(tr("← Back"), () => { view = "shop"; note = ""; render(); }));
+      rows.push(mk(tr("← Back"), () => { view = tab; note = ""; render(); }));
       body.replaceChildren(...rows); return;
     }
     if (view === "board") {
@@ -379,7 +382,7 @@ const Furnish = (() => {
         rows.push(el("p", `${tr(Shopkeep.GOODS[cr.k][0])}: ${"🌱".repeat(Math.max(1, cr.g))}${"·".repeat(Math.max(0, need - Math.max(1, cr.g)))} (${cr.g} / ${need} ${tr("days of water")})`, "dnote"));
         rows.push(mk(tr(ripe ? "Watered enough" : cr.w === today() ? "Watered today" : "💧 Water"), waterBed, ripe || cr.w === today()), mk(tr("🧺 Harvest"), harvest, !ripe));
       }
-      rows.push(mk(tr("← Back"), () => { view = "shop"; note = ""; render(); }));
+      rows.push(mk(tr("← Back"), () => { view = tab; note = ""; render(); }));
       body.replaceChildren(...rows); return;
     }
     if (view === "cook") {
@@ -400,7 +403,7 @@ const Furnish = (() => {
       const ul = el("ul", undefined, "mk-items");
       for (const b of book.slice().reverse()) { const li = el("li"), txt = el("span"); txt.append(el("strong", b.name), el("small", b.text)); li.append(txt); ul.append(li); }
       rows.push(ul.children.length ? ul : el("p", tr("Nobody has written in your guestbook yet. Friends who visit your house can leave a note."), "dnote"));
-      const back = el("button", tr("← Back")); back.type = "button"; back.addEventListener("click", () => { view = "shop"; render(); }); rows.push(back);
+      const back = el("button", tr("← Back")); back.type = "button"; back.addEventListener("click", () => { view = tab; render(); }); rows.push(back);
       body.replaceChildren(...rows); return;
     }
     if (view === "chest") {
@@ -415,47 +418,148 @@ const Furnish = (() => {
       const pack = el("ul", undefined, "mk-items");
       for (const id of Shopkeep.IDS) { const n = Shopkeep.owns(id); if (n <= 0) continue; const li = el("li"), txt = el("span"); txt.append(el("strong", `${tr(Shopkeep.GOODS[id][0])} × ${n}`)); li.append(txt, mk(tr("Store 1"), () => stash(id, 1)), mk(tr("Store all"), () => stash(id, 999))); pack.append(li); }
       rows.push(pack.children.length ? pack : el("p", tr("You carry no goods."), "dnote"));
-      rows.push(mk(tr("← Back"), () => { view = "shop"; note = ""; render(); }));
+      rows.push(mk(tr("← Back"), () => { view = tab; note = ""; render(); }));
       body.replaceChildren(...rows); return;
     }
     rows.push(el("p", tr("You have {0} denarii.").replace("{0}", Math.round(Vitals.coins)), "dnote"));
     if (note) rows.push(el("p", note, "sk-note"));
+    const tabs = el("div", undefined, "pm-tabs");
+    for (const [k, label] of [["mine", "🛋️ My furniture"], ["buy", "🛒 Buy"], ["house", "🏠 House"]]) { const b = el("button", tr(label)); b.type = "button"; if (k === view) b.className = "on"; b.addEventListener("click", () => { view = tab = k; note = ""; render(); }); tabs.append(b); }
+    rows.splice(0, 0, tabs);
+    if (view === "buy") {
+      rows.push(el("h3", tr("Furniture for sale")));
+      const shop = el("ul", undefined, "mk-items");
+      for (const id of IDS) {
+        const li = el("li"), txt = el("span"), b = el("button", `${tr("Buy")} · ${PIECES[id][1]}`);
+        txt.append(el("strong", tr(PIECES[id][0])));
+        b.type = "button"; b.disabled = Vitals.coins < PIECES[id][1] || owned(id) >= OWN_MAX; b.addEventListener("click", () => buy(id));
+        li.append(txt, b); shop.append(li);
+      }
+      rows.push(shop); body.replaceChildren(...rows); return;
+    }
     const extra = el("div", undefined, "sk-menu");
     const gb = el("button", tr("📖 Guestbook")); gb.type = "button"; gb.addEventListener("click", () => Online.navalSend({ t: "social", a: "f_get", fid: "me" }));
     const pb = el("button", tr("🎉 Throw a party (50 denarii)")); pb.type = "button"; pb.disabled = Vitals.coins < 50 || partyLeft > 0; pb.addEventListener("click", () => { if (guest) return; Online.navalSend({ t: "social", a: "f_party" }); });
     const sb = el("button", tr("🏪 My stall")); sb.type = "button"; sb.addEventListener("click", () => { view = "stall"; note = ""; Online.navalSend({ t: "social", a: "f_sget" }); render(); });
     const cb = el("button", tr("🏆 Cooking contest")); cb.type = "button"; cb.hidden = !(typeof Festival !== "undefined" && Festival.active); cb.addEventListener("click", () => { view = "contest"; note = ""; contest = null; Online.navalSend({ t: "social", a: "c_list", fest: Festival.id }); render(); });
-    if (typeof Account !== "undefined" && Account.loggedIn) { extra.append(gb, pb, sb, cb); rows.push(extra); }
     const inside = inHouse();
-    rows.push(el("p", inside ? tr("You are in your house: stand where you want a piece and press Place.") : tr("Go inside your own house to place furniture (the house you own in this city)."), "dnote"));
-    if (inside) {
-      const bar = el("div", undefined, "sk-menu");
-      for (const [label, f] of [["↻ Turn nearest", turn], ["🧺 Pick up nearest", pickUp]]) { const b = el("button", tr(label)); b.type = "button"; b.addEventListener("click", f); bar.append(b); }
-      rows.push(bar);
+    if (view === "house") {
+      rows.push(el("p", inside ? tr("You are in your house.") : tr("Go inside your own house to place furniture (the house you own in this city)."), "dnote"));
+      if (inside) {
+        const bar = el("div", undefined, "sk-menu");
+        for (const [label, f] of [["✋ Move nearest", () => { closePanels(); movePiece(); }], ["↻ Turn nearest", turn], ["🧺 Pick up nearest", pickUp]]) { const b = el("button", tr(label)); b.type = "button"; b.addEventListener("click", f); bar.append(b); }
+        rows.push(bar);
+      }
+      if (typeof Account !== "undefined" && Account.loggedIn) { extra.append(gb, pb, sb, cb); rows.push(extra); }
+      else rows.push(el("p", tr("Log in to throw parties, keep a stall and use the guestbook."), "dnote"));
+      body.replaceChildren(...rows); return;
     }
+    rows.push(el("p", inside ? tr("You are in your house: press Place beside a piece, then click on the floor where it goes.") : tr("Go inside your own house to place furniture (the house you own in this city)."), "dnote"));
     rows.push(el("h3", tr("Your furniture")));
     const mine = el("ul", undefined, "mk-items");
     for (const id of IDS) {
       if (!owned(id)) continue;
       const li = el("li"), txt = el("span"), place1 = el("button", tr("Place")), sell1 = el("button", tr("Sell"));
       txt.append(el("strong", `${tr(PIECES[id][0])} × ${owned(id)}`), el("small", `${free(id)} ${tr("in your pack")} · ${placedCount(id, c)} ${tr("in this house")}`));
-      place1.type = "button"; place1.disabled = free(id) < 1; place1.addEventListener("click", () => place(id));
+      place1.type = "button"; place1.disabled = free(id) < 1; place1.addEventListener("click", () => startPlace(id));
       sell1.type = "button"; sell1.disabled = free(id) < 1; sell1.addEventListener("click", () => sell(id));
       li.append(txt, place1, sell1); mine.append(li);
     }
-    rows.push(mine.children.length ? mine : el("p", tr("You have no furniture yet. Buy some below."), "dnote"));
-    rows.push(el("h3", tr("Furniture for sale")));
-    const shop = el("ul", undefined, "mk-items");
-    for (const id of IDS) {
-      const li = el("li"), txt = el("span"), b = el("button", `${tr("Buy")} · ${PIECES[id][1]}`);
-      txt.append(el("strong", tr(PIECES[id][0])));
-      b.type = "button"; b.disabled = Vitals.coins < PIECES[id][1] || owned(id) >= OWN_MAX; b.addEventListener("click", () => buy(id));
-      li.append(txt, b); shop.append(li);
-    }
-    rows.push(shop);
+    rows.push(mine.children.length ? mine : el("p", tr("You have no furniture yet: open the Buy tab."), "dnote"));
     body.replaceChildren(...rows);
   }
-  function open() { note = ""; view = "shop"; render(); openPanel("#furnish"); }
+  function open(t) { note = ""; tab = view = typeof t === "string" ? t : (Object.keys(st.own).length ? "mine" : "buy"); render(); openPanel("#furnish"); }
+  const quick = (f) => () => { note = ""; f(); if (note) toast(note); };                          // (the menu's one-step buttons: the answer comes as a toast, not in the box)
+  function openStall() { view = "stall"; note = ""; Online.navalSend({ t: "social", a: "f_sget" }); render(); openPanel("#furnish"); }
+  function openContest() { view = "contest"; note = ""; contest = null; if (typeof Festival !== "undefined" && Festival.active) Online.navalSend({ t: "social", a: "c_list", fest: Festival.id }); render(); openPanel("#furnish"); }
+  const needAccount = () => { if (typeof Online === "undefined" || !Online.connected || typeof Account === "undefined" || !Account.loggedIn) { toast(tr("This needs your account and the game server: log in and wait to be connected.")); return false; } return true; };
+
+  // ---------------------------------------------------------------- placing: a see-through copy of the piece follows the mouse over the floor of your house
+  let placing = null, lastPtr = null, downAt2 = null, hintEl = null;
+  const ray = typeof THREE !== "undefined" ? new THREE.Raycaster() : null, ndc = typeof THREE !== "undefined" ? new THREE.Vector2() : null;
+  function floorPoint(ev) {
+    if (!ev || typeof renderer === "undefined" || typeof camera === "undefined") return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera);
+    const o = ray.ray.origin, d = ray.ray.direction; if (d.y > -0.02) return null;
+    const t = (FLOOR[here()] - o.y) / d.y; return t > 0 ? { x: o.x + d.x * t, z: o.z + d.z * t } : null;
+  }
+  function tint(g, ok) { g.traverse((o) => { if (o.material) { o.material.transparent = true; o.material.opacity = 0.6; o.material.depthWrite = false; if (o.material.emissive) o.material.emissive.setHex(ok ? 0x1f6a2a : 0x7a1f1f); } }); }
+  function ghostAt(x, z) {
+    if (!placing) return;
+    const dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz); if (d > 9) { x = player.x + (dx / d) * 9; z = player.z + (dz / d) * 9; }          // (within nine steps of you)
+    placing.x = x; placing.z = z; placing.ok = insideAt(x, z);
+    placing.ghost.position.set(x, FLOOR[here()] + 0.02, z); placing.ghost.rotation.y = placing.yaw; tint(placing.ghost, placing.ok);
+  }
+  function buildGhost() {
+    if (placing.ghost) { worldScene.remove(placing.ghost); placing.ghost.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+    placing.ghost = make(placing.id, here(), placing.piece && placing.piece.from, placing.piece ? cropView(placing.piece) : null); worldScene.add(placing.ghost); ghostAt(placing.x, placing.z);
+  }
+  function showHint() {
+    if (!hintEl) {
+      hintEl = document.createElement("div"); hintEl.id = "place-hint";
+      hintEl.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.94);color:#f4ead6;border:1px solid #e2b955;border-radius:10px;padding:8px 12px;font:600 .85rem system-ui,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw";
+      const t = document.createElement("span"); t.id = "place-hint-text"; hintEl.append(t);
+      for (const [label, f] of [["↻ Turn (R)", () => turnGhost()], ["✓ Place here (Enter)", () => confirmPlace()], ["✕ Done (Esc)", () => endPlace(true)]]) { const b = document.createElement("button"); b.type = "button"; b.textContent = tr(label); b.style.cssText = "font:inherit;cursor:pointer;padding:5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#ffd24a;color:#2a2118"; b.addEventListener("click", f); hintEl.append(b); }
+      document.body.append(hintEl);
+    }
+    hintEl.style.display = "flex"; hintEl.querySelector("#place-hint-text").textContent = `${tr(PIECES[placing.id][0])}: ${tr("click where it goes")}`;
+  }
+  function onMove(ev) { lastPtr = ev; const p = floorPoint(ev); if (p) ghostAt(p.x, p.z); }
+  function onDown(ev) { downAt2 = { x: ev.clientX, y: ev.clientY }; }
+  function onClick(ev) {
+    if (!placing || (hintEl && hintEl.contains(ev.target)) || !downAt2 || Math.hypot(ev.clientX - downAt2.x, ev.clientY - downAt2.y) > 6) return;
+    const p = floorPoint(ev); if (p) ghostAt(p.x, p.z);
+    confirmPlace();
+  }
+  function onKey(ev) {
+    if (!placing) return;
+    if (ev.code === "KeyR") { ev.preventDefault(); ev.stopImmediatePropagation(); turnGhost(); }
+    else if (ev.code === "Enter") { ev.preventDefault(); ev.stopImmediatePropagation(); confirmPlace(); }
+    else if (ev.code === "Escape") { ev.preventDefault(); ev.stopImmediatePropagation(); endPlace(true); }
+  }
+  function turnGhost() { if (placing) { placing.yaw = +(((placing.yaw + Math.PI / 4 + 3.1416) % (Math.PI * 2)) - 3.1416).toFixed(2); ghostAt(placing.x, placing.z); Sfx.play("creak"); } }
+  function startPlace(id, piece) {
+    if (guest) { note = tr("You are a guest: you cannot move the furniture here."); render(); return; }
+    if (!inHouse()) { note = tr("Go inside your own house to put furniture down."); render(); return; }
+    if (!piece) {
+      if (free(id) < 1) return;
+      if (id === "plot" && totalPlaced("plot") >= PLOTS_MAX) { note = tr("You can keep four garden beds at most."); render(); return; }
+      if (st.placed[here()].length >= MAX) { note = tr("The house is full: pick something up first."); render(); return; }
+    }
+    endPlace(false);
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    placing = { id, piece: piece || null, orig: piece ? { x: piece.x, z: piece.z, yaw: piece.yaw } : null, x: piece ? piece.x : player.x + fx * 2, z: piece ? piece.z : player.z + fz * 2, yaw: piece ? piece.yaw : +(player.yaw + Math.PI).toFixed(2), ghost: null, ok: true };
+    if (piece) { const arr = st.placed[here()]; arr.splice(arr.indexOf(piece), 1); refresh(); }                  // (lifted while you choose a new place: it goes back if you give up)
+    buildGhost(); closePanels(); showHint();
+    window.addEventListener("pointermove", onMove, true); window.addEventListener("pointerdown", onDown, true); window.addEventListener("click", onClick, true); window.addEventListener("keydown", onKey, true);
+  }
+  function endPlace(cancelled) {
+    if (!placing) return;
+    const p = placing; placing = null;
+    if (p.ghost) { worldScene.remove(p.ghost); p.ghost.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+    if (p.piece && !p.done) { p.piece.x = p.orig.x; p.piece.z = p.orig.z; p.piece.yaw = p.orig.yaw; st.placed[here()].push(p.piece); refresh(); }
+    window.removeEventListener("pointermove", onMove, true); window.removeEventListener("pointerdown", onDown, true); window.removeEventListener("click", onClick, true); window.removeEventListener("keydown", onKey, true);
+    if (hintEl) hintEl.style.display = "none";
+    if (cancelled && !p.piece) toast(tr("Done."));
+  }
+  function confirmPlace() {
+    if (!placing) return;
+    if (!placing.ok) { toast(tr("Put it down inside your house.")); Sfx.play("oof"); return; }
+    const p = placing, c = here(), x = +p.x.toFixed(2), z = +p.z.toFixed(2);
+    if (p.piece) { p.piece.x = x; p.piece.z = z; p.piece.yaw = p.yaw; st.placed[c].push(p.piece); p.done = true; save(); refresh(); Sfx.play("thud"); endPlace(false); toast(`${tr(PIECES[p.id][0])}: ${tr("moved.")}`); return; }
+    if (free(p.id) < 1 || st.placed[c].length >= MAX) { endPlace(false); return; }
+    const piece = { id: p.id, x, z, yaw: p.yaw };
+    if (st.gifts[p.id] && st.gifts[p.id].length) { piece.from = st.gifts[p.id].shift(); if (!st.gifts[p.id].length) delete st.gifts[p.id]; }
+    st.placed[c].push(piece); save(); refresh(); Sfx.play("thud");
+    if (free(p.id) > 0 && st.placed[c].length < MAX && !(p.id === "plot" && totalPlaced("plot") >= PLOTS_MAX)) { toast(`${tr(PIECES[p.id][0])}: ${tr("placed. Click for the next one, Esc to finish.")}`); buildGhost(); }
+    else { endPlace(false); toast(`${tr(PIECES[p.id][0])}: ${tr("placed.")}`); }
+  }
+  function movePiece() {
+    if (guest || !inHouse()) { toast(tr("Go inside your own house first.")); return; }
+    const p = nearest(); if (!p) { toast(tr("Stand beside a piece of furniture.")); return; }
+    startPlace(p.id, p);
+  }
   function openBoard() {
     if (typeof Online === "undefined" || !Online.connected || typeof Account === "undefined" || !Account.loggedIn) { toast(tr("Friends' scores need an account and the game server: log in and wait to be connected.")); return; }
     view = "board"; note = ""; sendStats(); Online.navalSend({ t: "social", a: "f_board" }); render(); openPanel("#furnish");
@@ -467,7 +571,12 @@ const Furnish = (() => {
     if (k !== lastStats) { lastStats = k; Online.navalSend({ t: "social", a: "f_stats", ...s }); }
   }
   function bind() {
-    const b = $p("btn-furn"); if (b) b.addEventListener("click", open);
+    const b = $p("btn-furn"); if (b) b.addEventListener("click", () => open("mine"));
+    const on = (id, f) => { const e = $p(id); if (e) e.addEventListener("click", f); };
+    on("btn-fbuy", () => open("buy")); on("btn-fmove", movePiece); on("btn-fturn", quick(turn)); on("btn-fpick", quick(pickUp));
+    on("btn-fstall", () => { if (needAccount()) openStall(); }); on("btn-fcontest", () => { if (needAccount()) openContest(); });
+    on("btn-fparty", () => { if (!needAccount()) return; if (guest) return; if (Vitals.coins < 50) { toast(tr("A party costs 50 denarii.")); return; } if (partyLeft > 0) { toast(tr("Your party is still going.")); return; } Online.navalSend({ t: "social", a: "f_party" }); });
+    on("btn-fbook", () => { if (needAccount()) Online.navalSend({ t: "social", a: "f_get", fid: "me" }); });
     const fb = $p("btn-fboard"); if (fb) fb.addEventListener("click", openBoard);
     setInterval(() => { sendStats(); const p = $p("furnish"); if (p && p.classList.contains("show") && Online.connected) { pollN++; if (view === "contest" && pollN % 3 === 0 && typeof Festival !== "undefined" && Festival.active) Online.navalSend({ t: "social", a: "c_list", fest: Festival.id }); if (view === "board" && pollN % 5 === 0) Online.navalSend({ t: "social", a: "f_board" }); } }, 2000);
     setInterval(() => { refresh(); if (sat && !Vitals.resting) sat = null; const p = $p("furnish"); if (p && p.classList.contains("show")) render(); }, 2000);
@@ -482,5 +591,5 @@ const Furnish = (() => {
   const snapshot = () => JSON.parse(JSON.stringify(st));
   function restore(r) { st = clean(r); save(); refresh(); }
 
-  return { openBoard, petSpot, guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
+  return { openBoard, startPlace, movePiece, placingInfo: () => (placing ? { id: placing.id, x: placing.x, z: placing.z, yaw: placing.yaw, ok: placing.ok, move: !!placing.piece } : null), petSpot, guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
 })();

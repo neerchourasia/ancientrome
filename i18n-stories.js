@@ -259,5 +259,18 @@
     ["There is no tavern or food stop near you.", "No hay ninguna taberna ni lugar para comer cerca de ti.|Non c'è nessuna taverna o posto dove mangiare vicino a te.|आपके पास कोई सराय या खाने की जगह नहीं है।|你附近没有酒馆或用餐的地方。"],
   ];
   for (const [en, t] of W4) add(en, t);
+  const W5 = [
+    ["Home and furniture", "Casa y muebles|Casa e mobili|घर और फ़र्नीचर|家和家具"], ["🛋️ Place furniture", "🛋️ Colocar muebles|🛋️ Sistema i mobili|🛋️ फ़र्नीचर रखिए|🛋️ 摆放家具"], ["🛒 Buy furniture", "🛒 Comprar muebles|🛒 Compra mobili|🛒 फ़र्नीचर खरीदिए|🛒 购买家具"],
+    ["✋ Move nearest", "✋ Mover el más cercano|✋ Sposta il più vicino|✋ सबसे पास वाला हटाइए|✋ 移动最近的"], ["↻ Turn nearest", "↻ Girar el más cercano|↻ Ruota il più vicino|↻ सबसे पास वाला घुमाइए|↻ 转动最近的"], ["🎉 Throw a party", "🎉 Dar una fiesta|🎉 Dai una festa|🎉 पार्टी दीजिए|🎉 办派对"],
+    ["🛋️ My furniture", "🛋️ Mis muebles|🛋️ I miei mobili|🛋️ मेरा फ़र्नीचर|🛋️ 我的家具"], ["🛒 Buy", "🛒 Comprar|🛒 Compra|🛒 खरीदिए|🛒 购买"], ["🏠 House", "🏠 Casa|🏠 Casa|🏠 घर|🏠 房子"],
+    ["You are in your house.", "Estás en tu casa.|Sei nella tua casa.|आप अपने घर में हैं।|你在你的家里。"], ["Log in to throw parties, keep a stall and use the guestbook.", "Inicia sesión para dar fiestas, tener un puesto y usar el libro de visitas.|Accedi per dare feste, avere una bancarella e usare il libro degli ospiti.|पार्टी देने, ठेला रखने और अतिथि पुस्तिका के लिए लॉग इन कीजिए।|登录后才能办派对、摆摊和使用留言簿。"],
+    ["You are in your house: press Place beside a piece, then click on the floor where it goes.", "Estás en tu casa: pulsa Colocar junto a una pieza y luego haz clic en el suelo donde va.|Sei nella tua casa: premi Sistema accanto a un pezzo, poi clicca sul pavimento dove va.|आप अपने घर में हैं: किसी चीज़ के पास रखिए दबाइए, फिर फ़र्श पर जहाँ रखना है वहाँ क्लिक कीजिए।|你在家里:点某件家具旁边的“放置”,再点地板上要放的位置。"],
+    ["You have no furniture yet: open the Buy tab.", "Aún no tienes muebles: abre la pestaña Comprar.|Non hai ancora mobili: apri la scheda Compra.|आपके पास अभी फ़र्नीचर नहीं है: खरीदिए टैब खोलिए।|你还没有家具:打开“购买”页。"],
+    ["click where it goes", "haz clic donde va|clicca dove va|जहाँ रखना है वहाँ क्लिक कीजिए|点击要放的位置"], ["↻ Turn (R)", "↻ Girar (R)|↻ Ruota (R)|↻ घुमाइए (R)|↻ 转动 (R)"], ["✓ Place here (Enter)", "✓ Colocar aquí (Intro)|✓ Sistema qui (Invio)|✓ यहाँ रखिए (Enter)|✓ 放在这里 (回车)"], ["✕ Done (Esc)", "✕ Listo (Esc)|✕ Fatto (Esc)|✕ बस (Esc)|✕ 完成 (Esc)"],
+    ["Done.", "Listo.|Fatto.|हो गया।|完成。"], ["Put it down inside your house.", "Colócalo dentro de tu casa.|Mettilo dentro la tua casa.|इसे अपने घर के अंदर रखिए।|请放在你的房子里面。"], ["moved.", "movido.|spostato.|हटाया गया।|已移动。"], ["placed. Click for the next one, Esc to finish.", "colocado. Haz clic para el siguiente, Esc para terminar.|sistemato. Clicca per il prossimo, Esc per finire.|रख दिया। अगले के लिए क्लिक कीजिए, खत्म करने के लिए Esc।|已放好。点击放下一个,按Esc结束。"], ["placed.", "colocado.|sistemato.|रख दिया।|已放好。"],
+    ["Go inside your own house first.", "Entra primero en tu propia casa.|Entra prima nella tua casa.|पहले अपने घर के अंदर जाइए।|请先进入你自己的家。"], ["This needs your account and the game server: log in and wait to be connected.", "Esto necesita tu cuenta y el servidor del juego: inicia sesión y espera a conectarte.|Serve il tuo account e il server di gioco: accedi e attendi la connessione.|इसके लिए आपका खाता और गेम सर्वर चाहिए: लॉग इन कीजिए और जुड़ने तक रुकिए।|这需要你的账号和游戏服务器:请登录并等待连接。"],
+    ["A party costs 50 denarii.", "Una fiesta cuesta 50 denarios.|Una festa costa 50 denari.|पार्टी का खर्च 50 दीनार है।|派对需要50第纳尔。"], ["Your party is still going.", "Tu fiesta sigue en marcha.|La tua festa è ancora in corso.|आपकी पार्टी अभी चल रही है।|你的派对还在进行。"],
+  ];
+  for (const [en, t] of W5) add(en, t);
   I18n.add(rows);
 })();
