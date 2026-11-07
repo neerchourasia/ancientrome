@@ -272,5 +272,13 @@
     ["A party costs 50 denarii.", "Una fiesta cuesta 50 denarios.|Una festa costa 50 denari.|पार्टी का खर्च 50 दीनार है।|派对需要50第纳尔。"], ["Your party is still going.", "Tu fiesta sigue en marcha.|La tua festa è ancora in corso.|आपकी पार्टी अभी चल रही है।|你的派对还在进行。"],
   ];
   for (const [en, t] of W5) add(en, t);
+  const W6 = [
+    ["✋ Arrange: drag pieces", "✋ Ordenar: arrastra piezas|✋ Disponi: trascina i pezzi|✋ सजाइए: चीज़ें खींचिए|✋ 布置:拖动家具"],
+    ["Arrange: drag a piece to move it, drop it where it goes", "Ordenar: arrastra una pieza para moverla y suéltala donde va|Disponi: trascina un pezzo per spostarlo e rilascialo dove va|सजाइए: किसी चीज़ को खींचकर हटाइए और जहाँ रखनी है वहाँ छोड़िए|布置:拖动家具移动,放到想放的位置松开"],
+    ["drop it on the floor", "suéltala en el suelo|rilascialo sul pavimento|इसे फ़र्श पर छोड़िए|放到地板上松开"], ["That is not a place for it: it went back.", "Ese no es sitio para ella: ha vuelto a su lugar.|Quello non è un posto per lui: è tornato indietro.|वह इसके लिए सही जगह नहीं है: यह वापस चली गई।|那里放不了:它回到了原位。"],
+    ["Drag it onto the floor of your house, or press Place", "Arrástrala al suelo de tu casa o pulsa Colocar|Trascinalo sul pavimento della tua casa o premi Sistema|इसे अपने घर के फ़र्श पर खींचिए या रखिए दबाइए|把它拖到你家的地板上,或点“放置”"],
+    ["You are in your house: drag a piece from the list onto the floor, or press Place and click where it goes.", "Estás en tu casa: arrastra una pieza de la lista al suelo, o pulsa Colocar y haz clic donde va.|Sei nella tua casa: trascina un pezzo dall'elenco sul pavimento, o premi Sistema e clicca dove va.|आप अपने घर में हैं: सूची से किसी चीज़ को फ़र्श पर खींचिए, या रखिए दबाकर जहाँ रखनी है वहाँ क्लिक कीजिए।|你在家里:把列表里的家具拖到地板上,或点“放置”再点要放的位置。"],
+  ];
+  for (const [en, t] of W6) add(en, t);
   I18n.add(rows);
 })();
