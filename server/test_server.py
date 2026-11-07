@@ -451,6 +451,55 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.3)
         self.assertTrue(any(e["kind"] == "jumped across the city" for e in server.EVENTS))
 
+    def test_chat_masks_bad_words_in_their_disguises_and_hides_personal_details(self):
+        f = lambda t: server.chat_filter(t)
+        self.assertEqual(f("hello there, nice game"), ("hello there, nice game", False, False))
+        for bad in ("you are a fuck", "sh1t happens", "f u c k this", "f.u.c.k", "fuuuuck", "$h!t", "what a b!tch", "kill yourself", "k y s", "nigger"):
+            self.assertTrue(f(bad)[1], bad)
+        self.assertNotIn("fuck", f("you are a fuck")[0])
+        self.assertEqual(f("you are a fuck")[0], "you are a f***")
+        for fine in ("a classic assassin from Scunthorpe", "the peacock and the cockatoo", "a cocktail", "Hancock passed the glass", "bass and grass", "the donkey is an ass of a mount", "analysis of the Latin class", "cum laude"):
+            self.assertFalse(f(fine)[1], fine)
+        # email addresses, links, phone numbers and @names are hidden; scores and prices are not
+        for pii in ("mail me at bob@example.com", "bob at example dot com", "bob (at) example (dot) com", "see https://example.org/x", "www.evil.com now", "join discord.gg/abc", "call 555 123 4567", "+44 20 7946 0958", "555-1234", "my snap is @coolkid99"):
+            out = f(pii)
+            self.assertTrue(out[2], pii)
+            self.assertIn("[hidden]", out[0])
+        for fine in ("I have 12345 coins", "the score was 3-2 in round 4", "price 1500 aspcgua", "1234567 points", "meet at 7 pm", "level 10, 20, 30"):
+            self.assertFalse(f(fine)[2], fine)
+        self.assertEqual(server.clean_chat("x" * 400), "x" * server.CHAT_MAX)
+
+    async def test_chat_pictures_can_be_switched_off_for_everybody(self):
+        c = await WS.connect(self.port); self.clients.append(c)
+        c.send({"t": "hello", "name": "Pia", "cls": "gladiator", "look": {}, "vid": "d" * 32}); await c.until(lambda m: m["t"] == "welcome")
+        conn = next(x for x in server.CONNS if x.name == "Pia"); conn.uid = "u-1"
+        jpeg = "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8\xff" + b"0" * 200 + b"\xff\xd9").decode()
+        with mock.patch.dict(server.CFG, {"chat_pictures": False}):
+            c.send({"t": "chat", "text": "look", "pic": jpeg})
+            msg = await c.until(lambda m: m["t"] == "chat" and m.get("sys"))
+            self.assertIn("switched off", msg["text"])
+        c.send({"t": "chat", "text": "look", "pic": jpeg})
+        msg = await c.until(lambda m: m["t"] == "chat" and m.get("pic"))
+        self.assertEqual(msg["name"], "Pia")
+
+    async def test_a_message_can_be_reported_with_the_flag_button(self):
+        server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear()
+        async def player(name, vid):
+            c = await WS.connect(self.port); self.clients.append(c)
+            c.send({"t": "hello", "name": name, "cls": "gladiator", "look": {}, "vid": vid}); c.welcome = await c.until(lambda m: m["t"] == "welcome")
+            return c
+        ann, bea = await player("Ann", "a" * 32), await player("Bea", "b" * 32)
+        ann.send({"t": "report", "id": bea.welcome["id"], "text": "you are a f u c k", "w": 1}); await asyncio.sleep(0.3)
+        ev = [e for e in server.EVENTS if e["kind"] == "reported by a player"]
+        self.assertEqual((len(ev), ev[0]["who"]), (1, "Bea"))
+        self.assertIn("(a whisper)", ev[0]["detail"])
+        self.assertNotIn("f u c k", ev[0]["detail"])                                      # (what is reported is masked too)
+        ann.send({"t": "report", "id": ann.welcome["id"], "text": "me"}); await asyncio.sleep(0.2)       # nobody reports themselves
+        self.assertEqual(len([e for e in server.EVENTS if e["kind"] == "reported by a player"]), 1)
+        for _ in range(4):
+            ann.send({"t": "report", "id": bea.welcome["id"], "text": "again"}); await asyncio.sleep(0.15)
+        await ann.until(lambda m: m["t"] == "chat" and "few reports" in m.get("text", ""))        # reports are limited
+
     async def test_admin_chat_log_player_reports_and_big_money_jumps(self):
         server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear(); server.ADMIN_CHAT.clear()
         async def player(name, vid):

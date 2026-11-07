@@ -56,6 +56,7 @@ def load_config():
         "origins": [o.strip() for o in e("ALLOWED_ORIGINS", "").split(",") if o.strip()],
         "max_conns": int(e("MAX_CONNS", "400")),
         "max_per_ip": int(e("MAX_PER_IP", "8")),
+        "chat_pictures": e("CHAT_PICTURES", "on").lower() != "off",       # CHAT_PICTURES=off switches pictures in chat off for everybody (text chat stays)
     }
 
 
@@ -3116,13 +3117,76 @@ CHAT_LOG = collections.deque(maxlen=40)     # the last messages, shown to people
 ADMIN_CHAT = collections.deque(maxlen=300)  # the last public messages with who sent them, for the admins' Chat log (memory only; whispers are never in it)
 BLOCKED = {}                                # kicked: login id or address -> until when
 CHAT_MAX = 140
-BAD_WORDS = re.compile(r"(fuck|shit|bitch|cunt|asshole|nigg|fagg)", re.I)   # masked, not blocked
+# What the chat does to a message: bad words are masked (not blocked), and personal details are hidden. A word is checked after the usual disguises are undone (f u c k, f.u.c.k, sh1t, fuuuck,
+# $hit); a few short words only count when they are a word on their own (so classic, Scunthorpe and cockatoo are fine). Email addresses, links, phone numbers and @names are replaced by [hidden],
+# so nobody gets a stranger's contact details through the game's chat.
+BAD_STEMS = ("fuck", "shit", "bitch", "cunt", "nigg", "fagg", "whore", "slut", "retard", "bastard", "asshole", "dickhead", "cocksuck", "motherf", "wank", "twat", "pussy", "jizz", "blowjob", "handjob", "dildo")
+BAD_WHOLE = {"dick", "cock", "tits", "porn", "rape", "rapist", "nazi", "kys", "piss", "fag", "boob", "boobs"}
+BAD_FINE = {"scunthorpe", "shiitake", "cocktail", "peacock", "hancock", "cockatoo", "cockpit", "titsonly"}            # (words that contain a bad stem but are fine)
+BAD_PHRASES = re.compile(r"k\W*i\W*l\W*l\W*(?:y\W*o\W*u\W*r\W*s\W*e\W*l\W*f|u\W*r\W*s\W*e\W*l\W*f)|k\W*y\W*s\b", re.I)
+BAD_STEM_RE = re.compile("|".join("".join(c + "+" for c in st) for st in BAD_STEMS))
+BAD_WORDS = BAD_STEM_RE                                                                                          # (kept for the code that only asks "is there swearing")
+LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s", "!": "i", "|": "i", "+": "t"})
+EMAIL_RE = re.compile(r"[\w.+-]+\s*(?:@|\(at\)|\[at\])\s*[\w-]+(?:\s*(?:\.|\(dot\)|\[dot\])\s*[\w-]+)+", re.I)
+EMAIL_WORDS_RE = re.compile(r"\b[\w.+-]+\s+at\s+[\w-]+\s+dot\s+[\w-]+(?:\s+dot\s+[\w-]+)*\b", re.I)               # (bob at example dot com)
+URL_RE = re.compile(r"(?:https?://|www\.)\S+|\b[\w-]+\.(?:com|net|org|io|gg|me|co|uk|us|app|xyz|tv|ly|link|info|gl|be)\b\S*", re.I)
+PHONE_RE = re.compile(r"(?<!\w)\+?\d(?:[\s().-]?\d){6,}(?!\w)")
+HANDLE_RE = re.compile(r"(?<!\w)@\w{3,}")
+
+
+def _bad_token(w):
+    n = re.sub(r"[^a-z]", "", w.lower().translate(LEET))
+    if not n or n in BAD_FINE:
+        return False
+    return n in BAD_WHOLE or bool(BAD_STEM_RE.search(n))
+
+
+def chat_filter(v):
+    """-> (the message as it will be shown, whether it had bad words, whether it had personal details)"""
+    v = re.sub(r"[\x00-\x1f\x7f]", " ", str(v if v is not None else ""))
+    v = re.sub(r"\s+", " ", v).strip()[:CHAT_MAX]
+    pii = [False]
+
+    def hide(m):
+        t = m.group(0)
+        if m.re is PHONE_RE:
+            d = re.sub(r"\D", "", t)
+            if len(d) < 7 or (len(d) < 9 and not re.search(r"[\s().-]", t.strip("+"))):
+                return t                                  # (a plain number of up to eight digits is a score or a price, not a phone number)
+        pii[0] = True
+        return "[hidden]"
+    for rx in (EMAIL_RE, EMAIL_WORDS_RE, URL_RE, PHONE_RE, HANDLE_RE):
+        v = rx.sub(hide, v)
+    bad = [False]
+    parts = re.split(r"(\s+)", v)
+    words = [i for i, x in enumerate(parts) if x and not x.isspace()]
+    mask = lambda w: w[0] + "*" * (len(w) - 1)
+    i = 0
+    while i < len(words):
+        w = parts[words[i]]
+        if len(w) == 1 and w.isalpha():                   # letters spaced out: f u c k
+            j = i
+            while j < len(words) and len(parts[words[j]]) == 1 and parts[words[j]].isalpha():
+                j += 1
+            if j - i >= 3 and _bad_token("".join(parts[words[k]] for k in range(i, j))):
+                for k in range(i, j):
+                    parts[words[k]] = "*"
+                bad[0] = True
+                i = j
+                continue
+        if _bad_token(w):
+            parts[words[i]] = mask(w)
+            bad[0] = True
+        i += 1
+    v = "".join(parts)
+    if BAD_PHRASES.search(v):
+        v = BAD_PHRASES.sub(lambda m: "*" * len(m.group(0)), v)
+        bad[0] = True
+    return v, bad[0], pii[0]
 
 
 def clean_chat(v):
-    v = re.sub(r"[\x00-\x1f\x7f]", " ", str(v if v is not None else ""))
-    v = re.sub(r"\s+", " ", v).strip()[:CHAT_MAX]
-    return BAD_WORDS.sub(lambda m: m.group(0)[0] + "*" * (len(m.group(0)) - 1), v)
+    return chat_filter(v)[0]
 
 
 def say_to(conn, text):
@@ -3229,11 +3293,15 @@ def on_chat(conn, m):
     if conn.ctok < 1:
         flag("chat flooding", "sends messages faster than the chat allows", "low", conn=conn, gap=120)
         return say_to(conn, "Slow down a little.")
-    text = clean_chat(m.get("text"))
-    if BAD_WORDS.search(str(m.get("text") or "")):
+    text, bad, pii = chat_filter(m.get("text"))
+    if bad:
         flag("swearing in chat", text[:100], "low", conn=conn, gap=120)
+    if pii:
+        flag("personal details in chat", "tried to send an email address, link or phone number: " + text[:100], "low", conn=conn, gap=120)
     pic = None
     if m.get("pic"):
+        if not CFG["chat_pictures"]:
+            return say_to(conn, "Pictures in chat are switched off.")
         if not conn.uid:
             return say_to(conn, "Log in to your account to send pictures.")
         if t - conn.pic_t < PIC_GAP:
@@ -3255,6 +3323,25 @@ def on_chat(conn, m):
     else:
         CHAT_LOG.append(entry)
     broadcast_chat(entry)
+
+
+def on_report(conn, m):
+    """A player reports a message (the flag button in the chat): who sent it and what it said go to the admins' suspicious list. A whisper can be reported too (it is the only way an admin sees one)."""
+    t = now()
+    conn.reports = [x for x in getattr(conn, "reports", []) if t - x < 300]
+    if len(conn.reports) >= 3:
+        return say_to(conn, "You have sent a few reports already. An admin will look at them.")
+    target = next((c for c in CONNS if c.hello and not c.closed and str(c.id) == str(m.get("id"))), None)
+    if target is conn:
+        return
+    who = target.name if target else clean_name(m.get("name"))
+    if not who or who == "Player":
+        return say_to(conn, "Report someone with: /report name what they did")
+    conn.reports.append(t)
+    what = clean_chat(m.get("text"))[:100]
+    flag("reported by a player", "%s reported %s%s: %s" % (conn.name, who, " (a whisper)" if m.get("w") else "", what or "(no text)"), "medium",
+         ip=target.ip if target else None, vid=target.vid if target else None, gap=20, who=who)
+    return say_to(conn, "Thank you. An admin will look at your report about %s." % who)
 
 
 SONGS = {   # traditional songs (long out of copyright) and a few new ones for the game
@@ -3346,7 +3433,7 @@ def chat_command(conn, text):
             conn.send(entry)
         return
     if cmd == "help":
-        say_to(conn, "Chat: just type. /w name message whispers to one person. /sing sings a song, /songs lists them.")
+        say_to(conn, "Chat: just type. /w name message whispers to one person. /sing sings a song, /songs lists them. To report someone, click the flag beside their message, or type /report name what they did.")
         if conn.admin:
             say_to(conn, "Admin: /who, /kick name, /mute name [minutes], /unmute name, /say message")
         return
@@ -6432,6 +6519,8 @@ async def handle_msg(conn, m):
         return on_heist_caught(conn, m)
     if t == "chat":
         return on_chat(conn, m)
+    if t == "report":
+        return on_report(conn, m)
     if t == "social":
         return on_social(conn, m)
     if t == "fest":

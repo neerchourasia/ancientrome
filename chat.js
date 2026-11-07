@@ -10,10 +10,32 @@ const Chat = (() => {
   let open = false, timer = null;
 
   const send = (obj) => Online.navalSend(obj);
+  // Pictures in chat: on or off for you (the button in the menu). Off: pictures other people send are not shown (a line says one was hidden) and you cannot send one. Kept in the browser.
+  let pics = true;
+  try { pics = localStorage.getItem("rome-chatpics") !== "off"; } catch (e) { /* storage unavailable */ }
+  function setPics(v) {
+    pics = !!v;
+    try { localStorage.setItem("rome-chatpics", pics ? "on" : "off"); } catch (e) { /* ignore */ }
+    const b = $c("btn-chatpics"); if (b) b.textContent = pics ? "Chat pictures on" : "Chat pictures off";
+    toast(pics ? "Pictures in chat are on" : "Pictures in chat are off: you will not see them or send them");
+  }
+  // the flag beside someone else's message: it tells the admins who said what (a whisper too)
+  function reportButton(li, entry) {
+    if (entry.sys || entry.name === Character.name || !entry.id) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "rp"; b.textContent = "⚑"; b.title = `Report ${entry.name}'s message to the admins`; b.setAttribute("aria-label", b.title);
+    b.addEventListener("click", () => {
+      Dialog.confirm(`Report ${entry.name}'s message to the admins?`).then((yes) => {
+        if (yes) { send({ t: "report", id: entry.id, name: entry.name, text: String(entry.text || "").slice(0, 140), w: entry.w ? 1 : 0 }); b.disabled = true; b.textContent = "✓"; }
+      });
+    });
+    li.append(" ", b);
+  }
 
   function add(entry) {
     const li = document.createElement("li");
     if (entry.sys) { li.className = "sys"; li.textContent = entry.text; }
+    else if (entry.pic && !pics) { const who = document.createElement("b"); who.textContent = entry.name; li.className = "sys"; li.append(who, document.createTextNode(" sent a picture (hidden: \"Chat pictures\" is off in the menu)")); }
     else if (entry.pic && PIC_OK.test(entry.pic)) {                  // a small picture, with what they wrote under it
       const who = document.createElement("b");
       who.textContent = entry.name; if (entry.adm) { who.className = "adm"; who.textContent = "★ " + who.textContent; }
@@ -36,6 +58,7 @@ const Chat = (() => {
       tm.className = "ct"; tm.textContent = when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); tm.title = when.toLocaleString();
       li.prepend(tm, " ");
     }
+    reportButton(li, entry);
     $c("chat-log").append(li);
     lines.push({ el: li, at: performance.now() });
     while (lines.length > 60) { lines.shift().el.remove(); }
@@ -71,6 +94,7 @@ const Chat = (() => {
     return null;
   }
   async function sendPic(file) {
+    if (!pics) { add({ sys: 1, text: "Chat pictures are off for you. Turn them on in the menu to send one." }); return; }
     if (!file || !/^image\//.test(file.type)) { add({ sys: 1, text: "That is not a picture." }); return; }
     if (!Account.loggedIn) { add({ sys: 1, text: "Log in to your account to send pictures." }); return; }
     if (!Online.connected) { add({ sys: 1, text: (Account.demo ? Account.why("Chat needs an account: log in to talk to other players.") : "Not connected to the game server yet. Try again in a moment.") }); return; }
@@ -129,6 +153,7 @@ const Chat = (() => {
     $c("chat-input").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); closeChat(); } });
     $c("btn-chat").addEventListener("click", () => (open ? closeChat() : openChat()));
     $c("chat-pic").addEventListener("click", () => $c("chat-file").click());
+    const cp = $c("btn-chatpics"); if (cp) { cp.textContent = pics ? "Chat pictures on" : "Chat pictures off"; cp.addEventListener("click", () => setPics(!pics)); }
     $c("chat-file").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; sendPic(f); });
     $c("chat-input").addEventListener("paste", (e) => { const f = [...(e.clipboardData ? e.clipboardData.files : [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); sendPic(f); } });
     timer = setInterval(refresh, 1500);

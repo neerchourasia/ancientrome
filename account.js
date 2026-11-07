@@ -41,8 +41,11 @@ const Account = (() => {
   try { knownAt = localStorage.getItem(SYNC_KEY) || ""; } catch (e) { /* storage unavailable */ }
   const setKnown = (t) => { knownAt = t; try { localStorage.setItem(SYNC_KEY, t); } catch (e) { /* ignore */ } };
 
+  // "Remember me": ticked (the default), the login is kept on this device until you log out; not ticked, it is kept only for this browser tab and is gone when the tab is closed.
+  let remember = true;
+  try { remember = localStorage.getItem("rome-remember") !== "0"; } catch (e) { /* storage unavailable */ }
   try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY) || "null");
     if (s && typeof s.access_token === "string" && typeof s.refresh_token === "string" && typeof s.id === "string" && typeof s.email === "string") session = s;
   } catch (e) { /* storage unavailable */ }
 
@@ -56,7 +59,10 @@ const Account = (() => {
   function storeSession(s) {
     session = s;
     if (s) { demo = false; demoOver = false; clearInterval(demoTimer); }
-    try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+    try {
+      const keep = remember ? localStorage : sessionStorage, other = remember ? sessionStorage : localStorage;
+      if (s) { keep.setItem(SESSION_KEY, JSON.stringify(s)); other.removeItem(SESSION_KEY); } else { localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); }
+    } catch (e) { /* ignore */ }
   }
 
   async function api(path, opt = {}) {
@@ -319,6 +325,7 @@ const Account = (() => {
         if (!s) throw new Error("Could not log in");
         storeSession(s); $a("ac-pass").value = "";
       }
+      try { remember ? localStorage.setItem("rome-login-email", email) : localStorage.removeItem("rome-login-email"); } catch (e) { /* ignore */ }
       say(""); changed();
       try { await sync(); } finally { unlock(); }   // the saved game is loaded first, then the game starts
     } catch (e) {
@@ -474,6 +481,15 @@ const Account = (() => {
     $a("btn-account").addEventListener("click", open);
     $a("account-close").addEventListener("click", closePanels);
     $a("account").addEventListener("click", (e) => { if (e.target.id === "account") closePanels(); });
+    // Remember me: the choice is kept, and the email of a remembered login is filled in next time
+    const rm = $a("ac-remember"), em = $a("ac-email");
+    rm.checked = remember;
+    try { if (remember) { const saved = localStorage.getItem("rome-login-email"); if (saved && !em.value) em.value = saved; } } catch (e) { /* ignore */ }
+    rm.addEventListener("change", () => {
+      remember = rm.checked;
+      try { localStorage.setItem("rome-remember", remember ? "1" : "0"); if (!remember) localStorage.removeItem("rome-login-email"); } catch (e) { /* ignore */ }
+      if (session) storeSession(session);                                                  // (moves a login that is already there to the right place)
+    });
     $a("ac-login").addEventListener("click", () => submit("in"));
     $a("ac-signup").addEventListener("click", () => submit("up"));
     $a("ac-google").addEventListener("click", googleLogin);
