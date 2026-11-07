@@ -149,7 +149,7 @@ const Trade = (() => {
   function lose() { const vid = Car.current; if (vid && hold[vid]) { delete hold[vid]; save(); toast("Your cargo was lost in the crash!"); } }
 
   // the caravan sails: it is in the city you arrive in. Pirates take part of it; a storm costs a crate
-  function caravanMoved(to) { if (used("caravan")) { caravanAt = to; save(); toast(`${tr("Your caravan is in")} ${tr(CITY_NAMES[to] || to)}. ${tr("Go to the market to sell it.")}`); } else caravanAt = null; }
+  function caravanMoved(to) { if (used("caravan")) { caravanAt = to; save(); if (typeof Guilds !== "undefined") Guilds.score("caravan");  toast(`${tr("Your caravan is in")} ${tr(CITY_NAMES[to] || to)}. ${tr("Go to the market to sell it.")}`); } else caravanAt = null; }
   function caravanLoss(frac, why) {
     const h = hold.caravan; if (!h) return 0;
     let lost = 0, total = used("caravan"), n = Math.max(1, Math.round(total * frac));

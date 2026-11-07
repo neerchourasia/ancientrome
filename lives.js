@@ -63,9 +63,9 @@ const Lives = (() => {
   }
 
   // what a citizen is doing at an hour of the day
-  function plan(o, hour) {
+  function plan(o, hour, dry) {
     const h = (hour + o.jit + 24) % 24;
-    if (bad() && h >= 5.5 && h < 21) { const at = o.work || o.eat || o.home; return { key: "shelter", at, text: `sheltering from ${badWord()}` }; }
+    if (!dry && bad() && h >= 5.5 && h < 21) { const at = o.work || o.eat || o.home; return { key: "shelter", base: plan(o, hour, true).key, at, text: `sheltering from ${badWord()}` }; }     // (base: what the day would be in dry weather)
     if (h < 5.5 || h >= 21) return { key: "sleep", at: o.home, text: "at home for the night" };
     if (h < 7.5) return { key: "home", at: o.home, text: "having breakfast at home" };
     if (h < 8.5) return o.work ? { key: "commute", at: o.work, text: `walking to work at the ${o.workName}` } : { key: "stroll", at: null, text: "out for a walk" };
@@ -162,7 +162,19 @@ const Lives = (() => {
     if (cur.line) rows.push(el("p", cur.line, "sk-note"));
     const b = el("button", f.day === today ? tr("💬 Chat (you have chatted today)") : tr("💬 Chat")); b.type = "button"; b.disabled = f.day === today; b.addEventListener("click", chat);
     const bye = el("button", tr("👋 Goodbye")); bye.type = "button"; bye.addEventListener("click", closePanels);
-    const bar = el("div", undefined, "sk-menu"); bar.append(b, bye); rows.push(bar);
+    const bar = el("div", undefined, "sk-menu"); bar.append(b, bye);
+    const rm = typeof Mystery !== "undefined" && Mystery.rumor ? Mystery.rumor(o.name) : null;
+    if (rm) {                                                                                                  // this name knows something about the open case (mystery.js)
+      const q = el("button", `🔎 ${tr("Ask about")} ${tr(rm.caseName)}`); q.type = "button";
+      q.addEventListener("click", () => {
+        if (f.day !== today) { cur.line = `${o.name}: ${tr("Let us chat a little first, and then I will tell you what I know.")}`; render(); return; }
+        const now = plan(o, Time.hour), r = Mystery.ask(o.name, now.base || now.key);
+        cur.line = r.state === "told" ? `${o.name}: ${tr("I heard it from the witness in person:")} ${tr(r.text)}` : `${o.name}: ${tr("Not now, I am busy. Find me")} ${Mystery.whenText(r.when)}.`;
+        render();
+      });
+      bar.append(q);
+    }
+    rows.push(bar);
     body.replaceChildren(...rows);
   }
   function chat() {
@@ -181,5 +193,5 @@ const Lives = (() => {
   const snapshot = () => JSON.parse(JSON.stringify(friends));
   function restore(r) { if (!r || typeof r !== "object") return; friends = {}; for (const k of Object.keys(r).slice(0, 2000)) if (r[k] && Number.isFinite(+r[k].n)) friends[k] = { n: Math.min(999, Math.floor(+r[k].n)), day: Number.isFinite(+r[k].day) ? +r[k].day : -1, lv: Math.min(3, Math.max(0, Math.floor(+r[k].lv || 0))) }; save(); }
 
-  return { bind, update, at, open, promptText, snapshot, restore, plan, identity, get friends() { return Object.values(friends).filter((f) => levelOf(f.n) >= 2).length; }, get chats() { return Object.values(friends).reduce((n, f) => n + f.n, 0); } };
+  return { bind, update, at, open, promptText, snapshot, restore, plan, identity, names: (c) => NAMES[c] || [], get friends() { return Object.values(friends).filter((f) => levelOf(f.n) >= 2).length; }, get chats() { return Object.values(friends).reduce((n, f) => n + f.n, 0); } };
 })();

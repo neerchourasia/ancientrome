@@ -3,6 +3,8 @@
 // Painting". Three clues wait at three famous places (in any order): stand there and a witness tells you one thing about the culprit. Then you have four suspects, each described in full, and exactly one of
 // them fits all three clues. Accuse the right one for a big reward; a wrong accusation costs 20 denarii and clears that suspect. Solve the first case and a harder second one opens in the same city (Rome *The Loosened
 // Wheel*, Delhi *The Poisoned Chai*, Cancún *The Missing Calendar Stone*, Beijing *The Forged Edict*): four clues, five suspects, and every wrong suspect fits three of the four. Progress is kept in the browser (rome-mystery) and the saved game.
+// TEAM CASES (👥 Team tab): start one of the cases with friends (they must be online and have you as a friend): each of the clues is held by one of the team, who has to stand at its place, and everybody sees
+// what has been found; when the team names the culprit each is paid the case's reward and 100 more (twice an hour at most). The game server (server.py, "team cases") keeps the team.
 // Depends on vitals.js, the landmarks of each city (by id) and the globals of game.js (LANDMARKS, city, player, startDirections, Narrator, openPanel, closePanels).
 
 const Mystery = (() => {
@@ -153,18 +155,113 @@ const Mystery = (() => {
     if (idx[0] === 0) idx.push(idx.shift());
     return idx;
   };
+  let team = null, teamView = false, teamOk = false;
+  const CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
+  const tabsFor = (c, n) => {
+    const tabs = el("div", undefined, "pm-tabs");
+    CASES[c].forEach((k, i) => { const b = el("button", tr(i === 0 ? "Case 1" : open1(c) ? "Case 2: harder" : "Case 2 🔒")); b.type = "button"; if (i === n && !teamView) b.className = "on"; b.disabled = i > open1(c); b.addEventListener("click", () => { teamView = false; sel[c] = i; render(); }); tabs.append(b); });
+    const tb = el("button", tr("👥 Team")); tb.type = "button"; if (teamView) tb.className = "on"; tb.addEventListener("click", () => { teamView = true; render(); if (typeof Online !== "undefined" && Online.connected) Online.navalSend({ t: "social", a: "co_me" }); }); tabs.append(tb);
+    return tabs;
+  };
+  const csend = (o) => Online.navalSend({ t: "social", ...o });
+  function renderTeam(body) {
+    const c = cityOf(), n = curIdx(c), rows = [tabsFor(c, n)];
+    const ready = typeof Online !== "undefined" && Online.connected && typeof Account !== "undefined" && Account.loggedIn;
+    if (!team) {
+      rows.push(el("p", tr("Solve a case with friends: each of you holds some of the clues and has to stand at the right place. When the team names the culprit, everybody is paid."), "dnote"));
+      if (!ready) rows.push(el("p", tr("Team cases need your account and the game server: log in and wait to be connected."), "dnote"));
+      for (const k of [0, 1]) {
+        const b = el("button", `${tr("Start a team case")}: ${tr(CASES[c][k].name)} (${tr(CITY_NAMES[c])})`); b.type = "button"; b.disabled = !ready || k > open1(c);
+        b.addEventListener("click", () => csend({ a: "co_make", city: c, n: k })); rows.push(b);
+      }
+      body.replaceChildren(...rows); return;
+    }
+    const cs = CASES[team.city][team.n], mem = team.members, here = team.city === city;
+    rows.push(el("h3", `${tr(cs.name)} · ${tr(CITY_NAMES[team.city])}`), el("p", tr(cs.intro), "dnote"));
+    rows.push(el("p", `👥 ${mem.map((m, i) => `${m.online ? "●" : "○"} ${m.name}${i === team.me ? ` (${tr("you")})` : ""}`).join(" · ")}`, "dnote"));
+    if (!here) rows.push(el("p", `${tr("Travel to")} ${tr(CITY_NAMES[team.city])} ${tr("to look for the clues.")}`, "sk-note"));
+    cs.clues.forEach((cl, i) => {
+      const lm = lmOf(cl[0]), holder = mem[i % mem.length];
+      if (team.found[i]) rows.push(el("p", `✓ ${tr(cl[1])} (${team.by[i]})`, "st-old"));
+      else if (i % mem.length === team.me) {
+        const row = el("p", `❓ ${tr("You hold this clue:")} ${lm ? tr(lm.name) : cl[0]}`, "st-now");
+        if (lm && here) { const b = el("button", tr("Show me the way")); b.type = "button"; b.addEventListener("click", () => { closePanels(); if (typeof startDirections === "function") { try { startDirections(lm); } catch (e) { /* ignore */ } } }); row.append(" ", b); }
+        rows.push(row);
+      } else rows.push(el("p", `❓ ${holder ? holder.name : "?"} ${tr("holds this clue: ask them to find it.")}`, "st-now"));
+    });
+    const found = team.found.filter(Boolean).length;
+    if (team.ok) rows.push(el("p", `${tr("Case closed:")} ${tr(cs.suspects.find((s) => s[2].every((v) => v))[3])}`, "sk-note"));
+    else if (found < team.k) rows.push(el("p", `${found} ${tr("of")} ${team.k} ${tr("clues found.")}`, "dnote"));
+    else {
+      rows.push(el("h3", tr("Who did it?")), el("p", `${tr("All the clues are in:")} ${cs.clues.map((cl) => tr(cl[2])).join(", ")}. ${tr("Only one suspect fits them all. A wrong accusation costs 20 denarii.")}`, "dnote"));
+      const ul = el("ul", undefined, "mk-items");
+      suspectOrder(team.city, team.n).forEach((i) => {
+        const s = cs.suspects[i], li = el("li"), txt = el("span"), cleared = team.no.includes(i), b = el("button", tr(cleared ? "Cleared" : "Accuse")); b.type = "button"; b.disabled = cleared; b.addEventListener("click", () => accuseTeam(i));
+        txt.append(el("strong", tr(s[0])), el("small", tr(s[1]))); if (cleared) li.style.opacity = "0.5";
+        li.append(txt, b); ul.append(li);
+      });
+      rows.push(ul);
+    }
+    const bar = el("div", undefined, "sk-menu");
+    if (team.host && !team.ok) {
+      const inv = el("button", tr("➕ Invite a friend")); inv.type = "button";
+      inv.addEventListener("click", () => {
+        const online = typeof Social !== "undefined" && Social.list ? Social.list().filter((f) => f.online) : [];
+        if (!online.length) { toast(tr("None of your friends are online.")); return; }
+        Dialog.ask(`${tr("Which friend? Type a name:")} ${online.map((f) => f.name).join(", ")}`, online[0].name).then((raw) => { const f = online.find((x) => x.name.toLowerCase() === String(raw || "").trim().toLowerCase()); if (f) csend({ a: "co_invite", fid: f.fid }); else if (raw !== null) toast(tr("No friend of that name is online.")); });
+      });
+      bar.append(inv);
+    }
+    const leave = el("button", tr("Leave the team")); leave.type = "button"; leave.addEventListener("click", () => csend({ a: "co_leave" })); bar.append(leave);
+    rows.push(bar);
+    body.replaceChildren(...rows);
+  }
+  function accuseTeam(i) {
+    if (!team || team.ok || team.found.some((v) => !v)) return;
+    const cs = CASES[team.city][team.n], s = cs.suspects[i];
+    if (s[2].every((v) => v)) { csend({ a: "co_solve" }); say(`${tr(s[0])} ${tr("is the culprit!")} ${tr(s[3])}`); }
+    else { csend({ a: "co_no", i }); Vitals.coins = Math.max(0, Vitals.coins - FINE); Sfx.play("oof"); toast(`${tr(s[0])} ${tr("has an alibi: wrong! −20 denarii. Think again about the clues.")}`); }
+  }
+  function onCoop(m) {
+    if (m.a === "state") {
+      const first = !team; team = m.s;
+      if (first) toast(`👥 ${tr("Team case:")} ${tr(CASES[team.city][team.n].name)}`);
+      if (team.ok && !teamOk) { teamOk = true; Sfx.play("medal"); toast(`🏆 ${tr("Your team solved the case! The reward is on its way.")}`); }
+      if (!team.ok) teamOk = false;
+      if ($s("mystery").classList.contains("show")) render();
+    } else if (m.a === "end") { team = null; teamOk = false; if ($s("mystery").classList.contains("show")) render(); }
+    else if (m.a === "invite") {
+      Sfx.play("chime");
+      Dialog.confirm(`${m.from} ${tr("invites you to a team case:")} ${tr(CASES[m.city][m.n].name)} (${tr(CITY_NAMES[m.city])}). ${tr("Join?")}`).then((yes) => { if (yes) { csend({ a: "co_join", sid: m.sid }); teamView = true; } });
+    } else if (m.a === "clue_ok") {
+      Vitals.coins += 10; Sfx.play("page"); Sfx.play("discover");
+      if (team) say(`🔎 ${tr(CASES[team.city][team.n].clues[m.i][1])} (+10 ${tr("denarii")})`);
+    } else if (m.a === "sent") toast(tr("Invitation sent."));
+    else if (m.a === "no") toast(tr(m.text));
+  }
+  // the clues you hold in the team case are told when you stand at their places
+  const told = {};
+  function teamUpdate() {
+    if (!team || team.ok || team.city !== city || team.me < 0) return;
+    CASES[team.city][team.n].clues.forEach((cl, i) => {
+      if (team.found[i] || i % team.members.length !== team.me || told[i] > performance.now() - 4000) return;
+      const lm = lmOf(cl[0]); if (!lm) return;
+      const d = Math.hypot(player.x - lm.x, player.z - lm.z), st2 = lm.stand ? Math.hypot(player.x - lm.stand[0], player.z - lm.stand[1]) : Infinity;
+      if (d > (lm.r || 20) + 6 && st2 > 14) return;
+      told[i] = performance.now(); csend({ a: "co_clue", i });
+    });
+  }
   function render() {
+    const body0 = $s("my-body"); if (body0 && teamView) { $s("my-title").textContent = `🔎 ${tr("Mystery")}`; renderTeam(body0); return; }
     const c = cityOf(), n = curIdx(c), cs = CASES[c][n], p = prog[c][n], body = $s("my-body"); if (!body) return;
     $s("my-title").textContent = `🔎 ${tr(cs.name)}`;
     const rows = [];
-    const tabs = el("div", undefined, "pm-tabs");
-    CASES[c].forEach((k, i) => { const b = el("button", tr(i === 0 ? "Case 1" : open1(c) ? "Case 2: harder" : "Case 2 🔒")); b.type = "button"; if (i === n) b.className = "on"; b.disabled = i > open1(c); b.addEventListener("click", () => { sel[c] = i; render(); }); tabs.append(b); });
-    rows.push(tabs, el("p", tr(cs.intro), "dnote"));
+    rows.push(tabsFor(c, n), el("p", tr(cs.intro), "dnote"));
     cs.clues.forEach((cl, i) => {
       const lm = lmOf(cl[0]);
       if (p.c[i]) rows.push(el("p", `✓ ${tr(cl[1])}`, "st-old"));
       else {
-        const row = el("p", `❓ ${lm ? tr(lm.name) : cl[0]}: ${tr("a witness may know something.")}`, "st-now");
+        const w = witness(c, n, i), row = el("p", `❓ ${lm ? tr(lm.name) : cl[0]}: ${tr("a witness may know something.")}${w ? ` ${tr("Or ask someone called")} ${w.name} ${whenText(w.when)}.` : ""}`, "st-now");
         if (lm) { const b = el("button", tr("Show me the way")); b.type = "button"; b.addEventListener("click", () => { closePanels(); if (typeof startDirections === "function") { try { startDirections(lm); } catch (e) { /* ignore */ } } }); row.append(" ", b); }
         rows.push(row);
       }
@@ -190,7 +287,7 @@ const Mystery = (() => {
     if (p.ok || p.c.some((v) => !v)) return;
     const s = cs.suspects[i];
     if (s[2].every((v) => v)) {
-      p.ok = 1; save(); Vitals.coins += cs.reward; Sfx.play("medal");
+      p.ok = 1; save(); Vitals.coins += cs.reward; Sfx.play("medal"); if (typeof Guilds !== "undefined") Guilds.score("mystery"); 
       say(`${tr(s[0])} ${tr("is the culprit!")} ${tr(s[3])} ${tr("The case is closed:")} +${cs.reward} ${tr("denarii")}.${n === 0 ? ` ${tr("A harder case is now open.")}` : ""}`);
     } else {
       if (!p.no.includes(i)) p.no.push(i);
@@ -201,9 +298,38 @@ const Mystery = (() => {
   }
   function open() { render(); openPanel("#mystery"); }
 
+  // the citizens (lives.js) know things too: for each clue of the case you are working on, one name in the city knows what the witness saw, and tells you when you have chatted that day and
+  // catch them at the right time of the day (at work, at lunch or in the evening)
+  const WHEN = ["work", "lunch", "evening"], WHEN_TEXT = { work: "while they are at work", lunch: "at lunchtime", evening: "in the evening" };
+  const hashS = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  function witness(c, n, i) {
+    const names = typeof Lives !== "undefined" && Lives.names ? Lives.names(c) : []; if (!names.length) return null;
+    const h = hashS(`${c}${n}${i}w`);
+    return { name: names[(h % names.length + i * 3) % names.length], when: WHEN[(h >>> 8) % 3] };
+  }
+  // the clues of the open case that this name knows, and the one case name (for the talk panel)
+  function rumor(name) {
+    const c = CASES[city] ? city : null; if (!c) return null;
+    const n = curIdx(c), p = prog[c][n]; if (p.ok) return null;
+    const i = CASES[c][n].clues.findIndex((cl, k) => !p.c[k] && witness(c, n, k) && witness(c, n, k).name === name);
+    return i < 0 ? null : { i, caseName: CASES[c][n].name, when: witness(c, n, i).when };
+  }
+  // a chat that turned to the case: told (the clue is yours) or later (wrong time of day)
+  function ask(name, planKey) {
+    const r = rumor(name); if (!r) return { state: "none" };
+    if (planKey !== r.when) return { state: "later", when: r.when };
+    const c = cityOf(), n = curIdx(c), p = prog[c][n], cl = CASES[c][n].clues[r.i];
+    p.c[r.i] = 1; save(); Vitals.coins += 10; Sfx.play("page"); Sfx.play("discover");
+    toast(`🔎 ${tr(cl[1])} (${p.c.filter(Boolean).length} ${tr("of")} ${p.c.length} ${tr("clues")}, +10 ${tr("denarii")})`);
+    if ($s("mystery").classList.contains("show")) render();
+    return { state: "told", text: cl[1] };
+  }
+  const whenText = (w) => tr(WHEN_TEXT[w] || "");
+
   // a clue is told when you stand at its place (the clues of the case you are working on, and of the first case until it is solved)
   function update() {
     if (typeof started === "undefined" || !started || (mode !== "walk" && mode !== "drive")) return;
+    teamUpdate();
     const c = CASES[city] ? city : null; if (!c) return;
     const n = curIdx(c), p = prog[c][n]; if (p.ok) return;
     CASES[c][n].clues.forEach((cl, i) => {
@@ -218,7 +344,7 @@ const Mystery = (() => {
   }
   function bind() { const b = $s("btn-mystery"); if (b) b.addEventListener("click", open); }
   return {
-    bind, update, open, CASES,
+    bind, update, open, CASES, rumor, ask, whenText, onCoop,
     snapshot: () => JSON.parse(JSON.stringify(prog)),
     restore(raw) { prog = clean(raw); save(); },
     get solved() { return Object.values(prog).reduce((n, list) => n + list.filter((e) => e.ok).length, 0); }, _prog: () => prog,

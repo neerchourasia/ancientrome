@@ -69,9 +69,9 @@ const Seasons = (() => {
   }
   function take(s, k) {
     const arr = got[k] || (got[k] = []);
-    arr.push(s.i); save(); sync(); Vitals.coins += EACH; Sfx.play("discover");
+    arr.push(s.i); save(); sync(); Vitals.coins += EACH; Sfx.play("discover"); if (typeof Guilds !== "undefined") Guilds.score("spec"); 
     const kind = KINDS[Weather.season];
-    if (arr.length >= COUNT) { Vitals.coins += BONUS; Sfx.play("medal"); toast(`${kind.icon} ${tr("The whole set of")} ${tr(kind.plural)}: ${tr(CITY_NAMES[city])}, ${tr(SEASON_NAMES[city][Weather.season])}! +${EACH + BONUS} ${tr("denarii")}`); }
+    if (arr.length >= COUNT) { Vitals.coins += BONUS; Sfx.play("medal"); if (typeof Guilds !== "undefined") Guilds.score("set");  toast(`${kind.icon} ${tr("The whole set of")} ${tr(kind.plural)}: ${tr(CITY_NAMES[city])}, ${tr(SEASON_NAMES[city][Weather.season])}! +${EACH + BONUS} ${tr("denarii")}`); }
     else toast(`${kind.icon} ${tr(kind.word)} ${tr("near")} ${tr(s.lm)} (${arr.length} ${tr("of")} ${COUNT}, +${EACH} ${tr("denarii")})`);
     if ($s("seasons") && $s("seasons").classList.contains("show")) render();
   }

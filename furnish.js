@@ -16,11 +16,15 @@ const Furnish = (() => {
   // id: [name, price, what it looks like]
   const PIECES = {
     rug: ["Rug", 40], table: ["Low table", 60], stool: ["Stool", 15], chest: ["Storage chest", 70], lamp: ["Lamp stand", 35],
-    bed: ["Bed", 90], plant: ["Potted plant", 20], vase: ["Tall vase", 45], statue: ["Small statue", 120], cushions: ["Floor cushions", 25], screen: ["Folding screen", 80],
+    bed: ["Bed", 90], plot: ["Garden bed", 50], plant: ["Potted plant", 20], vase: ["Tall vase", 45], statue: ["Small statue", 120], cushions: ["Floor cushions", 25], screen: ["Folding screen", 80],
   };
   const IDS = Object.keys(PIECES);
-  const ACTIONS = { bed: "F: lie down on your bed", table: "F: cook or eat at your table", chest: "F: open your chest", stool: "F: sit down", cushions: "F: sit on the cushions", plant: "F: water the plant" };
+  const ACTIONS = { bed: "F: lie down on your bed", table: "F: cook or eat at your table", chest: "F: open your chest", stool: "F: sit down", cushions: "F: sit on the cushions", plant: "F: water the plant", plot: "F: tend your garden bed" };
   const MEAL = 15, MEALS_A_DAY = 2, CHEST_MAX = 60;
+  // the GARDEN BED (at most four): sow a seed (cost), water it once on each game day, and when it has had its days of water the harvest is 2 of that good for your cooking.
+  // crop: [days of water it needs, seed price, the colour of the ripe plant]
+  const CROPS = { cumin: [2, 5, 0x9a7a3a], cacao: [2, 4, 0x7a4a2a], pepper: [2, 8, 0x2f6a2f], jasmine: [3, 8, 0xf2f2e6], vanilla: [3, 9, 0xb8c46a], saffron: [4, 15, 0x8a4aa8] }, HARVEST = 2, PLOTS_MAX = 4;
+  const stageOf = (cr) => (cr && CROPS[cr.k] ? Math.min(3, Math.max(1, Math.ceil((3 * cr.g) / CROPS[cr.k][0]))) : 0);
   // dishes: [name, {ingredient good: how many}, heal, fill]; and the dishes of festival days (festival key -> dish), cooked only on that feast
   const RECIPES = [
     ["Olive oil flatbread", { oliveoil: 1, pepper: 1 }, 22, 55], ["Spiced lentils", { cumin: 1, pepper: 1 }, 25, 60], ["Saffron rice", { saffron: 1, cumin: 1 }, 35, 70], ["Hot chocolate", { cacao: 1, honey: 1 }, 28, 50],
@@ -38,20 +42,23 @@ const Furnish = (() => {
     cancun: { main: 0x1f9aa8, accent: 0xf2c21b, wood: 0x8a6a3a }, beijing: { main: 0xa51e1e, accent: 0xe2b52a, wood: 0x3a2418 },
   };
   const FLOOR = { rome: 0.15, delhi: 0.02, cancun: 0.15, beijing: 0.15 };
-  let st = { own: {}, placed: { rome: [], delhi: [], cancun: [], beijing: [] }, chest: {}, meals: { day: -1, n: 0 }, water: { day: -1, n: 0 } };
+  let st = { own: {}, placed: { rome: [], delhi: [], cancun: [], beijing: [] }, chest: {}, meals: { day: -1, n: 0 }, water: { day: -1, n: 0 }, gifts: {} };
   const groups = {}, shown = {};
   let note = "";
 
   const num = (v, lo, hi) => (Number.isFinite(+v) ? Math.max(lo, Math.min(hi, +v)) : 0);
   function clean(r) {
-    const o = { own: {}, placed: { rome: [], delhi: [], cancun: [], beijing: [] }, chest: {}, meals: { day: -1, n: 0 }, water: { day: -1, n: 0 } };
+    const o = { own: {}, placed: { rome: [], delhi: [], cancun: [], beijing: [] }, chest: {}, meals: { day: -1, n: 0 }, water: { day: -1, n: 0 }, gifts: {} };
+    if (r && r.gifts && typeof r.gifts === "object") for (const id of IDS) if (Array.isArray(r.gifts[id])) { const a = r.gifts[id].filter((x) => typeof x === "string" && x).map((x) => x.slice(0, 18)).slice(0, OWN_MAX); if (a.length) o.gifts[id] = a; }
     if (r && r.chest && typeof r.chest === "object" && typeof Shopkeep !== "undefined") { let room = CHEST_MAX; for (const id of Shopkeep.IDS) { const n = Math.min(room, Math.max(0, Math.floor(+r.chest[id]) || 0)); if (n) { o.chest[id] = n; room -= n; } } }
     if (r && r.meals) o.meals = { day: Number.isFinite(+r.meals.day) ? +r.meals.day : -1, n: Math.min(9, Math.max(0, Math.floor(+r.meals.n) || 0)) };
     if (r && r.water) o.water = { day: Number.isFinite(+r.water.day) ? +r.water.day : -1, n: Math.min(999, Math.max(0, Math.floor(+r.water.n) || 0)) };
     if (r && r.own && typeof r.own === "object") for (const id of IDS) if (Number.isInteger(r.own[id]) && r.own[id] > 0) o.own[id] = Math.min(OWN_MAX, r.own[id]);
     if (r && r.placed && typeof r.placed === "object") for (const c of Object.keys(o.placed)) {
       if (!Array.isArray(r.placed[c])) continue;
-      for (const p of r.placed[c].slice(0, MAX)) if (p && PIECES[p.id] && Number.isFinite(+p.x) && Number.isFinite(+p.z)) o.placed[c].push({ id: p.id, x: num(p.x, -1e5, 1e5), z: num(p.z, -1e5, 1e5), yaw: num(p.yaw, -7, 7) });
+      for (const p of r.placed[c].slice(0, MAX)) if (p && PIECES[p.id] && Number.isFinite(+p.x) && Number.isFinite(+p.z)) o.placed[c].push({ id: p.id, x: num(p.x, -1e5, 1e5), z: num(p.z, -1e5, 1e5), yaw: num(p.yaw, -7, 7), ...(typeof p.from === "string" && p.from ? { from: p.from.slice(0, 18) } : {}),
+        ...(p.id === "plot" && p.crop && CROPS[p.crop.k] ? { crop: { k: p.crop.k, g: Math.min(9, Math.max(0, Math.floor(+p.crop.g) || 0)), w: Number.isFinite(+p.crop.w) ? +p.crop.w : -1 } } : {}),
+        ...(p.id === "plot" && CROPS[p.ck] ? { ck: p.ck, gs: Math.min(3, Math.max(0, Math.floor(+p.gs) || 0)) } : {}) });
     }
     return o;
   }
@@ -79,7 +86,7 @@ const Furnish = (() => {
   }
 
   // ---------------------------------------------------------------- the pieces (simple shapes, in the colours of the city)
-  function make(id, c) {
+  function make(id, c, from, crop) {
     const pal = PAL[c] || PAL.rome, g = new THREE.Group();
     const mat = (col, extra) => new THREE.MeshLambertMaterial({ color: col, emissive: 0x120c06, ...extra });
     const box = (w, h, d, x, y, z, col, extra) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(col, extra)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
@@ -93,6 +100,11 @@ const Furnish = (() => {
       case "chest": box(0.95, 0.5, 0.55, 0, 0.25, 0, pal.wood); box(0.97, 0.12, 0.57, 0, 0.56, 0, pal.main); box(0.1, 0.62, 0.58, 0.28, 0.31, 0, pal.accent); box(0.1, 0.62, 0.58, -0.28, 0.31, 0, pal.accent); ball(0.045, 0, 0.5, -0.29, pal.accent); break;
       case "lamp": cyl(0.2, 0.25, 0.06, 0, 0.03, 0, pal.wood); cyl(0.03, 0.03, 1.4, 0, 0.73, 0, pal.wood); { const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 9), new THREE.MeshBasicMaterial({ color: 0xffd27a })); b.position.set(0, 1.5, 0); g.add(b); } break;
       case "plant": { cyl(0.22, 0.16, 0.32, 0, 0.16, 0, 0xa95a2c); const gr = 0.7 + Math.min(10, make.water === undefined ? st.water.n : make.water) * 0.06; for (const [x, y, z, r] of [[0, 0.55, 0, 0.26], [0.14, 0.75, 0.06, 0.2], [-0.12, 0.72, -0.08, 0.2], [0.02, 0.92, 0.04, 0.15]]) ball(r * gr, x * gr, 0.32 + (y - 0.32) * gr, z * gr, 0x3f8a3a); } break;
+      case "plot": {
+        box(1.3, 0.2, 0.8, 0, 0.1, 0, pal.wood); box(1.15, 0.05, 0.65, 0, 0.21, 0, 0x4a3320);
+        const stg = crop ? crop.stage : 0, col = crop && CROPS[crop.k] ? CROPS[crop.k][2] : 0x3f8a3f;
+        for (let i = 0; i < (stg ? 6 : 0); i++) { const px = -0.45 + (i % 3) * 0.45, pz = i < 3 ? -0.17 : 0.17, h = 0.1 + stg * 0.13; cyl(0.02 + stg * 0.012, 0.05 + stg * 0.025, h, px, 0.23 + h / 2, pz, stg === 3 ? col : 0x4a9a3f, 7); if (stg === 3) ball(0.07, px, 0.25 + h, pz, col); }
+      } break;
       case "bed": box(1.05, 0.3, 2.0, 0, 0.15, 0, pal.wood); box(0.95, 0.16, 1.9, 0, 0.38, 0, 0xe9e4d8); box(0.97, 0.1, 1.1, 0, 0.45, 0.4, pal.main); box(0.6, 0.14, 0.3, 0, 0.52, -0.75, 0xf3efe6); break;
       case "vase": cyl(0.13, 0.2, 0.2, 0, 0.1, 0, pal.main); cyl(0.26, 0.13, 0.45, 0, 0.42, 0, pal.main); cyl(0.12, 0.26, 0.3, 0, 0.78, 0, pal.main); cyl(0.14, 0.1, 0.1, 0, 1.0, 0, pal.accent); cyl(0.275, 0.275, 0.05, 0, 0.5, 0, pal.accent); break;
       case "statue": box(0.5, 0.7, 0.5, 0, 0.35, 0, 0xcfc8b8); box(0.55, 0.06, 0.55, 0, 0.73, 0, 0xb8b0a0); cyl(0.16, 0.2, 0.55, 0, 1.05, 0, 0xe9e4d8); ball(0.13, 0, 1.46, 0, 0xe9e4d8); break;
@@ -100,9 +112,17 @@ const Furnish = (() => {
       case "screen": for (const [x, r] of [[-0.55, 0.45], [0, -0.45], [0.55, 0.45]]) { const p = box(0.55, 1.5, 0.04, x, 0.78, 0, pal.main); p.rotation.y = r; box(0.5, 1.4, 0.045, x, 0.78, 0, pal.accent, { transparent: true, opacity: 0.35 }).rotation.y = r; } break;
       default: box(0.4, 0.4, 0.4, 0, 0.2, 0, pal.wood);
     }
+    if (from) {                                                                                  // a gift stays a gift: a little card in front of it with the giver's name
+      const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64; const x = cv.getContext("2d");
+      x.fillStyle = "#f6eed8"; x.fillRect(0, 0, 256, 64); x.strokeStyle = "#a07a2a"; x.lineWidth = 4; x.strokeRect(2, 2, 252, 60);
+      x.fillStyle = "#4a3b26"; x.font = "italic 20px Georgia, serif"; x.textAlign = "center"; x.fillText(tr("A gift from"), 128, 25); x.font = "bold 26px Georgia, serif"; x.fillText(from, 128, 53, 236);
+      const card = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.125), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+      card.position.set(0, 0.11, id === "rug" ? 0.95 : 0.62); card.rotation.x = -0.9; g.add(card);
+    }
     return g;
   }
 
+  const cropView = (p) => (p.id !== "plot" ? null : p.crop ? { k: p.crop.k, stage: stageOf(p.crop) } : p.ck ? { k: p.ck, stage: p.gs } : null);
   // the pieces stand in a group in the world (the position is in world coordinates, so the same group works in every city)
   function refresh() {
     if (typeof worldScene === "undefined" || !worldScene) return;
@@ -110,9 +130,9 @@ const Furnish = (() => {
       const sig = JSON.stringify(st.placed[c]) + st.water.n;
       if (shown[c] === sig) continue;
       shown[c] = sig;
-      if (groups[c]) { worldScene.remove(groups[c]); groups[c].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+      if (groups[c]) { worldScene.remove(groups[c]); groups[c].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
       const grp = new THREE.Group();
-      for (const p of st.placed[c]) { const m = make(p.id, c); m.position.set(p.x, FLOOR[c], p.z); m.rotation.y = p.yaw; grp.add(m); }
+      for (const p of st.placed[c]) { const m = make(p.id, c, p.from, cropView(p)); m.position.set(p.x, FLOOR[c], p.z); m.rotation.y = p.yaw; grp.add(m); }
       worldScene.add(grp); groups[c] = grp;
     }
   }
@@ -121,7 +141,7 @@ const Furnish = (() => {
   function applyVisibility() { for (const c of Object.keys(groups)) groups[c].visible = !(guest && guest.city === c); }
   function endGuest() {
     if (!guest) return;
-    if (guestGroup && worldScene) { worldScene.remove(guestGroup); guestGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    if (guestGroup && worldScene) { worldScene.remove(guestGroup); guestGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
     guestGroup = null; guest = null; away = 0; applyVisibility(); toast(tr("You are home again."));
   }
   function visit(fid, name) {
@@ -148,7 +168,7 @@ const Furnish = (() => {
     guest = { name: m.name, city: c, water: +m.water || 0, fid: m.fid };
     make.water = guest.water;
     guestGroup = new THREE.Group();
-    for (const p of clean({ placed: m.placed }).placed[c]) { const o = make(p.id, c); o.position.set(p.x, FLOOR[c], p.z); o.rotation.y = p.yaw; guestGroup.add(o); }
+    for (const p of clean({ placed: m.placed }).placed[c]) { const o = make(p.id, c, p.from, cropView(p)); o.position.set(p.x, FLOOR[c], p.z); o.rotation.y = p.yaw; guestGroup.add(o); }
     make.water = undefined;
     worldScene.add(guestGroup); applyVisibility(); away = 0;
     toast(`🏠 ${tr("You are visiting")} ${m.name}${tr("'s house. Walk out of the door to go home.")} ${tr("Open 🛋️ Furnish house to leave a note or a gift.")}${m.party ? ` 🎉 ${tr("A party!")}` : ""}`);
@@ -167,7 +187,7 @@ const Furnish = (() => {
   }
 
   // ---------------------------------------------------------------- what the pieces do
-  let sat = null, view = "shop", book = [], partyLeft = 0;
+  let sat = null, view = "shop", book = [], partyLeft = 0, garden = null;
   const today = () => (typeof Payroll !== "undefined" ? Payroll.epoch() : 0);
   const comfort = (c = here()) => 1 + 0.05 * new Set((st.placed[c] || []).map((p) => p.id)).size;       // (heal faster at home for each kind of piece: Vitals restBoost)
   function actNear() {
@@ -189,10 +209,23 @@ const Furnish = (() => {
     } else if (p.id === "stool" || p.id === "cushions") sitAt(p, tr("You sit down. Move to stand up."));
     else if (p.id === "table") { view = "cook"; note = ""; render(); openPanel("#furnish"); }
     else if (p.id === "chest") { view = "chest"; note = ""; render(); openPanel("#furnish"); }
+    else if (p.id === "plot") { garden = p; view = "garden"; note = ""; render(); openPanel("#furnish"); }
     else if (p.id === "plant") {
       if (st.water.day === today()) { toast(tr("The plant has been watered today.")); return; }
       st.water = { day: today(), n: st.water.n + 1 }; save(); refresh(); Sfx.play("splash"); toast(tr("You water the plant. It grows a little."));
     }
+  }
+  function sow(k) {
+    if (!garden || garden.crop || !CROPS[k] || Vitals.coins < CROPS[k][1]) return;
+    Vitals.coins -= CROPS[k][1]; garden.crop = { k, g: 0, w: -1 }; save(); refresh(); Sfx.play("thud"); note = `${tr(Shopkeep.GOODS[k][0])}: ${tr("sown. Water it once a day.")}`; render();
+  }
+  function waterBed() {
+    const cr = garden && garden.crop; if (!cr || cr.w === today() || cr.g >= CROPS[cr.k][0]) return;
+    cr.w = today(); cr.g++; save(); refresh(); Sfx.play("splash"); note = cr.g >= CROPS[cr.k][0] ? tr("It is ripe! Harvest it.") : tr("You water the bed. It grows a little."); render();
+  }
+  function harvest() {
+    const cr = garden && garden.crop; if (!cr || cr.g < CROPS[cr.k][0]) return;
+    if (typeof Guilds !== "undefined") Guilds.score("harvest"); Shopkeep.give(cr.k, HARVEST); delete garden.crop; save(); refresh(); Sfx.play("pop"); Sfx.play("discover"); note = `+${HARVEST} ${tr(Shopkeep.GOODS[cr.k][0])}`; render();
   }
   function plainMeal() {
     if (st.meals.day !== today()) st.meals = { day: today(), n: 0 };
@@ -203,7 +236,7 @@ const Furnish = (() => {
   function cook(r) {
     if (!canCook(r)) return;
     for (const [id, n] of Object.entries(r[1])) Shopkeep.take(id, n);
-    Vitals.eat(r[2], r[3]); Sfx.play("sizzle"); setTimeout(() => Sfx.play("clink"), 900); note = `${tr(r[0])}: ${tr("delicious!")} (+${r[2]})`; render();
+    if (typeof Guilds !== "undefined") Guilds.score("dish"); Vitals.eat(r[2], r[3]); Sfx.play("sizzle"); setTimeout(() => Sfx.play("clink"), 900); note = `${tr(r[0])}: ${tr("delicious!")} (+${r[2]})`; render();
   }
   const stash = (id, n) => { const room = CHEST_MAX - Object.values(st.chest).reduce((a, b) => a + b, 0), k = Math.min(n, room, Shopkeep.owns(id)); if (k > 0 && Shopkeep.take(id, k)) { st.chest[id] = (st.chest[id] || 0) + k; save(); } else if (room <= 0) note = tr("The chest is full."); render(); };
   const fetchOut = (id, n) => { const k = Math.min(n, st.chest[id] || 0); if (k > 0) { Shopkeep.give(id, k); st.chest[id] -= k; if (!st.chest[id]) delete st.chest[id]; save(); } render(); };
@@ -219,9 +252,12 @@ const Furnish = (() => {
     if (guest) { note = tr("You are a guest: you cannot move the furniture here."); render(); return; }
     if (!inHouse()) { note = tr("Go inside your own house to put furniture down."); render(); return; }
     const c = here();
+    if (id === "plot" && totalPlaced("plot") >= PLOTS_MAX) { note = tr("You can keep four garden beds at most."); render(); return; }
     if (st.placed[c].length >= MAX) { note = tr("The house is full: pick something up first."); render(); return; }
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), x = player.x + fx * 1.4, z = player.z + fz * 1.4;
-    st.placed[c].push({ id, x: +x.toFixed(2), z: +z.toFixed(2), yaw: +(player.yaw + Math.PI).toFixed(2) });
+    const piece = { id, x: +x.toFixed(2), z: +z.toFixed(2), yaw: +(player.yaw + Math.PI).toFixed(2) };
+    if (st.gifts[id] && st.gifts[id].length) { piece.from = st.gifts[id].shift(); if (!st.gifts[id].length) delete st.gifts[id]; }                  // (a gift in your pack goes down first: its card goes with it)
+    st.placed[c].push(piece);
     save(); refresh(); Sfx.play("thud"); note = `${tr(PIECES[id][0])}: ${tr("placed in front of you.")}`; render();
   }
   // the nearest piece in this house, within three steps
@@ -236,14 +272,15 @@ const Furnish = (() => {
   }
   function pickUp() {
     const p = nearest(); if (!p) { note = tr("Stand beside a piece of furniture."); render(); return; }
-    const arr = st.placed[here()]; arr.splice(arr.indexOf(p), 1); save(); refresh(); note = `${tr(PIECES[p.id][0])}: ${tr("back in your pack.")}`; render();
+    const arr = st.placed[here()]; arr.splice(arr.indexOf(p), 1); if (p.from) (st.gifts[p.id] || (st.gifts[p.id] = [])).push(p.from); save(); refresh(); note = `${tr(PIECES[p.id][0])}: ${tr("back in your pack.")}`; render();
   }
   // the player market (playermarket.js): a piece you do not have placed goes into a listing, and comes back (or arrives from a buyer) by mail
-  const take = (id, n = 1) => { if (!PIECES[id] || free(id) < n) return false; st.own[id] = owned(id) - n; if (!st.own[id]) delete st.own[id]; save(); if ($p("furnish") && $p("furnish").classList.contains("show")) render(); return true; };
-  const give = (id, n = 1) => { if (!PIECES[id]) return false; st.own[id] = Math.min(OWN_MAX, owned(id) + n); save(); return true; };
+  const trimGifts = (id) => { if (st.gifts[id]) { st.gifts[id].length = Math.min(st.gifts[id].length, Math.max(0, free(id))); if (!st.gifts[id].length) delete st.gifts[id]; } };       // (a piece that goes away goes without its card if you have a plain one: gifts are kept last)
+  const take = (id, n = 1) => { if (!PIECES[id] || free(id) < n) return false; st.own[id] = owned(id) - n; if (!st.own[id]) delete st.own[id]; trimGifts(id); save(); if ($p("furnish") && $p("furnish").classList.contains("show")) render(); return true; };
+  const give = (id, n = 1, from) => { if (!PIECES[id]) return false; st.own[id] = Math.min(OWN_MAX, owned(id) + n); if (from) { const a = st.gifts[id] || (st.gifts[id] = []); for (let i = 0; i < n && a.length < OWN_MAX; i++) a.push(String(from).slice(0, 18)); } save(); return true; };
   function sell(id) {
     if (free(id) < 1) return;
-    st.own[id] = owned(id) - 1; if (!st.own[id]) delete st.own[id];
+    st.own[id] = owned(id) - 1; if (!st.own[id]) delete st.own[id]; trimGifts(id);
     Vitals.coins += Math.round(PIECES[id][1] * 0.5); save(); note = `${tr(PIECES[id][0])}: ${tr("sold for half.")}`; render();
   }
 
@@ -264,6 +301,24 @@ const Furnish = (() => {
       for (const [ik, id, name] of opts) { const o = el("option", tr(name)); o.value = `${ik}:${id}`; sel.append(o); }
       if (opts.length) rows.push(sel, mk(tr("Leave 1 as a gift"), () => { const [ik, id] = sel.value.split(":"); Online.navalSend({ t: "social", a: "f_gift", fid: guest.fid, item: id, ik, n: 1, label: tr(ik === "good" ? Shopkeep.GOODS[id][0] : PIECES[id][0]) }); }));
       else rows.push(el("p", tr("You have nothing to give: buy goods in the shops, or furniture here."), "dnote"));
+      body.replaceChildren(...rows); return;
+    }
+    if (view === "garden" && garden) {
+      const mk = (label, f, dis) => { const b = el("button", label); b.type = "button"; b.disabled = !!dis; b.addEventListener("click", f); return b; };
+      rows.push(el("h3", tr("Your garden bed")), el("p", tr("You have {0} denarii.").replace("{0}", Math.round(Vitals.coins)), "dnote"));
+      if (note) rows.push(el("p", note, "sk-note"));
+      const cr = garden.crop;
+      if (!cr) {
+        rows.push(el("p", tr("The bed is empty. Sow a seed: water it once on each game day, and the harvest is 2 of the good, for your cooking."), "dnote"));
+        const ul = el("ul", undefined, "mk-items");
+        for (const k of Object.keys(CROPS)) { const li = el("li"), tx = el("span"); tx.append(el("strong", tr(Shopkeep.GOODS[k][0])), el("small", `${CROPS[k][0]} ${tr("days of water")}`)); li.append(tx, mk(`${tr("Sow")} · ${CROPS[k][1]}`, () => sow(k), Vitals.coins < CROPS[k][1])); ul.append(li); }
+        rows.push(ul);
+      } else {
+        const need = CROPS[cr.k][0], ripe = cr.g >= need;
+        rows.push(el("p", `${tr(Shopkeep.GOODS[cr.k][0])}: ${"🌱".repeat(Math.max(1, cr.g))}${"·".repeat(Math.max(0, need - Math.max(1, cr.g)))} (${cr.g} / ${need} ${tr("days of water")})`, "dnote"));
+        rows.push(mk(tr(ripe ? "Watered enough" : cr.w === today() ? "Watered today" : "💧 Water"), waterBed, ripe || cr.w === today()), mk(tr("🧺 Harvest"), harvest, !ripe));
+      }
+      rows.push(mk(tr("← Back"), () => { view = "shop"; note = ""; render(); }));
       body.replaceChildren(...rows); return;
     }
     if (view === "cook") {
@@ -343,11 +398,12 @@ const Furnish = (() => {
     setInterval(() => { refresh(); if (sat && !Vitals.resting) sat = null; const p = $p("furnish"); if (p && p.classList.contains("show")) render(); }, 2000);
     setInterval(() => { if (partyLeft > 0) partyLeft -= 1; }, 1000);
     setInterval(() => {                                                                           // (your layout goes to the server for your friends; a guest goes home when they walk out)
-      if (dirty && typeof Online !== "undefined" && Online.connected && typeof Account !== "undefined" && Account.loggedIn) { dirty = false; Online.navalSend({ t: "social", a: "f_set", placed: st.placed, water: st.water.n }); }
+      if (dirty && typeof Online !== "undefined" && Online.connected && typeof Account !== "undefined" && Account.loggedIn) { dirty = false; Online.navalSend({ t: "social", a: "f_set", placed: serial(), water: st.water.n }); }
       if (guest) { away = inHouse() && here() === guest.city ? 0 : away + 0.5; if (away > 3) endGuest(); }
     }, 500);
     refresh();
   }
+  const serial = () => { const o = {}; for (const c of Object.keys(st.placed)) o[c] = st.placed[c].map((p) => (p.crop ? { ...p, ck: p.crop.k, gs: stageOf(p.crop) } : p)); return o; };      // (friends see the stage of what grows)
   const snapshot = () => JSON.parse(JSON.stringify(st));
   function restore(r) { st = clean(r); save(); refresh(); }
 

@@ -93,7 +93,7 @@ const Photo = (() => {
   // what the camera sees as a PNG, with a small caption in the corner (a postcard look adds a white border and a bigger caption)
   function picture(done) {
     renderer.render(scene, camera);                                         // (drawn and read in the same moment, so the picture is not empty)
-    const src = renderer.domElement, caption = `Time Machine · ${typeof ERA_NAMES !== "undefined" && ERA_NAMES[city] ? ERA_NAMES[city][era === "modern" ? 1 : 0] : city}`;
+    const src = renderer.domElement, caption = `Time Machine · ${typeof ERA_NAMES !== "undefined" && ERA_NAMES[city] ? ERA_NAMES[city][era === "modern" ? 1 : 0] : city} · ${(typeof Time !== "undefined" ? `${String(Math.floor(Time.hour)).padStart(2, "0")}:${String(Math.floor((Time.hour % 1) * 60)).padStart(2, "0")} · ` : "")}${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
     const w = src.width, h = src.height, c = document.createElement("canvas"), g0 = c.getContext("2d");
     const s = Math.max(14, Math.round(h / 40)), card = look === "card", pad = card ? Math.round(h / 22) : 0, foot = card ? Math.round(h / 12) : 0;
     c.width = w + pad * 2; c.height = h + pad * 2 + foot;

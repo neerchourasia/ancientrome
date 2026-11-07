@@ -3957,7 +3957,12 @@ def furn_clean(raw):
     for c in FURN_CITIES:
         for p in (pl.get(c) if isinstance(pl.get(c), list) else [])[:30]:
             if isinstance(p, dict) and re.fullmatch(r"[a-z]{2,12}", str(p.get("id", ""))):
-                out["placed"][c].append({"id": p["id"], "x": round(num(p.get("x"), -1e5, 1e5, 0), 2), "z": round(num(p.get("z"), -1e5, 1e5, 0), 2), "yaw": round(num(p.get("yaw"), -7, 7, 0), 2)})
+                piece = {"id": p["id"], "x": round(num(p.get("x"), -1e5, 1e5, 0), 2), "z": round(num(p.get("z"), -1e5, 1e5, 0), 2), "yaw": round(num(p.get("yaw"), -7, 7, 0), 2)}
+                if p.get("from"):
+                    piece["from"] = class_clean(p.get("from"), 18)                  # the giver's name on a gift
+                if p["id"] == "plot" and re.fullmatch(r"[a-z]{3,12}", str(p.get("ck", ""))):
+                    piece["ck"], piece["gs"] = p["ck"], int(num(p.get("gs"), 0, 3, 0))      # what grows in a garden bed, and how far
+                out["placed"][c].append(piece)
     return out
 
 
@@ -4021,7 +4026,7 @@ def on_furn(conn, a, m):
         if ik not in ("good", "furn") or not re.fullmatch(r"[a-z0-9_]{2,24}", item):
             return
         n = int(num(m.get("n"), 1, 5, 1))
-        mkt_mail(fid, item=item, ik=ik, n=n, text="%s left you a gift: %s." % (conn.name, class_clean(m.get("label"), 30) or item))
+        mkt_mail(fid, item=item, ik=ik, n=n, frm=class_clean(conn.name, 18), text="%s left you a gift: %s." % (conn.name, class_clean(m.get("label"), 30) or item))
         return conn.send({"t": "furn", "a": "gift_ok", "item": item, "ik": ik, "n": n})
     if not fid or not (fid == conn.fid or mutual(conn.fid, fid)) or fid not in FURN:
         return conn.send({"t": "furn", "a": "none", "fid": fid or ""})
@@ -4133,6 +4138,11 @@ GUILDS = {}                # key (lower-case name) -> {"name", "tag", "leader" (
 GUILD_OF = {}              # friend id -> key
 GUILD_MAX, GUILD_COST, GUILD_PAY_MAX, GUILD_PAY_HOUR = 20, 500, 1000, 3000
 GUILD_DEP_MAX = 1000000
+GUILD_LOOKS = 8                                                  # banner colours and emblems to choose from (the browser draws them)
+GSCORE = {"spec": 1, "set": 10, "mystery": 10, "coop": 15, "caravan": 5, "dish": 1, "harvest": 1}        # what a member's doings are worth to the guild this week
+GSCORE_HOUR, GCHEST_MAX, GCHEST_TAKE_HOUR, GUILD_WEEK_PRIZE, GUILD_WEEK_MIN = 60, 100, 10, 300, 20
+GUILD_WEEK = {"week": -1, "last": None}                          # the week the scores belong to, and who won the last one: {"name", "tag", "pts", "week"}
+GRATE = {}                                                       # friend id -> [window start, points scored, goods taken] (an hour at a time)
 
 
 def guild_name(v):
@@ -4147,10 +4157,63 @@ def guild_of(conn):
     return GUILDS.get(GUILD_OF.get(conn.fid)) if conn.fid else None
 
 
+def guild_pts(g):
+    return sum(int(v) for f, v in g.get("pts", {}).items() if f in g["members"])
+
+
+def guild_look(g):
+    h = sum(ord(ch) for ch in g["name"])
+    return int(g.get("color", h % GUILD_LOOKS)) % GUILD_LOOKS, int(g.get("emblem", (h // 3) % GUILD_LOOKS)) % GUILD_LOOKS
+
+
+def guild_rank(g):
+    return 1 + sum(1 for x in GUILDS.values() if guild_pts(x) > guild_pts(g))
+
+
 def guild_state(g, conn=None):
-    mem = [{"fid": f, "name": n, "online": bool(conns_of(f)), "leader": f == g["leader"]} for f, n in g["members"].items()]
+    mem = [{"fid": f, "name": n, "online": bool(conns_of(f)), "leader": f == g["leader"], "pts": int(g.get("pts", {}).get(f, 0))} for f, n in g["members"].items()]
     mem.sort(key=lambda r: (not r["leader"], not r["online"], r["name"].lower()))
-    return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX, "motd": g.get("motd", "")}}
+    col, emb = guild_look(g)
+    return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX, "motd": g.get("motd", ""),
+                                "color": col, "emblem": emb, "pts": guild_pts(g), "rank": guild_rank(g), "of": len(GUILDS), "wins": int(g.get("wins", 0)), "chest": g.get("gk", {}), "chest_max": GCHEST_MAX, "last": GUILD_WEEK["last"], "prize": GUILD_WEEK_PRIZE}}
+
+
+def guild_add(fid, k):
+    """Points for a member's doing (GSCORE), at most GSCORE_HOUR an hour each."""
+    g = GUILDS.get(GUILD_OF.get(fid)) if fid else None
+    if not g or k not in GSCORE:
+        return
+    t = time.time()
+    r = GRATE.get(fid)
+    if not r or t - r[0] > 3600:
+        r = GRATE[fid] = [t, 0, 0]
+    if r[1] >= GSCORE_HOUR:
+        return
+    r[1] += GSCORE[k]
+    pts = g.setdefault("pts", {})
+    pts[fid] = int(pts.get(fid, 0)) + GSCORE[k]
+    world_soon()
+    guild_push(g)
+
+
+def guild_roll(t=None):
+    """A new week: the guild with the most points (and at least GUILD_WEEK_MIN) wins GUILD_WEEK_PRIZE for its treasury, and every score starts again."""
+    wk = week_of(time.time() if t is None else t)
+    if wk == GUILD_WEEK["week"]:
+        return
+    if GUILD_WEEK["week"] >= 0 and GUILDS:
+        ranked = sorted(GUILDS.values(), key=lambda x: (-guild_pts(x), x["name"].lower()))
+        top = ranked[0]
+        if guild_pts(top) >= GUILD_WEEK_MIN:
+            top["treasury"] += GUILD_WEEK_PRIZE
+            top["wins"] = int(top.get("wins", 0)) + 1
+            GUILD_WEEK["last"] = {"name": top["name"], "tag": top["tag"], "pts": guild_pts(top), "week": GUILD_WEEK["week"]}
+            guild_say(top, "Your guild won the week with %d points! %d denarii went into the treasury." % (guild_pts(top), GUILD_WEEK_PRIZE))
+            guild_push(top)
+    GUILD_WEEK["week"] = wk
+    for x in GUILDS.values():
+        x["pts"] = {}
+    world_soon()
 
 
 def guild_push(g):
@@ -4165,12 +4228,13 @@ def guild_tag_of(conn):
 
 
 def on_guild(conn, a, m):
+    guild_roll()
     g = guild_of(conn)
     if a == "g_me":
         return conn.send(guild_state(g, conn) if g else {"t": "guild", "g": None})
     if a == "g_list":
         rows = sorted(GUILDS.values(), key=lambda x: (-x["treasury"], -len(x["members"])))[:30]
-        return conn.send({"t": "guilds", "list": [{"name": x["name"], "tag": x["tag"], "n": len(x["members"]), "treasury": x["treasury"]} for x in rows]})
+        return conn.send({"t": "guilds", "list": [{"name": x["name"], "tag": x["tag"], "n": len(x["members"]), "treasury": x["treasury"], "pts": guild_pts(x), "color": guild_look(x)[0], "emblem": guild_look(x)[1]} for x in rows]})
     if a == "g_make":
         if g:
             return social_msg(conn, "Leave your guild first.")
@@ -4204,6 +4268,7 @@ def on_guild(conn, a, m):
         return social_msg(conn, "You are not in a guild.")
     if a == "g_leave":
         g["members"].pop(conn.fid, None)
+        g.get("pts", {}).pop(conn.fid, None)
         GUILD_OF.pop(conn.fid, None)
         conn.send({"t": "guild", "g": None})
         if not g["members"]:
@@ -4225,6 +4290,46 @@ def on_guild(conn, a, m):
         conn.ctok -= 1
         g["chat"].append({"name": conn.name, "text": text, "ts": int(time.time())})
         del g["chat"][:-40]
+        return guild_push(g)
+    if a == "g_look":
+        if g["leader"] != conn.fid:
+            return social_msg(conn, "Only the guild leader can do that.")
+        g["color"], g["emblem"] = int(num(m.get("color"), 0, GUILD_LOOKS - 1, 0)), int(num(m.get("emblem"), 0, GUILD_LOOKS - 1, 0))
+        world_soon()
+        return guild_push(g)
+    if a == "g_score":                                                           # the browser tells us what a member did (found a specimen, solved a case, ...): points for this week, at most GSCORE_HOUR an hour each
+        k = str(m.get("k", ""))
+        if k not in GSCORE:
+            return
+        return guild_add(conn.fid, k)
+    if a in ("g_gdep", "g_gtake"):                                               # the guild's chest of goods: put some in, or take a few out (10 an hour each)
+        item = str(m.get("item", ""))
+        if not re.fullmatch(r"[a-z0-9_]{2,24}", item):
+            return
+        chest = g.setdefault("gk", {})
+        if a == "g_gdep":
+            n = int(num(m.get("n"), 1, 20, 1))
+            if sum(chest.values()) + n > GCHEST_MAX:
+                return social_msg(conn, "The guild chest holds %d goods at most." % GCHEST_MAX)
+            chest[item] = chest.get(item, 0) + n
+            conn.send({"t": "g_good", "dir": "dep", "item": item, "n": n})
+            guild_say(g, "%s put %d in the guild chest." % (conn.name, n))
+        else:
+            n = int(num(m.get("n"), 1, 5, 1))
+            t = time.time()
+            r = GRATE.get(conn.fid)
+            if not r or t - r[0] > 3600:
+                r = GRATE[conn.fid] = [t, 0, 0]
+            if chest.get(item, 0) < n:
+                return social_msg(conn, "The chest does not hold that.")
+            if r[2] + n > GCHEST_TAKE_HOUR:
+                return social_msg(conn, "You can take %d goods an hour from the guild chest." % GCHEST_TAKE_HOUR)
+            r[2] += n
+            chest[item] -= n
+            if chest[item] <= 0:
+                del chest[item]
+            conn.send({"t": "g_good", "dir": "take", "item": item, "n": n})
+        world_soon()
         return guild_push(g)
     if a == "g_motd":
         if g["leader"] != conn.fid:
@@ -4281,6 +4386,128 @@ def guild_say(g, text):
     g["chat"].append({"name": "", "text": text, "ts": int(time.time())})
     del g["chat"][:-40]
 
+
+
+# ---- team cases: friends solve one of the mysteries (mystery.js) together. Each of the clues is held by one of the players, who must stand at its place; everybody sees what has been found, and when the
+# team names the culprit everybody is paid (the case's reward and 100 more). Kept in memory only; the browser knows the texts and the suspects, the server keeps who holds which clue and what is found.
+COOPS = {}                   # session id -> {"sid", "host", "city", "n", "k" (clues), "order": [friend ids], "names": {fid: name}, "found": [0/1], "by": [name], "no": [suspect numbers], "ok", "inv": {fids}, "t"}
+CO_OF = {}                   # friend id -> session id
+CO_MAX, CO_LIFE, CO_REWARD, CO_BONUS, CO_HOUR_REWARDS = 4, 3 * 3600.0, (250, 400), 100, 2
+CO_PAID = {}                 # friend id -> [when] of the team rewards they got lately
+
+
+def coop_state(co, fid):
+    order = co["order"]
+    return {"t": "coop", "a": "state", "s": {"sid": co["sid"], "city": co["city"], "n": co["n"], "k": co["k"], "host": co["host"] == fid, "me": order.index(fid) if fid in order else -1,
+                                             "members": [{"name": co["names"].get(f, ""), "online": bool(conns_of(f))} for f in order], "found": co["found"], "by": co["by"], "no": co["no"], "ok": co["ok"]}}
+
+
+def coop_push(co):
+    for f in co["order"]:
+        for c in conns_of(f):
+            c.send(coop_state(co, f))
+
+
+def coop_drop(fid):
+    sid = CO_OF.pop(fid, None)
+    co = COOPS.get(sid)
+    if not co:
+        return
+    if fid in co["order"]:
+        co["order"].remove(fid)
+    if not co["order"]:
+        COOPS.pop(sid, None)
+        return
+    if co["host"] == fid:
+        co["host"] = co["order"][0]
+    coop_push(co)
+
+
+def on_coop(conn, a, m):
+    t = time.time()
+    for sid in [k for k, v in COOPS.items() if t - v["t"] > CO_LIFE]:                        # old sessions go
+        for f in COOPS[sid]["order"]:
+            CO_OF.pop(f, None)
+            for c in conns_of(f):
+                c.send({"t": "coop", "a": "end"})
+        COOPS.pop(sid, None)
+    if not conn.fid:
+        return conn.send({"t": "coop", "a": "no", "text": "Team cases need your account."})
+    co = COOPS.get(CO_OF.get(conn.fid))
+    if a == "co_me":
+        return conn.send(coop_state(co, conn.fid) if co else {"t": "coop", "a": "end"})
+    if a == "co_make":
+        if co:
+            return conn.send({"t": "coop", "a": "no", "text": "Leave your team case first."})
+        city, n = str(m.get("city", "")), int(num(m.get("n"), 0, 1, 0))
+        if city not in FURN_CITIES or len(COOPS) >= 300:
+            return
+        sid = "%08x" % random.getrandbits(32)
+        k = 3 if n == 0 else 4
+        co = COOPS[sid] = {"sid": sid, "host": conn.fid, "city": city, "n": n, "k": k, "order": [conn.fid], "names": {conn.fid: conn.name}, "found": [0] * k, "by": [""] * k, "no": [], "ok": 0, "inv": set(), "t": t}
+        CO_OF[conn.fid] = sid
+        return coop_push(co)
+    if a == "co_join":
+        if co:
+            return conn.send({"t": "coop", "a": "no", "text": "Leave your team case first."})
+        tg = COOPS.get(str(m.get("sid", "")))
+        if not tg or conn.fid not in tg["inv"] or len(tg["order"]) >= CO_MAX:
+            return conn.send({"t": "coop", "a": "no", "text": "That team case is not open to you any more."})
+        tg["order"].append(conn.fid)
+        tg["names"][conn.fid] = conn.name
+        CO_OF[conn.fid] = tg["sid"]
+        return coop_push(tg)
+    if not co:
+        return conn.send({"t": "coop", "a": "end"})
+    if a == "co_leave":
+        conn.send({"t": "coop", "a": "end"})
+        return coop_drop(conn.fid)
+    if a == "co_invite":
+        fid = clean_fid(m.get("fid"))
+        if co["host"] != conn.fid:
+            return conn.send({"t": "coop", "a": "no", "text": "Only the one who started the case can invite."})
+        if not fid or fid in co["order"] or not mutual(conn.fid, fid) or len(co["inv"]) >= 12:
+            return conn.send({"t": "coop", "a": "no", "text": "Only your friends can join, and the team holds %d." % CO_MAX})
+        cs = conns_of(fid)
+        if not cs:
+            return conn.send({"t": "coop", "a": "no", "text": "They must be online."})
+        co["inv"].add(fid)
+        for c in cs:
+            c.send({"t": "coop", "a": "invite", "sid": co["sid"], "from": conn.name, "city": co["city"], "n": co["n"]})
+        return conn.send({"t": "coop", "a": "sent"})
+    if co["ok"]:
+        return
+    if a == "co_clue":
+        i = int(num(m.get("i"), 0, co["k"] - 1, 0))
+        if co["found"][i] or co["order"][i % len(co["order"])] != conn.fid:
+            return
+        co["found"][i] = 1
+        co["by"][i] = conn.name
+        conn.send({"t": "coop", "a": "clue_ok", "i": i})
+        return coop_push(co)
+    if a == "co_no":
+        i = int(num(m.get("i"), 0, 9, 0))
+        if i not in co["no"]:
+            co["no"].append(i)
+        return coop_push(co)
+    if a == "co_solve":
+        if len(co["order"]) < 2:
+            return conn.send({"t": "coop", "a": "no", "text": "A team case needs two players or more."})
+        if not all(co["found"]):
+            return
+        co["ok"] = 1
+        reward = CO_REWARD[co["n"]] + CO_BONUS
+        for f in co["order"]:
+            recent = [x for x in CO_PAID.get(f, []) if t - x < 3600]
+            paid = len(recent) < CO_HOUR_REWARDS
+            if paid:
+                recent.append(t)
+                mkt_mail(f, coins=reward, text="Your team solved the case: +%d denarii." % reward)
+            else:
+                mkt_mail(f, coins=0, text="Your team solved the case. You have had your team rewards for this hour, so there is no reward this time.")
+            CO_PAID[f] = recent
+            guild_add(f, "coop")
+        return coop_push(co)
 
 
 # ---- the exchange: eight companies whose prices wander (a random walk that is pulled back towards its usual price, with the odd piece of news). Everyone sees
@@ -5816,13 +6043,15 @@ def on_social(conn, m):
         return on_market(conn, a, m)
     if a in ("f_set", "f_get", "f_note", "f_gift", "f_party"):
         return on_furn(conn, a, m)
+    if a in ("co_make", "co_invite", "co_join", "co_leave", "co_clue", "co_no", "co_solve", "co_me"):
+        return on_coop(conn, a, m)
     if a == "title":
         return on_title(conn, m)
     if a == "ev_time":
         return on_event_time(conn, m)
     if a == "ev_top":
         return on_event_top(conn, m)
-    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd"):
+    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd", "g_look", "g_score", "g_gdep", "g_gtake"):
         return on_guild(conn, a, m)
     if a == "leaders":
         return conn.send(dict(top_boards(), t="leaders"))
@@ -6453,7 +6682,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
@@ -6477,10 +6706,20 @@ def world_apply(rows):
                 v["treasury"] = int(num(v.get("treasury"), 0, 1e12, 0))
                 v["motd"] = str(v.get("motd", ""))[:140]
                 v["paid"] = v["paid"] if isinstance(v.get("paid"), list) and len(v["paid"]) == 2 else [0.0, 0]
+                v["pts"] = {f: int(num(n, 0, 10 ** 6, 0)) for f, n in list((v.get("pts") if isinstance(v.get("pts"), dict) else {}).items())[:GUILD_MAX] if clean_fid(f)}
+                v["gk"] = {i: int(num(n, 1, GCHEST_MAX, 1)) for i, n in list((v.get("gk") if isinstance(v.get("gk"), dict) else {}).items())[:60] if re.fullmatch(r"[a-z0-9_]{2,24}", str(i))}
+                v["wins"] = int(num(v.get("wins"), 0, 10 ** 6, 0))
+                if "color" in v:
+                    v["color"], v["emblem"] = int(num(v.get("color"), 0, GUILD_LOOKS - 1, 0)), int(num(v.get("emblem"), 0, GUILD_LOOKS - 1, 0))
                 GUILDS[k] = v
         for f, k in g["of"].items():
             if k in GUILDS and f in GUILDS[k]["members"]:
                 GUILD_OF[f] = k
+        w = g.get("week")
+        if isinstance(w, dict):
+            GUILD_WEEK["week"] = int(num(w.get("week"), -1, 10 ** 6, -1))
+            ls = w.get("last")
+            GUILD_WEEK["last"] = {"name": class_clean(ls.get("name"), 18), "tag": guild_tag(ls.get("tag")), "pts": int(num(ls.get("pts"), 0, 10 ** 6, 0)), "week": int(num(ls.get("week"), 0, 10 ** 6, 0))} if isinstance(ls, dict) else None
     st = rows.get("stocks")
     if isinstance(st, dict) and isinstance(st.get("p"), dict) and isinstance(st.get("hist"), dict) and all(d[0] in st["p"] and d[0] in st["hist"] for d in STOCK_DEFS):
         STOCKS.update({"t": float(st.get("t") or time.time()), "p": {d[0]: float(st["p"][d[0]]) for d in STOCK_DEFS}, "hist": {d[0]: [float(x) for x in st["hist"][d[0]]][-STOCK_HIST:] for d in STOCK_DEFS},
@@ -6520,7 +6759,8 @@ def world_apply(rows):
         for f, box in list((mk.get("mail") if isinstance(mk.get("mail"), dict) else {}).items())[:5000]:
             if clean_fid(f) and isinstance(box, list):
                 MKT["mail"][f] = [{"id": str(x.get("id"))[:12], "coins": int(num(x.get("coins"), -10 ** 9, 10 ** 9, 0)), "text": class_clean(x.get("text"), 140),
-                                   **({"item": x["item"], "ik": x["ik"], "n": int(num(x.get("n"), 1, 99, 1))} if re.fullmatch(r"[a-z0-9_]{2,24}", str(x.get("item", ""))) and x.get("ik") in ("item", "good", "furn") else {})}
+                                   **({"item": x["item"], "ik": x["ik"], "n": int(num(x.get("n"), 1, 99, 1))} if re.fullmatch(r"[a-z0-9_]{2,24}", str(x.get("item", ""))) and x.get("ik") in ("item", "good", "furn") else {}),
+                                   **({"frm": class_clean(x.get("frm"), 18)} if x.get("frm") else {})}
                                   for x in box[-MKT_MAIL_MAX:] if isinstance(x, dict)]
     dl = rows.get("daily")
     if isinstance(dl, dict):

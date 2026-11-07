@@ -22,7 +22,7 @@ const PlayerMarket = (() => {
     let ok = true;
     if (mail.item) {
       if (mail.ik === "good") Shopkeep.give(mail.item, mail.n || 1);
-      else if (mail.ik === "furn") Furnish.give(mail.item, mail.n || 1);
+      else if (mail.ik === "furn") Furnish.give(mail.item, mail.n || 1, mail.frm);
       else if (!Market.grant(mail.item)) ok = false;                                     // (you already own that one: the money is not taken)
     }
     if (ok && mail.coins) Vitals.coins = Math.max(0, Vitals.coins + mail.coins);

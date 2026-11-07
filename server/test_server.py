@@ -3722,6 +3722,123 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.2)
         self.assertEqual(server.GUILDS, {})                                                              # the last member out closes the guild
 
+    async def test_gift_cards_and_garden_stages_reach_a_friends_view_of_the_house(self):
+        server.FURN.clear(); server.LEFT.clear(); server.MKT["mail"].clear()
+        self.addCleanup(lambda: (server.FURN.clear(), server.LEFT.clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        fa, fb = server.fid_of("u-ann"), server.fid_of("u-bob")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        ann.send({"t": "social", "a": "f_set", "placed": {"rome": [
+            {"id": "table", "x": 1, "z": 1, "yaw": 0, "from": "Bob <i>"},
+            {"id": "plot", "x": 3, "z": 1, "yaw": 0, "ck": "saffron", "gs": 9},
+            {"id": "plot", "x": 5, "z": 1, "yaw": 0, "ck": "<b>", "gs": 2}]}, "water": 0})
+        await asyncio.sleep(0.3)
+        bob.send({"t": "social", "a": "f_get", "fid": fa})
+        rows = (await bob.until(lambda m: m["t"] == "furn" and m["a"] == "layout"))["placed"]["rome"]
+        self.assertEqual(rows[0]["from"], "Bob i")                                                         # (cleaned) the giver's name stays on the piece
+        self.assertEqual((rows[1]["ck"], rows[1]["gs"]), ("saffron", 3))                                    # the stage is cut to 3
+        self.assertNotIn("ck", rows[2])
+        bob.send({"t": "social", "a": "f_gift", "fid": fa, "item": "rug", "ik": "furn", "n": 1, "label": "Rug"})
+        await bob.until(lambda m: m["t"] == "furn" and m["a"] == "gift_ok")
+        self.assertEqual(server.MKT["mail"][fa][-1]["frm"], "Bob")                                          # the mail says who gave it
+
+    async def test_guild_banner_weekly_score_goods_chest_and_the_weekly_prize(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear(); server.GRATE.clear()
+        hour = server.GSCORE_HOUR
+        server.GSCORE_HOUR = 20
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear(), server.GRATE.clear(), setattr(server, "GSCORE_HOUR", hour)))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "EAG"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["members"]) == 2)
+        # the banner is the leader's to change (and stays within the choices)
+        bob.send({"t": "social", "a": "g_look", "color": 3, "emblem": 4})
+        self.assertIn("leader", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_look", "color": 99, "emblem": 4})
+        g = (await ann.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["emblem"] == 4))["g"]
+        self.assertEqual(g["color"], 7)
+        # points: a known doing counts, an unknown one does not, and an hour holds at most GSCORE_HOUR
+        ann.send({"t": "social", "a": "g_score", "k": "mystery"})
+        ann.send({"t": "social", "a": "g_score", "k": "made-up"})
+        bob.send({"t": "social", "a": "g_score", "k": "caravan"})
+        g = (await ann.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["pts"] == 15))["g"]
+        self.assertEqual((g["rank"], g["of"]), (1, 1))
+        for _ in range(2):
+            ann.send({"t": "social", "a": "g_score", "k": "coop"})
+        await asyncio.sleep(0.4)
+        self.assertEqual(server.GUILDS["red eagles"]["pts"][server.fid_of("u-ann")], 25)                    # (the second coop point was over the hour's limit of 20)
+        # the goods chest: a member puts goods in, anyone takes a few out (the hourly limit holds)
+        ann.send({"t": "social", "a": "g_gdep", "item": "saffron", "n": 20})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "g_good"))["dir"], "dep")
+        bob.send({"t": "social", "a": "g_gtake", "item": "saffron", "n": 5})
+        got = await bob.until(lambda m: m["t"] == "g_good")
+        self.assertEqual((got["dir"], got["item"], got["n"]), ("take", "saffron", 5))
+        bob.send({"t": "social", "a": "g_gtake", "item": "saffron", "n": 5})
+        await bob.until(lambda m: m["t"] == "g_good")
+        bob.send({"t": "social", "a": "g_gtake", "item": "saffron", "n": 1})
+        self.assertIn("an hour", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        self.assertEqual(server.GUILDS["red eagles"]["gk"], {"saffron": 10})
+        # a new week: the guild with the points wins the prize and the scores start again
+        before = server.GUILDS["red eagles"]["treasury"]
+        server.GUILD_WEEK["week"] = server.week_of(time.time()) - 1
+        server.guild_roll()
+        g = server.GUILDS["red eagles"]
+        self.assertEqual((g["treasury"], g["wins"], g["pts"]), (before + server.GUILD_WEEK_PRIZE, 1, {}))
+        self.assertEqual(server.GUILD_WEEK["last"]["name"], "Red Eagles")
+        snap = json.loads(json.dumps(server.world_snapshot()["guilds"]))                                    # (a copy: the snapshot shares the live dicts)
+        self.assertIn("week", snap)
+        server.GUILDS.clear(); server.GUILD_OF.clear()
+        server.world_apply({"guilds": snap})
+        self.assertEqual((server.GUILDS["red eagles"]["wins"], server.GUILDS["red eagles"]["gk"], server.GUILDS["red eagles"]["color"]), (1, {"saffron": 10}, 7))
+
+    async def test_a_team_case_splits_the_clues_between_friends_and_pays_everyone(self):
+        server.COOPS.clear(); server.CO_OF.clear(); server.CO_PAID.clear(); server.MKT["mail"].clear(); server.GUILDS.clear(); server.GUILD_OF.clear()
+        self.addCleanup(lambda: (server.COOPS.clear(), server.CO_OF.clear(), server.CO_PAID.clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        fa, fb = server.fid_of("u-ann"), server.fid_of("u-bob")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        ann.send({"t": "social", "a": "co_make", "city": "rome", "n": 0})
+        st = (await ann.until(lambda m: m["t"] == "coop" and m["a"] == "state"))["s"]
+        self.assertEqual((st["k"], st["me"], st["host"], len(st["members"])), (3, 0, True, 1))
+        # only a friend can be invited, and only the host invites
+        ann.send({"t": "social", "a": "co_invite", "fid": server.fid_of("u-cy")})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "coop" and m["a"] == "no"))["a"], "no")
+        ann.send({"t": "social", "a": "co_invite", "fid": fb})
+        inv = await bob.until(lambda m: m["t"] == "coop" and m["a"] == "invite")
+        self.assertEqual((inv["from"], inv["city"], inv["n"]), ("Ann", "rome", 0))
+        cy.send({"t": "social", "a": "co_join", "sid": inv["sid"]})                                         # (not invited)
+        self.assertEqual((await cy.until(lambda m: m["t"] == "coop" and m["a"] == "no"))["a"], "no")
+        bob.send({"t": "social", "a": "co_join", "sid": inv["sid"]})
+        st = (await bob.until(lambda m: m["t"] == "coop" and m["a"] == "state"))["s"]
+        self.assertEqual((st["me"], [m["name"] for m in st["members"]]), (1, ["Ann", "Bob"]))
+        # clue 0 and 2 are Ann's, clue 1 is Bob's: a clue is only taken by its holder
+        bob.send({"t": "social", "a": "co_clue", "i": 0})
+        ann.send({"t": "social", "a": "co_clue", "i": 0})
+        await ann.until(lambda m: m["t"] == "coop" and m["a"] == "clue_ok")
+        ann.send({"t": "social", "a": "co_solve"})                                                          # not all clues yet: nothing happens
+        await asyncio.sleep(0.2)
+        self.assertEqual(server.MKT["mail"], {})
+        bob.send({"t": "social", "a": "co_clue", "i": 1})
+        ann.send({"t": "social", "a": "co_clue", "i": 2})
+        st = (await bob.until(lambda m: m["t"] == "coop" and m["a"] == "state" and all(m["s"]["found"])))["s"]
+        self.assertEqual(st["by"], ["Ann", "Bob", "Ann"])
+        bob.send({"t": "social", "a": "co_no", "i": 2})
+        await ann.until(lambda m: m["t"] == "coop" and m["a"] == "state" and m["s"]["no"] == [2])
+        ann.send({"t": "social", "a": "co_solve"})
+        await ann.until(lambda m: m["t"] == "coop" and m["a"] == "state" and m["s"]["ok"])
+        await asyncio.sleep(0.2)
+        pay = [(f, x["coins"]) for f, box in server.MKT["mail"].items() for x in box]
+        self.assertEqual(sorted(pay), sorted([(fa, 350), (fb, 350)]))                                       # case 250 + 100 for the team
+        ann.send({"t": "social", "a": "co_leave"})
+        await ann.until(lambda m: m["t"] == "coop" and m["a"] == "end")
+        self.assertNotIn(fa, server.CO_OF)
+
     async def test_the_exchange_shows_shared_prices_and_prices_each_trade(self):
         ann, bob = await self.player("Ann"), await self.player("Bob")
         ann.send({"t": "stock", "a": "list"})
