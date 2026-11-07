@@ -280,5 +280,11 @@
     ["You are in your house: drag a piece from the list onto the floor, or press Place and click where it goes.", "Estás en tu casa: arrastra una pieza de la lista al suelo, o pulsa Colocar y haz clic donde va.|Sei nella tua casa: trascina un pezzo dall'elenco sul pavimento, o premi Sistema e clicca dove va.|आप अपने घर में हैं: सूची से किसी चीज़ को फ़र्श पर खींचिए, या रखिए दबाकर जहाँ रखनी है वहाँ क्लिक कीजिए।|你在家里:把列表里的家具拖到地板上,或点“放置”再点要放的位置。"],
   ];
   for (const [en, t] of W6) add(en, t);
+  const W7 = [
+    ["The {0} is shut for the night. Come back in the morning (or press T to change the time).", "El/la {0} está cerrado por la noche. Vuelve por la mañana (o pulsa T para cambiar la hora).|Il/La {0} è chiuso per la notte. Torna domattina (o premi T per cambiare l'ora).|{0} रात के लिए बंद है। सुबह आइए (या समय बदलने के लिए T दबाइए)।|{0}夜里关门了。早上再来(或按T改变时间)。"],
+    ["The {0} is shut because of the {1}. Come back when it has passed (or press T to change the time).", "El/la {0} está cerrado por {1}. Vuelve cuando haya pasado (o pulsa T para cambiar la hora).|Il/La {0} è chiuso a causa di {1}. Torna quando sarà passato (o premi T per cambiare l'ora).|{1} की वजह से {0} बंद है। उसके गुज़रने पर आइए (या समय बदलने के लिए T दबाइए)।|因为{1},{0}关门了。等它过去再来(或按T改变时间)。"],
+    ["cyclone", "el ciclón|il ciclone|चक्रवात|气旋"], ["tornado", "el tornado|il tornado|बवंडर|龙卷风"], ["blizzard", "la ventisca|la bufera di neve|बर्फ़ीला तूफ़ान|暴风雪"], ["hail", "el granizo|la grandine|ओलावृष्टि|冰雹"], ["storm", "la tormenta|la tempesta|तूफ़ान|暴风雨"],
+  ];
+  for (const [en, t] of W7) add(en, t);
   I18n.add(rows);
 })();

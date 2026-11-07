@@ -323,7 +323,9 @@ const Interiors = (() => {
       }
       if (p.door) p.door.locked = !open && !p.inside;                                                        // a shut shop stays shut (unless you are still inside: then you can leave)
       if (slow && !open && !p.inside && p.doorPos && mode === "walk" && Math.hypot(player.x - p.doorPos[0], player.z - p.doorPos[1]) < 3.6 && now - (p.told || -99) > 45) {
-        p.told = now; toast(tr("The {0} is shut for the night. Come back in the morning.").replace("{0}", tr(p.kind.name).toLowerCase()));
+        p.told = now;
+        if (night) toast(tr("The {0} is shut for the night. Come back in the morning (or press T to change the time).").replace("{0}", tr(p.kind.name).toLowerCase()));
+        else toast(tr("The {0} is shut because of the {1}. Come back when it has passed (or press T to change the time).").replace("{0}", tr(p.kind.name).toLowerCase()).replace("{1}", tr(Weather.kind === "cyclone" ? "cyclone" : Weather.kind === "tornado" ? "tornado" : Weather.kind === "blizzard" ? "blizzard" : Weather.kind === "hail" ? "hail" : "storm")));
       }
       if (open && p.keeper && dist < 25) {                                                                   // the keeper sways a little and waves a hand now and then
         const t = now + p.i;
