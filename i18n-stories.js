@@ -252,5 +252,12 @@
     ["Some clues come only from the citizens: chat with them first.", "Algunas pistas solo las dan los ciudadanos: charla primero con ellos.|Alcuni indizi arrivano solo dai cittadini: chiacchiera prima con loro.|कुछ सुराग केवल नागरिकों से मिलते हैं: पहले उनसे बात कीजिए।|有些线索只有市民知道:先和他们聊聊。"],
   ];
   for (const [en, t] of W3) add(en, t);
+  const W4 = [
+    ["🍺 Take me to the nearest tavern", "🍺 Llévame a la taberna más cercana|🍺 Portami alla taverna più vicina|🍺 मुझे सबसे नज़दीकी सराय ले चलिए|🍺 带我去最近的酒馆"],
+    ["The nearest tavern, chai stall, taco bar, noodle bar or tea house: sit, eat and play dice", "La taberna, puesto de chai, taquería, fideería o casa de té más cercanos: siéntate, come y juega a los dados|La taverna, il chiosco del chai, la taqueria, il ristorante di noodle o la sala da tè più vicini: siediti, mangia e gioca ai dadi|सबसे नज़दीकी सराय, चाय की दुकान, टैको बार, नूडल बार या चाय घर: बैठिए, खाइए और पासे खेलिए|最近的酒馆、茶摊、塔科店、面馆或茶馆:坐下、吃饭、玩骰子"],
+    ["Taverns and food stops", "Tabernas y lugares para comer|Taverne e posti dove mangiare|सराय और खाने की जगहें|酒馆和用餐的地方"], ["Open late: sit, eat and play dice", "Abierto hasta tarde: siéntate, come y juega a los dados|Aperto fino a tardi: siediti, mangia e gioca ai dadi|देर तक खुला: बैठिए, खाइए और पासे खेलिए|营业到很晚:坐下、吃饭、玩骰子"], ["Sit down and eat", "Siéntate y come|Siediti e mangia|बैठिए और खाइए|坐下吃饭"],
+    ["There is no tavern or food stop near you.", "No hay ninguna taberna ni lugar para comer cerca de ti.|Non c'è nessuna taverna o posto dove mangiare vicino a te.|आपके पास कोई सराय या खाने की जगह नहीं है।|你附近没有酒馆或用餐的地方。"],
+  ];
+  for (const [en, t] of W4) add(en, t);
   I18n.add(rows);
 })();

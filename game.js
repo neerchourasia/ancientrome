@@ -380,6 +380,7 @@ function wireInput(canvas) {
   refreshMuteButton();
   refreshSoundButton();
   $("#dirs-nearest").addEventListener("click", guideMe);
+  $("#dirs-tavern").addEventListener("click", () => { const t = nearestEat(); if (t) startDirections(t); else toast(typeof I18n !== "undefined" ? I18n.t("There is no tavern or food stop near you.") : "There is no tavern or food stop near you."); });
   $("#dirs-home").addEventListener("click", () => startDirections(LANDMARKS.find((l) => l.home)));
   $("#btn-view").addEventListener("click", () => { if (mode === "walk") cycleView(1); else toast("The camera view can be changed while walking"); });
   $("#btn-era").addEventListener("click", toggleEra);
@@ -1403,20 +1404,50 @@ function updateVitalsHud() {
 
 let placesMode = "go"; // "go": rows teleport you. "dirs": rows give walking directions.
 
+// The walk-in shops where you can sit and eat (taverns, chai stalls, taco and noodle bars, tea houses: see interiors.js), as places you can get directions to. A shop has no landmark entry, so one is made here:
+// where you stand to arrive is in front of its door when the door is known (the shop has been built), otherwise a free spot about nine steps from its middle on the side you are coming from.
+const EAT_SHOPS = new Set(["Tavern", "Chai stall", "Taco bar", "Noodle bar", "Tea house", "Dumpling shop"]);              // (the ones with tables and seats: not the bakeries and sweet shops)
+let eatCache = [];
+function eatPlaces() {
+  if (typeof Interiors === "undefined") return [];
+  const out = [];
+  for (const s of Interiors.shops()) {
+    if (!EAT_SHOPS.has(s.name) || (s.era && s.era !== era)) continue;
+    const dist = Math.hypot(s.x - player.x, s.z - player.z);
+    if (dist > 1800) continue;                                                                       // (only the city you are in)
+    let stand = null;
+    if (s.door) { const dx = s.door[0] - s.x, dz = s.door[1] - s.z, l = Math.hypot(dx, dz) || 1; stand = [s.door[0] + (dx / l) * 2.5, s.door[1] + (dz / l) * 2.5]; }
+    else {
+      const base = Math.atan2(player.z - s.z, player.x - s.x); let bestD = 1e9;
+      for (let k = 0; k < 16; k++) {
+        const a = base + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.39, x = s.x + Math.cos(a) * 9, z = s.z + Math.sin(a) * 9;
+        if (canMove(x, z, x + 0.1, z)) { stand = [x, z]; bestD = 0; break; }
+      }
+      if (!stand) stand = [s.x + 9, s.z];
+    }
+    out.push({ id: `eat-${Math.round(s.x)}-${Math.round(s.z)}`, name: s.name, sub: s.late ? "Open late: sit, eat and play dice" : "Sit down and eat", x: s.x, z: s.z, stand, r: 8, dist, eat: true });
+  }
+  return out.sort((a, b) => a.dist - b.dist);
+}
+function nearestEat() { eatCache = eatPlaces(); return eatCache[0] || null; }
+
 function buildPlacesList() {
   const dirs = placesMode === "dirs";
   const ul = $("#places-list");
-  const list = dirs ? [...LANDMARKS].sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z)) : LANDMARKS;
-  ul.replaceChildren(...list.map((lm) => {
+  eatCache = dirs ? eatPlaces().slice(0, 8) : [];
+  const list = dirs ? [...LANDMARKS].sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z)).concat(eatCache) : LANDMARKS;
+  ul.replaceChildren(...list.map((lm, i) => {
     const li = document.createElement("li");
     li.dataset.id = lm.id;
+    if (lm.eat && !list[i - 1].eat) li.dataset.first = "1";
     const b = document.createElement("button");
     b.type = "button";
     b.className = "go";
     const seen = discovered.has(lm.id);
     b.innerHTML = `<span class="dot ${seen ? "seen" : ""}"></span><span><strong></strong><small></small><em class="away"></em></span>`;
-    b.querySelector("strong").textContent = lm.name;
-    b.querySelector("small").textContent = lm.sub;
+    const trl = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
+    b.querySelector("strong").textContent = lm.eat ? `🍺 ${trl(lm.name)}` : lm.name;
+    b.querySelector("small").textContent = lm.eat ? trl(lm.sub) : lm.sub;
     b.title = dirs ? `Walking directions to ${lm.name}` : "Teleport here";
     b.addEventListener("click", () => (dirs ? startDirections(lm) : goTo(lm)));
     const d = document.createElement("button");
@@ -1428,6 +1459,8 @@ function buildPlacesList() {
     li.append(b, d);
     return li;
   }));
+  const firstEat = ul.querySelector("li[data-first]");                                                                          // (a heading above the taverns)
+  if (firstEat) { const h = document.createElement("li"); h.textContent = `🍺 ${typeof I18n !== "undefined" && I18n.t ? I18n.t("Taverns and food stops") : "Taverns and food stops"}`; h.style.cssText = "list-style:none;font-weight:700;padding:10px 4px 2px;opacity:.85"; firstEat.before(h); }
   $("#places-title").textContent = dirs ? "Directions: where to?" : "Places";
   $("#places-actions").hidden = !dirs;
   $("#places").classList.toggle("dirs", dirs);
@@ -1438,7 +1471,7 @@ function buildPlacesList() {
 // Distance and compass direction from you to each place, shown in the Places list.
 function refreshPlaceDistances() {
   for (const li of document.querySelectorAll("#places-list li")) {
-    const lm = LANDMARKS.find((l) => l.id === li.dataset.id);
+    const lm = LANDMARKS.find((l) => l.id === li.dataset.id) || eatCache.find((l) => l.id === li.dataset.id);
     if (!lm) continue;
     const dx = lm.x - player.x, dz = lm.z - player.z, d = Math.hypot(dx, dz);
     li.querySelector(".away").textContent = `${d < 1000 ? Math.round(d) + " m" : (d / 1000).toFixed(1) + " km"} ${Nav.cardinal(dx, dz)}`;
