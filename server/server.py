@@ -2818,6 +2818,8 @@ async def world_loop():
                 trade_tick()
             if n % 40 == 0:
                 mkt_tick()
+                contest_tick()
+                guild_roll()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
                 season_roll()
@@ -3983,7 +3985,147 @@ def furn_limit(conn):
     return True
 
 
+# a STALL at the door of a house: a player puts goods out at prices of their own, and their friends buy them (also while the owner is away): coins and goods go by mail
+STALLS = {}                  # friend id -> {"items": {good: {"n": stock, "p": price}}}
+STALL_KINDS, STALL_N, STALL_P, STALL_BUY = 8, 40, 5000, 10
+
+
+def stall_view(fid):
+    return [{"item": i, "n": v["n"], "price": v["p"]} for i, v in sorted((STALLS.get(fid) or {"items": {}})["items"].items())]
+
+
+def stall_push(fid, extra=None):
+    for c in conns_of(fid):
+        c.send({"t": "furn", "a": "stall", "fid": "me", "stall": stall_view(fid)})
+
+
+# friends' scores: each player's browser reports a few counts; a player sees their own and their friends'
+FSTATS = {}                  # friend id -> {"name", "mys", "sets", "dishes", "harv", "fr"}
+FSTAT_KEYS = ("mys", "sets", "dishes", "harv", "fr")
+
+# the festival COOKING CONTEST: the first player to enter a festival dish starts a round of CONTEST_LIFE seconds; everybody with an account may vote once (not for themselves); the dish with the most votes
+# (CONTEST_MIN or more) wins CONTEST_PRIZE, and each who voted for it CONTEST_VOTER
+CONTESTS = {}                # festival id -> {"t0", "entries": {fid: {"name", "dish", "votes": [fids]}}, "voted": [fids]}
+CONTEST_LAST = {}            # festival id -> {"name", "dish", "votes"} of the last round
+CONTEST_LIFE, CONTEST_PRIZE, CONTEST_VOTER, CONTEST_MIN = 1200.0, 200, 5, 2
+
+
+def contest_view(conn, fest):
+    c = CONTESTS.get(fest)
+    rows = []
+    if c:
+        for f, e in c["entries"].items():
+            rows.append({"fid": f, "name": e["name"], "dish": e["dish"], "votes": len(e["votes"]), "me": f == conn.fid, "mine": conn.fid in e["votes"]})
+        rows.sort(key=lambda r: (-r["votes"], r["name"].lower()))
+    return {"t": "furn", "a": "contest", "fest": fest, "left": int(max(0, c["t0"] + CONTEST_LIFE - time.time())) if c else 0, "rows": rows, "voted": bool(c and conn.fid in c["voted"]), "last": CONTEST_LAST.get(fest)}
+
+
+def contest_tick():
+    t = time.time()
+    for fest in [k for k, c in CONTESTS.items() if t - c["t0"] >= CONTEST_LIFE]:
+        c = CONTESTS.pop(fest)
+        ranked = sorted(c["entries"].items(), key=lambda kv: (-len(kv[1]["votes"]), kv[1]["name"].lower()))
+        if ranked and len(ranked[0][1]["votes"]) >= CONTEST_MIN:
+            wf, w = ranked[0]
+            CONTEST_LAST[fest] = {"name": w["name"], "dish": w["dish"], "votes": len(w["votes"])}
+            mkt_mail(wf, coins=CONTEST_PRIZE, text="Your %s won the cooking contest with %d votes: +%d denarii!" % (w["dish"], len(w["votes"]), CONTEST_PRIZE))
+            for v in w["votes"]:
+                mkt_mail(v, coins=CONTEST_VOTER, text="The dish you voted for won the contest: +%d denarii." % CONTEST_VOTER)
+        for f in c["entries"]:
+            for cn in conns_of(f):
+                cn.send({"t": "furn", "a": "contest_end", "fest": fest, "last": CONTEST_LAST.get(fest)})
+
+
 def on_furn(conn, a, m):
+    if not conn.fid and a in ("f_stats", "f_board", "f_sget", "f_sput", "f_stake", "f_sbuy"):
+        return
+    if a == "f_stats":
+        f = {k: int(num(m.get(k), 0, 99999, 0)) for k in FSTAT_KEYS}
+        f["name"] = conn.name
+        if conn.fid in FSTATS or len(FSTATS) < 20000:
+            FSTATS[conn.fid] = f
+            world_soon()
+        return
+    if a == "f_board":
+        rows = []
+        for f in [conn.fid] + sorted(x for x in CLAIMS.get(conn.fid, ()) if mutual(conn.fid, x))[:60]:
+            r = FSTATS.get(f) or {k: 0 for k in FSTAT_KEYS}
+            rows.append(dict({k: r.get(k, 0) for k in FSTAT_KEYS}, name=NAMES.get(f) or r.get("name") or "A friend", me=f == conn.fid))
+        return conn.send({"t": "furn", "a": "board", "rows": rows})
+    if a in ("c_enter", "c_vote", "c_list"):
+        if not conn.fid:
+            return conn.send({"t": "furn", "a": "no", "text": "The contest needs your account."})
+        fest = str(m.get("fest", ""))
+        if not re.fullmatch(r"[a-z]{3,16}", fest):
+            return
+        contest_tick()
+        if a == "c_enter":
+            dish = class_clean(m.get("dish"), 40)
+            if not dish:
+                return
+            c = CONTESTS.get(fest)
+            if not c:
+                if len(CONTESTS) >= 40:
+                    return
+                c = CONTESTS[fest] = {"t0": time.time(), "entries": {}, "voted": []}
+            old = c["entries"].get(conn.fid)
+            c["entries"][conn.fid] = {"name": conn.name, "dish": dish, "votes": old["votes"] if old else []}
+            if len(c["entries"]) > 30:
+                c["entries"].pop(next(iter(c["entries"])))
+        elif a == "c_vote":
+            c = CONTESTS.get(fest)
+            f = clean_fid(m.get("fid"))
+            if not c or not f or f not in c["entries"] or f == conn.fid:
+                return conn.send({"t": "furn", "a": "no", "text": "You cannot vote for that."})
+            if conn.fid in c["voted"]:
+                return conn.send({"t": "furn", "a": "no", "text": "You have already voted in this contest."})
+            c["voted"].append(conn.fid)
+            c["entries"][f]["votes"].append(conn.fid)
+        return conn.send(contest_view(conn, fest))
+    if a in ("f_sget", "f_sput", "f_stake", "f_sbuy"):
+        if a == "f_sget":
+            return conn.send({"t": "furn", "a": "stall", "fid": "me", "stall": stall_view(conn.fid)})
+        item = str(m.get("item", ""))
+        if not re.fullmatch(r"[a-z0-9_]{2,24}", item):
+            return
+        if a == "f_sbuy":
+            fid = clean_fid(m.get("fid"))
+            n = int(num(m.get("n"), 1, STALL_BUY, 1))
+            v = ((STALLS.get(fid) or {}).get("items") or {}).get(item) if fid else None
+            if not fid or fid == conn.fid or not mutual(conn.fid, fid) or not v or v["n"] < n:
+                return conn.send({"t": "furn", "a": "no", "text": "That is not on the stall any more."})
+            total = v["p"] * n
+            if (conn.coins or 0) < total:
+                return conn.send({"t": "furn", "a": "no", "text": "You need %d denarii for that." % total})
+            v["n"] -= n
+            if v["n"] <= 0:
+                del STALLS[fid]["items"][item]
+            conn.coins = max(0, (conn.coins or 0) - total)
+            mkt_mail(conn.fid, coins=-total, item=item, ik="good", n=n, text="You bought %d from %s's stall for %d denarii." % (n, NAMES.get(fid) or "a friend", total))
+            mkt_mail(fid, coins=total, text="%s bought %d %s from your stall: +%d denarii." % (conn.name, n, item, total))
+            stall_push(fid)
+            world_soon()
+            return conn.send({"t": "furn", "a": "stall", "fid": fid, "stall": stall_view(fid)})
+        s_ = STALLS.setdefault(conn.fid, {"items": {}})
+        its = s_["items"]
+        if a == "f_sput":
+            n, price = int(num(m.get("n"), 1, STALL_N, 1)), int(num(m.get("price"), 1, STALL_P, 0))
+            if price < 1 or (item not in its and len(its) >= STALL_KINDS) or its.get(item, {"n": 0})["n"] + n > STALL_N:
+                return conn.send({"t": "furn", "a": "no", "text": "A stall holds %d kinds of goods, %d of each, at 1 to %d denarii." % (STALL_KINDS, STALL_N, STALL_P)})
+            its[item] = {"n": its.get(item, {"n": 0})["n"] + n, "p": price}
+            conn.send({"t": "furn", "a": "stall_ok", "dir": "put", "item": item, "n": n})
+        else:
+            n = int(num(m.get("n"), 1, STALL_N, 1))
+            have = its.get(item, {"n": 0})["n"]
+            n = min(n, have)
+            if n < 1:
+                return
+            its[item]["n"] -= n
+            if its[item]["n"] <= 0:
+                del its[item]
+            conn.send({"t": "furn", "a": "stall_ok", "dir": "take", "item": item, "n": n})
+        world_soon()
+        return stall_push(conn.fid)
     if a == "f_set":
         f = furn_clean(m)
         f["name"] = conn.name
@@ -4032,6 +4174,7 @@ def on_furn(conn, a, m):
         return conn.send({"t": "furn", "a": "none", "fid": fid or ""})
     f = FURN[fid]
     msg = {"t": "furn", "a": "layout", "fid": fid, "name": NAMES.get(fid) or f.get("name") or "A friend", "placed": f["placed"], "water": f["water"]}
+    msg["stall"] = stall_view(fid)
     if fid == conn.fid:
         msg["book"] = f.get("book", [])
     p = PARTIES.get(fid)
@@ -6041,7 +6184,7 @@ def on_social(conn, m):
         return on_stats(conn, m)
     if a in ("m_board", "m_list", "m_buy", "m_bid", "m_cancel", "m_ack", "m_mail"):
         return on_market(conn, a, m)
-    if a in ("f_set", "f_get", "f_note", "f_gift", "f_party"):
+    if a in ("f_set", "f_get", "f_note", "f_gift", "f_party", "f_sget", "f_sput", "f_stake", "f_sbuy", "f_stats", "f_board", "c_enter", "c_vote", "c_list"):
         return on_furn(conn, a, m)
     if a in ("co_make", "co_invite", "co_join", "co_leave", "co_clue", "co_no", "co_solve", "co_me"):
         return on_coop(conn, a, m)
@@ -6682,7 +6825,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
@@ -6696,6 +6839,20 @@ def world_apply(rows):
                 c["name"] = class_clean(f.get("name"), 20)
                 c["book"] = [{"name": class_clean(b.get("name"), 20), "text": class_clean(b.get("text"), 80), "t": int(num(b.get("t"), 0, 4e9, 0))} for b in (f.get("book") if isinstance(f.get("book"), list) else [])[-BOOK_MAX:] if isinstance(b, dict)]
                 FURN[fid] = c
+    sl = rows.get("stalls")
+    if isinstance(sl, dict):
+        STALLS.clear()
+        for fid, v in list(sl.items())[:5000]:
+            if clean_fid(fid) and isinstance(v, dict) and isinstance(v.get("items"), dict):
+                its = {i: {"n": int(num(x.get("n"), 1, STALL_N, 1)), "p": int(num(x.get("p"), 1, STALL_P, 1))} for i, x in list(v["items"].items())[:STALL_KINDS] if isinstance(x, dict) and re.fullmatch(r"[a-z0-9_]{2,24}", str(i))}
+                if its:
+                    STALLS[fid] = {"items": its}
+    fs = rows.get("fstats")
+    if isinstance(fs, dict):
+        FSTATS.clear()
+        for fid, v in list(fs.items())[:20000]:
+            if clean_fid(fid) and isinstance(v, dict):
+                FSTATS[fid] = dict({k: int(num(v.get(k), 0, 99999, 0)) for k in FSTAT_KEYS}, name=class_clean(v.get("name"), 16))
     g = rows.get("guilds")
     if isinstance(g, dict) and isinstance(g.get("guilds"), dict) and isinstance(g.get("of"), dict):
         GUILDS.clear()

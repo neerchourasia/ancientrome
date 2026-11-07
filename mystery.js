@@ -5,6 +5,8 @@
 // Wheel*, Delhi *The Poisoned Chai*, Cancún *The Missing Calendar Stone*, Beijing *The Forged Edict*): four clues, five suspects, and every wrong suspect fits three of the four. Progress is kept in the browser (rome-mystery) and the saved game.
 // TEAM CASES (👥 Team tab): start one of the cases with friends (they must be online and have you as a friend): each of the clues is held by one of the team, who has to stand at its place, and everybody sees
 // what has been found; when the team names the culprit each is paid the case's reward and 100 more (twice an hour at most). The game server (server.py, "team cases") keeps the team.
+// A THIRD case in each city (Rome *The Counterfeit Denarii*, Delhi *The Missing Ledger*, Cancún *The Silent Drum*, Beijing *The Stolen Imperial Tea*) opens when the second is solved: five clues, the last two told
+// only by citizens (chat with them, then ask), six suspects, 600 denarii. (Team cases are for the first two cases.)
 // Depends on vitals.js, the landmarks of each city (by id) and the globals of game.js (LANDMARKS, city, player, startDirections, Narrator, openPanel, closePanels).
 
 const Mystery = (() => {
@@ -120,8 +122,77 @@ const Mystery = (() => {
         ["Mei, the fan maker", "A callus, the speech of Suzhou and a missing fingertip, but she smells of lacquer, not sandalwood.", [1, 0, 1, 1], ""],
       ] },
   };
+
+  // the third case of each city is the hardest: five clues, the last two told by citizens only (a clue whose place is null is not at any sight: chat with the citizens, see rumor() below), and six suspects, each wrong one failing
+  // exactly one clue. It opens when the second case is solved.
+  const THIRD = {
+    rome: { name: "The Counterfeit Denarii", reward: 600, intro: "A chest of silver denarii at the Temple of Saturn, the state treasury, has turned out to be full of coins that are lead under a thin coat of silver. Somebody has been making false money for months. The treasurer wants the forger found, quietly.",
+      clues: [
+        ["saturn", "A treasury clerk at the Temple of Saturn sniffed the counter where the false coins were paid in: 'Hot lead and charcoal. I would know that smell anywhere.'", "the smell of hot lead"],
+        ["pantheon", "A priest at the Pantheon remembers a man who left a tiny silver wing as an offering: 'Mercury, god of merchants and thieves. He prayed for a good market.'", "a Mercury amulet"],
+        ["palatine", "A guard on the Palatine Hill noticed a signet ring when the man showed his pass: 'A wild boar carved into the stone.'", "a boar signet ring"],
+        [null, "Somebody in the city remembers how the man counted his coins at the inn: 'He used his left hand for everything, even the cup.'", "left-handed"],
+        [null, "Somebody in the city remembers his face by the lamp: 'A pale scar across the chin, as if from a knife long ago.'", "a scar on the chin"],
+      ],
+      suspects: [
+        ["Gellius, the mint worker", "Smells of hot lead from the melting pots, wears a Mercury amulet and a boar signet ring, is left-handed, and has a scar across the chin.", [1, 1, 1, 1, 1], "Gellius had worked at the mint for years, and saw how little it would take to stamp lead as silver in his spare hours."],
+        ["Rufus, the plumber", "Smells of hot lead from his pipes, wears a Mercury amulet and a boar ring, is left-handed, but has a clean chin.", [1, 1, 1, 1, 0], ""],
+        ["Aulus, the lamp maker", "Smells of hot lead, wears a Mercury amulet and a boar ring and has a chin scar, but writes and eats with his right hand.", [1, 1, 1, 0, 1], ""],
+        ["Septimus, the bronzesmith", "Smells of lead and charcoal, is left-handed, has a chin scar and a Mercury amulet, but wears a ring with an eagle, not a boar.", [1, 1, 0, 1, 1], ""],
+        ["Lucilla, the jeweller", "Smells of lead from soldering, wears a boar ring, is left-handed and has a chin scar, but prays to Venus and carries no wing of Mercury.", [1, 0, 1, 1, 1], ""],
+        ["Pollio, the pewterer", "Wears a Mercury amulet and a boar ring, is left-handed and has a chin scar, but his workshop smells of tin and not of lead.", [0, 1, 1, 1, 1], ""],
+      ] },
+    delhi: { name: "The Missing Ledger", reward: 600, intro: "The great ledger of the tax collectors, which names who owes what to the Emperor, has vanished from the Diwan-i-Aam overnight. Without it nobody can prove a debt, and several nobles are suspiciously cheerful. Find the thief.",
+      clues: [
+        ["d-diwanaam", "A guard at the Diwan-i-Aam remembers a man who admired the hall at dusk: 'A turban pin shaped like a peacock, with a tiny blue stone.'", "a peacock turban pin"],
+        ["d-chhatta", "In the Chhatta Chowk arcade a perfume seller noticed him pass: 'Rosewater, so strong that I thought a bride had walked by.'", "the scent of rosewater"],
+        ["d-diwankhas", "At the Diwan-i-Khas a servant saw a hand reach for the door: 'A thick gold ring with a blue stone on the little finger.'", "a ring with a blue stone"],
+        [null, "Somebody in the city overheard him at a stall: 'He bargained in Punjabi, fast and loud, like a man from Lahore.'", "Punjabi speech"],
+        [null, "Somebody in the city remembers what he carried: 'A leather satchel with brass buckles. He never put it down, not even to eat.'", "a satchel with brass buckles"],
+      ],
+      suspects: [
+        ["Dilawar, the revenue clerk", "A peacock pin in his turban, smells of rosewater, wears a gold ring with a blue stone, speaks Punjabi, and carries a leather satchel with brass buckles.", [1, 1, 1, 1, 1], "Dilawar had been passed over for promotion for years, and a lost ledger would make his superiors look careless and himself indispensable."],
+        ["Karan, the cloth merchant", "A peacock pin, rosewater, a blue-stone ring and Punjabi at home, but he carries his goods in a plain cloth bundle.", [1, 1, 1, 1, 0], ""],
+        ["Nasir, the scribe", "A peacock pin, rosewater, a blue-stone ring and a brass-buckled satchel, but he speaks the soft Urdu of Lucknow.", [1, 1, 1, 0, 1], ""],
+        ["Pritam, the horse trader", "A peacock pin, rosewater, Punjabi and a brass-buckled satchel, but his ring has a red stone.", [1, 1, 0, 1, 1], ""],
+        ["Farhan, the courtier", "A peacock pin, a blue-stone ring, Punjabi and a satchel with brass buckles, but he smells of sandalwood, not rosewater.", [1, 0, 1, 1, 1], ""],
+        ["Omar, the book binder", "Rosewater, a blue-stone ring, Punjabi and a brass-buckled satchel, but his turban pin is a simple silver one.", [0, 1, 1, 1, 1], ""],
+      ] },
+    cancun: { name: "The Silent Drum", reward: 600, intro: "The great drum of the ball court, whose voice opens each game of pok-ta-pok, has been taken from its stand at Chichén Itzá. Without it the festival cannot begin, and the players are blaming each other. Find who took it.",
+      clues: [
+        ["c-ballcourt", "A player at the Great Ball Court remembers a man at the stand: 'He wore sandals of jaguar skin, which only the best players may wear.'", "jaguar-skin sandals"],
+        ["c-cenote", "At the Sacred Cenote a diver saw someone throw a bead into the water: 'A bracelet of jade beads, one of them cracked.'", "a bracelet of jade beads"],
+        ["c-warriors", "At the Temple of the Warriors a guard noticed red dust: 'Red ochre on both his hands, the paint of the drum makers.'", "red ochre on his hands"],
+        [null, "Somebody in the city heard him humming as he walked: 'A song from the south, in the Chontal tongue, which hardly anyone here knows.'", "humming in the Chontal tongue"],
+        [null, "Somebody in the city remembers him laughing: 'A front tooth missing, and a gap like a window when he smiled.'", "a missing front tooth"],
+      ],
+      suspects: [
+        ["Hun-Ahau, the drum maker", "Jaguar-skin sandals, a jade bead bracelet, red ochre on his hands, a Chontal song on his lips, and a gap where a front tooth was.", [1, 1, 1, 1, 1], "Hun-Ahau thought the new drum was a poor copy of the one his grandfather made, and he meant to take back what he thought was his family's."],
+        ["Balam-Itza, the star player", "Jaguar sandals, jade bracelet, red ochre from the ball paint and a Chontal song, but all his teeth are whole.", [1, 1, 1, 1, 0], ""],
+        ["Ek-Chuah, the trader", "Jaguar sandals, jade bracelet, red ochre and a missing tooth, but he sings only in Yucatec.", [1, 1, 1, 0, 1], ""],
+        ["Ixquic, the potter", "Jaguar sandals, jade bracelet, a Chontal song and a missing tooth, but her hands are grey with clay, not red.", [1, 1, 0, 1, 1], ""],
+        ["Kan-Mo, the diver", "Jaguar sandals, red ochre, a Chontal song and a missing tooth, but he wears a bracelet of shells.", [1, 0, 1, 1, 1], ""],
+        ["Zac-Nicte, the runner", "A jade bracelet, red ochre, a Chontal song and a missing tooth, but she goes barefoot.", [0, 1, 1, 1, 1], ""],
+      ] },
+    beijing: { name: "The Stolen Imperial Tea", reward: 600, intro: "A sealed chest of the finest tea, grown for the Emperor alone, has disappeared from the storeroom behind the Hall of Supreme Harmony. The seal was cut with a very thin blade. Someone who knows tea and who knows the palace did this.",
+      clues: [
+        ["b-harmony", "A eunuch at the Hall of Supreme Harmony remembers a visitor: 'A blue silk sash, tied in the style of the southern tea houses.'", "a blue silk sash"],
+        ["b-jingshan", "On Jingshan Hill a gardener saw someone hiding something: 'A bamboo flute at his belt, the kind the street players use.'", "a bamboo flute at his belt"],
+        ["b-lake", "At Kunming Lake a boatman remembers his muddy boots: 'Black mud from the lake shore, still wet. He had walked round the water.'", "boots black with lake mud"],
+        [null, "Somebody in the city overheard him ask the price: 'He spoke with the singing accent of Shanxi, where the tea merchants come from.'", "a Shanxi accent"],
+        [null, "Somebody in the city remembers what he carried: 'A red sandalwood abacus, polished by years of use, that clicked as he walked.'", "a red sandalwood abacus"],
+      ],
+      suspects: [
+        ["Zhao, the tea broker", "A blue silk sash, a bamboo flute at his belt, boots black with lake mud, a Shanxi accent, and a red sandalwood abacus that clicks as he walks.", [1, 1, 1, 1, 1], "Zhao had promised a rich buyer in the south the Emperor's own tea, and he had no other way to keep the promise."],
+        ["Yu, the street musician", "A blue sash, a bamboo flute, lake-mud boots and a Shanxi accent, but he carries no abacus: he cannot count.", [1, 1, 1, 1, 0], ""],
+        ["Cheng, the grain merchant", "A blue sash, a flute, lake-mud boots and a red abacus, but he speaks the flat speech of the capital.", [1, 1, 1, 0, 1], ""],
+        ["Hua, the fisherman", "A blue sash, a flute, a Shanxi accent and a red abacus, but his boots are clean: he fishes from a boat.", [1, 1, 0, 1, 1], ""],
+        ["Ming, the tea-house owner", "A blue sash, lake-mud boots, a Shanxi accent and a red abacus, but he has no flute.", [1, 0, 1, 1, 1], ""],
+        ["Lan, the silk trader", "A flute, lake-mud boots, a Shanxi accent and a red abacus, but her sash is green.", [0, 1, 1, 1, 1], ""],
+      ] },
+  };
   const CASES = {};
-  for (const c of Object.keys(EASY)) CASES[c] = [EASY[c], HARD[c]];
+  for (const c of Object.keys(EASY)) CASES[c] = [EASY[c], HARD[c], THIRD[c]];
 
   // progress: per city, one entry per case: { c: [clue found 0/1...], ok: solved, no: suspects cleared }
   const blank = (c) => CASES[c].map((k) => ({ c: k.clues.map(() => 0), ok: 0, no: [] }));
@@ -143,8 +214,9 @@ const Mystery = (() => {
   const $s = (id) => document.getElementById(id);
   const lmOf = (id) => LANDMARKS.find((l) => l.id === id);
   const cityOf = () => (CASES[city] ? city : "rome");
-  const open1 = (c) => (prog[c][0].ok ? 1 : 0);                       // the hard case opens when the first is solved
-  const curIdx = (c) => Math.min(sel[c] === undefined ? (prog[c][0].ok && !prog[c][1].ok ? 1 : 0) : sel[c], open1(c));
+  const openTo = (c) => (prog[c][0].ok ? (prog[c][1].ok ? 2 : 1) : 0);   // the second case opens when the first is solved, the third when the second is
+  const open1 = openTo;
+  const curIdx = (c) => { const top = openTo(c); if (sel[c] !== undefined) return Math.min(sel[c], top); for (let i = 0; i <= top; i++) if (!prog[c][i].ok) return i; return top; };
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
   function say(text) { toast(text.length > 160 ? text.slice(0, 157) + "..." : text); try { Narrator.say(text, { interrupt: true }); } catch (e) { /* ignore */ } }
 
@@ -159,7 +231,7 @@ const Mystery = (() => {
   const CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
   const tabsFor = (c, n) => {
     const tabs = el("div", undefined, "pm-tabs");
-    CASES[c].forEach((k, i) => { const b = el("button", tr(i === 0 ? "Case 1" : open1(c) ? "Case 2: harder" : "Case 2 🔒")); b.type = "button"; if (i === n && !teamView) b.className = "on"; b.disabled = i > open1(c); b.addEventListener("click", () => { teamView = false; sel[c] = i; render(); }); tabs.append(b); });
+    CASES[c].forEach((k, i) => { const b = el("button", tr(i > openTo(c) ? `Case ${i + 1} 🔒` : ["Case 1", "Case 2: harder", "Case 3: the hardest"][i])); b.type = "button"; if (i === n && !teamView) b.className = "on"; b.disabled = i > openTo(c); b.addEventListener("click", () => { teamView = false; sel[c] = i; render(); }); tabs.append(b); });
     const tb = el("button", tr("👥 Team")); tb.type = "button"; if (teamView) tb.className = "on"; tb.addEventListener("click", () => { teamView = true; render(); if (typeof Online !== "undefined" && Online.connected) Online.navalSend({ t: "social", a: "co_me" }); }); tabs.append(tb);
     return tabs;
   };
@@ -171,7 +243,7 @@ const Mystery = (() => {
       rows.push(el("p", tr("Solve a case with friends: each of you holds some of the clues and has to stand at the right place. When the team names the culprit, everybody is paid."), "dnote"));
       if (!ready) rows.push(el("p", tr("Team cases need your account and the game server: log in and wait to be connected."), "dnote"));
       for (const k of [0, 1]) {
-        const b = el("button", `${tr("Start a team case")}: ${tr(CASES[c][k].name)} (${tr(CITY_NAMES[c])})`); b.type = "button"; b.disabled = !ready || k > open1(c);
+        const b = el("button", `${tr("Start a team case")}: ${tr(CASES[c][k].name)} (${tr(CITY_NAMES[c])})`); b.type = "button"; b.disabled = !ready || k > openTo(c);
         b.addEventListener("click", () => csend({ a: "co_make", city: c, n: k })); rows.push(b);
       }
       body.replaceChildren(...rows); return;
@@ -260,6 +332,7 @@ const Mystery = (() => {
     cs.clues.forEach((cl, i) => {
       const lm = lmOf(cl[0]);
       if (p.c[i]) rows.push(el("p", `✓ ${tr(cl[1])}`, "st-old"));
+      else if (!cl[0]) { const w = witness(c, n, i); rows.push(el("p", `❓ ${tr("Nobody saw this one at a sight: ask the citizens.")}${w ? ` ${tr("Ask someone called")} ${w.name} ${whenText(w.when)}.` : ""}`, "st-now")); }
       else {
         const w = witness(c, n, i), row = el("p", `❓ ${lm ? tr(lm.name) : cl[0]}: ${tr("a witness may know something.")}${w ? ` ${tr("Or ask someone called")} ${w.name} ${whenText(w.when)}.` : ""}`, "st-now");
         if (lm) { const b = el("button", tr("Show me the way")); b.type = "button"; b.addEventListener("click", () => { closePanels(); if (typeof startDirections === "function") { try { startDirections(lm); } catch (e) { /* ignore */ } } }); row.append(" ", b); }
@@ -268,7 +341,7 @@ const Mystery = (() => {
     });
     const found = p.c.filter(Boolean).length, total = cs.clues.length;
     if (p.ok) rows.push(el("p", `${tr("Case closed:")} ${tr(cs.suspects.find((s) => s[2].every((v) => v))[3])}`, "sk-note"));
-    else if (found < total) rows.push(el("p", `${found} ${tr("of")} ${total} ${tr("clues found. Walk to the places above: the witnesses will find you.")}`, "dnote"));
+    else if (found < total) rows.push(el("p", `${found} ${tr("of")} ${total} ${tr("clues found. Walk to the places above: the witnesses will find you.")}${cs.clues.some((cl) => !cl[0]) ? ` ${tr("Some clues come only from the citizens: chat with them first.")}` : ""}`, "dnote"));
     else {
       rows.push(el("h3", tr("Who did it?")));
       rows.push(el("p", `${tr("All the clues are in:")} ${cs.clues.map((cl) => tr(cl[2])).join(", ")}. ${tr("Only one suspect fits them all. A wrong accusation costs 20 denarii.")}`, "dnote"));
@@ -288,7 +361,7 @@ const Mystery = (() => {
     const s = cs.suspects[i];
     if (s[2].every((v) => v)) {
       p.ok = 1; save(); Vitals.coins += cs.reward; Sfx.play("medal"); if (typeof Guilds !== "undefined") Guilds.score("mystery"); 
-      say(`${tr(s[0])} ${tr("is the culprit!")} ${tr(s[3])} ${tr("The case is closed:")} +${cs.reward} ${tr("denarii")}.${n === 0 ? ` ${tr("A harder case is now open.")}` : ""}`);
+      say(`${tr(s[0])} ${tr("is the culprit!")} ${tr(s[3])} ${tr("The case is closed:")} +${cs.reward} ${tr("denarii")}.${n === 0 ? ` ${tr("A harder case is now open.")}` : n === 1 ? ` ${tr("The hardest case is now open.")}` : ""}`);
     } else {
       if (!p.no.includes(i)) p.no.push(i);
       Vitals.coins = Math.max(0, Vitals.coins - FINE); save(); Sfx.play("oof");
@@ -304,8 +377,8 @@ const Mystery = (() => {
   const hashS = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   function witness(c, n, i) {
     const names = typeof Lives !== "undefined" && Lives.names ? Lives.names(c) : []; if (!names.length) return null;
-    const h = hashS(`${c}${n}${i}w`);
-    return { name: names[(h % names.length + i * 3) % names.length], when: WHEN[(h >>> 8) % 3] };
+    const base = hashS(`${c}${n}w`) % names.length, h = hashS(`${c}${n}${i}t`);                      // (the names of one case are all different: steps of 3 round ten names)
+    return { name: names[(base + i * 3) % names.length], when: WHEN[h % 3] };
   }
   // the clues of the open case that this name knows, and the one case name (for the talk panel)
   function rumor(name) {

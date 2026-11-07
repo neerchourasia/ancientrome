@@ -3839,6 +3839,81 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         await ann.until(lambda m: m["t"] == "coop" and m["a"] == "end")
         self.assertNotIn(fa, server.CO_OF)
 
+    async def test_a_stall_sells_goods_to_friends_by_mail(self):
+        server.STALLS.clear(); server.MKT["mail"].clear(); server.FURN.clear()
+        self.addCleanup(lambda: (server.STALLS.clear(), server.MKT["mail"].clear(), server.FURN.clear()))
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        fa, fb = server.fid_of("u-ann"), server.fid_of("u-bob")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        for c, coins in ((ann, 10), (bob, 100), (cy, 500)):
+            c.send({"t": "walk", "c": "rome", "x": 1, "z": 1, "yaw": 0, "s": 0, "d": coins})
+        await asyncio.sleep(0.3)
+        ann.send({"t": "social", "a": "f_sput", "item": "saffron", "n": 5, "price": 30})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "furn" and m["a"] == "stall_ok"))["n"], 5)
+        ann.send({"t": "social", "a": "f_sput", "item": "saffron", "n": 99, "price": 30})                 # more than a stall holds
+        self.assertEqual((await ann.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["a"], "no")
+        # a friend sees the stall with the house, buys two; a stranger can neither see nor buy
+        ann.send({"t": "social", "a": "f_set", "placed": {"rome": [{"id": "rug", "x": 1, "z": 1, "yaw": 0}]}, "water": 0})
+        await asyncio.sleep(0.2)
+        bob.send({"t": "social", "a": "f_get", "fid": fa})
+        lay = await bob.until(lambda m: m["t"] == "furn" and m["a"] == "layout")
+        self.assertEqual(lay["stall"], [{"item": "saffron", "n": 5, "price": 30}])
+        cy.send({"t": "social", "a": "f_sbuy", "fid": fa, "item": "saffron", "n": 1})
+        self.assertEqual((await cy.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["a"], "no")
+        bob.send({"t": "social", "a": "f_sbuy", "fid": fa, "item": "saffron", "n": 2})
+        view = await bob.until(lambda m: m["t"] == "furn" and m["a"] == "stall" and m["fid"] == fa)
+        self.assertEqual(view["stall"], [{"item": "saffron", "n": 3, "price": 30}])
+        mine = [x for x in server.MKT["mail"][fb] if x.get("item") == "saffron"][0]
+        self.assertEqual((mine["coins"], mine["n"], mine["ik"]), (-60, 2, "good"))
+        self.assertEqual([x["coins"] for x in server.MKT["mail"][fa] if x.get("coins")], [60])             # the owner is paid by mail
+        bob.send({"t": "social", "a": "f_sbuy", "fid": fa, "item": "saffron", "n": 3})                     # Bob has 40 left: not enough
+        self.assertIn("90", (await bob.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["text"])
+        # the owner takes the rest back, and the stall survives a save
+        ann.send({"t": "social", "a": "f_stake", "item": "saffron", "n": 2})
+        self.assertEqual((await ann.until(lambda m: m["t"] == "furn" and m["a"] == "stall_ok" and m["dir"] == "take"))["n"], 2)
+        snap = json.loads(json.dumps(server.world_snapshot()["stalls"]))
+        server.STALLS.clear()
+        server.world_apply({"stalls": snap})
+        self.assertEqual(server.STALLS[fa]["items"], {"saffron": {"n": 1, "p": 30}})
+
+    async def test_friends_scores_and_the_festival_cooking_contest(self):
+        server.FSTATS.clear(); server.CONTESTS.clear(); server.CONTEST_LAST.clear(); server.MKT["mail"].clear()
+        self.addCleanup(lambda: (server.FSTATS.clear(), server.CONTESTS.clear(), server.CONTEST_LAST.clear(), server.MKT["mail"].clear()))
+        self.accounts("ann", "bob", "cy")
+        ann, bob, cy = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Cy", token="cy")
+        fa, fb, fc = server.fid_of("u-ann"), server.fid_of("u-bob"), server.fid_of("u-cy")
+        server.CLAIMS.setdefault(fa, set()).add(fb)
+        server.CLAIMS.setdefault(fb, set()).add(fa)
+        # scores: friends see each other (cut to sane numbers), a stranger is not on the board
+        ann.send({"t": "social", "a": "f_stats", "mys": 3, "sets": 1, "dishes": 10 ** 9, "harv": 2, "fr": 4})
+        bob.send({"t": "social", "a": "f_stats", "mys": 5, "sets": 0, "dishes": 7, "harv": 0, "fr": 1})
+        cy.send({"t": "social", "a": "f_stats", "mys": 9})
+        await asyncio.sleep(0.3)
+        ann.send({"t": "social", "a": "f_board"})
+        rows = (await ann.until(lambda m: m["t"] == "furn" and m["a"] == "board"))["rows"]
+        self.assertEqual([(r["name"], r["me"], r["mys"], r["dishes"]) for r in rows], [("Ann", True, 3, 99999), ("Bob", False, 5, 7)])
+        # the contest: two entries, votes (not for yourself, once), the winner is paid when the round ends
+        ann.send({"t": "social", "a": "c_enter", "fest": "diwali", "dish": "Kheer for Diwali"})
+        await ann.until(lambda m: m["t"] == "furn" and m["a"] == "contest")
+        bob.send({"t": "social", "a": "c_enter", "fest": "diwali", "dish": "Kheer for Diwali"})
+        await bob.until(lambda m: m["t"] == "furn" and m["a"] == "contest")
+        bob.send({"t": "social", "a": "c_vote", "fest": "diwali", "fid": fb})                              # not for yourself
+        self.assertEqual((await bob.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["a"], "no")
+        cy.send({"t": "social", "a": "c_vote", "fest": "diwali", "fid": fa})
+        v = await cy.until(lambda m: m["t"] == "furn" and m["a"] == "contest")
+        self.assertEqual(([r["votes"] for r in v["rows"]], v["voted"]), ([1, 0], True))
+        cy.send({"t": "social", "a": "c_vote", "fest": "diwali", "fid": fb})                               # only one vote each
+        self.assertIn("already", (await cy.until(lambda m: m["t"] == "furn" and m["a"] == "no"))["text"])
+        server.CONTESTS["diwali"]["entries"][fa]["votes"].append("0123456789ab")                            # a second voter
+        server.CONTESTS["diwali"]["t0"] -= server.CONTEST_LIFE + 1
+        server.contest_tick()
+        self.assertNotIn("diwali", server.CONTESTS)
+        self.assertEqual(server.CONTEST_LAST["diwali"]["name"], "Ann")
+        paid = sorted((f, x["coins"]) for f, box in server.MKT["mail"].items() for x in box if x.get("coins"))
+        self.assertEqual(paid, sorted([(fa, 200), (fc, 5), ("0123456789ab", 5)]))
+
     async def test_the_exchange_shows_shared_prices_and_prices_each_trade(self):
         ann, bob = await self.player("Ann"), await self.player("Bob")
         ann.send({"t": "stock", "a": "list"})
