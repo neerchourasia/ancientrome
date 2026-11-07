@@ -290,5 +290,5 @@ const Home = (() => {
     lamp.intensity = 0.25 + night * 1.0;
   }
 
-  return { X, Z, W, D, inside, build, update, setTier, setDecor, restBoost, get tier() { return tier; } };
+  return { X, Z, W, D, bedSpot: () => ({ x: X + 3.6, z: Z + 3.1, y: heightAt(X + 3.6, Z + 3.1) + 0.9, yaw: 0 }), inside, build, update, setTier, setDecor, restBoost, get tier() { return tier; } };
 })();

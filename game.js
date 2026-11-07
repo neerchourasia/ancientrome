@@ -915,9 +915,27 @@ function updateAvatar(dt) {
   const swing = pace > 0.3 ? Math.sin(avPhase) * Math.min(1, pace / 8.5) * 0.7 : 0;
   avParts.armL.rotation.x = swing; avParts.armR.rotation.x = -swing;
   avParts.legL.rotation.x = -swing; avParts.legR.rotation.x = swing;
-  if (Shopkeep.seated) { avParts.legL.rotation.x = avParts.legR.rotation.x = 1.45; avatar.position.y -= 0.1; }          // sitting on a stool in a shop
+  const lie = lyingSpot();
+  avatar.rotation.order = "YXZ";
+  if (lie) {                                                                                                                 // lying on a bed (or the floor): flat on the back, head at the pillow, arms and legs relaxed
+    avatar.rotation.set(Math.PI / 2, lie.yaw, 0);
+    avatar.position.set(lie.x - Math.sin(lie.yaw) * 0.9, lie.y + 0.16, lie.z - Math.cos(lie.yaw) * 0.9);
+    avParts.armL.rotation.x = avParts.armR.rotation.x = avParts.legL.rotation.x = avParts.legR.rotation.x = 0;
+  } else avatar.rotation.x = 0;
+  if (!lie && (Shopkeep.seated || Furnish.seated)) { avParts.legL.rotation.x = avParts.legR.rotation.x = 1.45; avatar.position.y -= 0.1; }          // sitting on a stool in a shop, or on a stool or cushions at home
   if (mode === "online") Online.poseMine(avParts);
   Emotes.update(avFig, dt);
+}
+
+// Lying down: resting on a bed of your house, or asleep (a bed of yours, the bed of the Rome house, or the floor where you stand).
+function lyingSpot() {
+  const fb = Furnish.lying(); if (fb) return fb;
+  if (sleepT > 0 && sleepT < 4.6 && mode === "walk") {
+    const bed = Furnish.bedNear(player.x, player.z); if (bed) return bed;
+    if (city === "rome" && Home.inside(player.x, player.z)) return Home.bedSpot();
+    return { x: player.x, z: player.z, y: player.feet + 0.02, yaw: player.yaw + Math.PI };
+  }
+  return null;
 }
 
 function refreshViewButton() { $("#btn-view").innerHTML = `View: ${VIEWS[viewIndex].name} <kbd>C</kbd>`; }
@@ -1808,9 +1826,9 @@ function updateTime(dt) {
   // the sleep fade: dark, wake up, light again
   if (sleeping) {
     sleepT += dt;
-    $("#sleep").classList.toggle("on", sleepT < 2.4 && deathT === 0);
-    if (sleepT >= 1.2 && !slept) { slept = true; wakeUp(); }
-    if (sleepT >= 3.6) { sleepT = 0; slept = false; }
+    $("#sleep").classList.toggle("on", sleepT > 0.9 && sleepT < 3.3 && deathT === 0);                       // (first you are seen lying down, then the screen goes dark)
+    if (sleepT >= 2.1 && !slept) { slept = true; wakeUp(); }
+    if (sleepT >= 4.5) { sleepT = 0; slept = false; }
   }
 }
 

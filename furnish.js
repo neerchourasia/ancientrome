@@ -210,8 +210,10 @@ const Furnish = (() => {
   }
   const promptText = () => { const p = actNear(); return p ? tr(ACTIONS[p.id]) : ""; };
   const at = () => !!actNear();
+  // where you lie when you rest or sleep on a bed: the middle of it, on the mattress, head at the pillow end (the bed piece's -z end); game.js draws the avatar flat there
+  const lieOn = (p) => ({ x: p.x, z: p.z, y: FLOOR[here()] + 0.5, yaw: p.yaw + Math.PI });
   function sitAt(p, text) {
-    player.x = p.x; player.z = p.z; player.vx = player.vz = 0; Vitals.startRest(); sat = { x: p.x, z: p.z }; Sfx.play("creak"); toast(text);
+    player.x = p.x; player.z = p.z; player.vx = player.vz = 0; Vitals.startRest(); sat = { x: p.x, z: p.z, lie: p.id === "bed" ? lieOn(p) : null }; Sfx.play("creak"); toast(text);
   }
   function act() {
     const p = actNear(); if (!p) return;
@@ -635,5 +637,5 @@ const Furnish = (() => {
   const snapshot = () => JSON.parse(JSON.stringify(st));
   function restore(r) { st = clean(r); save(); refresh(); }
 
-  return { openBoard, startPlace, movePiece, arranging: () => arrange, pieceAt: (ev) => { const p = pieceAt(ev); return p ? { id: p.id, x: p.x, z: p.z } : null; }, placingInfo: () => (placing ? { id: placing.id, x: placing.x, z: placing.z, yaw: placing.yaw, ok: placing.ok, move: !!placing.piece } : null), petSpot, guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
+  return { lying: () => (sat && sat.lie && Vitals.resting && !guest ? sat.lie : null), bedNear: (x, z) => { if (guest) return null; let best = null, bd = 3.2; for (const p of st.placed[here()] || []) { if (p.id !== "bed") continue; const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } } return best ? lieOn(best) : null; }, openBoard, startPlace, movePiece, arranging: () => arrange, pieceAt: (ev) => { const p = pieceAt(ev); return p ? { id: p.id, x: p.x, z: p.z } : null; }, placingInfo: () => (placing ? { id: placing.id, x: placing.x, z: placing.z, yaw: placing.yaw, ok: placing.ok, move: !!placing.piece } : null), petSpot, guestInfo: () => (guest ? { name: guest.name, city: guest.city, n: guestGroup ? guestGroup.children.length : 0, hiddenOwn: !!(groups[guest.city] && !groups[guest.city].visible) } : null), bind, open, visit, onServer, endGuest, act, take, give, free, at, inside: inHouse, promptText, comfort, get seated() { return !!sat && Vitals.resting; }, snapshot, restore, refresh, PIECES, get count() { return Object.values(st.placed).reduce((n, a) => n + a.length, 0); }, place, buy, nearest };
 })();
