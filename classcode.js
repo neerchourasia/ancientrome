@@ -28,6 +28,7 @@ const ClassCode = (() => {
     put(hunt.length, 4); for (const i of hunt) put(i + 1, 7);
     put(Math.max(0, CURRENCIES.indexOf(o.cur)), 3);
     if (/^[0-9a-f]{8}$/.test(o.cid || "")) { put(1, 1); for (let i = 0; i < 8; i++) put(parseInt(o.cid[i], 16), 4); } else put(0, 1);
+    put(o.low ? 1 : 0, 1);                                                                    // (light graphics: after the class id, so codes made before it still mean the same)
     while (bits.length % 5) bits.push(0);
     const vals = []; for (let i = 0; i < bits.length; i += 5) vals.push(bits.slice(i, i + 5).reduce((a, b) => a * 2 + b, 0));
     vals.push(check(vals));
@@ -53,6 +54,7 @@ const ClassCode = (() => {
     o.hunt = []; for (let i = 0; i < n; i++) { const k = get(7); if (k < 1 || k > IDS.length) return null; o.hunt.push(IDS[k - 1]); }
     o.cur = CURRENCIES[get(3)] || CURRENCIES[0];
     o.cid = ""; if (get(1) && bits.length >= pos + 32) for (let i = 0; i < 8; i++) o.cid += get(4).toString(16);
+    o.low = !!get(1);
     return o;
   }
   // the link for some options: the class name is shown on the screen; options are only added when they differ from what a link starts with
@@ -67,6 +69,7 @@ const ClassCode = (() => {
     if (o.at) p.set("at", o.at);
     if (o.hour !== null && o.hour !== undefined && o.hour !== "") p.set("hour", String(o.hour));
     if (o.hunt && o.hunt.length) p.set("hunt", o.hunt.join(","));
+    if (o.low) p.set("low", "1");
     if (o.cur === "denarii") p.set("cur", "denarii");
     if (/^[0-9a-f]{8}$/.test(o.cid || "")) p.set("cid", o.cid);
     return p.toString().replace(/%2C/g, ",");

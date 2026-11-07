@@ -500,7 +500,7 @@ const Beijing = (() => {
   const WEAR_MODERN_B = [0x2b3a55, 0x454545, 0xb23b3b, 0x3f6b4a, 0xd9d9d9, 0xe0b040, 0x2e2e2e, 0x5577aa].map((c) => new T.Color(c));
   const HAT_MING = [0x222222, 0x3a2a1a, 0x7a1c16, 0x2d4a7a, 0x333333].map((c) => new T.Color(c));      // black caps
   const HAT_MODERN_B = [0xe6cf8a, 0xd02020, 0xf1ead8, 0x2c7fe0, 0x333333].map((c) => new T.Color(c));
-  function buildPeople(count = 80) {
+  function buildPeople(count = window.CLASSMODE && CLASSMODE.low ? 45 : 80) {
     const bodyGeo = new T.CylinderGeometry(0.3, 0.42, 1.35, 8); bodyGeo.translate(0, 0.68, 0);
     const headGeo = new T.SphereGeometry(0.19, 8, 6); headGeo.translate(0, 1.58, 0);
     const hatGeo = new T.SphereGeometry(0.24, 8, 6); hatGeo.scale(1, 0.5, 1); hatGeo.translate(0, 1.76, 0);

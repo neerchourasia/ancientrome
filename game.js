@@ -26,13 +26,14 @@ try { if (localStorage.getItem("rome-era") === "modern") era = "modern"; } catch
 
 function init() {
   const canvas = $("#view");
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
+  const LOW = !!(window.CLASSMODE && CLASSMODE.low);                                       // light graphics for slow computers (perf.js)
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW });
+  renderer.setPixelRatio(LOW ? Math.min(devicePixelRatio, 1) * 0.75 : Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = !LOW;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, 1, 0.3, 3000);
+  camera = new THREE.PerspectiveCamera(70, 1, 0.3, LOW ? 1600 : 3000);
   camera.rotation.order = "YXZ";
 
   sky = buildSky(scene);
@@ -319,6 +320,7 @@ function wireInput(canvas) {
   // class mode: a teacher's link (classmode.js) starts the game at once, with no login; the options in the link are applied once the student has made a character
   if (window.CLASSMODE && CLASSMODE.on) {
     Account.startClass(CLASSMODE); begin();
+    const ll = $("#class-low"); if (ll) ll.hidden = false;
     const lb = $("#class-latin");
     if (lb) { lb.hidden = false; lb.classList.toggle("on", Latin.on); lb.addEventListener("click", () => { Latin.set(!Latin.on); lb.classList.toggle("on", Latin.on); }); }
     let tries = 0;
@@ -1888,6 +1890,7 @@ function tick(dt) {
 
 function loop(now) {
   if (window.CLASS_PAUSED) { last = now; requestAnimationFrame(loop); return; }                       // the teacher has paused the class (classreport.js): the game stands still
+  if (typeof Perf !== "undefined") Perf.frame((now - last) / 1000);                                  // (is this computer too slow? perf.js)
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now; clock += dt;
   try {

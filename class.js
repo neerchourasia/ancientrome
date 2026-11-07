@@ -30,7 +30,7 @@
   }
 
   function options() {
-    return { cur: $("c-cur").value, cid: $("c-watch").checked ? cid : "", latin: $("c-latin").checked, fights: $("c-fights").checked, city: $("c-city").value, era: $("c-era").value, lang: $("c-lang").value, at: $("c-at").value, hour: $("c-hour").value === "" ? null : Number($("c-hour").value), hunt: [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12) };
+    return { low: $("c-low").checked, cur: $("c-cur").value, cid: $("c-watch").checked ? cid : "", latin: $("c-latin").checked, fights: $("c-fights").checked, city: $("c-city").value, era: $("c-era").value, lang: $("c-lang").value, at: $("c-at").value, hour: $("c-hour").value === "" ? null : Number($("c-hour").value), hunt: [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12) };
   }
   function link() {
     const p = new URLSearchParams();
@@ -43,6 +43,7 @@
     if ($("c-at").value) p.set("at", $("c-at").value);
     if ($("c-hour").value) p.set("hour", $("c-hour").value);
     if ($("c-cur").value === "denarii") p.set("cur", "denarii");
+    if ($("c-low").checked) p.set("low", "1");
     if ($("c-watch").checked && cid) p.set("cid", cid);
     const hunt = [...document.querySelectorAll(".c-hunt-box:checked")].map((b) => b.value).slice(0, 12);
     if (hunt.length) p.set("hunt", hunt.join(","));
@@ -65,7 +66,7 @@
     try { await TeacherAuth.removeClass(cur); await pick(0); $("c-msg").textContent = "Class deleted."; } catch (e) { $("c-msg").textContent = e.message; }
   });
   $("c-name").addEventListener("input", () => { clearTimeout(nameTimer); nameTimer = setTimeout(async () => { try { await TeacherAuth.renameClass(cur, $("c-name").value.trim() || "Class"); fillClasses(); } catch (e) { /* ignore */ } }, 900); });
-  for (const id of ["c-cur", "c-watch", "c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
+  for (const id of ["c-low", "c-cur", "c-watch", "c-name", "c-latin", "c-fights", "c-city", "c-era", "c-lang", "c-at", "c-hour"]) $(id).addEventListener("input", show);
   $("c-copy").addEventListener("click", async () => {
     const l = link();
     try { await navigator.clipboard.writeText(l); $("c-msg").textContent = "Copied."; }

@@ -237,7 +237,7 @@ const Cancun = (() => {
   const WEAR_MODERN = [0xe23b3b, 0x2f8fe0, 0xf2c21b, 0x35b86a, 0xff8c3a, 0xffffff, 0x9a4fd0, 0x1f1f1f].map((c) => new T.Color(c));
   const HAT_MAYA = [0x2f8f4a, 0xd9341f, 0x2c7fe0, 0xf2c21b, 0xffffff].map((c) => new T.Color(c));      // feathered headbands
   const HAT_MODERN = [0xe6cf8a, 0xf1ead8, 0xd9b868, 0xffffff, 0x2c7fe0].map((c) => new T.Color(c));    // straw hats and caps
-  function buildPeople(count = 70) {
+  function buildPeople(count = window.CLASSMODE && CLASSMODE.low ? 40 : 70) {
     const bodyGeo = new T.CylinderGeometry(0.3, 0.42, 1.35, 8); bodyGeo.translate(0, 0.68, 0);
     const headGeo = new T.SphereGeometry(0.19, 8, 6); headGeo.translate(0, 1.58, 0);
     const hatGeo = new T.SphereGeometry(0.26, 8, 6); hatGeo.scale(1, 0.55, 1); hatGeo.translate(0, 1.78, 0);
