@@ -139,20 +139,40 @@ const Car = (() => {
       g.add(box(1.5, 0.15, 1.7, lam(0x7a3a2a), 0, 4.25, 0.2));
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.1, 1.5, 0.1, gold, sx * 0.7, 5.0, 0.2 + sz * 0.75));
       g.add(box(1.7, 0.1, 1.9, red, 0, 5.8, 0.2));
-    } else if (id === "plane") {                       // a small propeller plane: a fuselage, high wings, a tail, three wheels and a propeller
-      const white = lam(0xf2f2f4), red = lam(0xc0262b), dk = lam(0x2b2b2b);
+    } else if (id === "plane") {                       // a small propeller plane (shapes and paint from aircraftgfx.js): a lathe fuselage, a tapered high wing on struts, a swept tail, a cowling with a spinner and a propeller
+      const A = AircraftGfx, white = A.paint(0xf4f5f7), red = A.paint(0xc0262b, 60), dk = lam(0x2b2b2b), gl = A.glass(), steel = A.metal(0x9aa0a8);
       const n0 = g.children.length;
-      g.add(box(1.3, 1.2, 5.2, white, 0, 1.3, 0.3), box(1.34, 0.28, 5.24, red, 0, 1.12, 0.3));          // the body and a red stripe
-      g.add(box(1.1, 0.9, 1.2, dk, 0, 1.3, -2.8), box(1.0, 0.7, 1.4, white, 0, 1.55, -0.9));              // the engine and the cockpit
-      g.add(box(1.0, 0.6, 1.1, lam(0x1d3a4a), 0, 1.85, -0.9));                                           // the canopy
-      g.add(box(11, 0.16, 1.8, white, 0, 2.4, -0.7), box(11.04, 0.18, 0.4, red, 0, 2.4, -1.4));           // the wing and its red front edge
-      g.add(box(0.12, 1.3, 1.1, white, 0, 2.2, 3.2), box(3.6, 0.12, 1.0, white, 0, 1.55, 3.2));          // the tail fin and the tailplane
-      for (const sx of [-1, 1]) g.add(box(0.1, 1.3, 0.1, dk, sx * 1.6, 1.8, -0.7));                       // the wing struts
-      g.add(box(0.1, 0.9, 0.1, dk, 0, 0.55, -1.8), box(0.1, 0.8, 0.1, dk, -0.8, 0.55, 0.6), box(0.1, 0.8, 0.1, dk, 0.8, 0.55, 0.6));
-      for (const [x, z, r] of [[0, -1.8, 0.28], [-0.8, 0.6, 0.3], [0.8, 0.6, 0.3]]) { const w = wheel(r, 0.14, x, r, z); g.add(w); wheels.push(w); }
-      const prop = new THREE.Group(); prop.position.set(0, 1.3, -3.45); prop.add(box(0.18, 2.5, 0.08, dk, 0, 0, 0), box(2.5, 0.18, 0.08, dk, 0, 0, 0.01)); g.add(prop); g.userData.prop = prop;
+      const body = new THREE.Mesh(A.fuselage(7.0, 0.66, { noseEnd: 0.17, tailStart: 0.5, tailR: 0.09, noseR: 0.62 }), white); body.position.set(0, 1.3, 0.2); body.scale.y = 1.1; body.castShadow = true; g.add(body);
+      const stripes = new THREE.Group(); for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.13, 4.6), red); st.position.set(sx * 0.655, 1.17, 0.35); stripes.add(st); } g.add(stripes);
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), gl); canopy.scale.set(0.5, 0.42, 1.15); canopy.position.set(0, 1.86, -0.55); g.add(canopy);
+      for (const sx of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.34, 1.5), gl); w.position.set(sx * 0.6, 1.62, -0.45); g.add(w); }                      // the side windows
+      for (const sx of [-1, 1]) { const vent = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.5), dk); vent.position.set(sx * 0.6, 1.22, -2.75); g.add(vent); }                 // the cowling's air vents
+      const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.62, 16), red); spinner.rotation.x = -Math.PI / 2; spinner.position.set(0, 1.3, -3.62); g.add(spinner);
+      const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), steel); exhaust.rotation.x = Math.PI / 2; exhaust.position.set(0.25, 0.88, -2.2); g.add(exhaust);
+      // the wing: two tapered halves with a little dihedral, a red tip each, and struts down to the body
+      for (const sx of [-1, 1]) {
+        const half = new THREE.Group(); half.position.set(0, 2.42, -0.5); half.rotation.z = sx * 0.045;
+        const wing = new THREE.Mesh(A.wingGeo(5.5, 1.95, 1.2, 0.17, 0.3), white); wing.scale.x = sx; wing.castShadow = true; half.add(wing);
+        const tip = new THREE.Mesh(A.wingGeo(0.5, 1.2, 1.05, 0.18, 0.05), red); tip.position.set(sx * 5.0, 0, -0.3 * 5.0 / 5.5 * 0.0); tip.scale.x = sx; half.add(tip);
+        g.add(half);
+        g.add(A.strut([sx * 0.5, 1.05, -0.35], [sx * 2.9, 2.36, -0.6], dk, 0.045));
+      }
+      // the tail: a swept fin and two tapered tailplanes
+      const fin = new THREE.Mesh(A.finGeo(1.6, 1.5, 0.85, 0.75, 0.13), white); fin.position.set(0, 1.45, 2.3); fin.castShadow = true; g.add(fin);
+      const rudderTip = new THREE.Mesh(A.finGeo(0.28, 0.9, 0.8, 0.12, 0.14), red); rudderTip.position.set(0, 1.45 + 1.34, 2.3 + 0.55); g.add(rudderTip);
+      for (const sx of [-1, 1]) { const tp = new THREE.Mesh(A.wingGeo(1.95, 1.1, 0.62, 0.1, 0.18), white); tp.scale.x = sx; tp.position.set(0, 1.5, 3.1); tp.castShadow = true; g.add(tp); }
+      // the landing gear: a nose wheel and two main wheels on struts, with fairings
+      g.add(A.strut([0, 1.0, -1.7], [0, 0.34, -1.85], dk, 0.06));
+      for (const sx of [-1, 1]) { g.add(A.strut([sx * 0.42, 1.0, 0.35], [sx * 0.98, 0.34, 0.62], dk, 0.06)); const fair = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), white); fair.scale.set(0.12, 0.3, 0.5); fair.position.set(sx * 0.98, 0.34, 0.62); g.add(fair); }
+      for (const [x, z, r] of [[0, -1.85, 0.28], [-0.98, 0.62, 0.3], [0.98, 0.62, 0.3]]) { const w = A.wheelMesh(r, 0.15, x, r, z); g.add(w); wheels.push(w); }
+      // the propeller: two blades and a faint disc that shows it spinning
+      const prop = new THREE.Group(); prop.position.set(0, 1.3, -3.7);
+      for (const sx of [-1, 1]) { const bl = new THREE.Mesh(A.wingGeo(1.3, 0.2, 0.11, 0.035), dk); bl.rotation.x = Math.PI / 2; bl.scale.x = sx; bl.rotation.y = 0.18; prop.add(bl); const bt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.01, 0.12), A.bright(0xf2c21b)); bt.position.set(sx * 1.25, 0, 0); bt.rotation.x = Math.PI / 2; prop.add(bt); }
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(1.32, 24), new THREE.MeshBasicMaterial({ color: 0xcfd6dd, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false })); prop.add(disc);
+      g.add(prop); g.userData.prop = prop;
+      AircraftGfx.addLights(g, 10.9, 2.45 + 0.5, -0.4, 3.0, 3.85);
       g.userData.cockpit = planeCockpit(g);
-      g.userData.shell = [g.children[n0], g.children[n0 + 1], g.children[n0 + 3]];                     // the body, its stripe and the cockpit block: hidden from the inside so you can see the panel
+      g.userData.shell = [body, stripes, canopy];                                                                                          // hidden from the inside so you can see the panel
     } else {
       const L = M.len, W = M.wid, low = id === "sportscar";
       g.add(box(W, low ? 0.5 : 0.65, L, body, 0, low ? 0.5 : 0.6, 0));
@@ -404,6 +424,7 @@ const Car = (() => {
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.order = "YXZ"; car.g.rotation.set(car.pitch, car.yaw, car.roll);
     const u = car.g.userData;
     if (u.prop) u.prop.rotation.z += (4 + car.throttle * 70) * dt;
+    if (u.strobes) { const ph = (performance.now() / 1000) % 1.3; for (const st of u.strobes) st.m.visible = ((ph + st.phase) % 1.3) < 0.1 || ((ph + st.phase) % 1.3) > 0.2 && ((ph + st.phase) % 1.3) < 0.3; }       // (the strobes flash twice, then wait)
     const rev = car.M.hover ? (car.alt > 0.4 || car.vy > 0 || car.throttle > 0 ? 1 : 0.35) : 0.35 + car.throttle;                    // rotors turn faster in the air
     for (const r of u.rotors || []) r.o.rotation[r.axis] += r.s * rev * dt;
     if (u.tips) {                                                                                 // folding wingtips: folded up while parked, stretched out once you move or fly

@@ -22,71 +22,77 @@ const AIRCRAFT = (() => {
 
   // ---- fixed-wing jets and big planes: one builder, many shapes. o: col, stripe, win (windows), wing "low"|"high", sweep, eng "wing"|"rear"|"fighter", engines (2 or 4), tail "T"|"low"|"twin", r (fuselage radius)
   function jet(M, o) {
-    const g = new T.Group(), wheels = [];
+    const A = AircraftGfx, g = new T.Group(), wheels = [], fighter = o.eng === "fighter";
     const L = M.len, S = M.span, r = o.r || Math.max(0.55, L * 0.06), gr = 0.3 + L * 0.008, y0 = r + gr * 2 + 0.2;
-    const white = lam(o.col), acc = lam(o.stripe), dk = lam(0x2b2b2b), steel = lam(0x8a8f96), glass = lam(0x1d3a4a);
-    g.add(tube(r, r, L * 0.45, white, 0, y0, -L * 0.075), tube(r * 0.2, r, L * 0.2, white, 0, y0, -L * 0.4), tube(r, r * 0.25, L * 0.35, white, 0, y0, L * 0.325));    // the tube, the nose and the tail cone
-    g.add(box(r * 2.04, r * 0.16, L * 0.45, acc, 0, y0 - r * 0.1, -L * 0.075));                       // a coloured band along the sides
+    const white = A.paint(o.col), acc = A.paint(o.stripe, 60), dk = lam(0x2b2b2b), steel = A.metal(0x8a8f96), glass = A.glass(), finMat = o.fin ? A.paint(o.fin) : white;
+    // the fuselage is one smooth lathe (a rounded nose, a long body and a tail that narrows); a fighter's is slim and pointed
+    const body = new T.Mesh(A.fuselage(L, r, fighter ? { noseEnd: 0.34, noseR: 0.02, tailStart: 0.7, tailR: 0.6 } : { noseEnd: 0.21, noseR: 0.2, tailStart: 0.66, tailR: 0.1 }), white); body.position.y = y0; body.castShadow = true; g.add(body);
+    if (!fighter) for (const sx of [-1, 1]) { const cl = new T.Mesh(new T.PlaneGeometry(L * 0.44, r * 0.1), new T.MeshPhongMaterial({ color: o.stripe, side: T.DoubleSide, shininess: 60 })); cl.position.set(sx * r * 0.985, y0 - r * 0.12, -L * 0.075); cl.rotation.y = sx * Math.PI / 2; g.add(cl); }        // a coloured stripe along each side
+    const strip = (len, z, yy, rr) => { for (const sx of [-1, 1]) { const w = A.windowStrip(len, rr * 0.3); w.position.set(sx * rr * 0.985, yy, z); w.rotation.y = sx * Math.PI / 2; g.add(w); } };
     if (o.deck) {                                                                                   // a double-decker (A380): a second, shorter fuselage on top of the first, with its own row of windows
-      g.add(tube(r * 0.82, r * 0.82, L * 0.5, white, 0, y0 + r * 0.72, -L * 0.1), tube(r * 0.3, r * 0.82, L * 0.1, white, 0, y0 + r * 0.72, -L * 0.4));
-      for (let z = -L * 0.32; z < L * 0.12; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.2, 0.4, glass, sx * (r * 0.82 + 0.01), y0 + r * 1.2, z));
+      const up = new T.Mesh(A.fuselage(L * 0.6, r * 0.82, { noseEnd: 0.3, noseR: 0.3, tailStart: 0.75, tailR: 0.3 }), white); up.position.set(0, y0 + r * 0.72, -L * 0.2); up.castShadow = true; g.add(up);
+      strip(L * 0.44, -L * 0.2, y0 + r * 1.2, r * 0.82);
     }
-    if (o.hump) g.add(tube(r * 0.7, r * 0.7, L * 0.26, white, 0, y0 + r * 0.78, -L * 0.3), tube(r * 0.25, r * 0.7, L * 0.1, white, 0, y0 + r * 0.78, -L * 0.46));   // a 747-style upper deck hump at the front
+    if (o.hump) { const hu = new T.Mesh(A.fuselage(L * 0.36, r * 0.7, { noseEnd: 0.4, noseR: 0.25, tailStart: 0.7, tailR: 0.3 }), white); hu.position.set(0, y0 + r * 0.78, -L * 0.3); hu.castShadow = true; g.add(hu); }   // a 747-style upper deck hump at the front
     if (o.uav) { /* a drone: no canopy and no cockpit windows */ }
-    else if (o.eng === "fighter") g.add(ball(r * 0.7, r * 0.5, L * 0.12, glass, 0, y0 + r * 0.75, -L * 0.2));   // bubble canopy
-    else g.add(box(r * 1.5, r * 0.5, L * 0.07, glass, 0, y0 + r * 0.45, -L * 0.32));                // cockpit windows
-    if (o.win) for (let z = -L * 0.26; z < L * 0.16; z += 1.1) for (const sx of [-1, 1]) g.add(box(0.05, r * 0.26, 0.4, glass, sx * (r + 0.01), y0 + r * 0.2, z));
-    // wings
-    const wy = o.wing === "high" ? y0 + r * 0.8 : y0 - r * 0.45, hs = S / 2 - r, chord = o.eng === "fighter" ? L * 0.3 : L * 0.16, wz = o.eng === "fighter" ? L * 0.12 : L * 0.04;
+    else if (fighter) g.add(ball(r * 0.7, r * 0.5, L * 0.12, glass, 0, y0 + r * 0.75, -L * 0.2));   // bubble canopy
+    else g.add(ball(r * 0.62, r * 0.32, L * 0.04, glass, 0, y0 + r * 0.45, -L * 0.375));              // cockpit windows
+    if (o.win) strip(L * 0.42, -L * 0.05, y0 + r * 0.2, r);
+    // wings: tapered, swept back, with a little lift at the tips
+    const wy = o.wing === "high" ? y0 + r * 0.8 : y0 - r * 0.45, hs = S / 2 - r, chord = fighter ? L * 0.3 : L * 0.16, wz = fighter ? L * 0.12 : L * 0.04, sw = o.sweep || 0.35;
+    const tipAt = (f) => ({ x: Math.cos(sw) * hs * f, z: Math.sin(sw) * hs * f });                    // a point along the wing, in the body's frame (z is back)
     for (const sx of [-1, 1]) {
-      const root = new T.Group(); root.position.set(sx * r * 0.9, wy, wz); root.rotation.y = sx * (o.sweep || 0.35);
-      const tipLen = o.tip === "fold" ? S * 0.075 : 0, main = hs - tipLen;
-      root.add(box(main, 0.16, chord, white, sx * main / 2, 0, 0), box(main, 0.18, 0.18, acc, sx * main / 2, 0, -chord / 2));
+      const root = new T.Group(); root.position.set(sx * r * 0.9, wy, wz); root.rotation.y = -sx * sw; root.rotation.z = sx * 0.03;
+      const tipLen = o.tip === "fold" ? S * 0.075 : 0, main = hs - tipLen, taper = fighter ? 0.3 : o.tip === "fold" || o.tip === "curve" ? 0.5 : 0.36;
+      const wing = new T.Mesh(A.wingGeo(main, chord * 1.25, chord * taper, 0.16 + L * 0.004, 0), white); wing.scale.x = sx; wing.castShadow = true; root.add(wing);
       if (o.tip === "fold") {                                                                     // folding wingtips (777X): a hinged outer section that folds up on the ground and stretches out to fly
-        const tip = new T.Group(); tip.position.set(sx * main, 0, 0.12); tip.add(box(tipLen, 0.14, chord * 0.7, white, sx * tipLen / 2, 0, 0), box(tipLen, 0.16, 0.14, acc, sx * tipLen / 2, 0, -chord * 0.35), box(0.2, 0.2, chord * 0.7, dk, 0, 0, 0));
+        const tip = new T.Group(); tip.position.set(sx * main, 0, 0.12); tip.add(box(tipLen, 0.14, chord * 0.5, white, sx * tipLen / 2, 0, 0), box(0.2, 0.2, chord * 0.5, dk, 0, 0, 0));
         tip.rotation.z = sx * 1.45; root.add(tip); (g.userData.tips = g.userData.tips || []).push({ g: tip, side: sx });
       } else if (o.tip === "curve") {                                                             // curved wingtips (A350): the wing bends smoothly up into a blade
         let parent = root, x = sx * main;
         for (let k = 0; k < 4; k++) {
-          const seg = new T.Group(), len = S * 0.03, ch = chord * (0.62 - k * 0.1); seg.position.set(k === 0 ? x : sx * len, 0, k === 0 ? 0 : 0); seg.rotation.z = sx * 0.4;
-          seg.add(box(len + 0.05, 0.12, ch, white, sx * len / 2, 0, 0.1 * k), box(len + 0.05, 0.14, 0.12, acc, sx * len / 2, 0, -ch / 2 + 0.1 * k));
+          const seg = new T.Group(), len = S * 0.03, ch = chord * (0.5 - k * 0.08); seg.position.set(k === 0 ? x : sx * len, 0, 0); seg.rotation.z = sx * 0.4;
+          seg.add(box(len + 0.05, 0.12, ch, white, sx * len / 2, 0, 0.08 * k));
           parent.add(seg); parent = seg;
         }
-      } else root.add(box(0.12, 0.7 + L * 0.02, chord * 0.5, acc, sx * hs, 0.35 + L * 0.01, 0));      // a plain winglet
+      } else { const wl = new T.Mesh(A.finGeo(0.7 + L * 0.02, chord * 0.5, chord * 0.2, chord * 0.2, 0.1), acc); wl.rotation.y = Math.PI / 2; wl.position.set(sx * (hs - 0.05), 0.05, -chord * 0.15); root.add(wl); }   // a plain winglet
       g.add(root);
     }
     // engines
+    const engine = (x, y, z, len, rr) => {                                                          // a nacelle with a lip, a fan and a cone, hung on a short pylon under the wing
+      const e = A.nacelle(len, rr, white, steel); e.position.set(x, y, z); g.add(e);
+      g.add(box(rr * 0.3, (wy - y) * 0.8, len * 0.5, white, x, y + (wy - y) * 0.4, z + len * 0.1));
+    };
     if (o.eng === "wing") {
       const xs = o.engines === 8 ? [0.18, 0.34, 0.5, 0.66] : o.engines === 4 ? [0.3, 0.6] : [0.4];
-      for (const f of xs) for (const sx of [-1, 1]) {
-        const x = sx * (r + hs * f);
-        g.add(tube(r * 0.46, r * 0.4, L * 0.12, steel, x, wy - r * 0.6, wz - chord * 0.55), tube(r * 0.3, r * 0.3, L * 0.125, dk, x, wy - r * 0.6, wz - chord * 0.55 - 0.02));
-      }
+      for (const f of xs) for (const sx of [-1, 1]) { const t = tipAt(f); engine(sx * (r * 0.9 + t.x), wy - r * 0.6, wz + t.z - chord * 0.75, L * 0.13, r * 0.44); }
     } else if (o.eng === "prop") {                                                                  // turboprops (A400M): a nacelle on each wing with a spinning propeller
       for (const f of o.engines === 2 ? [0.4] : [0.28, 0.58]) for (const sx of [-1, 1]) {
-        const x = sx * (r + hs * f), z = wz - chord * 0.7, py = wy - r * 0.25;
+        const t = tipAt(f), x = sx * (r * 0.9 + t.x), z = wz + t.z - chord * 0.7, py = wy - r * 0.25;
         g.add(tube(r * 0.3, r * 0.26, L * 0.15, steel, x, py, z + L * 0.02));
         const prop = new T.Group(); prop.position.set(x, py, z - L * 0.06); for (let i = 0; i < 3; i++) { const b = box(0.14, r * 2.1, 0.05, dk, 0, 0, 0); b.rotation.z = i * Math.PI / 3; prop.add(b); } g.add(prop); spin(g.userData, prop, "z", 70);
       }
     } else if (o.eng === "rear") {
-      for (const sx of [-1, 1]) g.add(tube(r * 0.42, r * 0.34, L * 0.14, steel, sx * (r + r * 0.6), y0 + r * 0.45, L * 0.27), box(0.3, 0.5, L * 0.12, white, sx * (r + r * 0.25), y0 + r * 0.3, L * 0.27));
+      for (const sx of [-1, 1]) { const e = A.nacelle(L * 0.15, r * 0.4, white, steel); e.position.set(sx * (r + r * 0.6), y0 + r * 0.45, L * 0.27); g.add(e, box(0.3, 0.5, L * 0.12, white, sx * (r + r * 0.25), y0 + r * 0.3, L * 0.27)); }
     } else {
       g.add(tube(r * 0.7, r * 0.55, L * 0.12, dk, 0, y0, L * 0.5), tube(r * 0.5, r * 0.5, L * 0.13, lam(0xff7a2a), 0, y0, L * 0.5));    // fighter: one big exhaust with a hot glow
       for (const sx of [-1, 1]) g.add(box(r * 0.55, r * 0.8, L * 0.16, dk, sx * (r + 0.1), y0 - r * 0.1, -L * 0.15));                  // the air intakes
     }
-    // tail
-    const fin = o.finH || r * 2.4 + L * 0.03;
-    const addFin = (x, tilt) => { const f = box(0.14, fin, L * 0.16, o.fin ? lam(o.fin) : white, x, y0 + r * 0.6 + fin / 2 - 0.1, L * 0.4); f.rotation.x = 0.3; f.rotation.z = tilt; g.add(f); return f; };
+    // tail: a swept fin (twin fins lean out) and tapered tailplanes
+    const fin = o.finH || r * 2.4 + L * 0.03, finBase = y0 + r * 0.3;
+    const addFin = (x, tilt) => { const f = new T.Mesh(A.finGeo(fin, L * 0.18, L * 0.07, L * 0.1, 0.14), finMat); f.position.set(x, finBase, L * 0.33); f.rotation.z = tilt; f.castShadow = true; g.add(f); return f; };
     if (o.tail === "none") { /* a flying wing: no tail */ } else if (o.tail === "twin") { addFin(r * 0.9, 0.4); addFin(-r * 0.9, -0.4); } else addFin(0, 0);
-    const sy = o.tail === "T" ? y0 + r * 0.6 + fin - 0.2 : y0 + r * 0.1;
-    if (o.tail !== "none") for (const sx of [-1, 1]) { const st = new T.Group(); st.position.set(sx * 0.2, sy, L * (o.tail === "T" ? 0.46 : 0.42)); st.rotation.y = sx * 0.35; st.add(box(S * 0.17, 0.1, L * 0.08, white, sx * S * 0.085, 0, 0)); g.add(st); }
+    const sy = o.tail === "T" ? finBase + fin - 0.1 : y0 + r * 0.1;
+    if (o.tail !== "none") for (const sx of [-1, 1]) { const st = new T.Group(); st.position.set(sx * 0.2, sy, L * (o.tail === "T" ? 0.44 : 0.42)); st.rotation.y = -sx * 0.35; const tp = new T.Mesh(A.wingGeo(S * 0.17, L * 0.11, L * 0.05, 0.1, 0), white); tp.scale.x = sx; tp.castShadow = true; st.add(tp); g.add(st); }
     if (o.boom) { const bm = box(0.3, 0.3, L * 0.22, lam(0x555a60), 0, y0 - r * 0.6, L * 0.44); bm.rotation.x = 0.22; g.add(bm, box(S * 0.09, 0.06, 0.5, lam(0x555a60), 0, y0 - r * 0.6 + 0.4, L * 0.52)); }   // the tanker's refuelling boom
-    if (o.canard) for (const sx of [-1, 1]) g.add(box(S * 0.17, 0.07, L * 0.09, white, sx * (r + S * 0.08), y0 + r * 0.25, -L * 0.26));   // small front wings (Typhoon)
-    if (o.pods) for (const sx of [-1, 1]) g.add(tube(0.2, 0.16, 1.7, dk, sx * (r * 0.9 + hs * Math.cos(o.sweep || 0.35)), wy + 0.12, wz - hs * Math.sin(o.sweep || 0.35)));   // wingtip pods (Growler)
+    if (o.canard) for (const sx of [-1, 1]) { const c = new T.Mesh(A.wingGeo(S * 0.17, L * 0.1, L * 0.05, 0.07, 0), white); c.scale.x = sx; c.position.set(sx * r * 0.9, y0 + r * 0.25, -L * 0.26); g.add(c); }   // small front wings (Typhoon)
+    if (o.pods) for (const sx of [-1, 1]) g.add(tube(0.2, 0.16, 1.7, dk, sx * (r * 0.9 + hs * Math.cos(sw)), wy + 0.12, wz + hs * Math.sin(sw)));   // wingtip pods (Growler)
     // landing gear: a nose wheel and the main wheels (double for the big ones)
     const strut = (x, z) => { g.add(box(0.12, y0 - r - gr, 0.12, dk, x, (y0 - r + gr) / 2 + 0.05, z)); };
-    const gear = (x, z) => { const w = wheelAt(gr, 0.22, x, gr, z); g.add(w); wheels.push(w); strut(x, z); };
+    const gear = (x, z) => { const w = A.wheelMesh(gr, 0.22, x, gr, z); g.add(w); wheels.push(w); strut(x, z); };
     gear(0, -L * 0.3); for (const sx of [-1, 1]) { gear(sx * r * 1.5, L * 0.08); if (L > 17) gear(sx * r * 1.5, L * 0.08 + gr * 2.4); }
+    // navigation lights on the wingtips and tail, and the strobes (Car makes them flash)
+    if (!o.uav) { const t = tipAt(o.tip === "fold" ? 1 - S * 0.075 / hs : 1); A.addLights(g, 2 * (r * 0.9 + t.x), wy + 0.15, wz + t.z, finBase + fin, L * 0.4, 0.1 + L * 0.004); }
     return { g, wheels };
   }
 
