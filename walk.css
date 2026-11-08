@@ -966,3 +966,20 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 
 #btn-farrange.active { background: rgba(226,185,85,.85); color: #2a2118; }
 .drag-handle { user-select: none; }
+
+/* instruments */
+.ins-tabs, .ins-groups { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ins-tabs button, .ins-groups button { font: 700 .9rem inherit; cursor: pointer; padding: 6px 12px; border: 1px solid rgba(226,185,85,.5); border-radius: 999px; color: var(--ink); background: transparent; }
+.ins-tabs button.on, .ins-groups button.on { color: #2a2118; background: var(--gold); }
+.ins-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.ins-grid button { display: flex; align-items: center; gap: 8px; text-align: left; font: 600 .88rem inherit; cursor: pointer; padding: 8px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; color: var(--ink); background: rgba(255,255,255,.06); }
+.ins-grid button.on { border-color: var(--gold); background: rgba(226,185,85,.22); }
+.ins-emoji { font-size: 1.3rem; }
+.ins-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.ins-row select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(226,185,85,.5); background: #14100b; color: var(--ink); }
+.ins-row button { font: 700 .95rem inherit; cursor: pointer; padding: 7px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
+.ins-keys { display: grid; gap: 4px; margin: 8px 0; user-select: none; touch-action: none; }
+.ins-keyrow { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.ins-key { font: 700 1rem system-ui; padding: 16px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); color: var(--ink); background: rgba(255,255,255,.08); cursor: pointer; touch-action: none; }
+.ins-key.down { background: var(--gold); color: #2a2118; transform: translateY(2px); }
+.ins-canvas { display: block; width: 100%; max-width: 440px; border-radius: 10px; border: 1px solid rgba(226,185,85,.4); margin: 6px 0; }

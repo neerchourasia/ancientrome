@@ -277,6 +277,37 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         body(await self.http_get("/class/set?c=%s&k=%s&p=1" % (cid2, key2)))
         self.assertTrue(server.CLASSES[cid2]["paused"])
 
+    async def test_notes_played_on_an_instrument_are_heard_only_by_walkers_nearby(self):
+        a, b, c, d = await self.player("Ann"), await self.player("Ben"), await self.player("Cyd"), await self.player("Dee")
+        a.send({"t": "walk", "c": "rome", "x": 100, "z": 50, "yaw": 0, "s": 0})
+        b.send({"t": "walk", "c": "rome", "x": 130, "z": 50, "yaw": 0, "s": 0})       # 30 m away: hears
+        c.send({"t": "walk", "c": "rome", "x": 400, "z": 50, "yaw": 0, "s": 0})       # far away: does not
+        d.send({"t": "walk", "c": "delhi", "x": 110, "z": 50, "yaw": 0, "s": 0})      # another city: does not
+        await asyncio.sleep(0.3)
+        a.send({"t": "note", "i": "trumpet", "f": 523.2})
+        got = await b.until(lambda m: m["t"] == "note")
+        self.assertEqual((got["i"], got["f"], got["id"]), ("trumpet", 523.2, a.welcome["id"]))
+        a.send({"t": "note", "i": "kazoo", "f": 440})                                     # not an instrument: ignored
+        a.send({"t": "note", "i": "gong", "f": 999999})                                   # silly pitches are cut down
+        got = await b.until(lambda m: m["t"] == "note")
+        self.assertEqual((got["i"], got["f"]), ("gong", 4200.0))
+        async def count(client, wait=0.6):
+            n = 0
+            try:
+                while True:
+                    m = await client.recv(wait)
+                    if m and m.get("t") == "note":
+                        n += 1
+            except asyncio.TimeoutError:
+                pass
+            return n
+        self.assertEqual((await count(c), await count(d)), (0, 0))
+        # a flood is cut: twelve at once, then about ten a second
+        for _ in range(40):
+            a.send({"t": "note", "i": "piano", "f": 440})
+        await asyncio.sleep(0.3)
+        self.assertLess(await count(b), 22)
+
     async def test_user_journey_is_recorded_and_only_admins_can_read_it(self):
         vid = "c" * 32
         server.JOURNEYS.clear(); server.VISITS.clear(); server.EVENTS.clear(); server.FLAG_GAP.clear(); server.JOURNEY_HITS.clear()

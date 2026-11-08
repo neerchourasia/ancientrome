@@ -2745,6 +2745,29 @@ def on_emote(conn, m):
             c.send({"t": "emote", "id": conn.id, "e": e})
 
 
+INSTRUMENTS = ("trumpet", "tuba", "cornu", "aulos", "hydraulis", "lyre", "tympanum", "bansuri", "sitar", "harmonium", "shehnai", "tabla", "ocarina", "conch", "marimba", "rattle",
+               "erhu", "dizi", "guzheng", "pipa", "gong", "piano", "violin", "guitar", "flute")
+NOTE_RANGE = 70.0           # metres: how far a note can be heard
+
+
+def on_note(conn, m):
+    """A player plays a note on an instrument (instruments.js): the other walkers within 70 m in the same city hear it. Twelve at once, then ten a second."""
+    i = m.get("i")
+    if i not in INSTRUMENTS or conn.room or not conn.hello or not conn.city:
+        return
+    f = num(m.get("f"), 30.0, 4200.0, 440.0)
+    t = now()
+    tokens = min(12.0, getattr(conn, "note_tok", 12.0) + (t - getattr(conn, "note_at", t)) * 10.0)
+    conn.note_at = t
+    if tokens < 1.0:
+        conn.note_tok = tokens
+        return
+    conn.note_tok = tokens - 1.0
+    for c in list(CONNS):
+        if c is not conn and c.hello and not c.closed and not c.room and c.city == conn.city and math.hypot(c.px - conn.px, c.pz - conn.pz) <= NOTE_RANGE:
+            c.send({"t": "note", "id": conn.id, "i": i, "f": round(f, 1)})
+
+
 def on_board(conn, m):
     """Someone asks to ride in another player's vehicle."""
     if conn.room or not conn.hello or conn.ride or conn.riders or conn.veh:
@@ -6483,6 +6506,8 @@ async def handle_msg(conn, m):
         return on_walk(conn, m)
     if t == "emote":
         return on_emote(conn, m)
+    if t == "note":
+        return on_note(conn, m)
     if t == "stock":
         return on_stock(conn, m)
     if t in ("pyr_get", "pyr_add"):
