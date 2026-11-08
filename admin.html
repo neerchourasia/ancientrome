@@ -8,73 +8,82 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co http://localhost:54321 http://127.0.0.1:54321 ws://localhost:8765 ws://127.0.0.1:8765 wss://*.onrender.com wss://*.fly.dev wss://*.up.railway.app; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="admin.css?v=1">
+  <link rel="stylesheet" href="admin.css?v=2">
 </head>
 <body>
   <!-- The owner's page: sign in, and watch and look after the game. It is not part of the game itself (nothing of the game is loaded here). -->
-  <main id="login" class="card" hidden>
-    <h1>🛠 Admin</h1>
-    <p class="note">Only accounts listed in the database's <code>admins</code> table can come in. Use the same email and password as in the game.</p>
-    <form id="login-form" autocomplete="on">
-      <label>Email <input id="login-email" type="email" autocomplete="username" required></label>
-      <label>Password <input id="login-pass" type="password" autocomplete="current-password" required></label>
-      <label class="check"><input id="login-remember" type="checkbox" checked> Keep me signed in on this device</label>
-      <button type="submit">Sign in</button>
-    </form>
-    <p id="login-msg" class="note" role="status"></p>
-    <p class="note"><a href="./">&larr; The game</a></p>
+  <main id="login" class="login" hidden>
+    <div class="panel login-card">
+      <div class="brand"><span class="logo">🛠</span><span class="name">Time Machine</span><span class="tag">Admin</span></div>
+      <h1>Sign in</h1>
+      <p class="dim">Only accounts listed in the database's <code>admins</code> table can come in. Use the same email and password as in the game.</p>
+      <form id="login-form" autocomplete="on">
+        <label>Email <input id="login-email" type="email" autocomplete="username" required></label>
+        <label>Password <input id="login-pass" type="password" autocomplete="current-password" required></label>
+        <label class="check"><input id="login-remember" type="checkbox" checked> Keep me signed in on this device</label>
+        <button type="submit" class="primary">Sign in</button>
+      </form>
+      <p id="login-msg" class="dim" role="status"></p>
+      <p class="dim"><a href="./">&larr; Back to the game</a></p>
+    </div>
   </main>
 
   <div id="app" hidden>
-    <header class="top">
-      <h1>🛠 Admin</h1>
-      <span id="who" class="note"></span>
+    <header class="topbar">
+      <div class="brand"><span class="logo">🛠</span><span class="name">Time Machine</span><span class="tag">Admin</span></div>
       <span id="conn" class="pill" role="status">Connecting...</span>
       <span class="spacer"></span>
+      <span id="who" class="dim"></span>
       <a class="btn" href="./">&larr; The game</a>
       <button id="refresh" type="button">&#8635; Refresh</button>
       <button id="signout" type="button" title="Also signs you out of the game on this device">Sign out</button>
     </header>
-    <nav class="tabs" aria-label="Admin sections">
-      <button type="button" class="tab on" data-tab="users">Users</button>
-      <button type="button" class="tab" data-tab="online">Online now <i id="b-online" class="badge"></i></button>
-      <button type="button" class="tab" data-tab="visitors">Visitors <i id="b-visits" class="badge"></i></button>
-      <button type="button" class="tab" data-tab="journey">User journey <i id="b-journey" class="badge"></i></button>
-      <button type="button" class="tab" data-tab="chat">Chat log <i id="b-chat" class="badge"></i></button>
-      <button type="button" class="tab" data-tab="events">Suspicious activity <i id="b-events" class="badge"></i></button>
-    </nav>
-    <p id="msg" class="note" role="status"></p>
+    <div class="shell">
+      <nav class="side" aria-label="Admin sections">
+        <div class="group">People</div>
+        <button type="button" class="tab on" data-tab="users"><span class="ico">👥</span>Users</button>
+        <button type="button" class="tab" data-tab="online"><span class="ico">🟢</span>Online now <i id="b-online" class="badge"></i></button>
+        <button type="button" class="tab" data-tab="visitors"><span class="ico">🚪</span>Visitors <i id="b-visits" class="badge"></i></button>
+        <button type="button" class="tab" data-tab="journey"><span class="ico">🧭</span>User journey <i id="b-journey" class="badge"></i></button>
+        <div class="group">Watch</div>
+        <button type="button" class="tab" data-tab="chat"><span class="ico">💬</span>Chat log <i id="b-chat" class="badge"></i></button>
+        <button type="button" class="tab" data-tab="events"><span class="ico">🚩</span>Suspicious activity <i id="b-events" class="badge"></i></button>
+        <p class="dim foot">Restoring items and adding denarii to your own game is still in the game: open it, then 🧰 Admin tools.</p>
+      </nav>
+      <main class="main">
+        <p id="msg" class="dim" role="status"></p>
 
-    <section class="pane" data-pane="users">
-      <h2>Who has signed up <span id="n-users" class="note"></span></h2>
-      <div class="scroll"><table id="t-users"></table></div>
-    </section>
-    <section class="pane" data-pane="online" hidden>
-      <h2>Online right now <span id="n-online" class="note"></span></h2>
-      <div class="scroll"><table id="t-online"></table></div>
-    </section>
-    <section class="pane" data-pane="events" hidden>
-      <h2>Suspicious activity <span id="n-events" class="note"></span></h2>
-      <p class="note">Things the game server noticed (red: serious, amber: worth a look, plain: minor), newest first. The server keeps the latest 1,000.</p>
-      <div class="scroll"><table id="t-events"></table></div>
-    </section>
-    <section class="pane" data-pane="visitors" hidden>
-      <h2>Everyone who came to the site <span id="n-visits" class="note"></span></h2>
-      <p class="note">Every browser that opened the game, newest first, with a made-up visitor id, the kind of device, the address with its last part hidden, the character name and the account if they logged in.</p>
-      <div class="scroll"><table id="t-visits"></table></div>
-    </section>
-    <section class="pane" data-pane="chat" hidden>
-      <h2>Chat log <span id="n-chat" class="note"></span></h2>
-      <p class="note">The last 300 public chat messages, newest first, with who sent them. Whispers and friend chats are never here. It is kept in the server's memory only, and a restart of the server empties it.</p>
-      <div class="scroll"><table id="t-chat"></table></div>
-    </section>
-    <section class="pane" data-pane="journey" hidden>
-      <h2>User journey <span id="n-journey" class="note"></span></h2>
-      <p class="note">What each visitor did every time they came on: where they went, what they bought, which games they played. Pick a visitor to see each visit, oldest line first.</p>
-      <div class="scroll"><table id="t-jlist"></table></div>
-      <div id="jdetail"></div>
-    </section>
-    <p class="note foot">Restoring items and adding denarii to your own game is still in the game: open it, then 🧰 Admin tools.</p>
+        <section class="pane" data-pane="users">
+          <h2>Who has signed up <span id="n-users" class="count"></span></h2>
+          <div class="panel scroll"><table id="t-users"></table></div>
+        </section>
+        <section class="pane" data-pane="online" hidden>
+          <h2>Online right now <span id="n-online" class="count"></span></h2>
+          <div class="panel scroll"><table id="t-online"></table></div>
+        </section>
+        <section class="pane" data-pane="events" hidden>
+          <h2>Suspicious activity <span id="n-events" class="count"></span></h2>
+          <p class="dim">Things the game server noticed (red: serious, amber: worth a look, plain: minor), newest first. The server keeps the latest 1,000.</p>
+          <div class="panel scroll"><table id="t-events"></table></div>
+        </section>
+        <section class="pane" data-pane="visitors" hidden>
+          <h2>Everyone who came to the site <span id="n-visits" class="count"></span></h2>
+          <p class="dim">Every browser that opened the game, newest first, with a made-up visitor id, the kind of device, the address with its last part hidden, the character name and the account if they logged in.</p>
+          <div class="panel scroll"><table id="t-visits"></table></div>
+        </section>
+        <section class="pane" data-pane="chat" hidden>
+          <h2>Chat log <span id="n-chat" class="count"></span></h2>
+          <p class="dim">The last 300 public chat messages, newest first, with who sent them. Whispers and friend chats are never here. It is kept in the server's memory only, and a restart of the server empties it.</p>
+          <div class="panel scroll"><table id="t-chat"></table></div>
+        </section>
+        <section class="pane" data-pane="journey" hidden>
+          <h2>User journey <span id="n-journey" class="count"></span></h2>
+          <p class="dim">What each visitor did every time they came on: where they went, what they bought, which games they played. Pick a visitor to see each visit, oldest line first.</p>
+          <div class="panel scroll"><table id="t-jlist"></table></div>
+          <div id="jdetail"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="config.js"></script>
