@@ -86,6 +86,7 @@ const Online = (() => {
       case "profile": case "replay": Profile.on(m); break;
       case "notice": Bulletin.on(m); break;
       case "note": if (typeof Instruments !== "undefined") Instruments.heard(m); break;
+      case "builds": if (typeof Builds !== "undefined") Builds.heard(m); break;
       case "emote": { const q = peers.get(m.id); if (q) q.emote = { e: m.e, t: 0 }; break; }
       case "ride": if (m.on) Ride.on(m); else Ride.off(m); break;
       case "ridenote": toast(m.text); break;

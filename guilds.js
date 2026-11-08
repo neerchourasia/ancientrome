@@ -94,5 +94,5 @@ const Guilds = (() => {
     $g("gd-gput").addEventListener("click", () => { const id = $g("gd-gsel").value, n = Math.min(5, Shopkeep.owns(id)); if (id && n > 0) send({ a: "g_gdep", item: id, n }); });
     $g("gd-leave").addEventListener("click", () => Dialog.confirm("Leave your guild?").then((yes) => { if (yes) send({ a: "g_leave" }); }));
   }
-  return { bind, on, open, score: (k) => { if (mine && typeof Online !== "undefined" && Online.connected) send({ a: "g_score", k }); }, get inGuild() { return !!mine; } };
+  return { bind, on, open, score: (k) => { if (mine && typeof Online !== "undefined" && Online.connected) send({ a: "g_score", k }); }, get inGuild() { return !!mine; }, get mine() { return mine; } };
 })();

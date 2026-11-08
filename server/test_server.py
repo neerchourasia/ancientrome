@@ -2320,6 +2320,46 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply(snap)
         self.assertEqual(server.GUILDS["red eagles"]["motd"], "Meet at the Colosseum at dusk")      # and it is saved
 
+    async def test_a_guild_leader_pays_for_a_public_build_that_everyone_sees_and_that_is_saved(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear(); server.BUILDS.clear()
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear(), server.BUILDS.clear()))
+        self.accounts("ann", "bob")
+        ann, bob, guest = await self.player("Ann", token="ann"), await self.player("Bob", token="bob"), await self.player("Guest")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["members"]) == 2)
+        guest.send({"t": "builds"})                                                                    # anyone can look: nothing built yet
+        first = await guest.until(lambda m: m["t"] == "builds")
+        self.assertEqual(first["list"], [])
+        self.assertEqual(first["price"]["fountain"], 2000)
+        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})                  # the treasury is empty
+        self.assertIn("treasury", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        server.GUILDS["red eagles"]["treasury"] = 9000
+        bob.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})                  # only the leader can
+        self.assertIn("leader", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_build", "city": "atlantis", "kind": "fountain"})              # not a city
+        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "palace"})                    # not a kind
+        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})
+        seen = await guest.until(lambda m: m["t"] == "builds" and m["list"])                           # everybody is told, guests too
+        self.assertEqual([(b["city"], b["kind"], b["name"], b["tag"]) for b in seen["list"]], [("rome", "fountain", "Red Eagles", "EAD")])
+        self.assertEqual(server.GUILDS["red eagles"]["treasury"], 7000)
+        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})                  # once only
+        self.assertIn("already", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        self.assertEqual(server.GUILDS["red eagles"]["treasury"], 7000)
+        ann.send({"t": "social", "a": "g_build", "city": "delhi", "kind": "aqueduct"})                 # 8000 > 7000
+        self.assertIn("8000", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_look", "color": 3, "emblem": 4})                              # the banner follows the guild's look
+        guest.send({"t": "builds"})
+        look = await guest.until(lambda m: m["t"] == "builds" and m["list"] and m["list"][0]["color"] == 3)
+        self.assertEqual(look["list"][0]["emblem"], 4)
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.BUILDS.clear()
+        server.world_apply(snap)
+        self.assertEqual(list(server.BUILDS), ["rome:fountain"])                                       # and it is saved
+        server.world_apply({"builds": {"rome:fountain": {"city": "rome", "kind": "palace"}, "x:y": {}}})
+        self.assertEqual(server.BUILDS, {})                                                            # (nonsense is ignored)
+
     # ---------------------------------------------------------------- the bulletin boards
 
     async def test_notice_board_post_list_delete_and_limits(self):

@@ -1010,3 +1010,14 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .pm-card small { opacity: .85; }
 .pm-card button { justify-self: start; font: 700 .8rem inherit; cursor: pointer; padding: 4px 10px; border: 1px solid rgba(226,185,85,.5); border-radius: 999px; color: var(--ink); background: transparent; }
 .pm-card button:hover { background: var(--gold); color: #2a2118; }
+
+/* guild builds (builds.js) */
+.bd-intro { margin: 0 0 8px; font-size: .88rem; }
+.bd-city { margin-bottom: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; }
+.bd-city h3 { margin: 0 0 6px; font-size: 1rem; }
+.bd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 3px 0; }
+.bd-name { min-width: 8.5em; font-weight: 700; }
+.bd-row small { opacity: .85; flex: 1; }
+.bd-row button { font: 700 .82rem inherit; cursor: pointer; padding: 5px 12px; border: 1px solid rgba(226,185,85,.5); border-radius: 999px; color: var(--ink); background: transparent; }
+.bd-row button:hover:not(:disabled) { background: var(--gold); color: #2a2118; }
+.bd-row button:disabled { opacity: .45; cursor: default; }

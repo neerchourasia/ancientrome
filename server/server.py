@@ -4519,6 +4519,25 @@ def on_guild(conn, a, m):
         return guild_push(tg)
     if not g:
         return social_msg(conn, "You are not in a guild.")
+    if a == "g_build":                                                           # the leader pays for a fountain, a lighthouse or an aqueduct in a city
+        if g["leader"] != conn.fid:
+            return social_msg(conn, "Only the guild leader can do that.")
+        city, kind = str(m.get("city", "")), str(m.get("kind", ""))
+        if city not in BUILD_CITIES or kind not in BUILD_KINDS:
+            return
+        key = "%s:%s" % (city, kind)
+        if key in BUILDS:
+            return social_msg(conn, "That has already been built.")
+        if g["treasury"] < BUILD_KINDS[kind]:
+            return social_msg(conn, "The treasury needs %d denarii for that." % BUILD_KINDS[kind])
+        g["treasury"] -= BUILD_KINDS[kind]
+        col, emb = guild_look(g)
+        gk = [k for k, v in GUILDS.items() if v is g][0]
+        BUILDS[key] = {"city": city, "kind": kind, "g": gk, "name": g["name"], "tag": g["tag"], "color": col, "emblem": emb, "t": int(time.time())}
+        guild_say(g, "%s paid %d denarii for a %s in %s for everyone to see." % (conn.name, BUILD_KINDS[kind], kind, city.title()))
+        world_soon()
+        guild_push(g)
+        return builds_broadcast()
     if a == "g_leave":
         g["members"].pop(conn.fid, None)
         g.get("pts", {}).pop(conn.fid, None)
@@ -4638,6 +4657,31 @@ def on_guild(conn, a, m):
 def guild_say(g, text):
     g["chat"].append({"name": "", "text": text, "ts": int(time.time())})
     del g["chat"][:-40]
+
+
+# ---- public builds: a guild pays from its treasury for a landmark of its own in a city (a fountain, a lighthouse, an aqueduct), and everyone in that city sees it with the guild's banner and name.
+# One of each kind per city, built once. The leader buys it; the browsers draw it (builds.js) at a spot they all work out the same way. Saved with the rest of the world.
+BUILD_KINDS = {"fountain": 2000, "lighthouse": 5000, "aqueduct": 8000}          # kind -> price in denarii from the guild's treasury
+BUILD_CITIES = ("rome", "delhi", "cancun", "beijing")
+BUILDS = {}                # "city:kind" -> {"city", "kind", "g" (the guild's key), "name", "tag", "color", "emblem", "t"}
+
+
+def builds_state():
+    rows = []
+    for b in BUILDS.values():
+        g = GUILDS.get(b["g"])
+        if g:                                                                          # (the guild's name and banner may have changed since)
+            col, emb = guild_look(g)
+            b.update(name=g["name"], tag=g["tag"], color=col, emblem=emb)
+        rows.append({k: b[k] for k in ("city", "kind", "name", "tag", "color", "emblem", "t")})
+    return {"t": "builds", "list": rows, "price": BUILD_KINDS}
+
+
+def builds_broadcast():
+    msg = builds_state()
+    for c in CONNS:
+        if c.hello and not c.closed:
+            c.send(msg)
 
 
 
@@ -6304,7 +6348,7 @@ def on_social(conn, m):
         return on_event_time(conn, m)
     if a == "ev_top":
         return on_event_top(conn, m)
-    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd", "g_look", "g_score", "g_gdep", "g_gtake"):
+    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd", "g_look", "g_score", "g_gdep", "g_gtake", "g_build"):
         return on_guild(conn, a, m)
     if a == "leaders":
         return conn.send(dict(top_boards(), t="leaders"))
@@ -6508,6 +6552,8 @@ async def handle_msg(conn, m):
         return on_emote(conn, m)
     if t == "note":
         return on_note(conn, m)
+    if t == "builds":                                                                # (anyone may ask: the guilds' public builds are for everyone to see)
+        return conn.send(builds_state())
     if t == "stock":
         return on_stock(conn, m)
     if t in ("pyr_get", "pyr_add"):
@@ -6939,7 +6985,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "builds": BUILDS, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
 
 
 def world_apply(rows):
@@ -7098,6 +7144,13 @@ def world_apply(rows):
             c = clean_tourney(v)
             if c:
                 TOURNEYS[c["id"]] = c
+    bd = rows.get("builds")
+    if isinstance(bd, dict):
+        BUILDS.clear()
+        for key, b in list(bd.items())[:100]:
+            if isinstance(b, dict) and b.get("city") in BUILD_CITIES and b.get("kind") in BUILD_KINDS and key == "%s:%s" % (b["city"], b["kind"]):
+                BUILDS[key] = {"city": b["city"], "kind": b["kind"], "g": str(b.get("g", ""))[:40], "name": class_clean(b.get("name"), 24), "tag": class_clean(b.get("tag"), 4),
+                               "color": int(num(b.get("color"), 0, GUILD_LOOKS - 1, 0)), "emblem": int(num(b.get("emblem"), 0, GUILD_LOOKS - 1, 0)), "t": int(num(b.get("t"), 0, 4e9, 0))}
     py = rows.get("pyramid")
     if isinstance(py, dict):
         PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})
