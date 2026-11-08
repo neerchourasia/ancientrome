@@ -49,7 +49,7 @@ function init() {
   Theatre.init(scene);
   Guards.build(scene);
   Tour.build(scene);
-  Builds.build(scene); PeriodBuildings.build(scene); MountHire.build(scene);
+  Builds.build(scene); PeriodBuildings.build(scene); MountHire.build(scene); Dig.build(scene);
   Police.init(scene);
   Jail.bind();
   Harbour.build(scene);
@@ -76,7 +76,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); Seasons.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Instruments.bind(); Tour.bind(); PhotoMissions.bind(); Builds.bind(); MountHire.bind(); GuildCaravans.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); Seasons.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Instruments.bind(); Tour.bind(); PhotoMissions.bind(); Builds.bind(); MountHire.bind(); GuildCaravans.bind(); Dig.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -1922,7 +1922,7 @@ function tick(dt) {
   Interiors.update(dt);
   Shopkeep.update(dt);
   Hunt.update(dt);
-  Tour.update(dt); Builds.update(dt); PeriodBuildings.update(dt); MountHire.update(dt);
+  Tour.update(dt); Builds.update(dt); PeriodBuildings.update(dt); MountHire.update(dt); Dig.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

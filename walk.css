@@ -1038,3 +1038,12 @@ body.midfilm::after { content: ""; position: fixed; inset: 0; z-index: 1; pointe
 /* guild caravans */
 .bd-row select { font: inherit; margin-left: 4px; padding: 3px 6px; color: var(--ink); background: rgba(255,255,255,.08); border: 1px solid rgba(226,185,85,.4); border-radius: 8px; }
 .bd-row select option { color: #222; }
+
+/* archaeology dig */
+.dg-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.dg-tabs button.on, .dg-tools button.on { background: var(--gold); color: #2a2118; }
+.dg-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.dg-info { margin-left: auto; font-size: .85rem; }
+#dig-canvas { display: block; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 10px; border: 2px solid rgba(226,185,85,.5); touch-action: none; cursor: crosshair; background: #5a4630; }
+.dg-hint { display: block; margin-top: 6px; opacity: .8; }
+#digpanel h3 { margin: 12px 0 6px; font-size: 1rem; }
