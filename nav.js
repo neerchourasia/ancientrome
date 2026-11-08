@@ -209,5 +209,6 @@ const Nav = (() => {
       return info;
     },
     cardinal,
+    path: (sx, sz, tx, tz) => search(sx, sz, tx, tz),                        // a walkable route as a list of { x, z } (or null): the tour guide walks it
   };
 })();

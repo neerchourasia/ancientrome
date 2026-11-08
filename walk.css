@@ -983,3 +983,16 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .ins-key { font: 700 1rem system-ui; padding: 16px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); color: var(--ink); background: rgba(255,255,255,.08); cursor: pointer; touch-action: none; }
 .ins-key.down { background: var(--gold); color: #2a2118; transform: translateY(2px); }
 .ins-canvas { display: block; width: 100%; max-width: 440px; border-radius: 10px; border: 1px solid rgba(226,185,85,.4); margin: 6px 0; }
+
+/* the tour guide (tourguide.js) */
+#tour-hud { position: fixed; left: 12px; top: 176px; z-index: 4; max-width: 300px; padding: 8px 12px; font-size: .85rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(255,210,74,.7); border-radius: 10px; }
+#tour-hud[hidden] { display: none; }
+#tour-hud p { margin: 4px 0 6px; }
+#tour-hud button, .tour-go { font: 700 .82rem inherit; cursor: pointer; padding: 5px 10px; margin-right: 6px; border: 1px solid rgba(226,185,85,.5); border-radius: 999px; color: var(--ink); background: transparent; }
+#tour-hud button:hover, .tour-go:hover { background: var(--gold); color: #2a2118; }
+.tour-intro { margin: 0 0 10px; }
+.tour-opt { display: grid; gap: 4px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; }
+.tour-opt small { opacity: .8; }
+.tour-opt ul { margin: 2px 0 6px 18px; padding: 0; font-size: .88rem; }
+.tour-go { justify-self: start; }
+#hunt-hud:not([hidden]) ~ #tour-hud { top: 330px; }
