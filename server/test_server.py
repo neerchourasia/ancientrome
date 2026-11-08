@@ -735,6 +735,36 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((end["coop"], end["won"], end["reason"]), (True, True, "cleared"))
         self.assertEqual(end["rank"]["delta"], 8)                                           # a crew victory counts towards your rank
 
+    async def test_the_admin_page_connects_as_a_panel_not_a_player(self):
+        server.CFG["supabase_url"] = "https://example.supabase.co"
+        server.VISITS.clear()
+
+        async def fake_verify(token):
+            return {"boss": "u-boss", "ann": "u-ann"}.get(token)
+
+        async def fake_admin(token):
+            return token == "boss"
+        server.verify_token, server.is_admin = fake_verify, fake_admin
+        # a player who is not an admin is turned away from the panel
+        ws = await WS.connect(self.port)
+        ws.send({"t": "hello", "vid": "adminpage", "token": "ann", "name": "Admin", "cls": "gladiator", "look": {}, "panel": 1})
+        err = await ws.until(lambda m: m["t"] == "error")
+        self.assertEqual(err["code"], "admin")
+        # an admin gets a welcome, answers to the admin commands, and is not in the online list or the visitor log
+        panel = await WS.connect(self.port)
+        panel.send({"t": "hello", "vid": "adminpage", "token": "boss", "name": "Admin", "cls": "gladiator", "look": {}, "panel": 1})
+        w = await panel.until(lambda m: m["t"] == "welcome")
+        self.assertEqual((w["admin"], w["panel"]), (True, True))
+        ann = await self.player("Ann")
+        panel.send({"t": "admin", "a": "who"})
+        who = (await panel.until(lambda m: m["t"] == "adminwho"))["who"]
+        self.assertEqual([x["name"] for x in who], ["Ann"])
+        panel.send({"t": "admin", "a": "visits"})
+        vids = [v["vid"] for v in (await panel.until(lambda m: m["t"] == "adminvisits"))["v"]]
+        self.assertNotIn("adminpage", vids)
+        panel.send({"t": "admin", "a": "chatlog"})
+        await panel.until(lambda m: m["t"] == "adminchat")
+
     async def test_the_admin_list_says_where_people_are(self):
         server.CFG["supabase_url"] = "https://example.supabase.co"
 

@@ -350,12 +350,13 @@ const Admin = (() => {
     }
   }
 
+  // 🛠 Admin opens the admin page (admin.html: people, visitors, chat log, suspicious activity); the box in the game is now only the owner's tools (restore an item, add denarii to your own game)
   function openPanel_() {
     if (!Account.admin) { toast("Only an admin account can open this."); return; }
     if (mode !== "walk" || (panelOpen && !creatorOpen) || !canStart()) { toast("Close what is open and stop the game first"); return; }
     openPanel("#admin");
-    showTab("users");
-    fillItems(); loadUsers(); loadOnline();
+    showTab("restore");
+    fillItems();
   }
 
   // the owner's way to put back something they lost (admin accounts only: the panel is hidden from everyone else)
@@ -374,12 +375,13 @@ const Admin = (() => {
       const n = Math.max(1, Math.min(100000, Math.floor(Number($a("ad-coins").value) || 0)));
       Vitals.coins += n; toast(`Added ${n} denarii.`); Account.saveNow(true);
     });
-    $a("btn-admin").addEventListener("click", openPanel_);
+    $a("btn-admin").addEventListener("click", () => { if (!Account.admin) { toast("Only an admin account can open this."); return; } window.open("admin.html", "_blank", "noopener"); });
+    $a("btn-admintools").addEventListener("click", openPanel_);
     for (const b of document.querySelectorAll("#admin .ad-tab")) b.addEventListener("click", () => showTab(b.dataset.tab));
     document.querySelector("#admin .ad-back").addEventListener("click", closePanels);
     $a("ad-refresh").addEventListener("click", () => { loadUsers(); loadOnline(); });
-    Account.onChange(() => { $a("btn-admin").hidden = !Account.admin; });
-    $a("btn-admin").hidden = !Account.admin;
+    Account.onChange(() => { $a("btn-admin").hidden = $a("btn-admintools").hidden = !Account.admin; });
+    $a("btn-admin").hidden = $a("btn-admintools").hidden = !Account.admin;
   }
 
   return { bind, showOnline, showVisits, showEvents, showJourney, showChat, set server(v) { serverAdmin = !!v; }, get server() { return serverAdmin; } };

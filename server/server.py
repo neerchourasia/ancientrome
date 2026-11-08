@@ -320,6 +320,7 @@ class Conn:
         self.souv_t = -99.0        # when they last told us which souvenirs they have
         self.trade_t = None        # when they last asked someone to trade
         self.fid = None            # their public friend id (a hash of the account id), only for logged-in players
+        self.panel = False         # the owner's admin page (admin.html) is not a player: it takes no part in the game and is not in the admin lists
         self.hints = {}            # friend id -> the name their own browser remembers for that friend
         self.shove_t, self.immune_t = 0.0, 0.0   # when they last shoved someone, and until when nobody can shove them again
         self.singing, self.sang_at = None, -1e9    # the song they are singing in the chat, and when they last started one
@@ -3498,7 +3499,7 @@ def on_admin(conn, m):
     a = m.get("a")
     if a == "who":
         conn.send({"t": "adminwho", "who": [dict({"id": c.id, "name": c.name, "acct": bool(c.uid), "city": c.city, "room": c.room.kind if c.room else None,
-                                                  "muted": c.muted_until > now(), "admin": c.admin, "coins": c.coins}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed],
+                                                  "muted": c.muted_until > now(), "admin": c.admin, "coins": c.coins}, **{("where_" + k): v for k, v in where_is(c).items()}) for c in CONNS if c.hello and not c.closed and not c.panel],
                    "blocked_uids": [k for k, until in BLOCKED.items() if until > now() and re.fullmatch(r"[0-9a-fA-F-]{36}", str(k))],
                    "blocked_emails": [USER_EMAIL[k] for k, until in BLOCKED.items() if until > now() and k in USER_EMAIL]})
         return
@@ -6523,10 +6524,12 @@ async def handle_msg(conn, m):
         conn.uid = await verify_token(m.get("token"))
         conn.name = clean_name(m.get("name"))
         conn.vid = clean_vid(m.get("vid"))
+        conn.panel = bool(m.get("panel"))
         if m.get("token") and not conn.uid and CFG["supabase_url"]:
             flag("login the database did not accept", "a forged or expired login token was sent", "medium", conn=conn, gap=300)
-        note_visit(conn.vid, conn.ip, conn.ua, None, conn.name if conn.name != "Player" else None, conn.uid, USER_EMAIL.get(conn.uid), "play")
-        name_ok, name_why = await check_name(conn.name)
+        if not conn.panel:
+            note_visit(conn.vid, conn.ip, conn.ua, None, conn.name if conn.name != "Player" else None, conn.uid, USER_EMAIL.get(conn.uid), "play")
+        name_ok, name_why = (True, None) if conn.panel else await check_name(conn.name)           # (the admin page is called Admin: that name is for nobody else)
         if not name_ok:                       # an unsuitable name is never shown to other players: they see "Player" until it is changed
             flag("inappropriate name", conn.name, "low", conn=conn, gap=300)
             conn.name = "Player"
@@ -6538,6 +6541,11 @@ async def handle_msg(conn, m):
             conn.send({"t": "error", "code": "kicked", "msg": "You were kicked for a while. Try again later."})
             return conn.close()
         conn.admin = bool(conn.uid) and await is_admin(m.get("token"))
+        if conn.panel:                                                                # the admin page: only for admins, and it is not a player (no friends, no visit, no chat log)
+            if not conn.admin:
+                conn.send({"t": "error", "code": "admin", "msg": "This account is not an admin."})
+                return conn.close()
+            return conn.send({"t": "welcome", "id": conn.id, "account": True, "admin": True, "panel": True})
         social_start(conn, m)
         conn.send({"t": "welcome", "id": conn.id, "account": bool(conn.uid), "admin": conn.admin, "bots": CFG["allow_bots"],
                    "rank": public_rank(rating_of(conn)) if conn.uid else None})
