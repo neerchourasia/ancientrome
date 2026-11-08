@@ -17,4 +17,4 @@ services:
       - key: SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxeHVndWJrY2pmcnZkeWhuY3lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NDYxMDAsImV4cCI6MjEwNzMyMjEwMH0.JsZ0BG6nRBAvcgdkvYw_smbUrBkbEuS1jKB3RIjyrjo
       - key: ALLOWED_ORIGINS
-        value: https://ancientrome-gold.vercel.app
+        value: https://ancientrome-gold.vercel.app,https://timemachine-3d.vercel.app

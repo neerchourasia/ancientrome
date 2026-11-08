@@ -19,7 +19,7 @@ Open the game, click **🌐 Play online**, tick "practice bot" and press **Duel*
 | `SUPABASE_URL` | `https://xxxx.supabase.co`. Turns on accounts (logging in and saving your game) |
 | `SUPABASE_ANON_KEY` | the public "anon" key (used to check a login) |
 | `SUPABASE_SERVICE_KEY` | optional: the secret "service_role" key. With it (and `supabase-world.sql` run once) the server keeps guilds, share prices, leaderboards, race times and the pyramid between restarts. Never put it in the game's web files |
-| `ALLOWED_ORIGINS` | your site's address, e.g. `https://ancientrome-gold.vercel.app` (comma separated; `*` = anyone). Without it only pages on localhost can connect |
+| `ALLOWED_ORIGINS` | your site's address, e.g. `https://timemachine-3d.vercel.app` (add every address the game is served from, comma separated: `https://ancientrome-gold.vercel.app,https://timemachine-3d.vercel.app`) (comma separated; `*` = anyone). Without it only pages on localhost can connect |
 | `ANTHROPIC_API_KEY` | optional: a Claude API key (from console.anthropic.com). Player names are then also checked by Claude (model `claude-haiku-5-5`) to make sure they are appropriate. Without it only the built-in word check runs. Keep it secret: set it here on the server, never in `config.js` |
 | `ALLOW_BOTS` | `1` (default) lets a lone player face a practice bot |
 | `PORT` | default 8765 (hosts like Render set this for you) |
