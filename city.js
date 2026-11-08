@@ -312,10 +312,10 @@ function buildCitizens(scene, count = window.CLASSMODE && CLASSMODE.low ? 50 : 9
 }
 
 // Switches citizens between togas and modern clothes.
-function applyCitizensEra(modern) {
+function applyCitizensEra(modern, mid) {
   const { list, body } = CITIZENS;
   if (!body) return;
-  const palette = modern ? ROBES_MODERN : ROBES_ANCIENT;
+  const palette = modern ? ROBES_MODERN : mid ? Period.robes(city) : ROBES_ANCIENT;
   list.forEach((c, i) => body.setColorAt(i, palette[c.ci]));
   body.instanceColor.needsUpdate = true;
 }

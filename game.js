@@ -15,12 +15,13 @@ let started = false, dragging = false, locked = false, panelOpen = false;
 let mode = "walk"; // "walk", "fight" (Colosseum), "race" (Circus Maximus) or "watch" (spectating)
 let renderer, camera, scene, sky, discovered = new Set();
 let era = "ancient"; // "ancient" (c. 128 AD) or "modern" (today); K switches
+let skin = false;    // the middle time of the city (period.js): `era` stays "ancient" (the old layout) and this is true
 
 try { // saved progress is only trusted if it names real landmarks, so edited or corrupted storage cannot inflate the count
   const saved = JSON.parse(localStorage.getItem("rome-discovered") || "[]");
   if (Array.isArray(saved)) discovered = new Set(saved.filter((id) => ALL_LANDMARKS.some((l) => l.id === id && !l.home && !l.game)));
 } catch (e) { /* storage unavailable */ }
-try { if (localStorage.getItem("rome-era") === "modern") era = "modern"; } catch (e) { /* storage unavailable */ }
+try { const saved = localStorage.getItem("rome-era"); if (saved === "modern") era = "modern"; else if (saved === "mid") skin = true; } catch (e) { /* storage unavailable */ }
 
 // ---------- setup ----------
 
@@ -331,8 +332,8 @@ function wireInput(canvas) {
       if (!started || !Character.exists || creatorOpen) return;
       clearInterval(iv);
       const sight = CLASSMODE.at ? ALL_LANDMARKS.find((l) => l.id === CLASSMODE.at && !l.game) : null;
-      if (CLASSMODE.era !== era) toggleEra();                                             // (the era in the link, whatever this tab had before)
-      if (sight && sight.only && sight.only !== era) toggleEra();                          // (a sight that exists in only one era)
+      if (CLASSMODE.era !== periodNow()) setPeriod(CLASSMODE.era);                         // (the era in the link, whatever this tab had before)
+      if (sight && sight.only && sight.only !== era) setPeriod(sight.only);                // (a sight that exists in only one era)
       const home = sight ? (sight.id.startsWith("d-") ? "delhi" : sight.id.startsWith("c-") ? "cancun" : sight.id.startsWith("b-") ? "beijing" : "rome") : CLASSMODE.city;
       if (home !== "rome") arriveIn(home, null);
       if (sight) setTimeout(() => placeAt(sight.stand[0], sight.stand[1], 0), 800);         // (after the city has been built)
@@ -1116,7 +1117,8 @@ function showCard(lm) {
   $("#card-text").textContent = lm.text;
   $("#card-fact").textContent = lm.fact;
   const modernNote = $("#card-modern");
-  if (era === "modern" && lm.modern) { modernNote.textContent = "Today: " + lm.modern; modernNote.hidden = false; }
+  if (skin && Period.note(lm.id)) { modernNote.textContent = `In ${Period.YEARS[city]}: ` + Period.note(lm.id); modernNote.hidden = false; }
+  else if (era === "modern" && lm.modern) { modernNote.textContent = "Today: " + lm.modern; modernNote.hidden = false; }
   else modernNote.hidden = true;
   card.classList.add("show");
 }
@@ -1205,7 +1207,7 @@ function applyEra() {
   const modern = era === "modern";
   applyWorldEra(modern);
   applyInsulaeEra(modern);
-  applyCitizensEra(modern);
+  applyCitizensEra(modern, skin);
   Modern.apply(modern);
   if (Delhi.built) Delhi.setEra(modern);
   if (Cancun.built) Cancun.setEra(modern);
@@ -1213,7 +1215,7 @@ function applyEra() {
   Car.onEra(modern); // cars and rickshaws only exist today, carts and elephants only in the ancient cities
   Crowd.setVisible(!modern);
   Jobs.setEra(modern);
-  Guards.setEra(modern);
+  Guards.setEra(modern, skin);
   const [oldName, newName] = ERA_NAMES[city];
   $("#era-badge").textContent = modern ? newName : oldName;
   $("#era-badge").classList.toggle("ancient", !modern);
@@ -1224,17 +1226,35 @@ function applyEra() {
   $("#btn-dgames").hidden = city !== "delhi";
   $("#map-title").textContent = city === "rome" ? "Map of Rome" : city === "cancun" ? "Map of Cancún and Chichén Itzá" : city === "beijing" ? "Map of Beijing" : "Map of Old Delhi";
   refreshLandmarks();
+  periodLabels();
+}
+
+const periodNow = () => (era === "modern" ? "modern" : skin ? "mid" : "ancient");
+// the labels of the era button, the badge and the title: the next time is on the button (ancient, then the middle time, then modern)
+function periodLabels() {
+  const p = periodNow(), [oldName, newName] = ERA_NAMES[city], mid = Period.BADGE[city];
+  $("#era-badge").textContent = p === "mid" ? mid : p === "modern" ? newName : oldName;
+  $("#era-badge").classList.toggle("ancient", p !== "modern");
+  $("#btn-era").innerHTML = `${p === "ancient" ? mid : p === "mid" ? newName : oldName} <kbd>K</kbd>`;
+  if (p === "mid") $("#hud .top-left h1").innerHTML = `Time Machine <small>${Period.small(city)}</small>`;
+  Period.apply(p === "mid");
 }
 
 function toggleEra() {
   if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (mode !== "walk") { toast("Leave the game first to switch eras"); return; }
-  era = era === "ancient" ? "modern" : "ancient";
-  try { localStorage.setItem("rome-era", era); } catch (e) { /* ignore */ }
+  setPeriod(periodNow() === "ancient" ? "mid" : periodNow() === "mid" ? "modern" : "ancient");
+}
+
+// go to one of the three times: "ancient", "mid" (the period look of period.js) or "modern"
+function setPeriod(p) {
+  era = p === "modern" ? "modern" : "ancient"; skin = p === "mid";
+  try { localStorage.setItem("rome-era", periodNow()); } catch (e) { /* ignore */ }
   applyEra();
   Nav.clear(); // a route drawn in the other era may no longer be walkable
   if (blockedAt(player.x, player.z, player.feet)) placeAt(player.x, player.z); // something appeared where you stand
   const modern = era === "modern";
+  if (skin) { toast(Period.SAY[city]); Narrator.say(Period.SAY[city] + ".", { interrupt: true }); if (currentLm) showCard(currentLm); return; }
   const say = city === "delhi"
     ? (modern ? "Modern Delhi: the old city as it stands today" : "Mughal Delhi, around 1650, under the emperor Shah Jahan")
     : city === "beijing" ? (modern ? "Modern Beijing: the old capital and the new city as they stand today" : "Ming Beijing, around 1420: the capital of the Yongle Emperor")

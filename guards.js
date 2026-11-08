@@ -21,17 +21,22 @@ const Guards = (() => {
   const $g = (id) => document.getElementById(id);
 
   function model(c, e) {
-    const g = new T.Group(), police = e === "modern", delhi = c === "delhi";
-    const body = new T.Mesh(CYLG, lam(police ? 0x2a3f6a : delhi ? 0x2f6b4a : 0x9a2a2a)); body.scale.set(0.38, 1.3, 0.38); body.position.y = 0.65; g.add(body);
+    const g = new T.Group(), police = e === "modern", delhi = c === "delhi", mid = e === "mid", L = mid ? Period.guard(c) : null;
+    const body = new T.Mesh(CYLG, lam(mid ? L.body : police ? 0x2a3f6a : delhi ? 0x2f6b4a : 0x9a2a2a)); body.scale.set(0.38, 1.3, 0.38); body.position.y = 0.65; g.add(body);
     const head = new T.Mesh(new T.SphereGeometry(0.23, 10, 8), lam(0xd8a77a)); head.position.y = 1.55; g.add(head);
-    if (police) { const cap = new T.Mesh(CYLG, lam(0x1c2a4a)); cap.scale.set(0.26, 0.16, 0.26); cap.position.y = 1.78; g.add(cap); }
+    if (mid) {                                                                                      // the soldiers of the middle time (period.js): a steel morion with a plume, a white sun helmet or a flat cap
+      if (L.hat === "pith") { const h = new T.Mesh(new T.SphereGeometry(0.29, 10, 8), lam(0xf2efe6)); h.scale.set(1.1, 0.75, 1.1); h.position.y = 1.76; g.add(h); }
+      else if (L.hat === "cap") { const h = new T.Mesh(CYLG, lam(0x4a4f40)); h.scale.set(0.27, 0.14, 0.27); h.position.y = 1.78; g.add(h); }
+      else { const h = new T.Mesh(CYLG, lam(0x8a8d92)); h.scale.set(0.24, 0.2, 0.24); h.position.y = 1.76; g.add(h); const brim = new T.Mesh(CYLG, lam(0x8a8d92)); brim.scale.set(0.34, 0.03, 0.34); brim.position.y = 1.7; g.add(brim);
+        const pl = new T.Mesh(new T.BoxGeometry(0.05, 0.22, 0.34), lam(L.plume)); pl.position.y = 1.98; g.add(pl); }
+    } else if (police) { const cap = new T.Mesh(CYLG, lam(0x1c2a4a)); cap.scale.set(0.26, 0.16, 0.26); cap.position.y = 1.78; g.add(cap); }
     else if (delhi) { const t = new T.Mesh(new T.SphereGeometry(0.27, 10, 8), lam(0xe8e4d6)); t.scale.set(1, 0.8, 1); t.position.y = 1.75; g.add(t); }
     else { const h = new T.Mesh(CYLG, lam(0x8a8d92)); h.scale.set(0.24, 0.24, 0.24); h.position.y = 1.78; g.add(h); const crest = new T.Mesh(new T.BoxGeometry(0.06, 0.2, 0.4), lam(0xb3262b)); crest.position.y = 1.98; g.add(crest); }
     if (!police) {
       const spear = new T.Mesh(CYLG, lam(0x6a4c2a)); spear.scale.set(0.03, 2.2, 0.03); spear.position.set(0.4, 1.1, 0); g.add(spear);
       const tip = new T.Mesh(CONEG, lam(0xb0b4ba)); tip.scale.set(0.07, 0.3, 0.07); tip.position.set(0.4, 2.3, 0); g.add(tip);
     } else { const stick = new T.Mesh(CYLG, lam(0x1a1a1a)); stick.scale.set(0.04, 0.6, 0.04); stick.position.set(0.4, 0.9, 0.1); g.add(stick); }
-    const cloak = new T.Mesh(new T.BoxGeometry(0.62, 1.1, 0.07), lam(police ? 0x3a5a9a : delhi ? 0xd9a928 : 0xc0262b)); cloak.position.set(0, 1.0, 0.24); g.add(cloak);   // a bright cloak, so you can see them from afar
+    const cloak = new T.Mesh(new T.BoxGeometry(0.62, 1.1, 0.07), lam(mid ? L.cloak : police ? 0x3a5a9a : delhi ? 0xd9a928 : 0xc0262b)); cloak.position.set(0, 1.0, 0.24); g.add(cloak);   // a bright cloak, so you can see them from afar
     const lantern = new T.Mesh(new T.SphereGeometry(0.1, 8, 6), new T.MeshBasicMaterial({ color: police ? 0x9ad0ff : 0xffb347 })); lantern.position.set(-0.42, 1.0, -0.1); g.add(lantern);   // and a lantern that glows after dark
     g.traverse((m) => { m.castShadow = true; });
     g.scale.setScalar(1.12);
@@ -52,12 +57,12 @@ const Guards = (() => {
   const here = (c) => typeof city !== "undefined" && city === c;
 
   // the guards' look follows the era (soldiers, or police today)
-  function setEra(modern) {
-    for (const gd of guards) { const p = gd.g.parent; p.remove(gd.g); gd.g = model(gd.city, modern ? "modern" : "ancient"); p.add(gd.g); gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); }
+  function setEra(modern, mid) {
+    for (const gd of guards) { const p = gd.g.parent; p.remove(gd.g); gd.g = model(gd.city, modern ? "modern" : mid ? "mid" : "ancient"); p.add(gd.g); gd.g.position.set(gd.x, groundAt(gd.x, gd.z), gd.z); }
   }
 
   function build(sc) { scene = sc; spawn("rome", sc, 0); }
-  function buildDelhi(parent) { if (delhiMade) return; delhiMade = true; spawn("delhi", parent, typeof DELHI_X !== "undefined" ? DELHI_X : 6000); setEra(typeof era !== "undefined" && era === "modern"); }
+  function buildDelhi(parent) { if (delhiMade) return; delhiMade = true; spawn("delhi", parent, typeof DELHI_X !== "undefined" ? DELHI_X : 6000); setEra(typeof era !== "undefined" && era === "modern", typeof skin !== "undefined" && skin); }
 
   // a crime: your wanted level goes up (100 is the most). The nearest guards hear of it at once.
   function crime(amount, why, at) {

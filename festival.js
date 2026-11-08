@@ -248,7 +248,7 @@ const Festival = (() => {
   function restoreTints() {
     if (!tinted.length) return;
     tinted = []; hits = 0;
-    try { if (city === "delhi") { Delhi.setEra(era === "modern"); } else applyCitizensEra(era === "modern"); } catch (e) { /* ignore */ }
+    try { if (city === "delhi") { Delhi.setEra(era === "modern"); } else applyCitizensEra(era === "modern", skin); } catch (e) { /* ignore */ }
   }
 
   function openLantern() {

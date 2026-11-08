@@ -17,7 +17,7 @@
   const C = {
     low, offline, on: q.has("class") || offline, name: clean(q.get("class") || (offline ? "Offline" : ""), 30),
     latin: q.get("latin") === "1" || q.get("la") === "1",
-    era: pick(q.get("era"), ["ancient", "modern"], "ancient"), city: pick(q.get("city"), ["rome", "delhi", "cancun", "beijing"], "rome"),
+    era: pick(q.get("era"), ["ancient", "mid", "modern"], "ancient"), city: pick(q.get("city"), ["rome", "delhi", "cancun", "beijing"], "rome"),
     fights: q.get("fights") !== "0", lang: pick(q.get("lang"), ["en", "es", "it", "hi", "zh"], "en"), shared: false,
     at: /^[a-z0-9-]{1,24}$/.test(q.get("at") || "") ? q.get("at") : "",                                                   // start at this sight (its id in landmarks.js)
     hour: Number.isFinite(parseFloat(q.get("hour"))) ? Math.max(0, Math.min(24, parseFloat(q.get("hour")))) % 24 : null,   // start at this hour of the day

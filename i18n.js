@@ -747,6 +747,15 @@ const I18n = (() => {
     ["📖 Latin words", "📖 Palabras latinas", "📖 Parole latine", "📖 लैटिन शब्द", "📖 拉丁语单词"],
     ["Hide the English (test yourself)", "Ocultar el inglés (pruébate)", "Nascondi l'inglese (mettiti alla prova)", "अंग्रेज़ी छिपाएँ (खुद को परखें)", "隐藏英文(自我测试)"],
     ["No words yet.", "Aún no hay palabras.", "Ancora nessuna parola.", "अभी कोई शब्द नहीं।", "还没有单词。"],
+    // the middle time of each city (period.js)
+    ["Renaissance Rome", "Roma del Renacimiento", "Roma rinascimentale", "पुनर्जागरण का रोम", "文艺复兴时期的罗马"],
+    ["Raj Delhi", "Delhi del Raj", "Delhi del Raj", "राज का दिल्ली", "英属印度时期的德里"],
+    ["Spanish Yucatán", "Yucatán español", "Yucatán spagnola", "स्पेनी यूकाटन", "西班牙统治下的尤卡坦"],
+    ["Republican Beijing", "Pekín republicano", "Pechino repubblicana", "गणराज्य काल का बीजिंग", "民国时期的北京"],
+    ["Renaissance Rome, around 1550: the popes rebuild the city among the ruins", "Roma del Renacimiento, hacia 1550: los papas reconstruyen la ciudad entre las ruinas", "Roma rinascimentale, intorno al 1550: i papi ricostruiscono la città tra le rovine", "पुनर्जागरण का रोम, लगभग 1550: पोप खंडहरों के बीच शहर को दोबारा बनाते हैं", "文艺复兴时期的罗马，约1550年：教宗们在废墟之中重建这座城市"],
+    ["Delhi under the British Raj, around 1911: the year the capital moves here from Calcutta", "Delhi bajo el Raj británico, hacia 1911: el año en que la capital se traslada aquí desde Calcuta", "Delhi sotto il Raj britannico, intorno al 1911: l'anno in cui la capitale si sposta qui da Calcutta", "ब्रिटिश राज में दिल्ली, लगभग 1911: जिस साल राजधानी कलकत्ता से यहाँ आई", "英属印度时期的德里，约1911年：首都从加尔各答迁到这里的那一年"],
+    ["Spanish Yucatán, around 1700: the Maya cities lie under the forest", "Yucatán español, hacia 1700: las ciudades mayas yacen bajo la selva", "Yucatán spagnola, intorno al 1700: le città maya giacciono sotto la foresta", "स्पेनी यूकाटन, लगभग 1700: माया शहर जंगल के नीचे दबे हैं", "西班牙统治下的尤卡坦，约1700年：玛雅城市埋在森林之下"],
+    ["Republican Beijing, around 1930: the emperor is gone and the palace is a museum", "Pekín republicano, hacia 1930: el emperador se ha ido y el palacio es un museo", "Pechino repubblicana, intorno al 1930: l'imperatore non c'è più e il palazzo è un museo", "गणराज्य काल का बीजिंग, लगभग 1930: सम्राट जा चुका है और महल एक संग्रहालय है", "民国时期的北京，约1930年：皇帝已经离去，宫殿成了博物馆"],
     // guild builds (builds.js)
     ["🏗 Guild builds", "🏗 Obras del gremio", "🏗 Opere della gilda", "🏗 गिल्ड निर्माण", "🏗 公会建筑"],
     ["Guilds pay for fountains, lighthouses and aqueducts that everyone can see", "Los gremios pagan fuentes, faros y acueductos que todos pueden ver", "Le gilde pagano fontane, fari e acquedotti che tutti possono vedere", "गिल्ड फव्वारे, प्रकाशस्तंभ और जलसेतु बनवाती हैं जो सबको दिखते हैं", "公会出资建造所有人都能看到的喷泉、灯塔和水渠"],
