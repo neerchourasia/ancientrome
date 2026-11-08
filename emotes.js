@@ -105,7 +105,7 @@ const Photo = (() => {
   }
   function flash() { const f = document.getElementById("photo-flash"); if (!f) return; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
   function take() {
-    flash();
+    flash(); if (typeof PhotoMissions !== "undefined") PhotoMissions.shot(true);                       // (a photo can finish a photo mission too)
     picture((blob) => {
       if (!blob) { toast("The picture could not be saved."); return; }
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `time-machine-${Date.now()}.png`; document.body.append(a); a.click(); a.remove();
@@ -114,7 +114,7 @@ const Photo = (() => {
     });
   }
   function share() {
-    flash();
+    flash(); if (typeof PhotoMissions !== "undefined") PhotoMissions.shot(true);
     picture(async (blob) => {
       if (!blob) { toast("The picture could not be saved."); return; }
       const file = new File([blob], "time-machine.png", { type: "image/png" });

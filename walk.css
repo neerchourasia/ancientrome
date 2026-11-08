@@ -996,3 +996,17 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .tour-opt ul { margin: 2px 0 6px 18px; padding: 0; font-size: .88rem; }
 .tour-go { justify-self: start; }
 #hunt-hud:not([hidden]) ~ #tour-hud { top: 330px; }
+
+/* photo missions (photomissions.js) */
+#photo-bar { flex-wrap: wrap; justify-content: center; max-width: 92vw; border-radius: 18px; }
+#photo-mission { flex-basis: 100%; text-align: center; font-size: .85rem; color: var(--gold); }
+#photo-mission:empty { display: none; }
+.pm-intro { margin: 0 0 10px; font-size: .88rem; }
+.pm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.pm-card { display: grid; gap: 3px; align-content: start; padding: 8px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; }
+.pm-card.done { border-color: var(--gold); background: rgba(226,185,85,.12); }
+.pm-card img { width: 100%; border-radius: 6px; display: block; }
+.pm-ph { display: grid; place-items: center; height: 70px; border-radius: 6px; background: rgba(255,255,255,.06); font-size: 1.6rem; }
+.pm-card small { opacity: .85; }
+.pm-card button { justify-self: start; font: 700 .8rem inherit; cursor: pointer; padding: 4px 10px; border: 1px solid rgba(226,185,85,.5); border-radius: 999px; color: var(--ink); background: transparent; }
+.pm-card button:hover { background: var(--gold); color: #2a2118; }
