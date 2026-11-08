@@ -25,6 +25,9 @@
     }
   ],
   "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" }
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/admin/", "destination": "/admin.html" },
+    { "source": "/Admin", "destination": "/admin.html" },
+    { "source": "/Admin/", "destination": "/admin.html" }
   ]
 }
