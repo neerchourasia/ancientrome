@@ -2845,6 +2845,8 @@ async def world_loop():
                 mkt_tick()
                 contest_tick()
                 guild_roll()
+                for gg in list(GUILDS.values()):
+                    caravan_roll(gg)
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
                 season_roll()
@@ -4429,7 +4431,7 @@ def guild_state(g, conn=None):
     mem.sort(key=lambda r: (not r["leader"], not r["online"], r["name"].lower()))
     col, emb = guild_look(g)
     return {"t": "guild", "g": {"name": g["name"], "tag": g["tag"], "treasury": g["treasury"], "members": mem, "chat": g["chat"][-30:], "me": conn.fid if conn else None, "max": GUILD_MAX, "motd": g.get("motd", ""),
-                                "color": col, "emblem": emb, "pts": guild_pts(g), "rank": guild_rank(g), "of": len(GUILDS), "wins": int(g.get("wins", 0)), "chest": g.get("gk", {}), "chest_max": GCHEST_MAX, "last": GUILD_WEEK["last"], "prize": GUILD_WEEK_PRIZE}}
+                                "color": col, "emblem": emb, "pts": guild_pts(g), "rank": guild_rank(g), "of": len(GUILDS), "wins": int(g.get("wins", 0)), "chest": g.get("gk", {}), "chest_max": GCHEST_MAX, "cv": caravan_view(g), "last": GUILD_WEEK["last"], "prize": GUILD_WEEK_PRIZE}}
 
 
 def guild_add(fid, k):
@@ -4484,6 +4486,8 @@ def guild_tag_of(conn):
 def on_guild(conn, a, m):
     guild_roll()
     g = guild_of(conn)
+    if g:
+        caravan_roll(g)
     if a == "g_me":
         return conn.send(guild_state(g, conn) if g else {"t": "guild", "g": None})
     if a == "g_list":
@@ -4539,6 +4543,22 @@ def on_guild(conn, a, m):
         world_soon()
         guild_push(g)
         return builds_broadcast()
+    if a == "g_caravan":                                                         # the leader sends a caravan of trade goods to another city, paid from the treasury
+        if g["leader"] != conn.fid:
+            return social_msg(conn, "Only the guild leader can do that.")
+        a_city, b_city, stake = str(m.get("from", "")), str(m.get("to", "")), int(num(m.get("stake"), 0, 10 ** 9, 0))
+        if a_city not in CARAVAN_ROUTE or b_city not in CARAVAN_ROUTE or a_city == b_city or stake not in CARAVAN_STAKES:
+            return
+        cv = g.setdefault("cv", [])
+        if len(cv) >= CARAVAN_MAX:
+            return social_msg(conn, "Your guild already has %d caravans on the road." % CARAVAN_MAX)
+        if g["treasury"] < stake:
+            return social_msg(conn, "The treasury needs %d denarii for that." % stake)
+        g["treasury"] -= stake
+        cv.append({"a": a_city, "b": b_city, "stake": stake, "end": time.time() + CARAVAN_SECS})
+        guild_say(g, "%s sent a caravan from %s to %s with %d denarii of goods." % (conn.name, a_city.title(), b_city.title(), stake))
+        world_soon()
+        return guild_push(g)
     if a == "g_leave":
         g["members"].pop(conn.fid, None)
         g.get("pts", {}).pop(conn.fid, None)
@@ -4683,6 +4703,60 @@ def builds_broadcast():
     for c in CONNS:
         if c.hello and not c.closed:
             c.send(msg)
+
+
+# ---- guild caravans: the leader sends a caravan of trade goods from one city to another, paid from the treasury. It is on the road for CARAVAN_SECS seconds (the server keeps the time, so it goes on while
+# everybody is away) and then comes home with the goods sold: the farther apart the two cities, the better the price, and a guild with a landmark of its own in the city it goes to (a public build)
+# sells at a better price. One caravan in six is ambushed by bandits and comes back with only a third of what it was worth. Up to CARAVAN_MAX on the road at once. Saved with the guild.
+CARAVAN_ROUTE = ("rome", "delhi", "beijing", "cancun")        # (in order along the road: the more cities lie between two, the more the goods are worth at the other end)
+CARAVAN_STAKES = (500, 1500, 4000)
+CARAVAN_SECS = 240
+CARAVAN_MAX = 3
+CARAVAN_AMBUSH = 1 / 6
+
+
+def caravan_view(g):
+    t = time.time()
+    return [{"a": c["a"], "b": c["b"], "stake": c["stake"], "left": max(0, int(c["end"] - t))} for c in g.get("cv", [])]
+
+
+def caravan_result(g, c, r):
+    """How much a caravan brings home (r: a number from 0 to 1 that decides whether it is ambushed) and what to tell the guild."""
+    if r < CARAVAN_AMBUSH:
+        return int(c["stake"] * 0.34), "bandits ambushed it on the road and took most of the goods"
+    hops = abs(CARAVAN_ROUTE.index(c["a"]) - CARAVAN_ROUTE.index(c["b"]))
+    mult, why = 1.25 + 0.12 * hops, "the goods sold well"
+    gk = next((k for k, v in GUILDS.items() if v is g), None)
+    if any(b["g"] == gk and b["city"] == c["b"] for b in BUILDS.values()):
+        mult, why = mult + 0.1, "the goods sold well, and the buyers came to see the guild's own landmark"
+    return int(c["stake"] * mult), why
+
+
+def caravan_roll(g, rnd=random.random):
+    """Settle the caravans of a guild that have arrived: the money goes into the treasury."""
+    cv = g.get("cv")
+    if not cv:
+        return False
+    t = time.time()
+    done = [c for c in cv if c["end"] <= t]
+    for c in done:
+        cv.remove(c)
+        back, why = caravan_result(g, c, rnd())
+        g["treasury"] += back
+        guild_say(g, "The caravan from %s reached %s: %s. %d denarii came back (it cost %d)." % (c["a"].title(), c["b"].title(), why, back, c["stake"]))
+    if done:
+        world_soon()
+        guild_push(g)
+    return bool(done)
+
+
+def caravan_clean(rows):
+    out = []
+    for c in (rows if isinstance(rows, list) else [])[:CARAVAN_MAX]:
+        if isinstance(c, dict) and c.get("a") in CARAVAN_ROUTE and c.get("b") in CARAVAN_ROUTE and c["a"] != c["b"] and c.get("stake") in CARAVAN_STAKES:
+            out.append({"a": c["a"], "b": c["b"], "stake": c["stake"], "end": float(num(c.get("end"), 0, 4e9, 0))})
+    return out
+
 
 
 
@@ -6349,7 +6423,7 @@ def on_social(conn, m):
         return on_event_time(conn, m)
     if a == "ev_top":
         return on_event_top(conn, m)
-    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd", "g_look", "g_score", "g_gdep", "g_gtake", "g_build"):
+    if a in ("g_me", "g_list", "g_make", "g_join", "g_leave", "g_say", "g_dep", "g_pay", "g_kick", "g_motd", "g_look", "g_score", "g_gdep", "g_gtake", "g_build", "g_caravan"):
         return on_guild(conn, a, m)
     if a == "leaders":
         return conn.send(dict(top_boards(), t="leaders"))
@@ -7034,6 +7108,7 @@ def world_apply(rows):
                 v["pts"] = {f: int(num(n, 0, 10 ** 6, 0)) for f, n in list((v.get("pts") if isinstance(v.get("pts"), dict) else {}).items())[:GUILD_MAX] if clean_fid(f)}
                 v["gk"] = {i: int(num(n, 1, GCHEST_MAX, 1)) for i, n in list((v.get("gk") if isinstance(v.get("gk"), dict) else {}).items())[:60] if re.fullmatch(r"[a-z0-9_]{2,24}", str(i))}
                 v["wins"] = int(num(v.get("wins"), 0, 10 ** 6, 0))
+                v["cv"] = caravan_clean(v.get("cv"))
                 if "color" in v:
                     v["color"], v["emblem"] = int(num(v.get("color"), 0, GUILD_LOOKS - 1, 0)), int(num(v.get("emblem"), 0, GUILD_LOOKS - 1, 0))
                 GUILDS[k] = v

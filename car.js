@@ -194,13 +194,13 @@ const Car = (() => {
 
   // Take the car out of the garage: it appears right where you are standing (facing the way you face), and you are in it at once.
   // If something is in the way there it is moved to the nearest clear spot; only if there is none at all, you are told there is no room.
-  function deploy(id) {
-    if (!MODELS[id]) return;
-    if (eraOf(MODELS[id]) !== era) { toast(eraOf(MODELS[id]) === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there." : "Carts and elephants only live in the ancient cities. Press K to go there."); return; }
+  function deploy(id, anyEra) {                                                                       // anyEra: a hired mount (mounthire.js) can be ridden in every time of every city
+    if (!MODELS[id]) return false;
+    if (!anyEra && eraOf(MODELS[id]) !== era) { toast(eraOf(MODELS[id]) === "modern" ? "Cars and rickshaws only exist in the modern cities. Press K to go there." : "Carts and elephants only live in the ancient cities. Press K to go there."); return; }
     if (mode !== "walk") { toast("Get out of what you are in first."); return; }
     stow();
     const m = build(id);
-    car = { id, M: MODELS[id], x: player.x, z: player.z, yaw: player.yaw, v: 0, ...m, y: groundAt(player.x, player.z), alt: 0, vy: 0, vx: 0, vz: 0, pitch: 0, roll: 0, throttle: 0 };
+    car = { id, anyEra: !!anyEra, M: MODELS[id], x: player.x, z: player.z, yaw: player.yaw, v: 0, ...m, y: groundAt(player.x, player.z), alt: 0, vy: 0, vx: 0, vz: 0, pitch: 0, roll: 0, throttle: 0 };
     if (!clearAt(car.x, car.z, car.yaw) && !rescue()) { car = null; toast("There is no room to put it here. Find an open street."); return; }
     car.y = groundAt(car.x, car.z);
     car.g.position.set(car.x, car.y, car.z); car.g.rotation.y = car.yaw;
@@ -209,6 +209,7 @@ const Car = (() => {
     player.x = car.x; player.z = car.z;
     Sfx.play("coin");
     enter();                                                                                          // and you get in
+    return true;
   }
 
   function stow() {
@@ -231,7 +232,7 @@ const Car = (() => {
   }
 
   function enter() {
-    if (!nearby() || eraOf(car.M) !== era) return;
+    if (!nearby() || (!car.anyEra && eraOf(car.M) !== era)) return;
     if (car.M.fly && Weather.grounded) { toast(`Flights are grounded in this weather (${Weather.kind}). Wait for it to pass.`); return; }
     driving = true; mode = "drive"; walkRoof = 0;
     showPilot();
@@ -281,10 +282,10 @@ const Car = (() => {
     if (!silent) toast(walkRoof ? `You got off on the roof, ${Math.round(walkRoof)} m above the street. Walk back to your ${car.M.name.toLowerCase()} to fly on, or step off the edge.` : `You got off. Your ${car.M.name.toLowerCase()} stays parked here.`);
   }
 
-  function toggleEnter() { if (driving) exit(); else if (nearby()) enter(); else if (car && eraOf(car.M) === era) toast(`Walk up to your ${car.M.name.toLowerCase()} to ${car.M.verb || "get in"}.`); }
+  function toggleEnter() { if (driving) exit(); else if (nearby()) enter(); else if (car && (car.anyEra || eraOf(car.M) === era)) toast(`Walk up to your ${car.M.name.toLowerCase()} to ${car.M.verb || "get in"}.`); }
 
   // Switching eras puts away anything that does not exist in the new one.
-  function onEra(modern) { if (car && eraOf(car.M) !== (modern ? "modern" : "ancient")) stow(); }
+  function onEra(modern) { if (car && !car.anyEra && eraOf(car.M) !== (modern ? "modern" : "ancient")) stow(); }
 
   // The five contact points of the car (centre and four corners) at a position and heading
   function points(x, z, yaw) {

@@ -2390,6 +2390,51 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.world_apply({"builds": {"rome:fountain": {"city": "rome", "kind": "palace"}, "x:y": {}}})
         self.assertEqual(server.BUILDS, {})                                                            # (nonsense is ignored)
 
+    async def test_a_guild_caravan_is_paid_for_by_the_leader_comes_back_with_a_profit_and_is_saved(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear(); server.BUILDS.clear()
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear(), server.BUILDS.clear()))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["members"]) == 2)
+        g = server.GUILDS["red eagles"]
+        ann.send({"t": "social", "a": "g_caravan", "from": "rome", "to": "cancun", "stake": 1500})     # the treasury is empty
+        self.assertIn("treasury", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        g["treasury"] = 9000
+        bob.send({"t": "social", "a": "g_caravan", "from": "rome", "to": "cancun", "stake": 1500})     # only the leader can
+        self.assertIn("leader", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        ann.send({"t": "social", "a": "g_caravan", "from": "rome", "to": "rome", "stake": 1500})        # (nonsense is ignored)
+        ann.send({"t": "social", "a": "g_caravan", "from": "rome", "to": "cancun", "stake": 1500})
+        state = await ann.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["cv"])
+        self.assertEqual(state["g"]["treasury"], 7500)
+        self.assertEqual([(c["a"], c["b"], c["stake"]) for c in state["g"]["cv"]], [("rome", "cancun", 1500)])
+        self.assertGreater(state["g"]["cv"][0]["left"], 200)
+        for _ in range(2):
+            ann.send({"t": "social", "a": "g_caravan", "from": "delhi", "to": "beijing", "stake": 500})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and len(m["g"]["cv"]) == 3)
+        ann.send({"t": "social", "a": "g_caravan", "from": "delhi", "to": "rome", "stake": 500})       # three at most
+        self.assertIn("3 caravans", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        snap = json.loads(json.dumps(server.world_snapshot()))                                       # the caravans are saved with the guild
+        g["cv"].clear()
+        server.world_apply(snap)
+        self.assertEqual(len(server.GUILDS["red eagles"]["cv"]), 3)
+        g = server.GUILDS["red eagles"]
+        before = g["treasury"]
+        self.assertFalse(server.caravan_roll(g))                                                       # still on the road
+        for c in g["cv"]:
+            c["end"] = 0
+        g["cv"][0]["end"], g["cv"][1]["end"], g["cv"][2]["end"] = 0, 0, 0
+        server.BUILDS["cancun:fountain"] = {"city": "cancun", "kind": "fountain", "g": "red eagles", "name": "Red Eagles", "tag": "EAD", "color": 0, "emblem": 0, "t": 0}
+        rolls = iter([0.9, 0.9, 0.05])                                                                 # two sell, one is ambushed
+        self.assertTrue(server.caravan_roll(g, rnd=lambda: next(rolls)))
+        self.assertEqual(g["cv"], [])
+        rome_cancun = int(1500 * (1.25 + 0.12 * 3 + 0.1))                                              # three cities along the road, and the guild's own fountain at the other end
+        delhi_beijing = int(500 * (1.25 + 0.12 * 1))
+        ambushed = int(500 * 0.34)
+        self.assertEqual(g["treasury"] - before, rome_cancun + delhi_beijing + ambushed)
+
     # ---------------------------------------------------------------- the bulletin boards
 
     async def test_notice_board_post_list_delete_and_limits(self):
