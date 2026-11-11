@@ -4736,9 +4736,9 @@ def guild_say(g, text):
     del g["chat"][:-40]
 
 
-# ---- public builds: a guild pays from its treasury for a landmark of its own in a city (a fountain, a lighthouse, an aqueduct), and everyone in that city sees it with the guild's banner and name.
+# ---- public builds: a guild pays from its treasury for a landmark of its own in a city (a fountain, a lighthouse, an aqueduct, a statue, a garden, a triumphal arch), and everyone in that city sees it with the guild's banner and name.
 # One of each kind per city, built once. The leader buys it; the browsers draw it (builds.js) at a spot they all work out the same way. Saved with the rest of the world.
-BUILD_KINDS = {"fountain": 2000, "lighthouse": 5000, "aqueduct": 8000}          # kind -> price in denarii from the guild's treasury
+BUILD_KINDS = {"fountain": 2000, "lighthouse": 5000, "aqueduct": 8000, "statue": 3000, "garden": 4000, "arch": 12000}          # kind -> price in denarii from the guild's treasury
 BUILD_CITIES = ("rome", "delhi", "cancun", "beijing")
 BUILDS = {}                # "city:kind" -> {"city", "kind", "g" (the guild's key), "name", "tag", "color", "emblem", "t"}
 

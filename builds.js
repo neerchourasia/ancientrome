@@ -7,14 +7,14 @@
 
 const Builds = (() => {
   const T = THREE;
-  const KINDS = { fountain: { icon: "⛲", name: "Fountain" }, lighthouse: { icon: "🗼", name: "Lighthouse" }, aqueduct: { icon: "🌉", name: "Aqueduct" } };
+  const KINDS = { fountain: { icon: "⛲", name: "Fountain" }, lighthouse: { icon: "🗼", name: "Lighthouse" }, aqueduct: { icon: "🌉", name: "Aqueduct" }, statue: { icon: "🗿", name: "Statue" }, garden: { icon: "🌳", name: "Garden" }, arch: { icon: "🏛", name: "Triumphal arch" } };
   const SIGHT = {                                                                  // the sights each build may stand near, per city (the first with a clear patch of ground is used)
-    rome: { fountain: ["forum", "castor", "market"], lighthouse: ["harbour"], aqueduct: ["circus", "palatine", "capitolium"] },
-    delhi: { fountain: ["d-chandni", "d-serai", "d-haveli"], lighthouse: ["d-jama", "d-diwanaam"], aqueduct: ["d-fatehpuri", "d-katra", "d-chandni", "d-lahori"] },
-    cancun: { fountain: ["c-casita", "c-castillo", "c-ballcourt"], lighthouse: ["c-beach", "c-reef", "c-azul"], aqueduct: ["c-sacbe", "c-cenote", "c-caracol"] },
-    beijing: { fountain: ["b-market", "b-tiananmen", "b-square"], lighthouse: ["b-lake", "b-jingshan", "b-summer"], aqueduct: ["b-hutong", "b-meridian", "b-heaven", "b-bridge"] },
+    rome: { fountain: ["forum", "castor", "market"], lighthouse: ["harbour"], aqueduct: ["circus", "palatine", "capitolium"], statue: ["capitolium", "forum", "pantheon"], garden: ["palatine", "domus", "hercules"], arch: ["trajan", "forum", "market"] },
+    delhi: { fountain: ["d-chandni", "d-serai", "d-haveli"], lighthouse: ["d-jama", "d-diwanaam"], aqueduct: ["d-fatehpuri", "d-katra", "d-chandni", "d-lahori"], statue: ["d-chandni", "d-lahori", "d-jama"], garden: ["d-haveli", "d-rangmahal", "d-diwankhas"], arch: ["d-indiagate", "d-kartavya", "d-chandni"] },
+    cancun: { fountain: ["c-casita", "c-castillo", "c-ballcourt"], lighthouse: ["c-beach", "c-reef", "c-azul"], aqueduct: ["c-sacbe", "c-cenote", "c-caracol"], statue: ["c-castillo", "c-ballcourt", "c-warriors"], garden: ["c-cenote", "c-venus", "c-caracol"], arch: ["c-sacbe", "c-tulum", "c-columns"] },
+    beijing: { fountain: ["b-market", "b-tiananmen", "b-square"], lighthouse: ["b-lake", "b-jingshan", "b-summer"], aqueduct: ["b-hutong", "b-meridian", "b-heaven", "b-bridge"], statue: ["b-tiananmen", "b-square", "b-meridian"], garden: ["b-summer", "b-heaven", "b-jingshan"], arch: ["b-bridge", "b-tiananmen", "b-drum"] },
   };
-  const FOOT = { fountain: [[0, 0], [4.5, 0], [-4.5, 0], [0, 4.5], [0, -4.5]], lighthouse: [[0, 0], [3.5, 0], [-3.5, 0], [0, 3.5], [0, -3.5]], aqueduct: [[0, 0], [-17, 0], [-9, 0], [9, 0], [17, 0], [0, 4], [0, -4], [-17, 4], [17, -4]] };
+  const FOOT = { statue: [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3]], garden: [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]], arch: [[0, 0], [-6, 0], [6, 0], [0, 4], [0, -4]], fountain: [[0, 0], [4.5, 0], [-4.5, 0], [0, 4.5], [0, -4.5]], lighthouse: [[0, 0], [3.5, 0], [-3.5, 0], [0, 3.5], [0, -3.5]], aqueduct: [[0, 0], [-17, 0], [-9, 0], [9, 0], [17, 0], [0, 4], [0, -4], [-17, 4], [17, -4]] };
   const COLORS = [0xb3342d, 0x2d6bb3, 0x2f8a4f, 0xc9a227, 0x7a3fa0, 0xd9731f, 0x2a2a2a, 0x2aa8a0], EMBLEMS = ["🦅", "🐺", "🐉", "🦁", "🌙", "⭐", "🐘", "🦊"];
   const lam = (c) => new T.MeshLambertMaterial({ color: c });
   const $b = (id) => document.getElementById(id);
@@ -102,7 +102,43 @@ const Builds = (() => {
     g.add(banner(b, -n * segW / 2 - 1.2, 0, 11)); g.add(sign(b, 13));
     return g;
   }
-  const MAKE = { fountain, lighthouse, aqueduct };
+  function statue(b) {
+    const g = new T.Group(), bronze = lam(0x8a6a2e);
+    for (let i = 0; i < 3; i++) { const st = new T.Mesh(new T.BoxGeometry(5 - i * 0.9, 0.5, 5 - i * 0.9), i % 2 ? stone : dark); st.position.y = 0.25 + i * 0.5; g.add(st); }
+    const ped = new T.Mesh(new T.BoxGeometry(2.2, 3.2, 2.2), stone); ped.position.y = 3.1; g.add(ped);
+    const body = new T.Mesh(new T.CylinderGeometry(0.6, 0.85, 3.0, 10), bronze); body.position.y = 6.2; g.add(body);
+    const head = new T.Mesh(new T.SphereGeometry(0.5, 12, 10), bronze); head.position.y = 8.2; g.add(head);
+    const arm = new T.Mesh(new T.BoxGeometry(0.3, 2.0, 0.3), bronze); arm.position.set(0.9, 8.0, 0); arm.rotation.z = -0.5; g.add(arm);
+    const band = new T.Mesh(new T.BoxGeometry(2.3, 0.4, 2.3), new T.MeshLambertMaterial({ color: COLORS[b.color % 8] })); band.position.y = 4.5; g.add(band);
+    g.add(banner(b, 3.4, 0, 6)); g.add(sign(b, 10.5));
+    g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+    return g;
+  }
+  function garden(b) {
+    const g = new T.Group(), col = COLORS[b.color % 8];
+    const lawn = new T.Mesh(new T.CircleGeometry(6, 28), lam(0x4f8f3f)); lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0.05; g.add(lawn);
+    const path = new T.Mesh(new T.RingGeometry(2.0, 2.7, 28), lam(0xd8c9a0)); path.rotation.x = -Math.PI / 2; path.position.y = 0.08; g.add(path);
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; if (i % 4 === 0) continue; const h = new T.Mesh(new T.BoxGeometry(1.5, 0.9, 0.7), lam(0x2f6f2f)); h.position.set(Math.cos(a) * 5.5, 0.45, Math.sin(a) * 5.5); h.rotation.y = -a + Math.PI / 2; g.add(h); }
+    for (let i = 0; i < 14; i++) { const a = i * 2.4, r = 0.6 + (i % 5) * 0.45, f = new T.Mesh(new T.SphereGeometry(0.22, 6, 5), new T.MeshLambertMaterial({ color: i % 2 ? col : 0xf2e04a })); f.position.set(Math.cos(a) * r, 0.25, Math.sin(a) * r); g.add(f); }
+    for (const [x, z] of [[-3.6, -3.4], [3.8, -3.2], [0, 4.2]]) { const tr = new T.Mesh(new T.CylinderGeometry(0.2, 0.28, 2.0, 7), lam(0x6a4a2a)); tr.position.set(x, 1.0, z); g.add(tr); const lf = new T.Mesh(new T.SphereGeometry(1.4, 9, 7), lam(0x2f7a35)); lf.position.set(x, 3.0, z); g.add(lf); }
+    const bench = new T.Mesh(new T.BoxGeometry(1.8, 0.25, 0.6), lam(0x8a6a3e)); bench.position.set(1.8, 0.5, 1.2); g.add(bench);
+    g.add(banner(b, 6.2, 0, 4.5)); g.add(sign(b, 7));
+    g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+    return g;
+  }
+  function arch(b) {
+    const g = new T.Group(), col = new T.MeshLambertMaterial({ color: COLORS[b.color % 8] });
+    for (const sx of [-1, 1]) { const pier = new T.Mesh(new T.BoxGeometry(3.4, 9, 4.2), stone); pier.position.set(sx * 4.6, 4.5, 0); g.add(pier); const cap = new T.Mesh(new T.BoxGeometry(3.8, 0.5, 4.6), dark); cap.position.set(sx * 4.6, 9.2, 0); g.add(cap); }
+    const lintel = new T.Mesh(new T.BoxGeometry(12.6, 2.2, 4.2), stone); lintel.position.set(0, 9.3, 0); g.add(lintel);
+    const frieze = new T.Mesh(new T.BoxGeometry(12.8, 0.7, 4.3), col); frieze.position.set(0, 9.0, 0); g.add(frieze);
+    const attic = new T.Mesh(new T.BoxGeometry(11.2, 2.6, 3.6), stone); attic.position.set(0, 11.7, 0); g.add(attic);
+    const top = new T.Mesh(new T.BoxGeometry(11.8, 0.5, 4.0), dark); top.position.set(0, 13.2, 0); g.add(top);
+    for (const sx of [-1, 1]) { const f = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 4, 6), lam(0x5a4a38)); f.position.set(sx * 5, 15.2, 0); g.add(f); }
+    g.add(sign(b, 17.4));
+    g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+    return g;
+  }
+  const MAKE = { fountain, lighthouse, aqueduct, statue, garden, arch };
 
   // ---- showing them
   function clearShown() { for (const s of shown) { scene.remove(s.g); for (const d of s.dyn) { const i = dynBlockers.indexOf(d); if (i >= 0) dynBlockers.splice(i, 1); } } shown = []; }
@@ -113,8 +149,8 @@ const Builds = (() => {
     for (const b of here) {
       const p = at[b.kind]; if (!p) continue;
       const g = MAKE[b.kind](b); g.position.set(p[0], groundAt(p[0], p[1]), p[1]); scene.add(g);
-      const r = b.kind === "lighthouse" ? 2.6 : b.kind === "fountain" ? 3.6 : 1.4, dyn = [];
-      const circles = b.kind === "aqueduct" ? [-16.8, -8.4, 0, 8.4, 16.8].map((dx) => [p[0] + dx, p[1]]) : [[p[0], p[1]]];      // (the aqueduct's piers; you can walk through its arches)
+      const r = b.kind === "lighthouse" ? 2.6 : b.kind === "fountain" ? 3.6 : b.kind === "statue" ? 2.2 : b.kind === "arch" ? 1.9 : 1.4, dyn = [];
+      const circles = b.kind === "aqueduct" ? [-16.8, -8.4, 0, 8.4, 16.8].map((dx) => [p[0] + dx, p[1]]) : b.kind === "garden" ? [] : b.kind === "arch" ? [[p[0] - 4.6, p[1]], [p[0] + 4.6, p[1]]] : [[p[0], p[1]]];      // (the aqueduct's piers; you can walk through its arches)
       for (const [x, z] of circles) { const d = { x, z, r, y1: groundAt(x, z) + 6, t: 1, on: true, era: undefined }; dynBlockers.push(d); dyn.push(d); }
       shown.push({ g, b, dyn });
     }
