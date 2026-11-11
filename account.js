@@ -427,12 +427,16 @@ const Account = (() => {
     for (const eye of document.querySelectorAll("#account .pw-eye")) { const box = eye.parentElement.querySelector("input"); if (box.type !== "password") eye.click(); }
     renderAccount();
   }
-  // The demo lasts 10 minutes in all (counted from the first time it is started in this browser) and cannot earn past 1,000 denarii.
+  // The demo lasts 10 minutes in all, once only (counted from the first time it is started in this browser; the end time is kept in the page's storage and in a cookie) and cannot earn past 1,000 denarii.
   // Returns false when this browser has used its demo up: the login screen is then what comes next.
   function startDemo() {
-    let end = 0;
+    let end = 0, ck = 0;                                                                              // (kept twice, in the page's storage and in a cookie, so clearing only one of them does not give a second demo)
     try { end = Number(localStorage.getItem(DEMO_KEY)) || 0; } catch (e) { /* storage unavailable */ }
-    if (!end) { end = Date.now() + DEMO_MS; try { localStorage.setItem(DEMO_KEY, String(end)); } catch (e) { /* ignore */ } }
+    try { ck = Number((document.cookie.match(/(?:^|; )rome_demo_end=(\d+)/) || [])[1]) || 0; } catch (e) { /* cookies unavailable */ }
+    end = Math.min(...[end, ck].filter(Boolean), Infinity);
+    if (end === Infinity) end = Date.now() + DEMO_MS;
+    try { localStorage.setItem(DEMO_KEY, String(end)); } catch (e) { /* ignore */ }
+    try { document.cookie = `rome_demo_end=${end}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`; } catch (e) { /* ignore */ }
     if (Date.now() >= end) { demoOver = true; renderAccount(); return false; }
     demo = true;
     const tick = () => {
