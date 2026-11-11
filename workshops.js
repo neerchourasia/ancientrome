@@ -18,6 +18,9 @@ const Workshops = (() => {
   const $w = (id) => document.getElementById(id);
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const lam = (c) => new T.MeshLambertMaterial({ color: c });
+  let mult = {};                                                                // the craft exchange: what each thing fetches now (1 = the normal price), from the game server
+  const m = (t, r) => mult[`${t}:${r}`] || 1;
+  const online = () => typeof Online !== "undefined" && Online.connected;
   let st = { crafts: { smith: 0, potter: 0, weaver: 0 }, inv: {}, job: null, order: { day: "", city: "", sold: 0 } };
   try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.crafts) st = { crafts: { ...st.crafts, ...s.crafts }, inv: s.inv || {}, job: s.job || null, order: s.order || st.order }; } catch (e) { /* nothing made yet */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage unavailable: it lasts until the page closes */ } };
@@ -94,8 +97,8 @@ const Workshops = (() => {
   function sell(t, r, q) {
     if (!near()) { toast(tr("Walk up to the workshop stand to sell.")); return; }
     const k = qkey(t, r, q); if (!st.inv[k]) return;
-    const o = order(), base = Math.round(TRADES[t].recipes[r][3] * QUALITY[q][1]), dbl = o.left > 0 && o.trade === t && o.rec === r, pay = base * (dbl ? 2 : 1);
-    st.inv[k]--; if (!st.inv[k]) delete st.inv[k]; if (dbl) st.order.sold++; Vitals.coins += pay; save(); Sfx.play("coin");
+    const o = order(), base = Math.round(TRADES[t].recipes[r][3] * QUALITY[q][1] * m(t, r)), dbl = o.left > 0 && o.trade === t && o.rec === r, pay = base * (dbl ? 2 : 1);
+    st.inv[k]--; if (!st.inv[k]) delete st.inv[k]; if (dbl) st.order.sold++; Vitals.coins += pay; save(); Sfx.play("coin"); if (online()) Online.navalSend({ t: "craftsell", id: `${t}:${r}` });
     toast(`+${pay} ${tr("denarii")}${dbl ? " · " + tr("the market's order: double!") : ""}`); render();
   }
 
@@ -127,18 +130,20 @@ const Workshops = (() => {
     parts.push(el("h3", `🎒 ${tr("What you have made")}`));
     if (!inv.length) parts.push(el("p", tr("Nothing yet."), "hire-far"));
     for (const [k, c] of inv) {
-      const [t, r, q] = k.split(":"), rec = TRADES[t].recipes[+r], pay = Math.round(rec[3] * QUALITY[+q][1]);
+      const [t, r, q] = k.split(":"), rec = TRADES[t].recipes[+r], pay = Math.round(rec[3] * QUALITY[+q][1] * m(t, +r)), mm = m(t, +r);
       const row = el("div", undefined, "hire-row"), txt = el("span");
-      txt.append(el("strong", `${TRADES[t].icon} ${tr(QUALITY[+q][0])} ${tr(rec[0])} × ${c}`), el("small", `${tr("sells for")} ${pay}${o.left > 0 && o.trade === t && o.rec === +r ? " ×2" : ""}`));
+      txt.append(el("strong", `${TRADES[t].icon} ${tr(QUALITY[+q][0])} ${tr(rec[0])} × ${c}`), el("small", `${tr("sells for")} ${pay} ${mm > 1.03 ? "▲" : mm < 0.97 ? "▼" : ""}${o.left > 0 && o.trade === t && o.rec === +r ? " ×2" : ""}`));
       row.append(txt, btn(tr("Sell"), () => sell(t, +r, +q), !n)); parts.push(row);
     }
     body.replaceChildren(...parts);
   }
   let timer = 0;
+  function priced(msg) { mult = msg.p || {}; if ($w("workpanel") && $w("workpanel").classList.contains("show")) render(); }
   function open() {
     if (mode !== "walk" || panelOpen) { toast(tr("Close what is open and stop the game first")); return; }
+    if (online()) Online.navalSend({ t: "craftp" });
     finish(); render(); openPanel("#workpanel");
-    clearInterval(timer); timer = setInterval(() => { if (!$w("workpanel").classList.contains("show")) { clearInterval(timer); return; } finish(); render(); }, 1000);
+    clearInterval(timer); let tick = 0; timer = setInterval(() => { if (!$w("workpanel").classList.contains("show")) { clearInterval(timer); return; } if (++tick % 20 === 0 && online()) Online.navalSend({ t: "craftp" }); finish(); render(); }, 1000);
   }
   function update(dt) {
     if (!scene || typeof started === "undefined" || !started) return;
@@ -150,5 +155,5 @@ const Workshops = (() => {
   }
   function bind() { const b = $w("btn-work"); if (b) b.addEventListener("click", open); }
   function build(sc) { scene = sc; }
-  return { build, bind, open, update, craft, sell, TRADES, get state() { return st; }, get site() { return here(); }, get near() { return near(); } };
+  return { build, bind, open, update, craft, sell, priced, TRADES, get state() { return st; }, get site() { return here(); }, get near() { return near(); } };
 })();

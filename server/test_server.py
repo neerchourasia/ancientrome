@@ -2498,6 +2498,31 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(server.GUILDS["blue"]["treasury"], 100 + int(5000 * 0.02))
         self.assertFalse(server.rule_tick(1000.0 + server.RULE_SECS + 5))
 
+    async def test_the_town_crier_keeps_the_news_and_the_craft_exchange_moves_with_sales(self):
+        server.NEWS.clear(); server.GUILDS.clear(); server.GUILD_OF.clear()
+        self.addCleanup(lambda: (server.NEWS.clear(), server.GUILDS.clear(), server.GUILD_OF.clear(), server.CRAFTP.update({i: 1.0 for i in server.CRAFT_IDS})))
+        self.accounts("ann")
+        ann, guest = await self.player("Ann", token="ann"), await self.player("Guest")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        guest.send({"t": "news"})                                                                       # anyone can read it
+        got = await guest.until(lambda m: m["t"] == "news")
+        self.assertIn("Red Eagles", got["list"][0]["text"])
+        for i in range(60):
+            server.news_add("item %d" % i)
+        self.assertEqual(len(server.NEWS), 40)
+        guest.send({"t": "craftp"})
+        before = (await guest.until(lambda m: m["t"] == "craftp"))["p"]["potter:0"]
+        guest.send({"t": "craftsell", "id": "potter:0"})
+        after = (await guest.until(lambda m: m["t"] == "craftp"))["p"]["potter:0"]
+        self.assertLess(after, before)
+        guest.send({"t": "craftsell", "id": "nonsense"})                                                # (nonsense changes nothing)
+        self.assertTrue(server.craft_tick(server.CRAFT_T[0] + 61))
+        self.assertTrue(all(0.5 <= v <= 1.6 for v in server.CRAFTP.values()))
+        snap = json.loads(json.dumps(server.world_snapshot()))
+        server.NEWS.clear(); server.world_apply(snap)
+        self.assertEqual(len(server.NEWS), 40)
+
     # ---------------------------------------------------------------- the bulletin boards
 
     async def test_notice_board_post_list_delete_and_limits(self):

@@ -1076,3 +1076,9 @@ body.midfilm::after { content: ""; position: fixed; inset: 0; z-index: 1; pointe
 #cd-body input { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: inherit; font: .85rem monospace; }
 .chal-intro { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: rgba(226,185,85,.18); border: 1px solid rgba(226,185,85,.5); color: var(--ink); font-weight: 600; }
 .chal-intro[hidden] { display: none; }
+
+/* town crier */
+.np-name { text-align: center; font-size: 1.5rem; margin: 0; font-family: Georgia, serif; }
+.np-date { display: block; text-align: center; opacity: .75; border-bottom: 2px double rgba(226,185,85,.6); padding-bottom: 6px; margin-bottom: 8px; }
+.np-head { font-size: 1.15rem; margin: 6px 0; }
+.np-line { margin: 4px 0; font-size: .9rem; }

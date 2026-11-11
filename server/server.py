@@ -2852,6 +2852,7 @@ async def world_loop():
                 for gg in list(GUILDS.values()):
                     caravan_roll(gg)
                 rule_tick()
+                craft_tick()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
                 season_roll()
@@ -4609,6 +4610,7 @@ def on_guild(conn, a, m):
             return social_msg(conn, "There is already a guild with that name.")
         if len(GUILDS) >= 500:
             return social_msg(conn, "There are too many guilds right now.")
+        news_add("A new guild was founded: %s [%s]." % (name, tag))
         GUILDS[name.lower()] = {"name": name, "tag": tag, "leader": conn.fid, "members": {conn.fid: conn.name}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
         GUILD_OF[conn.fid] = name.lower()
         conn.send({"t": "g_paid", "n": GUILD_COST, "why": "founding the guild"})
@@ -4657,6 +4659,7 @@ def on_guild(conn, a, m):
         gk = [k for k, v in GUILDS.items() if v is g][0]
         BUILDS[key] = {"city": city, "kind": kind, "n": n, "g": gk, "name": g["name"], "tag": g["tag"], "color": col, "emblem": emb, "t": int(time.time())}
         guild_say(g, "%s paid %d denarii for a %s in %s for everyone to see." % (conn.name, cost, kind, city.title()))
+        news_add("The guild %s [%s] built a %s in %s." % (g["name"], g["tag"], kind, city.title()), city)
         world_soon()
         guild_push(g)
         return builds_broadcast()
@@ -4814,10 +4817,44 @@ def build_key(city, kind, n):
     return "%s:%s" % (city, kind) if n == 1 else "%s:%s:%d" % (city, kind, n)
 
 
+# ---- the town crier's news: the last things that happened in the world (a guild founded, a build, a caravan home, a city that changed hands). Anyone can read it (📰 in the menu). Saved with the world.
+NEWS = []                  # [{"t": time, "text": ..., "city": ...}], newest last
+
+
+def news_add(text, city=""):
+    NEWS.append({"t": int(time.time()), "text": str(text)[:160], "city": city if city in ("rome", "delhi", "cancun", "beijing") else ""})
+    del NEWS[:-40]
+    world_soon()
+
+
+# ---- the craft exchange: what the workshops' goods fetch (workshops.js). Each of the 12 things has a price multiplier that drifts a little by itself, drops a bit with every one sold by anybody and
+# recovers over time, so what everybody makes together moves the price. The browsers pay what the multiplier says (and tell us what they sold).
+CRAFT_IDS = ["%s:%d" % (t, r) for t in ("smith", "potter", "weaver") for r in range(4)]
+CRAFTP = {i: 1.0 for i in CRAFT_IDS}
+CRAFT_T = [0.0]
+
+
+def craft_tick(t=None):
+    t = time.time() if t is None else t
+    if t - CRAFT_T[0] < 60:
+        return False
+    CRAFT_T[0] = t
+    for i in CRAFT_IDS:
+        m = CRAFTP[i]
+        m += (1.0 - m) * 0.08 + random.uniform(-0.04, 0.04)               # (it creeps back toward normal and wobbles)
+        CRAFTP[i] = round(min(1.6, max(0.5, m)), 3)
+    return True
+
+
+def craft_view():
+    return {"t": "craftp", "p": {i: CRAFTP[i] for i in CRAFT_IDS}}
+
+
 # ---- city control (guild wars by building): in each city the guild whose public builds are worth the most (the prices paid for them added up) rules it. Every RULE_SECS the ruling guild collects taxes
 # into its treasury: RULE_BASE and a share of the worth of every build in the city, so a city full of landmarks pays well and is worth fighting for. A rival takes over by building more than the ruler.
 RULE_SECS, RULE_BASE, RULE_PCT = 600, 100, 0.02
 RULE_T = [0.0]             # when the taxes were last paid
+RULERS = {}                # city -> the key of the guild that ruled it at the last tax
 
 
 BUILDS = {}                # "city:kind" -> {"city", "kind", "g" (the guild's key), "name", "tag", "color", "emblem", "t"}
@@ -4888,6 +4925,9 @@ def rule_tick(t=None):
         g = GUILDS.get(r[0]) if r else None
         if not g:
             continue
+        if RULERS.get(city) != r[0]:                                              # a new ruler
+            RULERS[city] = r[0]
+            news_add("The guild %s [%s] now rules %s." % (g["name"], g["tag"], city.title()), city)
         income = RULE_BASE + int(sum(s for s, _ in rule_scores(city).values()) * RULE_PCT)
         g["treasury"] += income
         guild_say(g, "Your guild rules %s: the taxes paid %d denarii into the treasury." % (city.title(), income))
@@ -4938,6 +4978,7 @@ def caravan_roll(g, rnd=random.random):
         back, why = caravan_result(g, c, rnd())
         g["treasury"] += back
         guild_say(g, "The caravan from %s reached %s: %s. %d denarii came back (it cost %d)." % (c["a"].title(), c["b"].title(), why, back, c["stake"]))
+        news_add("A caravan of the guild %s reached %s from %s%s." % (g["name"], c["b"].title(), c["a"].title(), ": bandits ambushed it on the road" if back < c["stake"] else ""), c["b"])
     if done:
         world_soon()
         guild_push(g)
@@ -6833,6 +6874,17 @@ async def handle_msg(conn, m):
         return on_emote(conn, m)
     if t == "note":
         return on_note(conn, m)
+    if t == "news":
+        return conn.send({"t": "news", "list": NEWS[-25:][::-1]})
+    if t == "craftp":
+        return conn.send(craft_view())
+    if t == "craftsell":                                                              # somebody sold something they made: the price drops a little for everyone
+        i = str(m.get("id", ""))
+        if i in CRAFTP and now() - getattr(conn, "craft_t", 0) > 0.8:
+            conn.craft_t = now()
+            CRAFTP[i] = round(max(0.5, CRAFTP[i] - 0.04), 3)
+            world_soon()
+        return conn.send(craft_view())
     if t == "builds":                                                                # (anyone may ask: the guilds' public builds are for everyone to see)
         return conn.send(builds_state())
     if t == "stock":
@@ -7266,7 +7318,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "builds": BUILDS, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON, "refs": REFS}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "builds": BUILDS, "news": NEWS, "craftp": CRAFTP, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON, "refs": REFS}
 
 
 def world_apply(rows):
@@ -7426,6 +7478,17 @@ def world_apply(rows):
             c = clean_tourney(v)
             if c:
                 TOURNEYS[c["id"]] = c
+    nw = rows.get("news")
+    if isinstance(nw, list):
+        NEWS.clear()
+        for x in nw[-40:]:
+            if isinstance(x, dict) and x.get("text"):
+                NEWS.append({"t": int(num(x.get("t"), 0, 4e9, 0)), "text": str(x["text"])[:160], "city": x.get("city") if x.get("city") in BUILD_CITIES else ""})
+    cp = rows.get("craftp")
+    if isinstance(cp, dict):
+        for i in CRAFT_IDS:
+            if i in cp:
+                CRAFTP[i] = round(float(num(cp[i], 0.5, 1.6, 1.0)), 3)
     bd = rows.get("builds")
     if isinstance(bd, dict):
         BUILDS.clear()
