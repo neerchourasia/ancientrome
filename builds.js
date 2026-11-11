@@ -21,7 +21,7 @@ const Builds = (() => {
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
   const sid = (kind, n) => (n > 1 ? `${kind}#${n}` : kind);                       // (the spot of the first of a kind, and of its second, third ...)
   const cost = (kind, n) => Math.round(price[kind] * (1 + 0.5 * (n - 1)));        // a second of a kind costs half as much again, a third twice as much ...
-  let max = 4, list = [], price = { fountain: 2000, lighthouse: 5000, aqueduct: 8000 }, scene = null, shown = [], sites = {}, shownKey = "", asked = "", askT = 0, siteT = 1.5, clock = 0;
+  let rule = {}, taxAt = 0, max = 4, list = [], price = { fountain: 2000, lighthouse: 5000, aqueduct: 8000 }, scene = null, shown = [], sites = {}, shownKey = "", asked = "", askT = 0, siteT = 1.5, clock = 0;
 
   // ---- where a build stands: the first clear patch near its sight (the same answer for everybody)
   function pickSites(c) {
@@ -178,7 +178,7 @@ const Builds = (() => {
     }
   }
 
-  function heard(m) { list = Array.isArray(m.list) ? m.list.filter((b) => b && KINDS[b.kind] && SIGHT[b.city]) : []; if (m.price) price = m.price; if (m.max) max = m.max; if ($b("buildspanel") && $b("buildspanel").classList.contains("show")) render(); }
+  function heard(m) { list = Array.isArray(m.list) ? m.list.filter((b) => b && KINDS[b.kind] && SIGHT[b.city]) : []; if (m.price) price = m.price; if (m.max) max = m.max; rule = m.rule || {}; if (m.tax_in !== undefined) taxAt = Date.now() + m.tax_in * 1000; if ($b("buildspanel") && $b("buildspanel").classList.contains("show")) render(); }
 
   // ---- the panel
   function render() {
@@ -191,6 +191,11 @@ const Builds = (() => {
     const names = { rome: "Rome", delhi: "Delhi", cancun: "Cancún", beijing: "Beijing" };
     for (const c of [city, ...Object.keys(SIGHT).filter((x) => x !== city)]) {
       const sec = el("div", undefined, "bd-city"); sec.append(el("h3", `${tr(names[c])}${c === city ? " · " + tr("you are here") : ""}`));
+      const rl = rule[c];                                                          // who rules the city (the guild whose builds are worth the most)
+      if (rl) {
+        const s2 = Math.max(0, Math.round((taxAt - Date.now()) / 1000)), top = rl.top[0];
+        sec.append(el("p", `👑 ${tr("Ruled by")} [${top.tag}] ${top.name} · ${top.score.toLocaleString()} · ${tr("taxes")} ${rl.income.toLocaleString()} ${tr("every 10 minutes")} (${Math.floor(s2 / 60)}:${String(s2 % 60).padStart(2, "0")})${rl.top.length > 1 ? " · " + tr("rivals") + ": " + rl.top.slice(1).map((r) => `[${r.tag}] ${r.score.toLocaleString()}`).join(", ") : ""}`, "bd-rule"));
+      } else sec.append(el("p", `👑 ${tr("Nobody rules this city yet: the guild with the most builds here collects taxes.")}`, "bd-rule"));
       for (const kind of Object.keys(KINDS)) {
         const have = list.filter((x) => x.city === c && x.kind === kind).sort((p, q) => (p.n || 1) - (q.n || 1));
         for (const b of have) {                                                  // the ones already built

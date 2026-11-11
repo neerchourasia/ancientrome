@@ -411,6 +411,7 @@ const Race = (() => {
     const leader = ranking()[0];
     const prize = Math.round((rank === 1 ? 100 : rank === 2 ? 40 : 0) * Character.mod("coin")); // only the top two are paid
     Vitals.coins += prize;
+    if (rank === 1 && typeof Stable !== "undefined") Stable.won();
     const money = prize
       ? ` Prize: +${prize} denarii (after the ${entryFee} denarii entry fee).`
       : ` No prize: you lose your ${entryFee} denarii entry fee.`;

@@ -2472,6 +2472,32 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         server.GUILD_OF.clear()                                                                        # (the open guild is worked out again after a restart)
         self.assertIn(server.active_key(next(f for f in server.GUILDS["green lions"]["members"])), ("green lions", "red eagles"))
 
+    async def test_the_guild_with_the_most_builds_in_a_city_rules_it_and_collects_taxes(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear(); server.BUILDS.clear(); server.RULE_T[0] = 0.0
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear(), server.BUILDS.clear(), server.RULE_T.__setitem__(0, 0.0)))
+        server.GUILDS["red"] = {"name": "Red", "tag": "RED", "leader": "a", "members": {"a": "A"}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+        server.GUILDS["blue"] = {"name": "Blue", "tag": "BLU", "leader": "b", "members": {"b": "B"}, "treasury": 0, "chat": [], "paid": [0.0, 0]}
+        def add(city, kind, n, g, t):
+            server.BUILDS[server.build_key(city, kind, n)] = {"city": city, "kind": kind, "n": n, "g": g, "name": g, "tag": g, "color": 0, "emblem": 0, "t": t}
+        add("rome", "fountain", 1, "red", 10)
+        add("rome", "statue", 1, "blue", 20)                       # 3000 beats 2000
+        add("delhi", "fountain", 1, "red", 30)
+        add("delhi", "fountain", 2, "blue", 40)                    # 3000 beats 2000 again
+        self.assertEqual(server.rule_of("rome"), ("blue", 3000))
+        self.assertEqual(server.rule_of("delhi"), ("blue", 3000))
+        self.assertIsNone(server.rule_of("cancun"))
+        view = server.rule_view()
+        self.assertEqual([r["tag"] for r in view["rome"]["top"]], ["BLU", "RED"])
+        self.assertEqual(view["rome"]["income"], 100 + int(5000 * 0.02))
+        add("rome", "lighthouse", 1, "red", 50)                    # red takes over Rome with 7000
+        self.assertEqual(server.rule_of("rome")[0], "red")
+        self.assertFalse(server.rule_tick(1000.0))                 # (the clock starts)
+        self.assertFalse(server.rule_tick(1100.0))
+        self.assertTrue(server.rule_tick(1000.0 + server.RULE_SECS))
+        self.assertEqual(server.GUILDS["red"]["treasury"], 100 + int(10000 * 0.02))
+        self.assertEqual(server.GUILDS["blue"]["treasury"], 100 + int(5000 * 0.02))
+        self.assertFalse(server.rule_tick(1000.0 + server.RULE_SECS + 5))
+
     # ---------------------------------------------------------------- the bulletin boards
 
     async def test_notice_board_post_list_delete_and_limits(self):

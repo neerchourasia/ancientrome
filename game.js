@@ -49,7 +49,7 @@ function init() {
   Theatre.init(scene);
   Guards.build(scene);
   Tour.build(scene);
-  Builds.build(scene); PeriodBuildings.build(scene); MountHire.build(scene); Dig.build(scene);
+  Builds.build(scene); PeriodBuildings.build(scene); MountHire.build(scene); Dig.build(scene); Workshops.build(scene);
   Police.init(scene);
   Jail.bind();
   Harbour.build(scene);
@@ -76,7 +76,7 @@ function init() {
   Swap.bind();
   Emotes.bind(); Photo.bind();
   Leaders.bind();
-  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); Seasons.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Instruments.bind(); Tour.bind(); PhotoMissions.bind(); Builds.bind(); MountHire.bind(); GuildCaravans.bind(); Dig.bind(); Profile.bind(); Bulletin.bind();
+  Ventures.bind(); Guilds.bind(); Exchange.bind(); Events.bind(); Voyage.bind(); Achievements.bind(); Tutorial.bind(); Fishing.bind(); TreasureMaps.bind(); Story.bind(); Weekly.bind(); Daily.bind(); Tournament.bind(); Hall.bind(); Souvenirs.bind(); Journal.bind(); PlayerMarket.bind(); Furnish.bind(); Lives.bind(); Mystery.bind(); Seasons.bind(); { const bc = document.getElementById("btn-caravan"); if (bc) bc.addEventListener("click", () => Trade.openCaravan()); } Shopkeep.bind(); Instruments.bind(); Tour.bind(); PhotoMissions.bind(); Builds.bind(); MountHire.bind(); GuildCaravans.bind(); Dig.bind(); Stable.bind(); Workshops.bind(); Profile.bind(); Bulletin.bind();
   $("#btn-report").addEventListener("click", () => Dialog.ask("Who do you want to report? Type their name exactly.", "").then((name) => { if (!name || !name.trim()) return; Dialog.ask("What did they do?", "").then((why) => { if (why && why.trim()) Online.navalSend({ t: "chat", text: `/report ${name.trim()} ${why.trim()}` }); else toast("Report stopped: say what they did."); }); }));
   Chat.bind();
   Social.bind();
@@ -137,6 +137,7 @@ function leaveMode() {
   else if (mode === "race") Race.stop();
   else if (mode === "naval") Naval.stop();
   else if (mode === "watch") Watch.stop();
+  else if (mode === "flyover") Flyover.stop();
   else if (mode === "online") Online.leave();
   else if (mode === "ride") Ride.leave();
   else if (mode === "drive") { if (Trade.isOpen) Trade.close(); else Car.exit(); }
@@ -342,6 +343,7 @@ function wireInput(canvas) {
     }, 500);
   }
   $("#btn-dgames").addEventListener("click", () => DGames.open());
+  Challenge.bind();
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);
   for (const b of document.querySelectorAll("#tv-cities button")) b.addEventListener("click", () => showArrivals(b.dataset.city));
@@ -1865,7 +1867,7 @@ function tick(dt) {
   if (Vitals.resting && (keys.has("KeyW") || keys.has("KeyA") || keys.has("KeyS") || keys.has("KeyD") || keys.has("ArrowUp") || keys.has("ArrowDown") || keys.has("ArrowLeft") || keys.has("ArrowRight"))) Vitals.stopRest();
   updateVitalsHud();
   updateNavHud(dt);
-  Music.update(dt, mode === "walk" || mode === "drive" || mode === "watch");
+  Music.update(dt, mode === "walk" || mode === "drive" || mode === "watch" || mode === "flyover");
   Sfx.update(dt, { mode, engine: Car.speed01(), driving: Car.driving && Car.motor, night: sky.night, walking: mode === "walk" ? Math.hypot(player.vx, player.vz) : 0, running: keys.has("ShiftLeft") || keys.has("ShiftRight") || (mode === "walk" && walkLevel >= 7) });
   placesTimer += dt;
   if (placesTimer > 0.6 && $("#places").classList.contains("show")) { placesTimer = 0; refreshPlaceDistances(); }
@@ -1878,6 +1880,7 @@ function tick(dt) {
   else if (mode === "watch") { if (!panelOpen) updatePlayer(dt); Watch.update(dt); }
   else if (mode === "ride") Ride.update(dt);
   else if (mode === "chute") Chute.update(dt);
+  else if (mode === "flyover") Flyover.update(dt, keys);
   else if (started && !panelOpen && deathT === 0) {
     if (Vitals.resting) { player.vx = player.vz = 0; player.y += (player.feet + 0.9 - player.y) * Math.min(1, dt * 4); } // sitting down
     else updatePlayer(dt);
@@ -1891,6 +1894,7 @@ function tick(dt) {
   else if (mode === "drive") Car.camera(camera, dt);
   else if (mode === "ride") Ride.camera(camera);
   else if (mode === "chute") Chute.camera(camera);
+  else if (mode === "flyover" && Flyover.camera(camera)) { /* the flyover camera */ }
   else if (mode === "dgame" && DGames.camera(camera, dt)) { /* the game's own camera */ }
   else if (mode === "watch" && Watch.camera(camera, dt)) { /* cinematic camera */ }
   else {
@@ -1921,8 +1925,8 @@ function tick(dt) {
   Doors.update(dt);
   Interiors.update(dt);
   Shopkeep.update(dt);
-  Hunt.update(dt);
-  Tour.update(dt); Builds.update(dt); PeriodBuildings.update(dt); MountHire.update(dt); Dig.update(dt);
+  Hunt.update(dt); Challenge.update(dt);
+  Tour.update(dt); Builds.update(dt); PeriodBuildings.update(dt); MountHire.update(dt); Dig.update(dt); Workshops.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
 

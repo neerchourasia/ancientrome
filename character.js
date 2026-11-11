@@ -98,7 +98,7 @@ const Character = (() => {
     get className() { return CLASSES[s.cls].name; },
     get look() { return s.look; },
     color: (part, i) => COLORS[part][validIndex(part, i) ? i : 0],
-    mod: (key) => { const m = CLASSES[s.cls].mods[key]; return (m === undefined ? 1 : m) * (typeof Market !== "undefined" ? Market.perk(key) : 1); }, // class bonus x anything bought in the Market
+    mod: (key) => { const m = CLASSES[s.cls].mods[key]; return (m === undefined ? 1 : m) * (typeof Market !== "undefined" ? Market.perk(key) : 1) * (typeof Stable !== "undefined" ? Stable.mod(key) : 1); }, // class bonus x anything bought in the Market
     set(next) {
       s = sanitize(next);
       saved = s.name.length >= 2;

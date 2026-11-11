@@ -2851,6 +2851,7 @@ async def world_loop():
                 guild_roll()
                 for gg in list(GUILDS.values()):
                     caravan_roll(gg)
+                rule_tick()
             if n % 240 == 0:
                 weekly_roll()                       # (once a minute: the week turns over even when nobody is playing a match)
                 season_roll()
@@ -4813,6 +4814,12 @@ def build_key(city, kind, n):
     return "%s:%s" % (city, kind) if n == 1 else "%s:%s:%d" % (city, kind, n)
 
 
+# ---- city control (guild wars by building): in each city the guild whose public builds are worth the most (the prices paid for them added up) rules it. Every RULE_SECS the ruling guild collects taxes
+# into its treasury: RULE_BASE and a share of the worth of every build in the city, so a city full of landmarks pays well and is worth fighting for. A rival takes over by building more than the ruler.
+RULE_SECS, RULE_BASE, RULE_PCT = 600, 100, 0.02
+RULE_T = [0.0]             # when the taxes were last paid
+
+
 BUILDS = {}                # "city:kind" -> {"city", "kind", "g" (the guild's key), "name", "tag", "color", "emblem", "t"}
 
 
@@ -4824,7 +4831,7 @@ def builds_state():
             col, emb = guild_look(g)
             b.update(name=g["name"], tag=g["tag"], color=col, emblem=emb)
         rows.append({**{k: b[k] for k in ("city", "kind", "name", "tag", "color", "emblem", "t")}, "n": b.get("n", 1)})
-    return {"t": "builds", "list": rows, "price": BUILD_KINDS, "max": BUILD_MAX}
+    return {"t": "builds", "list": rows, "price": BUILD_KINDS, "max": BUILD_MAX, "rule": rule_view(), "tax_in": max(0, int(RULE_T[0] + RULE_SECS - time.time())) if RULE_T[0] else RULE_SECS}
 
 
 def builds_broadcast():
@@ -4832,6 +4839,64 @@ def builds_broadcast():
     for c in CONNS:
         if c.hello and not c.closed:
             c.send(msg)
+
+
+def rule_scores(city):
+    out = {}
+    for b in BUILDS.values():
+        if b["city"] == city:
+            sc, first = out.get(b["g"], (0, b.get("t", 0)))
+            out[b["g"]] = (sc + build_price(b["kind"], b.get("n", 1)), min(first, b.get("t", 0)))
+    return out
+
+
+def rule_of(city):
+    """The guild that rules a city: the highest score (the earlier builder wins a tie), as (guild key, score), or None."""
+    sc = rule_scores(city)
+    if not sc:
+        return None
+    k = min(sc, key=lambda g: (-sc[g][0], sc[g][1], g))
+    return k, sc[k][0]
+
+
+def rule_view():
+    out = {}
+    for city in BUILD_CITIES:
+        sc = rule_scores(city)
+        rows = []
+        for k, (s, _) in sorted(sc.items(), key=lambda kv: (-kv[1][0], kv[1][1], kv[0]))[:3]:
+            g = GUILDS.get(k)
+            if g:
+                rows.append({"name": g["name"], "tag": g["tag"], "score": s})
+        if rows:
+            total = sum(s for s, _ in sc.values())
+            out[city] = {"top": rows, "income": RULE_BASE + int(total * RULE_PCT)}
+    return out
+
+
+def rule_tick(t=None):
+    """Every RULE_SECS the ruler of each city is paid its taxes."""
+    t = time.time() if t is None else t
+    if not RULE_T[0]:
+        RULE_T[0] = t
+    if t - RULE_T[0] < RULE_SECS:
+        return False
+    RULE_T[0] = t
+    paid = False
+    for city in BUILD_CITIES:
+        r = rule_of(city)
+        g = GUILDS.get(r[0]) if r else None
+        if not g:
+            continue
+        income = RULE_BASE + int(sum(s for s, _ in rule_scores(city).values()) * RULE_PCT)
+        g["treasury"] += income
+        guild_say(g, "Your guild rules %s: the taxes paid %d denarii into the treasury." % (city.title(), income))
+        guild_push(g)
+        paid = True
+    if paid:
+        world_soon()
+        builds_broadcast()
+    return paid
 
 
 # ---- guild caravans: the leader sends a caravan of trade goods from one city to another, paid from the treasury. It is on the road for CARAVAN_SECS seconds (the server keeps the time, so it goes on while
