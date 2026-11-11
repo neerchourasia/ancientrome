@@ -298,5 +298,10 @@
     ["You are flying yourself. W A S D fly where you look, E up, Q down, Shift faster. Space goes on with the tour.", "Ahora vuelas tú. W A S D vuela hacia donde miras, E sube, Q baja, Shift más rápido. Espacio sigue con el recorrido.|Ora voli tu. W A S D vola dove guardi, E su, Q giù, Maiusc più veloce. Spazio prosegue la visita.|अब आप खुद उड़ रहे हैं। W A S D जहाँ देख रहे हैं वहाँ उड़िए, E ऊपर, Q नीचे, Shift तेज़। Space से सैर जारी रहती है।|现在由你自己飞行。W A S D 朝视线方向飞行,E 上升,Q 下降,Shift 更快。空格继续游览。"],
   ];
   for (const [en, t] of W8) add(en, t);
+  const W10 = [
+    ["F: climb the lighthouse", "F: subir al faro|F: sali sul faro|F: दीपस्तंभ पर चढ़िए|F: 爬上灯塔"], ["F: climb down the lighthouse", "F: bajar del faro|F: scendi dal faro|F: दीपस्तंभ से उतरिए|F: 从灯塔下来"],
+    ["You climbed the lighthouse! The whole city lies below you. F climbs down again.", "¡Has subido al faro! Toda la ciudad está a tus pies. F para bajar.|Sei salito sul faro! Tutta la città è ai tuoi piedi. F per scendere.|आप दीपस्तंभ पर चढ़ गए! पूरा शहर आपके नीचे है। उतरने के लिए F।|你爬上了灯塔!整座城市尽收眼底。按 F 下来。"],
+  ];
+  for (const [en, t] of W10) add(en, t);
   I18n.add(rows);
 })();

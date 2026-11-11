@@ -214,6 +214,7 @@ function wireInput(canvas) {
       else if (k === "KeyF" && Harbour.at(player.x, player.z, player.feet)) Harbour.board();
       else if (k === "KeyF" && Furnish.at()) Furnish.act();
       else if (k === "KeyF" && Lives.at()) Lives.open();
+      else if (k === "KeyF" && Builds.at()) Builds.climbAct();
       else if (city === "rome" && era === "modern" && ["KeyF", "KeyL", "KeyU", "KeyN", "KeyR", "KeyV"].includes(k)) toast("Games only work in Ancient Rome. Press K to switch back.");
       else if (k === "KeyF" && city === "delhi") DGames.playHere();
       else if (k === "KeyF" && inArena(player.x, player.z)) Fight.start();
@@ -265,6 +266,7 @@ function wireInput(canvas) {
     if ($("#prompt").dataset.kind === "rest") { toggleRest(); return; }
     if ($("#prompt").dataset.kind === "car") { Car.enter(); return; }
     if ($("#prompt").dataset.kind === "dgame") { DGames.playHere(); return; }
+    if ($("#prompt").dataset.kind === "builds") { Builds.climbAct(); return; }
     if ($("#prompt").dataset.kind === "shop") { Shopkeep.act(); return; }
     if ($("#prompt").dataset.kind === "stall") { Stalls.open(); return; }
     if ($("#prompt").dataset.kind === "job") { Jobs.act(); return; }
@@ -1403,6 +1405,7 @@ function updatePrompt() {
     if (!text) { const rt = Ride.promptText(); if (rt) { text = rt; p.dataset.kind = "ride"; } }
     if (!text) { const ft = Furnish.promptText(); if (ft) { text = ft; p.dataset.kind = "furniture"; } }
     if (!text) { const lt = Lives.promptText(); if (lt) { text = lt; p.dataset.kind = "citizen"; } }
+    if (!text) { const bt = Builds.promptText(); if (bt) { text = bt; p.dataset.kind = "builds"; } }
     if (!text && Vitals.needsRest(stables)) { text = "Press Z to rest and heal"; p.dataset.kind = "rest"; }
     else if (text.includes("Press Z")) p.dataset.kind = "rest";
   }

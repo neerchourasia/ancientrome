@@ -17,8 +17,21 @@ const Builds = (() => {
   const FOOT = { statue: [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3]], garden: [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]], arch: [[0, 0], [-6, 0], [6, 0], [0, 4], [0, -4]], fountain: [[0, 0], [4.5, 0], [-4.5, 0], [0, 4.5], [0, -4.5]], lighthouse: [[0, 0], [3.5, 0], [-3.5, 0], [0, 3.5], [0, -3.5]], aqueduct: [[0, 0], [-17, 0], [-9, 0], [9, 0], [17, 0], [0, 4], [0, -4], [-17, 4], [17, -4]] };
   const COLORS = [0xb3342d, 0x2d6bb3, 0x2f8a4f, 0xc9a227, 0x7a3fa0, 0xd9731f, 0x2a2a2a, 0x2aa8a0], EMBLEMS = ["🦅", "🐺", "🐉", "🦁", "🌙", "⭐", "🐘", "🦊"];
   const lam = (c) => new T.MeshLambertMaterial({ color: c });
+  // CLIMBING A LIGHTHOUSE: a spiral of 35 steps round the outside of the tower leads up to a balcony 17.5 m up. Press F at the foot of the tower (the side of the steps) and you climb them, about eight seconds;
+  // at the top you walk about on the balcony (a thin slab the walking physics treats as a roof, like a landed aircraft's roof: walkRoof in physics.js), and F climbs you down again (or step off the edge).
+  const STAIR = { n: 35, rise: 0.5, R: 3.9, dth: 0.33, th0: Math.PI, outer: 4.85, balcony: 4.8, secs: 8 };
+  const slabs = new Map();                                                         // "city|spot" -> the balcony slab in the walking physics
+  function slabOn(k, x, z, g0, on) {
+    let s = slabs.get(k);
+    if (!on) { if (s) s.off = true; return; }
+    if (!s) { s = addBlockerCircle(x, z, STAIR.balcony, g0 + 16, g0 + STAIR.n * STAIR.rise, { roof: true, off: true }); slabs.set(k, s); }
+    s.y0 = g0 + 16; s.y1 = g0 + STAIR.n * STAIR.rise; s.off = false;
+  }
+  let climb = null;                                                                // the climb going on: { s (the lighthouse), dir, t, from }
+  const ease = (u) => u * u * (3 - 2 * u);
   const $b = (id) => document.getElementById(id);
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
+  const topped = new Set();
   const sid = (kind, n) => (n > 1 ? `${kind}#${n}` : kind);                       // (the spot of the first of a kind, and of its second, third ...)
   const cost = (kind, n) => Math.round(price[kind] * (1 + 0.5 * (n - 1)));        // a second of a kind costs half as much again, a third twice as much ...
   let rule = {}, taxAt = 0, max = 4, list = [], price = { fountain: 2000, lighthouse: 5000, aqueduct: 8000 }, scene = null, shown = [], sites = {}, shownKey = "", asked = "", askT = 0, siteT = 1.5, clock = 0;
@@ -85,7 +98,12 @@ const Builds = (() => {
     for (let i = 0; i < 5; i++) {
       const r0 = 2.6 - i * 0.28, r1 = 2.6 - (i + 1) * 0.28, band = new T.Mesh(new T.CylinderGeometry(r1, r0, 3.4, 16), i % 2 ? new T.MeshLambertMaterial({ color: col }) : lam(0xf1ede2)); band.position.y = 1.7 + i * 3.4; g.add(band);
     }
-    const gal = new T.Mesh(new T.CylinderGeometry(2.1, 2.1, 0.35, 16), dark); gal.position.y = 17.2; g.add(gal);
+    const gal = new T.Mesh(new T.CylinderGeometry(STAIR.balcony, STAIR.balcony, 0.35, 24), dark); gal.position.y = STAIR.n * STAIR.rise - 0.175; g.add(gal);                      // (the balcony you reach by the stairs)
+    const rail = new T.Mesh(new T.TorusGeometry(STAIR.balcony - 0.1, 0.06, 6, 40), dark); rail.rotation.x = Math.PI / 2; rail.position.y = STAIR.n * STAIR.rise + 1.0; g.add(rail);
+    for (let i = 1; i <= STAIR.n; i++) {                                                                                                                                   // the treads: from the tower (it narrows as it rises) out to the edge of the steps
+      const a = STAIR.th0 + (i - 1) * STAIR.dth, y = i * STAIR.rise, rt = Math.max(1.0, 2.6 - 0.0824 * y), len = STAIR.outer - rt, rc = (rt + STAIR.outer) / 2;
+      const tread = new T.Mesh(new T.BoxGeometry(len, 0.22, 1.32), i % 2 ? lam(0xcfc6b0) : lam(0xb9ae94)); tread.position.set(Math.cos(a) * rc, y - 0.11, Math.sin(a) * rc); tread.rotation.y = -a; g.add(tread);
+    }
     const lamp = new T.Mesh(new T.CylinderGeometry(1.0, 1.0, 1.9, 12), new T.MeshBasicMaterial({ color: 0xfff0b0 })); lamp.position.y = 18.4; lamp.userData.lamp = true; g.add(lamp);
     const roof = new T.Mesh(new T.ConeGeometry(1.5, 1.4, 12), new T.MeshLambertMaterial({ color: col })); roof.position.y = 20.0; g.add(roof);
     const beam = new T.Mesh(new T.ConeGeometry(6, 60, 12, 1, true), new T.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.18, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false }));
@@ -144,17 +162,18 @@ const Builds = (() => {
   const MAKE = { fountain, lighthouse, aqueduct, statue, garden, arch };
 
   // ---- showing them
-  function clearShown() { for (const s of shown) { scene.remove(s.g); for (const d of s.dyn) { const i = dynBlockers.indexOf(d); if (i >= 0) dynBlockers.splice(i, 1); } } shown = []; }
+  function clearShown() { climb = null; for (const s of shown) { if (s.b.__sk) slabOn(s.b.__sk, 0, 0, 0, false); scene.remove(s.g); for (const d of s.dyn) { const i = dynBlockers.indexOf(d); if (i >= 0) dynBlockers.splice(i, 1); } } shown = []; }
   function rebuild() {
     clearShown();
     const here = list.filter((b) => b.city === city && KINDS[b.kind]), at = sites[city];
     shownKey = key(); if (!at) return;
     for (const b of here) {
       const p = at[sid(b.kind, b.n || 1)]; if (!p) continue;
-      const g = MAKE[b.kind](b); g.position.set(p[0], groundAt(p[0], p[1]), p[1]); scene.add(g);
+      const sk = `${city}|${sid(b.kind, b.n || 1)}`, g = MAKE[b.kind](b); g.position.set(p[0], groundAt(p[0], p[1]), p[1]); scene.add(g);
+      if (b.kind === "lighthouse") { slabOn(sk, p[0], p[1], g.position.y, true); b.__sk = sk; }
       const r = b.kind === "lighthouse" ? 2.6 : b.kind === "fountain" ? 3.6 : b.kind === "statue" ? 2.2 : b.kind === "arch" ? 1.9 : 1.4, dyn = [];
       const circles = b.kind === "aqueduct" ? [-16.8, -8.4, 0, 8.4, 16.8].map((dx) => [p[0] + dx, p[1]]) : b.kind === "garden" ? [] : b.kind === "arch" ? [[p[0] - 4.6, p[1]], [p[0] + 4.6, p[1]]] : [[p[0], p[1]]];      // (the aqueduct's piers; you can walk through its arches)
-      for (const [x, z] of circles) { const d = { x, z, r, y1: groundAt(x, z) + 6, t: 1, on: true, era: undefined }; dynBlockers.push(d); dyn.push(d); }
+      for (const [x, z] of circles) { const d = { x, z, r, y1: (b.kind === "lighthouse" ? groundAt(x, z) + STAIR.n * STAIR.rise + 4.5 : groundAt(x, z) + 6), t: 1, on: true, era: undefined }; dynBlockers.push(d); dyn.push(d); }
       shown.push({ g, b, dyn });
     }
   }
@@ -168,6 +187,7 @@ const Builds = (() => {
     askT -= dt;
     if (typeof Online !== "undefined" && Online.connected && (askT <= 0 && asked !== "ok")) { asked = "ok"; askT = 30; Online.navalSend({ t: "builds" }); }
     if (typeof Online !== "undefined" && !Online.connected) asked = "";
+    if (climb) climbStep(dt);
     for (const s of shown) {
       s.g.traverse((o) => {
         if (o.userData.flag) o.rotation.y = Math.sin(clock * 3 + s.b.color) * 0.35;
@@ -175,6 +195,51 @@ const Builds = (() => {
         else if (o.userData.beam) { o.rotation.y = clock * 1.4; o.visible = Time.isNight; }
         else if (o.userData.lamp) o.material.color.setHex(Time.isNight ? 0xfff6c8 : 0xe9dca0);
       });
+    }
+  }
+
+  // the lighthouse you are at: at its foot on the street (the side of the steps) or up on its balcony
+  const startAt = (s) => [s.g.position.x + Math.cos(STAIR.th0) * 5.4, s.g.position.z + Math.sin(STAIR.th0) * 5.4];
+  function atLighthouse() {
+    if (mode !== "walk" || panelOpen || climb || typeof started === "undefined" || !started) return null;
+    for (const s of shown) {
+      if (s.b.kind !== "lighthouse") continue;
+      const g = s.g.position, up = walkRoof > 0 && player.feet > g.y + STAIR.n * STAIR.rise - 1.2;
+      if (up && Math.hypot(player.x - g.x, player.z - g.z) < STAIR.balcony + 1) return { s, dir: -1 };
+      const [sx, sz] = startAt(s);
+      if (!up && walkRoof === 0 && Math.abs(player.feet - g.y) < 1.6 && Math.hypot(player.x - sx, player.z - sz) < 4.5) return { s, dir: 1 };
+    }
+    return null;
+  }
+  const promptText = () => { const a = atLighthouse(); return a ? tr(a.dir > 0 ? "F: climb the lighthouse" : "F: climb down the lighthouse") : ""; };
+  function climbAct() {
+    const a = atLighthouse(); if (!a) return false;
+    climb = { s: a.s, dir: a.dir, t: 0, fx: player.x, fz: player.z, ff: player.feet };
+    Vitals.stopRest && Vitals.stopRest(); Nav.clear && Nav.clear();
+    return true;
+  }
+  function climbStep(dt) {
+    const c = climb, g = c.s.g.position, total = STAIR.n * STAIR.dth, lead = 0.9;
+    if (!shown.includes(c.s)) { climb = null; return; }                                                        // (the lighthouse went away)
+    c.t += dt; player.vx = player.vz = 0; player.vy = 0; player.airY = 0;
+    const cx = g.x, cz = g.z;
+    if (c.t < lead) {                                                                                           // first you go to the foot of the steps (or the top of them)
+      const u = ease(c.t / lead), a = c.dir > 0 ? STAIR.th0 : STAIR.th0 + total, tx = cx + Math.cos(a) * STAIR.R, tz = cz + Math.sin(a) * STAIR.R, tf = c.dir > 0 ? g.y : g.y + STAIR.n * STAIR.rise;
+      player.x = c.fx + (tx - c.fx) * u; player.z = c.fz + (tz - c.fz) * u; player.feet = c.ff + (tf - c.ff) * u; return;
+    }
+    const u = Math.min(1, (c.t - lead) / STAIR.secs), e = c.dir > 0 ? ease(u) : 1 - ease(u), a = STAIR.th0 + e * total;
+    player.x = cx + Math.cos(a) * STAIR.R; player.z = cz + Math.sin(a) * STAIR.R; player.feet = g.y + e * STAIR.n * STAIR.rise;
+    const vx = -Math.sin(a) * c.dir, vz = Math.cos(a) * c.dir; player.yaw = Math.atan2(-vx, -vz);                    // (facing the way up the stairs)
+    if (Math.floor(c.t * 2.2) !== Math.floor((c.t - dt) * 2.2)) Sfx.play("thud");
+    if (u >= 1) {
+      climb = null;
+      if (c.dir > 0) {                                                                                         // at the top: on the balcony, facing out over the city
+        const ex = Math.cos(a), ez = Math.sin(a); player.x = cx + ex * 4.1; player.z = cz + ez * 4.1; player.feet = g.y + STAIR.n * STAIR.rise; player.yaw = Math.atan2(ex, ez);
+        walkRoof = player.feet; lastTeleport = performance.now();
+        if (!topped.has(c.s.b.__sk)) { topped.add(c.s.b.__sk); Sfx.play("discover"); toast(`🗼 ${tr("You climbed the lighthouse! The whole city lies below you. F climbs down again.")}`); }
+      } else {                                                                                                  // down again: back on the street at the foot of the steps
+        const [sx, sz] = startAt(c.s); player.x = sx; player.z = sz; player.feet = g.y; walkRoof = 0; lastTeleport = performance.now();
+      }
     }
   }
 
@@ -227,5 +292,5 @@ const Builds = (() => {
   }
   function build(sc) { scene = sc; }
   function bind() { const b = $b("btn-builds"); if (b) b.addEventListener("click", open); }
-  return { build, bind, update, heard, open, render, get list() { return list; }, get sites() { return sites; } };
+  return { build, bind, update, heard, open, render, promptText, climbAct, at: () => !!atLighthouse(), get list() { return list; }, get sites() { return sites; } };
 })();
