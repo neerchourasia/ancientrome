@@ -286,5 +286,17 @@
     ["cyclone", "el ciclón|il ciclone|चक्रवात|气旋"], ["tornado", "el tornado|il tornado|बवंडर|龙卷风"], ["blizzard", "la ventisca|la bufera di neve|बर्फ़ीला तूफ़ान|暴风雪"], ["hail", "el granizo|la grandine|ओलावृष्टि|冰雹"], ["storm", "la tormenta|la tempesta|तूफ़ान|暴风雨"],
   ];
   for (const [en, t] of W7) add(en, t);
+  const W8 = [
+    ["🦅 Flyover of Rome", "🦅 Vuelo sobre Roma|🦅 Volo su Roma|🦅 रोम के ऊपर उड़ान|🦅 飞越罗马"],
+    ["Over Ancient Rome", "Sobre la Roma antigua|Sopra l'antica Roma|प्राचीन रोम के ऊपर|在古罗马上空"], ["⏸ Hover here", "⏸ Quedarse aquí|⏸ Fermati qui|⏸ यहीं ठहरिए|⏸ 在此悬停"], ["▶ Tour the sights", "▶ Recorrer los lugares|▶ Visita i luoghi|▶ स्थल देखिए|▶ 游览名胜"], ["⌂ Land", "⌂ Aterrizar|⌂ Atterra|⌂ उतरिए|⌂ 降落"],
+    ["Drag to look · wheel: closer or higher · Space: hover here or go on · W A S D glide, E up, Q down · Esc to land", "Arrastra para mirar · rueda: más cerca o más alto · Espacio: quedarse o seguir · W A S D deslizar, E subir, Q bajar · Esc para aterrizar|Trascina per guardare · rotella: più vicino o più in alto · Spazio: fermati o prosegui · W A S D plana, E su, Q giù · Esc per atterrare|देखने के लिए खींचिए · पहिया: पास या ऊपर · Space: यहीं रुकिए या आगे बढ़िए · W A S D सरकिए, E ऊपर, Q नीचे · Esc उतरने के लिए|拖动查看 · 滚轮:更近或更高 · 空格:悬停或继续 · W A S D 滑行,E 上升,Q 下降 · Esc 降落"],
+    ["The flyover is of Ancient Rome: go to Rome in the ancient time first (the city button, and K for the era).", "El vuelo es sobre la Roma antigua: ve primero a Roma en la época antigua (el botón de ciudad y K para la época).|Il volo è sull'antica Roma: vai prima a Roma nell'epoca antica (il pulsante città e K per l'epoca).|उड़ान प्राचीन रोम के ऊपर है: पहले प्राचीन समय में रोम जाइए (शहर का बटन, और युग के लिए K)।|飞越只在古罗马:请先到古代的罗马(城市按钮,K 切换时代)。"],
+    ["Close what is open and stop what you are doing first.", "Cierra lo que esté abierto y termina lo que estás haciendo.|Chiudi ciò che è aperto e finisci quello che stai facendo.|जो खुला है उसे बंद कीजिए और जो कर रहे हैं उसे रोकिए।|请先关闭打开的窗口并停下手头的事。"],
+    ["Step outside first: the flyover starts from the street.", "Sal primero: el vuelo empieza desde la calle.|Esci prima: il volo parte dalla strada.|पहले बाहर आइए: उड़ान सड़क से शुरू होती है।|请先到外面:飞越从街上开始。"],
+    ["Flyover of Ancient Rome: just hover and look. Esc to land.", "Vuelo sobre la Roma antigua: solo flota y mira. Esc para aterrizar.|Volo sull'antica Roma: resta sospeso e guarda. Esc per atterrare.|प्राचीन रोम के ऊपर उड़ान: बस तैरिए और देखिए। उतरने के लिए Esc।|飞越古罗马:悬停观看即可。按 Esc 降落。"],
+    ["You are back on the ground.", "Has vuelto al suelo.|Sei tornato a terra.|आप वापस ज़मीन पर हैं।|你回到了地面。"],
+    ["Hovering. W A S D glide, E up, Q down, drag to look. Space goes on with the tour.", "Flotando. W A S D deslizar, E subir, Q bajar, arrastra para mirar. Espacio sigue con el recorrido.|In volo fermo. W A S D plana, E su, Q giù, trascina per guardare. Spazio prosegue la visita.|तैर रहे हैं। W A S D सरकिए, E ऊपर, Q नीचे, देखने के लिए खींचिए। Space से सैर जारी रहती है।|悬停中。W A S D 滑行,E 上升,Q 下降,拖动查看。空格继续游览。"],
+  ];
+  for (const [en, t] of W8) add(en, t);
   I18n.add(rows);
 })();
