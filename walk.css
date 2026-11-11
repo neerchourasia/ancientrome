@@ -605,6 +605,8 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #btn-gift.ready { border-color: #ffd36b; box-shadow: 0 0 8px rgba(255,211,107,.7); animation: giftpulse 1.6s ease-in-out infinite; }
 @keyframes giftpulse { 50% { box-shadow: 0 0 14px rgba(255,211,107,1); } }
 #friends h3 { margin: 12px 0 4px; color: var(--gold); font: 700 1rem Georgia, serif; }
+.fr-invrow { display: flex; gap: 6px; }
+.fr-invrow input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: inherit; font: .85rem monospace; }
 .fr-list { list-style: none; margin: 0; padding: 0; }
 .fr-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .fr-list li > span:nth-child(2), .fr-list li > span:first-child:not(:only-child) + span { flex: 1; }

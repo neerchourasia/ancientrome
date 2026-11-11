@@ -11,8 +11,18 @@ const Social = (() => {
   const gotGifts = new Set();         // ids of gifts of denarii already added (so a gift that is sent twice is not counted twice)
   const invites = new Map();          // fid -> name of a friend who asked you to sail with them
   const convos = new Map();           // fid -> [{ mine, text, at }]
-  let rank = { r: 1000, w: 0, l: 0, d: 0 }, myFid = "", sel = "", notice = "", online = [], top = null;
+  let rank = { r: 1000, w: 0, l: 0, d: 0 }, myFid = "", sel = "", notice = "", online = [], top = null, refInfo = null;
   const KEY = () => `rome-social-${Account.userId || "guest"}`;
+
+  // An invite link (?inv=<friend id of the one who invited you>) is kept until the game server has taken it (the answer {t:"ref"} comes once you are logged in); the server only pays the bonus
+  // to a new account that plays for a few minutes, and the first link is the one that counts. Class mode sends nothing to the server, so it keeps nothing.
+  const INV = "rome-inv";
+  try {
+    const q = new URLSearchParams(location.search).get("inv");
+    if (/^[0-9a-f]{12}$/.test(q || "") && !(typeof CLASSMODE !== "undefined" && CLASSMODE.on) && !localStorage.getItem(INV)) localStorage.setItem(INV, q);
+  } catch (e) { /* storage unavailable */ }
+  const invCode = () => { try { return localStorage.getItem(INV) || ""; } catch (e) { return ""; } };
+  const inviteLink = () => (myFid ? `${location.origin}/?inv=${myFid}` : "");
 
   const TIERS = [[0, "Tiro", "🥉"], [900, "Gladiator", "🥈"], [1100, "Veteran", "🥇"], [1300, "Champion", "🏆"], [1500, "Legend of the Arena", "👑"]];
   function tier(r) { let t = TIERS[0]; for (const x of TIERS) if (r >= x[0]) t = x; return t; }
@@ -48,6 +58,11 @@ const Social = (() => {
 
   function on(m) {
     switch (m.t) {
+      case "ref":
+        if (m.a === "info") { refInfo = m; render(); break; }
+        try { localStorage.removeItem(INV); } catch (e) { /* ignore */ }
+        if (m.a === "new") toast("🎁 You came by a friend's invite: play a few minutes and you both get a bonus!");
+        break;
       case "fr_state": {
         myFid = m.fid || myFid;
         if (m.rank) rank = m.rank;
@@ -133,6 +148,11 @@ const Social = (() => {
       if (!convo(sel).length) { const row = document.createElement("div"); row.className = "dim"; row.textContent = "Say hello!"; log.append(row); }
       log.scrollTop = 1e6;
     }
+    const link = inviteLink();
+    $s("fr-invite").hidden = !link;
+    $s("fr-invlink").value = link;
+    $s("fr-invtext").textContent = refInfo ? `When a new player joins with your link and plays for ${refInfo.play} minutes, you get ${refInfo.inv} denarii and they get ${refInfo.new}.` : "";
+    $s("fr-invstat").textContent = refInfo && refInfo.n ? `Friends who joined with your link: ${refInfo.n} (up to ${refInfo.max} earn you a bonus).` : "";
     const ol = $s("fr-online"); ol.replaceChildren();
     for (const p of online) li(ol, span(p.name), p.friend ? span("friend", "dim") : p.sent ? span("asked", "dim") : btn("Add friend", () => { send({ a: "req", fid: p.fid }); p.sent = true; render(); }));
     if (!online.length) li(ol, span("Nobody else with an account is online right now.", "dim"));
@@ -174,6 +194,17 @@ const Social = (() => {
   function bind() {
     $s("btn-friends").addEventListener("click", open);
     $s("fr-refresh").addEventListener("click", () => { notice = ""; send({ a: "online" }); });
+    $s("fr-invcopy").addEventListener("click", () => {
+      const link = inviteLink(); if (!link) return;
+      const done = () => toast("🎁 Invite link copied: send it to a friend");
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, () => { $s("fr-invlink").select(); toast("Press Ctrl+C (or Cmd+C) to copy the link"); });
+      else { $s("fr-invlink").select(); toast("Press Ctrl+C (or Cmd+C) to copy the link"); }
+    });
+    if (navigator.share) {
+      $s("fr-invshare").hidden = false;
+      $s("fr-invshare").addEventListener("click", () => { const link = inviteLink(); if (link) navigator.share({ title: "Time Machine", text: "Walk through Ancient Rome with me!", url: link }).catch(() => { /* cancelled */ }); });
+    }
+    $s("fr-invlink").addEventListener("focus", (e) => e.target.select());
     $s("fr-add").addEventListener("submit", (e) => { e.preventDefault(); const n = $s("fr-name").value.trim(); if (n) { send({ a: "req", name: n }); $s("fr-name").value = ""; } });
     $s("fr-form").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -187,5 +218,5 @@ const Social = (() => {
     load();
   }
 
-  return { unread: unreadTotal, bind, on, load, open, render, restore, snapshot, setRank, tier, rankText, get rank() { return { ...rank }; }, helloFriends: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name })), list: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name, online: !!f.online })) };
+  return { invCode, unread: unreadTotal, bind, on, load, open, render, restore, snapshot, setRank, tier, rankText, get rank() { return { ...rank }; }, helloFriends: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name })), list: () => [...friends.values()].map((f) => ({ fid: f.fid, name: f.name, online: !!f.online })) };
 })();

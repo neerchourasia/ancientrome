@@ -113,6 +113,10 @@ const I18n = (() => {
     ["Rent", "Alquiler", "Affitto", "किराया", "租金"],
     // friends, travel, work
     ["Your friends", "Tus amigos", "I tuoi amici", "आपके दोस्त", "你的好友"],
+    ["🎁 Invite a friend", "🎁 Invita a un amigo", "🎁 Invita un amico", "🎁 दोस्त को बुलाएँ", "🎁 邀请好友"],
+    ["Copy link", "Copiar enlace", "Copia link", "लिंक कॉपी करें", "复制链接"],
+    ["Share", "Compartir", "Condividi", "साझा करें", "分享"],
+    ["Your invite link", "Tu enlace de invitación", "Il tuo link di invito", "आपका निमंत्रण लिंक", "你的邀请链接"],
     ["Add a friend", "Añadir un amigo", "Aggiungi un amico", "दोस्त जोड़ें", "添加好友"],
     ["Send request", "Enviar solicitud", "Invia richiesta", "अनुरोध भेजें", "发送请求"],
     ["Who is online?", "¿Quién está en línea?", "Chi è online?", "कौन ऑनलाइन है?", "谁在线?"],

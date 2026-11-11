@@ -34,7 +34,7 @@ const Online = (() => {
     try { sock = new WebSocket(URL); } catch (e) { setMsg("Can't reach the game server."); return; }
     ws = sock;
     sock.onopen = () => {
-      send({ t: "hello", vid: visitorId(), token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon }, rank: Social.rank, friends: Social.helloFriends() });
+      send({ t: "hello", vid: visitorId(), token: accountToken(), name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon }, rank: Social.rank, friends: Social.helloFriends(), inv: Social.invCode() });
       clearInterval(pingT); pingT = setInterval(() => send({ t: "ping" }), 25000);
     };
     sock.onmessage = (e) => { let m = null; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") onMessage(m); };
@@ -62,7 +62,7 @@ const Online = (() => {
       case "shove_ok": toast(`You shoved ${m.name}`); noteKnock(); break;
       case "shove_no": toast(m.msg || "You could not shove them"); break;
       case "shove_fx": { const p = peers.get(m.id); if (p) p.down = 1.4; break; }
-      case "fr_gift": case "fr_gave": case "fr_invite": case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
+      case "ref": case "fr_gift": case "fr_gave": case "fr_invite": case "fr_state": case "fr_in": case "fr_added": case "fr_removed": case "fr_presence": case "fr_online": case "fr_msg": case "dm": case "top": Social.on(m); break;
       case "chat": Chat.add(m); break;
       case "chat_log": Chat.history(m.m); break;
       case "adminwho": Admin.showOnline(m.who || [], m); break;
