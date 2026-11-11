@@ -220,6 +220,10 @@ async def verify_token(token):
         user = await asyncio.to_thread(_http_json, CFG["supabase_url"] + "/auth/v1/user", hdr)
         if isinstance(user, dict) and user.get("id") and user.get("email"):
             USER_EMAIL[user["id"]] = str(user["email"])[:120]
+            try:                                                      # when the account was made (an invite only counts for a new account: see "invite a friend")
+                USER_CREATED[user["id"]] = datetime.datetime.strptime(str(user.get("created_at"))[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+            except ValueError:
+                pass
         return user.get("id") if isinstance(user, dict) else None
     except Exception:
         return None
@@ -3011,6 +3015,7 @@ JOURNEY_HITS = {}
 EVENTS = collections.deque(maxlen=1000)   # suspicious things that happened, newest last
 FLAG_GAP = {}                     # (kind, who) -> when it was last logged, so one troublemaker does not flood the list
 USER_EMAIL = {}                   # account id -> email, remembered from the login check so admins can see who is who
+USER_CREATED = {}                 # account id -> when the account was made (seconds), from the login check
 VISIT_HITS = {}
 AIR_VEH = {"plane", "glider", "gyro", "helicopter", "tiltrotor", "blimp", "balloon", "vlj", "lightjet", "midjet", "supermid", "heavyjet", "airliner", "b777x", "a350", "a380", "cargo", "fighter", "bomber", "transport", "b737max", "b787", "b777", "b767f", "bbj", "vc25", "b52", "kc46", "p8", "a220", "a320neo", "a321xlr", "a330neo", "a350f", "a400m", "a330mrtt", "f15ex", "superhornet", "growler", "f47", "typhoon", "mq25", "mq28", "littlebird", "h125", "h145", "h160", "nh90", "apache", "chinook"}
 
@@ -4044,6 +4049,61 @@ def mkt_mail(fid, **mail):
     world_soon()
 
 
+# ---------------------------------------------------------------- invite a friend: a link with ?inv=<your friend id> (the Friends panel shows it). A NEW account (made in the last 3 days) that arrives with the link
+# and then plays for 5 minutes earns a welcome bonus for itself and a bonus for the one who invited it, by mail like the market's (so it arrives even if the inviter is away). One bonus per new account,
+# never for inviting yourself, and an inviter earns it at most REF_DAY times a day and REF_MAX times in all (the invited player still gets the welcome bonus). Saved with the rest of the world.
+REF_INVITER, REF_NEW, REF_PLAY, REF_AGE, REF_MAX, REF_DAY, REFS_MAX = 250, 150, 300.0, 3 * 86400, 10, 3, 20000
+REFS = {}                  # friend id of the invited one -> {"by": friend id of the one who invited, "secs": seconds played so far, "paid": when the bonus was paid (0 = not yet), "got": did the inviter get one}
+
+
+def ref_count(by, since=0):
+    return sum(1 for r in REFS.values() if r["by"] == by and r.get("got") and r["paid"] >= since)
+
+
+def ref_join(conn, inv):
+    """The hello of a logged-in player carried an invite: 'new' (taken now), 'ok' (taken before) or 'no' (not allowed: not a new account, their own link...); None when there was none."""
+    inv = clean_fid(inv)
+    if not inv or not conn.fid:
+        return None
+    if conn.fid in REFS:
+        return "ok"
+    made = USER_CREATED.get(conn.uid)
+    if inv == conn.fid or not made or time.time() - made > REF_AGE or len(REFS) >= REFS_MAX:
+        return "no"
+    REFS[conn.fid] = {"by": inv, "secs": 0.0, "paid": 0, "got": False}
+    world_soon()
+    return "new"
+
+
+def ref_info(conn):
+    conn.send({"t": "ref", "a": "info", "n": ref_count(conn.fid), "max": REF_MAX, "inv": REF_INVITER, "new": REF_NEW, "play": int(REF_PLAY // 60)})
+
+
+def ref_tick(dt=30.0):
+    """Called every 30 seconds: an invited player who has been here long enough gets the bonus, and so does the one who invited them."""
+    t = time.time()
+    for c in list(CONNS):
+        r = REFS.get(c.fid) if c.hello and not c.closed and c.fid else None
+        if not r or r["paid"]:
+            continue
+        r["secs"] += dt
+        if r["secs"] < REF_PLAY:
+            continue
+        r["paid"] = t
+        r["got"] = ref_count(r["by"]) < REF_MAX and ref_count(r["by"], t - 86400) < REF_DAY
+        mkt_mail(c.fid, coins=REF_NEW, text="Your friend's invite worked: welcome bonus +%d denarii." % REF_NEW)
+        if r["got"]:
+            mkt_mail(r["by"], coins=REF_INVITER, text="%s joined with your invite link: +%d denarii." % (c.name, REF_INVITER))
+            for b in conns_of(r["by"]):
+                ref_info(b)
+
+
+async def ref_loop():
+    while True:
+        await asyncio.sleep(30)
+        ref_tick(30.0)
+
+
 def mkt_err(conn, text):
     conn.send({"t": "mkt", "a": "err", "text": text})
 
@@ -4584,16 +4644,18 @@ def on_guild(conn, a, m):
         city, kind = str(m.get("city", "")), str(m.get("kind", ""))
         if city not in BUILD_CITIES or kind not in BUILD_KINDS:
             return
-        key = "%s:%s" % (city, kind)
-        if key in BUILDS:
-            return social_msg(conn, "That has already been built.")
-        if g["treasury"] < BUILD_KINDS[kind]:
-            return social_msg(conn, "The treasury needs %d denarii for that." % BUILD_KINDS[kind])
-        g["treasury"] -= BUILD_KINDS[kind]
+        n = sum(1 for b in BUILDS.values() if b["city"] == city and b["kind"] == kind) + 1       # the first of a kind, then a second, a third ...
+        if n > BUILD_MAX:
+            return social_msg(conn, "Every one of those has been built here.")
+        key = build_key(city, kind, n)
+        cost = build_price(kind, n)
+        if g["treasury"] < cost:
+            return social_msg(conn, "The treasury needs %d denarii for that." % cost)
+        g["treasury"] -= cost
         col, emb = guild_look(g)
         gk = [k for k, v in GUILDS.items() if v is g][0]
-        BUILDS[key] = {"city": city, "kind": kind, "g": gk, "name": g["name"], "tag": g["tag"], "color": col, "emblem": emb, "t": int(time.time())}
-        guild_say(g, "%s paid %d denarii for a %s in %s for everyone to see." % (conn.name, BUILD_KINDS[kind], kind, city.title()))
+        BUILDS[key] = {"city": city, "kind": kind, "n": n, "g": gk, "name": g["name"], "tag": g["tag"], "color": col, "emblem": emb, "t": int(time.time())}
+        guild_say(g, "%s paid %d denarii for a %s in %s for everyone to see." % (conn.name, cost, kind, city.title()))
         world_soon()
         guild_push(g)
         return builds_broadcast()
@@ -4737,9 +4799,20 @@ def guild_say(g, text):
 
 
 # ---- public builds: a guild pays from its treasury for a landmark of its own in a city (a fountain, a lighthouse, an aqueduct, a statue, a garden, a triumphal arch), and everyone in that city sees it with the guild's banner and name.
-# One of each kind per city, built once. The leader buys it; the browsers draw it (builds.js) at a spot they all work out the same way. Saved with the rest of the world.
+# Up to BUILD_MAX of each kind per city (each costs more than the one before). The leader buys it; the browsers draw it (builds.js) at a spot they all work out the same way. Saved with the rest of the world.
 BUILD_KINDS = {"fountain": 2000, "lighthouse": 5000, "aqueduct": 8000, "statue": 3000, "garden": 4000, "arch": 12000}          # kind -> price in denarii from the guild's treasury
 BUILD_CITIES = ("rome", "delhi", "cancun", "beijing")
+BUILD_MAX = 4              # how many of one kind a city can have: the second costs half as much again as the first, the third twice as much, and so on
+
+
+def build_price(kind, n):
+    return int(BUILD_KINDS[kind] * (1 + 0.5 * (n - 1)))
+
+
+def build_key(city, kind, n):
+    return "%s:%s" % (city, kind) if n == 1 else "%s:%s:%d" % (city, kind, n)
+
+
 BUILDS = {}                # "city:kind" -> {"city", "kind", "g" (the guild's key), "name", "tag", "color", "emblem", "t"}
 
 
@@ -4750,8 +4823,8 @@ def builds_state():
         if g:                                                                          # (the guild's name and banner may have changed since)
             col, emb = guild_look(g)
             b.update(name=g["name"], tag=g["tag"], color=col, emblem=emb)
-        rows.append({k: b[k] for k in ("city", "kind", "name", "tag", "color", "emblem", "t")})
-    return {"t": "builds", "list": rows, "price": BUILD_KINDS}
+        rows.append({**{k: b[k] for k in ("city", "kind", "name", "tag", "color", "emblem", "t")}, "n": b.get("n", 1)})
+    return {"t": "builds", "list": rows, "price": BUILD_KINDS, "max": BUILD_MAX}
 
 
 def builds_broadcast():
@@ -6681,6 +6754,11 @@ async def handle_msg(conn, m):
                    "rank": public_rank(rating_of(conn)) if conn.uid else None})
         conn.send({"t": "chat_log", "m": list(CHAT_LOG)})
         weekly_deliver(conn)
+        joined = ref_join(conn, m.get("inv"))
+        if joined:
+            conn.send({"t": "ref", "a": joined})
+        if conn.fid:
+            ref_info(conn)
         return send_social(conn)
     if not conn.hello:
         return conn.send({"t": "error", "code": "hello", "msg": "Say hello first"})
@@ -7123,7 +7201,7 @@ def world_headers(extra=None):
 
 
 def world_snapshot():
-    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "builds": BUILDS, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON}
+    return {"guilds": {"guilds": GUILDS, "of": GUILD_OF, "week": GUILD_WEEK}, "stocks": STOCKS, "leaders": LEADERS, "market": MKT, "furn": FURN, "stalls": STALLS, "fstats": FSTATS, "events": EVENT_BEST, "pyramid": PYRAMID, "builds": BUILDS, "weekly": {"week": WEEKLY["week"], "scores": WEEKLY["scores"], "last": WEEKLY["last"], "prizes": PRIZES}, "stats": {"p": STATS, "replays": REPLAYS}, "notices": NOTICES, "tourneys": TOURNEYS, "tourney_auto": TOURNEY_AUTO, "hall": HALL, "daily": DAILY, "season": SEASON, "refs": REFS}
 
 
 def world_apply(rows):
@@ -7286,10 +7364,17 @@ def world_apply(rows):
     bd = rows.get("builds")
     if isinstance(bd, dict):
         BUILDS.clear()
-        for key, b in list(bd.items())[:100]:
-            if isinstance(b, dict) and b.get("city") in BUILD_CITIES and b.get("kind") in BUILD_KINDS and key == "%s:%s" % (b["city"], b["kind"]):
-                BUILDS[key] = {"city": b["city"], "kind": b["kind"], "g": str(b.get("g", ""))[:40], "name": class_clean(b.get("name"), 24), "tag": class_clean(b.get("tag"), 4),
+        for key, b in list(bd.items())[:200]:
+            bn = int(num(b.get("n") if isinstance(b, dict) else 1, 1, BUILD_MAX, 1))
+            if isinstance(b, dict) and b.get("city") in BUILD_CITIES and b.get("kind") in BUILD_KINDS and key == build_key(b["city"], b["kind"], bn):
+                BUILDS[key] = {"city": b["city"], "kind": b["kind"], "n": bn, "g": str(b.get("g", ""))[:40], "name": class_clean(b.get("name"), 24), "tag": class_clean(b.get("tag"), 4),
                                "color": int(num(b.get("color"), 0, GUILD_LOOKS - 1, 0)), "emblem": int(num(b.get("emblem"), 0, GUILD_LOOKS - 1, 0)), "t": int(num(b.get("t"), 0, 4e9, 0))}
+    rf = rows.get("refs")
+    if isinstance(rf, dict):
+        REFS.clear()
+        for fid, v in list(rf.items())[:REFS_MAX]:
+            if clean_fid(fid) and isinstance(v, dict) and clean_fid(v.get("by")):
+                REFS[fid] = {"by": v["by"], "secs": num(v.get("secs"), 0, REF_PLAY, 0.0), "paid": num(v.get("paid"), 0, 4e9, 0), "got": bool(v.get("got"))}
     py = rows.get("pyramid")
     if isinstance(py, dict):
         PYRAMID.update({"blocks": int(num(py.get("blocks"), 0, PYR_NEED - 1, 0)), "done": int(num(py.get("done"), 0, 1e6, 0)), "who": py.get("who") if isinstance(py.get("who"), dict) else {}})
@@ -7374,6 +7459,7 @@ async def serve(host="0.0.0.0", port=None):
     srv = await asyncio.start_server(handle_http, host, CFG["port"] if port is None else port, limit=2 ** 16)
     asyncio.ensure_future(matchmaker())
     asyncio.ensure_future(world_loop())
+    asyncio.ensure_future(ref_loop())
     if world_on():
         await world_load()
         asyncio.ensure_future(world_save_loop())

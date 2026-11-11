@@ -2374,9 +2374,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         seen = await guest.until(lambda m: m["t"] == "builds" and m["list"])                           # everybody is told, guests too
         self.assertEqual([(b["city"], b["kind"], b["name"], b["tag"]) for b in seen["list"]], [("rome", "fountain", "Red Eagles", "EAD")])
         self.assertEqual(server.GUILDS["red eagles"]["treasury"], 7000)
-        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})                  # once only
-        self.assertIn("already", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
-        self.assertEqual(server.GUILDS["red eagles"]["treasury"], 7000)
+        ann.send({"t": "social", "a": "g_build", "city": "rome", "kind": "fountain"})                  # a second one costs half as much again
+        await guest.until(lambda m: m["t"] == "builds" and len(m["list"]) == 2)
+        self.assertEqual(server.GUILDS["red eagles"]["treasury"], 4000)
+        self.assertEqual(sorted(server.BUILDS), ["rome:fountain", "rome:fountain:2"])
         ann.send({"t": "social", "a": "g_build", "city": "delhi", "kind": "aqueduct"})                 # 8000 > 7000
         self.assertIn("8000", (await ann.until(lambda m: m["t"] == "fr_msg"))["msg"])
         ann.send({"t": "social", "a": "g_look", "color": 3, "emblem": 4})                              # the banner follows the guild's look
@@ -2386,7 +2387,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         snap = json.loads(json.dumps(server.world_snapshot()))
         server.BUILDS.clear()
         server.world_apply(snap)
-        self.assertEqual(list(server.BUILDS), ["rome:fountain"])                                       # and it is saved
+        self.assertEqual(sorted(server.BUILDS), ["rome:fountain", "rome:fountain:2"])                   # and it is saved
         server.world_apply({"builds": {"rome:fountain": {"city": "rome", "kind": "palace"}, "x:y": {}}})
         self.assertEqual(server.BUILDS, {})                                                            # (nonsense is ignored)
 
@@ -3755,6 +3756,60 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("mars", m["placed"])
         cy.send({"t": "social", "a": "f_get", "fid": fa})
         self.assertEqual((await cy.until(lambda m: m["t"] == "furn"))["a"], "none")
+
+    async def test_invite_a_friend_pays_both_after_the_new_player_has_played(self):
+        server.MKT["mail"].clear(); server.REFS.clear(); server.USER_CREATED.clear()
+        self.addCleanup(lambda: (server.MKT["mail"].clear(), server.REFS.clear(), server.USER_CREATED.clear()))
+        self.accounts("ann", "bob", "cy", "old")
+        fa = server.fid_of("u-ann")
+        server.USER_CREATED.update({"u-bob": time.time() - 3600, "u-cy": time.time() - 3600, "u-old": time.time() - 30 * 86400, "u-ann": time.time() - 3600})
+
+        async def join(name, token, inv):
+            ws = await WS.connect(self.port)
+            self.clients.append(ws)
+            ws.send({"t": "hello", "name": name, "cls": "gladiator", "token": token, "look": {}, "inv": inv})
+            await ws.until(lambda m: m["t"] == "welcome")
+            return ws
+        ann = await join("Ann", "ann", "")
+        info = await ann.until(lambda m: m["t"] == "ref" and m["a"] == "info")
+        self.assertEqual((info["n"], info["inv"], info["new"]), (0, server.REF_INVITER, server.REF_NEW))
+        # a new account arrives with Ann's link: taken, but nothing is paid until it has played a while
+        bob = await join("Bob", "bob", fa)
+        self.assertEqual((await bob.until(lambda m: m["t"] == "ref" and m["a"] != "info"))["a"], "new")
+        server.ref_tick(30.0)
+        self.assertNotIn(fa, server.MKT["mail"])
+        for _ in range(int(server.REF_PLAY // 30)):
+            server.ref_tick(30.0)
+        got = await bob.until(lambda m: m["t"] == "mkt" and m["a"] == "mail")
+        self.assertEqual(got["mail"]["coins"], server.REF_NEW)
+        mail = await ann.until(lambda m: m["t"] == "mkt" and m["a"] == "mail")
+        self.assertEqual(mail["mail"]["coins"], server.REF_INVITER)
+        self.assertIn("Bob", mail["mail"]["text"])
+        self.assertEqual((await ann.until(lambda m: m["t"] == "ref" and m["a"] == "info" and m["n"] == 1))["n"], 1)
+        for _ in range(20):                                                       # (paid once only)
+            server.ref_tick(30.0)
+        self.assertEqual(len(server.MKT["mail"][fa]), 1)
+        # an old account and one's own link earn nothing
+        old = await join("Old", "old", fa)
+        self.assertEqual((await old.until(lambda m: m["t"] == "ref" and m["a"] != "info"))["a"], "no")
+        me = await join("Ann2", "ann", fa)
+        self.assertEqual((await me.until(lambda m: m["t"] == "ref" and m["a"] != "info"))["a"], "no")
+        self.assertNotIn(server.fid_of("u-old"), server.REFS)
+        # the inviter earns at most REF_DAY times a day; the new players still get their welcome bonus
+        server.USER_CREATED["u-cy"] = time.time() - 60
+        server.REFS.update({"f%011x" % i: {"by": fa, "secs": 0.0, "paid": time.time() - 60, "got": True} for i in range(server.REF_DAY - 2)})
+        cy = await join("Cy", "cy", fa)
+        await cy.until(lambda m: m["t"] == "ref" and m["a"] == "new")
+        for _ in range(int(server.REF_PLAY // 30)):
+            server.ref_tick(30.0)
+        await cy.until(lambda m: m["t"] == "mkt" and m["a"] == "mail")
+        self.assertTrue(server.REFS[server.fid_of("u-cy")]["got"])
+        self.assertEqual(server.ref_count(fa, time.time() - 86400), server.REF_DAY)
+        # saved with the world and loaded back
+        saved = json.loads(json.dumps(server.world_snapshot()["refs"]))
+        server.REFS.clear()
+        server.world_apply({"refs": saved})
+        self.assertEqual(server.REFS[server.fid_of("u-bob")]["by"], fa)
 
     async def test_guestbook_gifts_and_parties_between_friends(self):
         server.FURN.clear(); server.PARTIES.clear(); server.LEFT.clear(); server.MKT["mail"].clear()

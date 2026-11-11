@@ -19,16 +19,19 @@ const Builds = (() => {
   const lam = (c) => new T.MeshLambertMaterial({ color: c });
   const $b = (id) => document.getElementById(id);
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
-  let list = [], price = { fountain: 2000, lighthouse: 5000, aqueduct: 8000 }, scene = null, shown = [], sites = {}, shownKey = "", asked = "", askT = 0, siteT = 1.5, clock = 0;
+  const sid = (kind, n) => (n > 1 ? `${kind}#${n}` : kind);                       // (the spot of the first of a kind, and of its second, third ...)
+  const cost = (kind, n) => Math.round(price[kind] * (1 + 0.5 * (n - 1)));        // a second of a kind costs half as much again, a third twice as much ...
+  let max = 4, list = [], price = { fountain: 2000, lighthouse: 5000, aqueduct: 8000 }, scene = null, shown = [], sites = {}, shownKey = "", asked = "", askT = 0, siteT = 1.5, clock = 0;
 
   // ---- where a build stands: the first clear patch near its sight (the same answer for everybody)
   function pickSites(c) {
     const saved = dynBlockers.map((d) => d.on); dynBlockers.forEach((d) => { d.on = false; });               // (only the buildings and walls of the city count, not cars or people)
     const out = {}, taken = [];
     try {
-      for (const kind of Object.keys(KINDS)) {
+      for (const [kind, n] of Object.keys(KINDS).flatMap((k) => Array.from({ length: max }, (_, i) => [k, i + 1]))) {
         let pick = null, first = null;
-        for (const id of SIGHT[c][kind]) {
+        const cands = SIGHT[c][kind].map((_, i, a) => a[(i + n - 1) % a.length]);                         // (each copy starts from the next sight)
+        for (const id of cands) {
           const lm = ALL_LANDMARKS.find((l) => l.id === id); if (!lm) continue;
           const [bx, bz] = lm.stand || [lm.x, lm.z], g0 = groundAt(bx, bz);
           first = first || [bx + 12, bz + 12];
@@ -43,7 +46,7 @@ const Builds = (() => {
           }
           if (pick) break;
         }
-        out[kind] = pick || first || [0, 0]; taken.push(out[kind]);
+        out[sid(kind, n)] = pick || first || [0, 0]; taken.push(out[sid(kind, n)]);
       }
     } finally { dynBlockers.forEach((d, i) => { d.on = saved[i]; }); }
     return out;
@@ -147,7 +150,7 @@ const Builds = (() => {
     const here = list.filter((b) => b.city === city && KINDS[b.kind]), at = sites[city];
     shownKey = key(); if (!at) return;
     for (const b of here) {
-      const p = at[b.kind]; if (!p) continue;
+      const p = at[sid(b.kind, b.n || 1)]; if (!p) continue;
       const g = MAKE[b.kind](b); g.position.set(p[0], groundAt(p[0], p[1]), p[1]); scene.add(g);
       const r = b.kind === "lighthouse" ? 2.6 : b.kind === "fountain" ? 3.6 : b.kind === "statue" ? 2.2 : b.kind === "arch" ? 1.9 : 1.4, dyn = [];
       const circles = b.kind === "aqueduct" ? [-16.8, -8.4, 0, 8.4, 16.8].map((dx) => [p[0] + dx, p[1]]) : b.kind === "garden" ? [] : b.kind === "arch" ? [[p[0] - 4.6, p[1]], [p[0] + 4.6, p[1]]] : [[p[0], p[1]]];      // (the aqueduct's piers; you can walk through its arches)
@@ -155,7 +158,7 @@ const Builds = (() => {
       shown.push({ g, b, dyn });
     }
   }
-  const key = () => `${city}|${list.filter((b) => b.city === city).map((b) => `${b.kind}${b.name}${b.color}${b.emblem}`).join(",")}|${sites[city] ? 1 : 0}`;
+  const key = () => `${city}|${list.filter((b) => b.city === city).map((b) => `${b.kind}${b.n || 1}${b.name}${b.color}${b.emblem}`).join(",")}|${sites[city] ? 1 : 0}`;
 
   function update(dt) {
     if (!scene || typeof started === "undefined" || !started) return;
@@ -175,7 +178,7 @@ const Builds = (() => {
     }
   }
 
-  function heard(m) { list = Array.isArray(m.list) ? m.list.filter((b) => b && KINDS[b.kind] && SIGHT[b.city]) : []; if (m.price) price = m.price; if ($b("buildspanel") && $b("buildspanel").classList.contains("show")) render(); }
+  function heard(m) { list = Array.isArray(m.list) ? m.list.filter((b) => b && KINDS[b.kind] && SIGHT[b.city]) : []; if (m.price) price = m.price; if (m.max) max = m.max; if ($b("buildspanel") && $b("buildspanel").classList.contains("show")) render(); }
 
   // ---- the panel
   function render() {
@@ -189,16 +192,22 @@ const Builds = (() => {
     for (const c of [city, ...Object.keys(SIGHT).filter((x) => x !== city)]) {
       const sec = el("div", undefined, "bd-city"); sec.append(el("h3", `${tr(names[c])}${c === city ? " · " + tr("you are here") : ""}`));
       for (const kind of Object.keys(KINDS)) {
-        const row = el("div", undefined, "bd-row"), b = list.find((x) => x.city === c && x.kind === kind);
-        row.append(el("span", `${KINDS[kind].icon} ${tr(KINDS[kind].name)}`, "bd-name"));
-        if (b) {
-          row.append(el("small", `${EMBLEMS[b.emblem % 8] || "🛡"} [${b.tag}] ${b.name}`));
-          if (c === city && sites[city] && sites[city][kind]) { const go = el("button", tr("Directions")); go.type = "button"; go.addEventListener("click", () => { const p = sites[city][kind]; closePanels(); startDirections({ name: `${tr(KINDS[kind].name)} [${b.tag}]`, stand: [p[0] + 6, p[1] + 6] }); }); row.append(go); }
-        } else if (lead) {
-          const can = mine.treasury >= price[kind], bt = el("button", `${tr("Build")} · ${price[kind].toLocaleString()}`); bt.type = "button"; bt.disabled = !can;
-          bt.addEventListener("click", () => Dialog.confirm(`${tr("Build the")} ${tr(KINDS[kind].name).toLowerCase()} ${tr("in")} ${tr(names[c])} ${tr("for")} ${price[kind].toLocaleString()} ${tr("denarii from the treasury")}?`).then((yes) => { if (yes) Online.navalSend({ t: "social", a: "g_build", city: c, kind }); }));
+        const have = list.filter((x) => x.city === c && x.kind === kind).sort((p, q) => (p.n || 1) - (q.n || 1));
+        for (const b of have) {                                                  // the ones already built
+          const n = b.n || 1, row = el("div", undefined, "bd-row");
+          row.append(el("span", `${KINDS[kind].icon} ${tr(KINDS[kind].name)}${n > 1 ? " #" + n : ""}`, "bd-name"), el("small", `${EMBLEMS[b.emblem % 8] || "🛡"} [${b.tag}] ${b.name}`));
+          if (c === city && sites[city] && sites[city][sid(kind, n)]) { const go = el("button", tr("Directions")); go.type = "button"; go.addEventListener("click", () => { const p = sites[city][sid(kind, n)]; closePanels(); startDirections({ name: `${tr(KINDS[kind].name)} [${b.tag}]`, stand: [p[0] + 6, p[1] + 6] }); }); row.append(go); }
+          sec.append(row);
+        }
+        const n = have.length + 1;
+        if (n > max) continue;                                                   // (all of them are built)
+        const row = el("div", undefined, "bd-row"), pr = cost(kind, n);
+        row.append(el("span", `${KINDS[kind].icon} ${tr(KINDS[kind].name)}${n > 1 ? " #" + n : ""}`, "bd-name"));
+        if (lead) {
+          const can = mine.treasury >= pr, bt = el("button", `${tr(n > 1 ? "Build another" : "Build")} · ${pr.toLocaleString()}`); bt.type = "button"; bt.disabled = !can;
+          bt.addEventListener("click", () => Dialog.confirm(`${tr("Build the")} ${tr(KINDS[kind].name).toLowerCase()}${n > 1 ? " #" + n : ""} ${tr("in")} ${tr(names[c])} ${tr("for")} ${pr.toLocaleString()} ${tr("denarii from the treasury")}?`).then((yes) => { if (yes) Online.navalSend({ t: "social", a: "g_build", city: c, kind }); }));
           row.append(el("small", can ? "" : tr("the treasury is too small")), bt);
-        } else row.append(el("small", `${tr("Not built yet")} · ${price[kind].toLocaleString()} ${tr("denarii")}`));
+        } else row.append(el("small", `${tr(n > 1 ? "Room for another" : "Not built yet")} · ${pr.toLocaleString()} ${tr("denarii")}`));
         sec.append(row);
       }
       parts.push(sec);
