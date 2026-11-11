@@ -319,6 +319,7 @@ function wireInput(canvas) {
   $("#start").addEventListener("click", () => { if (Account.loggedIn || !Account.configured) begin(); else Account.gate(begin); });
   for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
   for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startDemo()) begin(); else Account.gate(begin); });
+  for (const e of document.querySelectorAll("#intro [data-offline]")) { e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startOffline()) begin(); }); if (navigator.onLine === false) e.classList.remove("ghost"); }      // (no internet: this is the one that works)
   $("#demo-login").addEventListener("click", () => Account.open());
   $("#hd-close").addEventListener("click", closePanels); $("#hd-print").addEventListener("click", () => window.print()); $("#hunt-hud").addEventListener("click", () => Hunt.reopen());
   // class mode: a teacher's link (classmode.js) starts the game at once, with no login; the options in the link are applied once the student has made a character
