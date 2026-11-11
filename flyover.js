@@ -31,7 +31,7 @@ const Flyover = (() => {
     bar.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.9);color:#f4ead6;border:1px solid #e2b955;border-radius:12px;padding:10px 14px;font:600 .85rem system-ui,sans-serif;display:none;flex-direction:column;gap:6px;align-items:center;max-width:94vw;text-align:center";
     nameEl = document.createElement("strong"); nameEl.style.cssText = "font:700 1.05rem Georgia,serif;color:#e2b955";
     subEl = document.createElement("span"); subEl.style.cssText = "opacity:.85";
-    const help = document.createElement("small"); help.style.cssText = "opacity:.7;font-weight:500"; help.textContent = tr("Drag to look · wheel: closer or higher · Space: hover here or go on · W A S D glide, E up, Q down · Esc to land");
+    const help = document.createElement("small"); help.style.cssText = "opacity:.7;font-weight:500"; help.textContent = tr("Drag to look · W A S D fly where you look, E up, Q down, Shift faster · wheel: closer, or faster · Space: hover or tour · Esc to land");
     const row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px";
     const mk = (label, f) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.style.cssText = "font:inherit;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#ffd24a;color:#2a2118"; b.addEventListener("click", f); row.append(b); return b; };
     toggleBtn = mk("", () => toggle()); mk(tr("⌂ Land"), () => stop());
@@ -87,7 +87,7 @@ const Flyover = (() => {
   }
   function toggle() {
     if (!active) return;
-    if (auto) { auto = false; phase = "free"; caption(); toast(tr("Hovering. W A S D glide, E up, Q down, drag to look. Space goes on with the tour.")); }
+    if (auto) { auto = false; phase = "free"; caption(); toast(tr("You are flying yourself. W A S D fly where you look, E up, Q down, Shift faster. Space goes on with the tour.")); }
     else {
       auto = true; let best = 0, bd = 1e12; stops.forEach((s, i) => { const d = Math.hypot(s.lm.x - cx, s.lm.z - cz); if (d < bd) { bd = d; best = i; } });
       offY = offP = 0; glideTo(best);
@@ -122,6 +122,7 @@ const Flyover = (() => {
     if (!active) return;
     if (city !== "rome" || era !== "ancient") { stop(); return; }                      // (K switched the era, or you travelled)
     dt = Math.min(dt, 0.1); clock += dt;
+    if (auto && ["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "KeyQ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].some((k) => keys.has(k))) toggle();       // (press a movement key on the tour and you are flying: no need to stop it first)
     if (auto) {
       t += dt;
       let look;
@@ -140,12 +141,12 @@ const Flyover = (() => {
       yaw += wrap(want.yaw + offY - yaw) * k; pitch += (want.pitch + offP - pitch) * k;
       if (!dragging) { offY *= Math.max(0, 1 - dt * 0.7); offP *= Math.max(0, 1 - dt * 0.7); }                          // (what you looked round at eases back to the sight)
     } else {
-      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx, sp = 34 * zoom * (keys.has("ShiftLeft") ? 2.5 : 1);
+      const cp = Math.cos(pitch), fx = -Math.sin(yaw) * cp, fz = -Math.cos(yaw) * cp, fy = Math.sin(pitch), rx = Math.cos(yaw), rz = -Math.sin(yaw), sp = 34 * zoom * (keys.has("ShiftLeft") ? 2.5 : 1);      // (W and S go where you look, up and down too; A and D go sideways)
       let mx = 0, mz = 0, my = 0;
-      if (keys.has("KeyW") || keys.has("ArrowUp")) { mx += fx; mz += fz; } if (keys.has("KeyS") || keys.has("ArrowDown")) { mx -= fx; mz -= fz; }
+      if (keys.has("KeyW") || keys.has("ArrowUp")) { mx += fx; mz += fz; my += fy * 1.6; } if (keys.has("KeyS") || keys.has("ArrowDown")) { mx -= fx; mz -= fz; my -= fy * 1.6; }
       if (keys.has("KeyD") || keys.has("ArrowRight")) { mx += rx; mz += rz; } if (keys.has("KeyA") || keys.has("ArrowLeft")) { mx -= rx; mz -= rz; }
       if (keys.has("KeyE")) my += 1; if (keys.has("KeyQ")) my -= 1;
-      cx += mx * sp * dt; cz += mz * sp * dt; cy += my * 22 * dt;
+      cx += mx * sp * dt; cz += mz * sp * dt; cy += my * 22 * Math.max(1, zoom) * dt;
       cx = Math.max(BOUNDS.minX + 5, Math.min(BOUNDS.maxX - 5, cx)); cz = Math.max(BOUNDS.minZ + 5, Math.min(BOUNDS.maxZ - 5, cz));
       cy = Math.max(groundHere(cx, cz) + 35, Math.min(groundHere(cx, cz) + 420, cy));
     }
