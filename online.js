@@ -15,7 +15,9 @@ const Online = (() => {
   let duel = null;
   let raceSendT = 0;
 
-  const send = (obj) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+  // a game played in this browser against bots (localgames.js): while it runs, what the screens send goes to it instead of the game server
+  let local = null, lastLocal = "";
+  const send = (obj) => { if (local) { local.on(obj); return; } if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
   const accountToken = () => (typeof Account !== "undefined" ? Account.token() : null);
 
   // ------------------------------------------------------------------ connection
@@ -42,7 +44,7 @@ const Online = (() => {
       if (ws !== sock) return;
       ws = null; welcome = null; waiting = false; clearInterval(pingT); clearPeers();
       if (typeof Ride !== "undefined") Ride.lost();
-      if (typeof Mini !== "undefined" && Mini.active) Mini.lost();
+      if (typeof Mini !== "undefined" && Mini.active && !local) Mini.lost();
       if (duel) endFight("The connection to the game server was lost.", "Disconnected");
       else if (Race.isOnline()) Race.stop();
       else if (Naval.isOnline()) Naval.stop();
@@ -97,7 +99,7 @@ const Online = (() => {
       case "error": waiting = false; setMsg(m.msg || "Something went wrong."); if (m.code === "name") { toast(m.msg || "That name is not allowed."); if (mode === "walk" && typeof openCreator === "function") openCreator(false); } break;
       case "watch": Mini.onWatch(m); break;
       case "cheer": Mini.onCheer(m); break;
-      case "match": waiting = false; setMsg(""); if (m.watch) { if (m.mode === "ball") toCity("cancun"); else if (m.mode === "dragon") toCity("beijing"); Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { if (!(m.mode === "xiangqi" && typeof Shopkeep !== "undefined" && Shopkeep.seated)) toCity("beijing"); Mini.start(m); }          // (xiangqi at a tavern table is played where you sit) else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
+      case "match": waiting = false; setMsg(""); if (!local) lastLocal = ""; if (m.watch) { if (m.mode === "ball") toCity("cancun"); else if (m.mode === "dragon") toCity("beijing"); Mini.start(m); break; } if (m.mode === "dragon" || m.mode === "xiangqi") { if (!(m.mode === "xiangqi" && typeof Shopkeep !== "undefined" && Shopkeep.seated)) toCity("beijing"); /* (a xiangqi game at a tavern table is played where you sit) */ Mini.start(m); } else if (m.mode === "ball") { toCity("cancun"); Mini.start(m); } else if (m.mode === "kushti" || m.mode === "kites") Mini.start(m); else if ((m.mode === "wushu" ? toCity("beijing") : toCity("rome")), m.mode === "race" || m.mode === "derby") Race.startOnline(m); else if (m.mode === "naval") Naval.startOnline(m); else startFight(m); break;
       case "duel": case "coop": case "arena": onFight(m); break;
       case "mini": Mini.on(m); break;
       case "dragon": Mini.onDragon(m); break;
@@ -215,16 +217,19 @@ const Online = (() => {
     if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
     send({ t: "queue", mode: "wushu", bot: true, practice: true });
   }
-  function playDragon() {
-    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("The dragon boat race needs the game server, so it needs an account: log in first.")); return; }
-    if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
-    send({ t: "queue", mode: "dragon", bot: true, practice: true });
+  // The dragon boat race (against three practice crews) and pok-ta-pok (against a practice bot) are played in this browser, like the fights in the Colosseum: no game server, no login, and they start at once
+  // (localgames.js has the rooms). Real people are played through the PvP menu, which needs the server.
+  function startLocal(kind) {
+    if (local || waiting || typeof LocalGames === "undefined") return;
+    const room = LocalGames.make(kind, { name: Character.name || "Player", cls: Character.cls, look: { ...Character.look, acc: Market.worn, pet: Market.pet, weapon: Market.weapon } }, (m) => { lastLocal = kind; onMessage(m); }, () => { if (local === room) local = null; });
+    if (!room) return;
+    local = room; lastLocal = kind;
+    room.begin();
   }
-  function playBall() {
-    if (typeof Account !== "undefined" && Account.demo) { toast(Account.why("Pok-ta-pok needs the game server, so it needs an account: log in first.")); return; }
-    if (!welcome) { connect(); toast("Connecting to the game server... press F again in a moment."); return; }
-    send({ t: "queue", mode: "ball", bot: true, practice: true });      // a practice game against a bot at once (play real people from the PvP menu)
-  }
+  const playDragon = () => startLocal("dragon");
+  const playBall = () => startLocal("ball");
+  // "Play again" after a game: another practice game when the last one was played here, otherwise the lobby
+  function playAgain(kind) { if (lastLocal === kind && (kind === "ball" || kind === "dragon")) startLocal(kind); else openLobby(); }
 
   function queue(game) {
     if (!welcome) { connect(); return; }
@@ -719,5 +724,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, classReport, atBallCourt, playBall, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, classReport, atBallCourt, playBall, playAgain, localRoom: () => local, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

@@ -394,7 +394,7 @@ const Mini = (() => {
     cleanup();
     showResult(rank === 1 ? "You won the dragon boat race!" : `You finished ${ords[rank] || "last"}`, `${table}. ${me0 && me0.strokes ? `${me0.perfect} of your ${me0.strokes} strokes were right on the beat.` : ""}${prize ? ` Prize: +${prize} denarii.` : ""}`, [
       ...(res.rp ? [{ label: "Watch the replay", fn: () => { closePanels(); send({ t: "replay", id: res.rp }); } }] : []),
-      { label: "Race again", fn: () => { closePanels(); Online.openLobby(); } },
+      { label: "Race again", fn: () => { closePanels(); Online.playAgain("dragon"); } },
       { label: "Close", fn: closePanels },
     ]);
   }
@@ -500,7 +500,7 @@ const Mini = (() => {
     cleanup();
     showResult(draw ? "A draw" : won ? "Victory!" : "Defeat", `${why}${prize ? ` Prize: +${prize} denarii.` : ""}${ladder}`, [
       ...(res.rp ? [{ label: "Watch the replay", fn: () => { closePanels(); send({ t: "replay", id: res.rp }); } }] : []),
-      { label: "Play again", fn: () => { closePanels(); Online.openLobby(); } },
+      { label: "Play again", fn: () => { closePanels(); Online.playAgain(kind); } },
       { label: "Close", fn: closePanels },
     ]);
     return kind;
