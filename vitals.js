@@ -30,7 +30,7 @@ const Vitals = (() => {
     get coins() { return s.coins; }, set coins(v) {
       v = Math.max(0, Math.round(v));
       // the demo cannot earn past its limit (it never takes away what a browser already holds)
-      if (v > s.coins && typeof Account !== "undefined" && Account.demo && !Account.classMode && !Account.offline && v > Account.DEMO_COINS) { v = Math.max(s.coins, Account.DEMO_COINS); Account.demoCapped(); }
+      if (v > s.coins && typeof Account !== "undefined" && Account.demo && !Account.classMode && v > Account.DEMO_COINS) { v = Math.max(s.coins, Account.DEMO_COINS); Account.demoCapped(); }
       s.coins = v;
     },
     get resting() { return resting; },

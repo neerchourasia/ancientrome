@@ -30,9 +30,7 @@ const Account = (() => {
   // Logging in is required whenever accounts are switched on: until someone is logged in, the account screen sits over the game and cannot be closed.
   let gateOpen = false, gateDone = null, leaving = false;
   // The demo: play without an account. Nothing is saved to an account and the online parts (other players, chat, friends) stay off until someone logs in.
-  // OFFLINE: 📴 Play offline on the front page (no login, no internet, no time limit and no limit on denarii): the game is saved in this browser (localStorage) and only the parts that need the game server or
-  // the account (other players, chat, friends, the market, the cloud save) are off. The game's own files are kept by the offline copy in the browser (sw.js) once the page has been opened online one time.
-  let demo = false, demoOver = false, demoTimer = 0, capNoted = 0, classMode = false, offline = false;
+  let demo = false, demoOver = false, demoTimer = 0, capNoted = 0, classMode = false;
   const DEMO_MS = 10 * 60 * 1000, DEMO_COINS = 1000, DEMO_KEY = "rome-demo-end";
   const GATE_TEXT = "You need an account to play. Log in, or create one in a few seconds: your game is saved to it and follows you to any device.";
   const DEMO_OVER_TEXT = "Your demo has ended. Log in, or create a free account in a few seconds, to keep playing: your game is saved to it and follows you to any device.";
@@ -60,7 +58,7 @@ const Account = (() => {
 
   function storeSession(s) {
     session = s;
-    if (s) { demo = false; demoOver = false; offline = false; clearInterval(demoTimer); }
+    if (s) { demo = false; demoOver = false; clearInterval(demoTimer); }
     try {
       const keep = remember ? localStorage : sessionStorage, other = remember ? sessionStorage : localStorage;
       if (s) { keep.setItem(SESSION_KEY, JSON.stringify(s)); other.removeItem(SESSION_KEY); } else { localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); }
@@ -456,14 +454,6 @@ const Account = (() => {
     $a("demo-text").textContent = t; $a("demo-login").hidden = true; $a("btn-account").hidden = true; bar.hidden = false;
     return true;
   }
-  function startOffline() {
-    demo = true; offline = true; classMode = false; demoOver = false; clearInterval(demoTimer);
-    const T = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t), bar = $a("demo-bar");
-    $a("demo-text").textContent = T("Offline: no internet needed · saved on this computer only · other players are off");
-    $a("demo-login").textContent = T("Log in (needs internet)"); bar.hidden = false;
-    renderAccount();
-    return true;
-  }
   function demoCapped() {
     if (Date.now() - capNoted < 20000) return;
     capNoted = Date.now();
@@ -535,10 +525,9 @@ const Account = (() => {
   }
 
   return {
-    configured, bind, open, saveNow, gate, startDemo, startClass, startOffline, demoCapped, DEMO_COINS,
-    get offline() { return offline && !session; },
+    configured, bind, open, saveNow, gate, startDemo, startClass, demoCapped, DEMO_COINS,
     get classMode() { return classMode && !session; },
-    why: (text) => (offline && !session ? (typeof I18n !== "undefined" ? I18n.t("This needs the internet, so it is off in offline mode.") : "This needs the internet, so it is off in offline mode.") : classMode ? (typeof I18n !== "undefined" ? I18n.t("Other players and the game server are off in class mode.") : "Other players and the game server are off in class mode.") : text),
+    why: (text) => (classMode ? (typeof I18n !== "undefined" ? I18n.t("Other players and the game server are off in class mode.") : "Other players and the game server are off in class mode.") : text),
     get demo() { return demo && !session; },
     get locked() { return gateOpen && configured && !session; },
     token: () => (session && session.expires_at - Date.now() / 1000 > 5 ? session.access_token : null),

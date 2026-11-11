@@ -298,11 +298,5 @@
     ["Hovering. W A S D glide, E up, Q down, drag to look. Space goes on with the tour.", "Flotando. W A S D deslizar, E subir, Q bajar, arrastra para mirar. Espacio sigue con el recorrido.|In volo fermo. W A S D plana, E su, Q giù, trascina per guardare. Spazio prosegue la visita.|तैर रहे हैं। W A S D सरकिए, E ऊपर, Q नीचे, देखने के लिए खींचिए। Space से सैर जारी रहती है।|悬停中。W A S D 滑行,E 上升,Q 下降,拖动查看。空格继续游览。"],
   ];
   for (const [en, t] of W8) add(en, t);
-  const W9 = [
-    ["📴 Play offline", "📴 Jugar sin conexión|📴 Gioca offline|📴 ऑफ़लाइन खेलिए|📴 离线游玩"], ["or play offline, no internet needed", "o juega sin conexión, sin internet|oppure gioca offline, senza internet|या ऑफ़लाइन खेलिए, इंटरनेट की ज़रूरत नहीं|或者离线游玩,不需要网络"],
-    ["Offline: no internet needed · saved on this computer only · other players are off", "Sin conexión: no necesita internet · se guarda solo en este ordenador · los otros jugadores están apagados|Offline: non serve internet · salvato solo su questo computer · gli altri giocatori sono spenti|ऑफ़लाइन: इंटरनेट की ज़रूरत नहीं · केवल इसी कंप्यूटर पर सहेजा जाता है · दूसरे खिलाड़ी बंद हैं|离线:不需要网络 · 只保存在这台电脑上 · 其他玩家已关闭"],
-    ["Log in (needs internet)", "Iniciar sesión (necesita internet)|Accedi (serve internet)|लॉग इन (इंटरनेट चाहिए)|登录(需要网络)"], ["This needs the internet, so it is off in offline mode.", "Esto necesita internet, así que está apagado sin conexión.|Serve internet, quindi in modalità offline è spento.|इसके लिए इंटरनेट चाहिए, इसलिए ऑफ़लाइन मोड में यह बंद है।|这需要网络,所以离线模式下不可用。"],
-  ];
-  for (const [en, t] of W9) add(en, t);
   I18n.add(rows);
 })();
