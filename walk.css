@@ -1047,3 +1047,7 @@ body.midfilm::after { content: ""; position: fixed; inset: 0; z-index: 1; pointe
 #dig-canvas { display: block; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 10px; border: 2px solid rgba(226,185,85,.5); touch-action: none; cursor: crosshair; background: #5a4630; }
 .dg-hint { display: block; margin-top: 6px; opacity: .8; }
 #digpanel h3 { margin: 12px 0 6px; font-size: 1rem; }
+/* more than one guild */
+#gd-switch { flex-wrap: wrap; }
+#gd-switch button.on, #gd-back.on { background: var(--gold); color: #2a2118; }
+#gd-back { margin-bottom: 6px; }

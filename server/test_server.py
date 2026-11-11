@@ -2435,6 +2435,42 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ambushed = int(500 * 0.34)
         self.assertEqual(g["treasury"] - before, rome_cancun + delhi_beijing + ambushed)
 
+    async def test_a_player_can_be_in_up_to_three_guilds_and_switch_between_them(self):
+        server.GUILDS.clear(); server.GUILD_OF.clear()
+        self.addCleanup(lambda: (server.GUILDS.clear(), server.GUILD_OF.clear()))
+        self.accounts("ann", "bob")
+        ann, bob = await self.player("Ann", token="ann"), await self.player("Bob", token="bob")
+        ann.send({"t": "social", "a": "g_make", "name": "Red Eagles", "tag": "ead"})
+        await ann.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_make", "name": "Blue Wolves", "tag": "wlf"})
+        await bob.until(lambda m: m["t"] == "guild" and m["g"])
+        bob.send({"t": "social", "a": "g_make", "name": "Green Lions", "tag": "lio"})                   # Bob can found a second one
+        two = await bob.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["name"] == "Green Lions")
+        self.assertEqual([(a["name"], a["on"]) for a in two["g"]["all"]], [("Blue Wolves", False), ("Green Lions", True)])
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})                                 # and join a third
+        three = await bob.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["name"] == "Red Eagles")
+        self.assertEqual(len(three["g"]["all"]), 3)
+        ann.send({"t": "social", "a": "g_say", "text": "hello eagles"})
+        bob.send({"t": "social", "a": "g_join", "name": "Red Eagles"})                                 # not twice
+        self.assertIn("already", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        server.GUILDS["red eagles"]["treasury"] = 0
+        bob.send({"t": "social", "a": "g_make", "name": "Gold Bears", "tag": "ber"})                   # a fourth is too many
+        self.assertIn("3 guilds", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        bob.send({"t": "social", "a": "g_switch", "name": "Blue Wolves"})                              # open another one
+        sw = await bob.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["name"] == "Blue Wolves")
+        self.assertEqual([a["on"] for a in sw["g"]["all"]], [False, True, False])
+        self.assertEqual(server.active_key(server.GUILDS["blue wolves"]["leader"]), "blue wolves")
+        ann.send({"t": "social", "a": "g_say", "text": "still here"})                                  # a message in Red Eagles does not replace what Bob has open
+        await ann.until(lambda m: m["t"] == "guild" and m["g"] and any(c.get("text") == "still here" for c in m["g"]["chat"]))
+        bob.send({"t": "social", "a": "g_switch", "name": "Nowhere"})
+        self.assertIn("not in that guild", (await bob.until(lambda m: m["t"] == "fr_msg"))["msg"])
+        bob.send({"t": "social", "a": "g_leave"})                                                      # leaving the open one opens another of his
+        after = await bob.until(lambda m: m["t"] == "guild" and m["g"] and m["g"]["name"] != "Blue Wolves")
+        self.assertEqual(len(after["g"]["all"]), 2)
+        self.assertEqual(len(server.guild_keys_of(next(iter(server.GUILDS["red eagles"]["members"])))), 1)
+        server.GUILD_OF.clear()                                                                        # (the open guild is worked out again after a restart)
+        self.assertIn(server.active_key(next(f for f in server.GUILDS["green lions"]["members"])), ("green lions", "red eagles"))
+
     # ---------------------------------------------------------------- the bulletin boards
 
     async def test_notice_board_post_list_delete_and_limits(self):
