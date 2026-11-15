@@ -28,7 +28,11 @@ try { const saved = localStorage.getItem("rome-era"); if (saved === "modern") er
 function init() {
   const canvas = $("#view");
   const LOW = !!(window.CLASSMODE && CLASSMODE.low);                                       // light graphics for slow computers (perf.js)
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW });
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW }); }
+  catch (e) {                                                                                    // (the computer would not start 3D: one more try with the lightest settings; if that fails too, boot.js says what to do)
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "default", stencil: false });
+    if (window.CLASSMODE) CLASSMODE.low = true;
+  }
   renderer.setPixelRatio(LOW ? Math.min(devicePixelRatio, 1) * 0.75 : Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = !LOW;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
