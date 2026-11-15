@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Is this computer ready?</title>
+  <style>
+    :root { --bg: #1c1610; --ink: #f1ead8; --muted: #c9bd9f; --gold: #e2b955; --card: #2a2118; --line: rgba(226,185,85,.35); --ok: #8fd49a; --bad: #f0a090; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    main { max-width: 680px; margin: 0 auto; padding: 28px 16px 56px; }
+    h1 { margin: 0 0 6px; font: 700 1.8rem Georgia, serif; }
+    .muted { color: var(--muted); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
+    .verdict { font-size: 1.2rem; font-weight: 700; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    td:first-child { width: 48%; color: var(--muted); }
+    a, button { color: var(--gold); }
+    button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
+    ol { padding-left: 22px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Is this computer ready?</h1>
+  <p class="muted">Open this page on the computer and in the browser you will use for the game. It checks that the browser can draw 3D graphics (WebGL), which the game needs.</p>
+  <div class="card"><div class="verdict" id="verdict">Checking...</div><div id="advice" style="margin-top:8px"></div></div>
+  <div class="card"><table><tbody id="rows"></tbody></table></div>
+  <p><a href="./">← Back to the game</a></p>
+  <button type="button" id="copy">Copy this report</button> <span id="msg" class="muted" role="status"></span>
+</main>
+<script src="check.js?v=559"></script>
+</body>
+</html>
