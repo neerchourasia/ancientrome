@@ -1,0 +1,17 @@
+{
+  "name": "Time Machine: Walk Ancient Rome, Delhi, Cancún and Beijing",
+  "short_name": "Time Machine",
+  "description": "A free 3D time-travel game in your browser. Walk Rome, Delhi, Cancún and Beijing as they were and as they are today.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1c1610",
+  "theme_color": "#1c1610",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
