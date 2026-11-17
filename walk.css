@@ -1077,3 +1077,13 @@ body:not(.touch) .top-right .buttons { left: 166px; bottom: 53px; max-width: min
 body:not(.touch) #card { left: auto; right: 14px; top: 12px; bottom: auto; transform: translateY(-12px); max-height: calc(100vh - 150px); overflow-y: auto; }
 body:not(.touch) #card.show { transform: none; }
 @media (max-width: 900px) { body:not(.touch) #card { top: 56px; width: min(360px, calc(100vw - 28px)); } }
+
+/* EVERY button looks like the Directions button: the green-to-blue gradient, dark text, a white edge and a soft shadow (not the menu ball, the close crosses, the touch controls, or buttons that carry their own colour, like colour chips) */
+button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled), .in-btn, .in-btn.ghost, #start {
+  background: var(--grad) !important; color: #06232a !important; border: 1.5px solid rgba(255,255,255,.92) !important; border-radius: 10px; font-weight: 700; box-shadow: 0 2px 9px rgba(0,0,0,.4);
+}
+button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled) kbd { border-color: rgba(0,0,0,.4); color: #06232a; }
+button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):hover, .in-btn:hover, #start:hover { filter: brightness(1.1) saturate(1.1); }
+/* the one that is chosen or switched on: a bright ring */
+button.on, button.active, button[aria-pressed="true"], .mgroup.open > .mh { box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(56,189,248,.9) !important; }
+button:disabled { background: #2a3d44 !important; color: #86a0a6 !important; border: 1.5px solid rgba(255,255,255,.18) !important; box-shadow: none; cursor: default; }
