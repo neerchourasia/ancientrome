@@ -1418,13 +1418,13 @@ function hungerWarn() {
 let lastCoins = Vitals.coins;
 function updateVitalsHud() {
   $("#v-hp").style.width = `${Vitals.hp}%`;
-  $("#v-hp").style.background = Vitals.hp < Vitals.MIN_FIGHT_HP ? "#c0392b" : Vitals.hp < 65 ? "#e2b955" : "#3aa557";
+  $("#v-hp").style.background = Vitals.hp < Vitals.MIN_FIGHT_HP ? "var(--bar-low)" : Vitals.hp < 65 ? "var(--bar-mid)" : "var(--bar-ok)";
   $("#v-hunger").style.width = `${Vitals.hunger}%`;
-  $("#v-hunger").style.background = Vitals.hunger <= 15 ? "#c0392b" : Vitals.hunger < 40 ? "#e2b955" : "#3aa557";
+  $("#v-hunger").style.background = Vitals.hunger <= 15 ? "var(--bar-low)" : Vitals.hunger < 40 ? "var(--bar-mid)" : "var(--bar-ok)";
   $("#v-hunger-n").textContent = `Food ${Math.round(Vitals.hunger)}`;
   hungerWarn();
   $("#v-horse").style.width = `${Vitals.horses}%`;
-  $("#v-horse").style.background = Vitals.horses < Vitals.MIN_RACE_HORSES ? "#c0392b" : Vitals.horses < 65 ? "#e2b955" : "#3aa557";
+  $("#v-horse").style.background = Vitals.horses < Vitals.MIN_RACE_HORSES ? "var(--bar-low)" : Vitals.horses < 65 ? "var(--bar-mid)" : "var(--bar-ok)";
   if (Vitals.coins > lastCoins) Sfx.play("coin");
   lastCoins = Vitals.coins;
   $("#v-coins").textContent = Vitals.coins;

@@ -531,7 +531,7 @@ const Race = (() => {
     if (me) {
       el("race-pace").textContent = `Speed ${me.pace}/${PACES.length}: ${PACES[me.pace - 1].name}${me.cruise ? " (cruise)" : ""}${me.tired ? " (tired)" : ""}${me.slowT > 0 ? " (SLOWED)" : ""} · ${CAM_NAMES[camMode]} cam`;
       el("race-horse").style.width = `${me.horse}%`;
-      el("race-horse").style.background = me.tired ? "#c0392b" : me.horse < 35 ? "#e2b955" : "#3aa557";
+      el("race-horse").style.background = me.tired ? "var(--bar-low)" : me.horse < 35 ? "var(--bar-mid)" : "var(--bar-ok)";
     }
     el("race-lap").textContent = derby ? `Derby: ${cars.filter((c) => !c.out).length} of ${cars.length} chariots left` : `Lap ${lapOf(focus)} / ${LAPS}`;
     el("race-speed").textContent = `${Math.round(focus.v * 3.6)} km/h`;

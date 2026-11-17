@@ -4,7 +4,7 @@
   --muted: #a6c2c6;
   --gold: #3ec97c;                                                              /* (the accent: green; the name is from the old gold) */
   --grad: linear-gradient(115deg, #ffe066 0%, #a6e35c 22%, #3ec97c 44%, #38bdf8 72%, #5b8def 100%);   /* the soft green-to-blue gradient of buttons, bars and badges */
-  --grad-soft: linear-gradient(115deg, rgba(127,227,196,.22), rgba(62,201,124,.16) 30%, rgba(56,189,248,.18) 65%, rgba(91,141,239,.22));
+  --bar-ok: linear-gradient(90deg, #3ec97c, #38bdf8); --bar-mid: linear-gradient(90deg, #ffe066, #f5b82e); --bar-low: linear-gradient(90deg, #ff8a7a, #d6202f); --grad-soft: linear-gradient(115deg, rgba(127,227,196,.22), rgba(62,201,124,.16) 30%, rgba(56,189,248,.18) 65%, rgba(91,141,239,.22));
   --red: #b3262b;
   --green: #4fa462;
 }
@@ -196,8 +196,8 @@ body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(scr
 #fight-hud .bars { display: grid; gap: 4px; }
 #fight-hud .bar, #race-hud .bar { height: 12px; margin-top: 3px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; overflow: hidden; }
 #fight-hud .bar.hp { height: 16px; }
-#foe-fill { height: 100%; width: 100%; background: #c0392b; transition: width .15s; }
-#hp-fill { height: 100%; width: 100%; background: #3aa557; transition: width .15s; }
+#foe-fill { height: 100%; width: 100%; background: var(--bar-low); transition: width .15s; }
+#hp-fill { height: 100%; width: 100%; background: var(--bar-ok); transition: width .15s; }
 #st-fill { height: 100%; width: 100%; background: #3ec97c; }
 #race-stam { height: 100%; width: 100%; background: #3ec97c; }
 #race-hud .stats { position: absolute; top: 90px; left: 16px; width: 180px; padding: 10px 12px; background: var(--panel); border-radius: 10px; text-shadow: none; }
@@ -225,7 +225,7 @@ body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(scr
 #duel-hud strong { display: block; font: 700 1.05rem Georgia, serif; color: var(--gold); margin-bottom: 4px; }
 #duel-hud .wb { margin-top: 6px; font-size: .85rem; }
 #duel-hud .bar { height: 10px; margin-top: 3px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; }
-#da-fill, #db-fill { height: 100%; width: 100%; background: #3aa557; transition: width .2s; }
+#da-fill, #db-fill { height: 100%; width: 100%; background: var(--bar-ok); transition: width .2s; }
 #watch-keys { display: none; position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 14px; background: var(--panel); border-radius: 999px; font-size: .82rem; white-space: nowrap; max-width: 96vw; overflow: hidden; text-overflow: ellipsis; }
 #watch-keys.show { display: block; }
 #race-hud.watching #race-bar, #race-hud.watching #race-horse-bar, #race-hud.watching #race-pace, #race-hud.watching #race-keys { display: none; }
@@ -238,7 +238,7 @@ body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(scr
 #naval-hud .stats > span { display: block; font-size: .9rem; }
 #naval-hud .lbl { margin-top: 6px; color: var(--muted); }
 #naval-hud .bar { height: 12px; margin-top: 3px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; overflow: hidden; }
-#nv-hull { height: 100%; width: 100%; background: #3aa557; transition: width .2s; }
+#nv-hull { height: 100%; width: 100%; background: var(--bar-ok); transition: width .2s; }
 #naval-hud .cool { display: flex; gap: 6px; margin-top: 8px; }
 #naval-hud .cool span { flex: 1; text-align: center; padding: 3px 4px; font-size: .75rem; border-radius: 6px; background: rgba(120,40,30,.7); color: var(--muted); }
 #naval-hud .cool span.ready { background: #2f6b3a; color: #fff; }
@@ -260,7 +260,7 @@ body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(scr
 #fatal button { font: inherit; padding: 4px 14px; border-radius: 6px; border: 1px solid #fff; background: transparent; color: #fff; cursor: pointer; }
 #race-hud .stats #race-pace { font-size: .8rem; color: var(--muted); margin-top: 2px; }
 #race-horse-bar { margin-top: 4px; }
-#race-horse { height: 100%; width: 100%; background: #3aa557; transition: width .2s, background .2s; }
+#race-horse { height: 100%; width: 100%; background: var(--bar-ok); transition: width .2s, background .2s; }
 #race-hud .keys { max-width: 96vw; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- colosseum programme ---------- */
@@ -276,7 +276,7 @@ body.photo > *:not(#view):not(#photo-bar):not(#photo-flash):not(#dialog):not(scr
 #vitals #v-hunger { transition: width .9s ease, background-color .9s ease, filter .4s; }
 #vitals #v-hunger.ate { filter: brightness(1.6); }
 #vitals .bar { flex: 1; height: 9px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; overflow: hidden; }
-#v-hp, #v-horse, #v-hunger { height: 100%; width: 100%; background: #3aa557; transition: width .3s, background .3s; }
+#v-hp, #v-horse, #v-hunger { height: 100%; width: 100%; background: var(--bar-ok); transition: width .3s, background .3s; }
 #vitals .coins b { color: var(--gold); font-size: .95rem; }
 #v-rest { margin: 2px 0 0; color: var(--gold); text-align: center; min-height: 1em; }
 
@@ -430,8 +430,8 @@ body.creating .top-right, body.creating .top-left, body.creating .top-center, bo
 .od-p { flex: 1; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 .od-p.foe { text-align: right; }
 .od-p .bar { height: 14px; margin-top: 3px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 7px; overflow: hidden; }
-#od-me-hp { height: 100%; width: 100%; background: #3aa557; }
-#od-foe-hp { height: 100%; width: 100%; background: #c0392b; margin-left: auto; }
+#od-me-hp { height: 100%; width: 100%; background: var(--bar-ok); }
+#od-foe-hp { height: 100%; width: 100%; background: var(--bar-low); margin-left: auto; }
 .od-bottom { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(460px, 92vw); text-align: center; }
 .od-st { height: 10px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; }
 #od-st { height: 100%; width: 100%; background: #d8b04a; }
@@ -468,7 +468,7 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 #od-team { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
 .od-chip { min-width: 90px; font-size: .78rem; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.9); text-align: center; }
 .od-chip .bar { height: 7px; margin-top: 2px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); border-radius: 4px; overflow: hidden; }
-.od-chip .bar div { height: 100%; width: 100%; background: #3aa557; }
+.od-chip .bar div { height: 100%; width: 100%; background: var(--bar-ok); }
 .od-chip.down { opacity: .5; }
 #od-note { position: absolute; top: 130px; left: 50%; transform: translateX(-50%); margin: 0; max-width: 92vw; text-align: center; font-weight: 700; color: #ffe29a; text-shadow: 0 1px 4px rgba(0,0,0,.95); }
 #online-hud:not(.coop) #od-team { display: none; }
@@ -1094,3 +1094,10 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
   box-shadow: 0 0 12px rgba(255,64,64,.9); animation: redpulse 1.2s ease-in-out infinite;
 }
 @keyframes redpulse { 50% { box-shadow: 0 0 22px rgba(255,64,64,1); transform: scale(1.04); } }
+
+/* the status box (bottom right): the same cool look as the buttons */
+#vitals { border: 1.5px solid rgba(255,255,255,.35); box-shadow: 0 2px 12px rgba(0,0,0,.4); }
+#vitals .bar { border-color: rgba(255,255,255,.5); }
+#vitals .coins b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800; }
+#v-rest { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
+#v-tax.warn { color: #ffe066; }
