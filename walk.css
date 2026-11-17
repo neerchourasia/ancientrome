@@ -1067,3 +1067,9 @@ body.midfilm::after { content: ""; position: fixed; inset: 0; z-index: 1; pointe
 .np-date { display: block; text-align: center; opacity: .75; border-bottom: 2px double rgba(226,185,85,.6); padding-bottom: 6px; margin-bottom: 8px; }
 .np-head { font-size: 1.15rem; margin: 6px 0; }
 .np-line { margin: 4px 0; font-size: .9rem; }
+
+/* the map and the sight card have swapped places on a computer: the round map sits above the menu button (bottom left) and the card about the sight you are at is where the map used to be (top right) */
+body:not(.touch) #minimap { position: fixed; left: 8px; bottom: 124px; z-index: 5; }
+body:not(.touch) #card { left: auto; right: 14px; top: 12px; bottom: auto; transform: translateY(-12px); max-height: calc(100vh - 150px); overflow-y: auto; }
+body:not(.touch) #card.show { transform: none; }
+@media (max-width: 900px) { body:not(.touch) #card { top: 56px; width: min(360px, calc(100vw - 28px)); } }
