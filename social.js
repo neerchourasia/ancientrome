@@ -19,7 +19,7 @@ const Social = (() => {
   const INV = "rome-inv";
   try {
     const q = new URLSearchParams(location.search).get("inv");
-    if (/^[0-9a-f]{12}$/.test(q || "") && !(typeof CLASSMODE !== "undefined" && CLASSMODE.on) && !localStorage.getItem(INV)) localStorage.setItem(INV, q);
+    if (/^[0-9a-f]{12}$/.test(q || "") && !localStorage.getItem(INV)) localStorage.setItem(INV, q);
   } catch (e) { /* storage unavailable */ }
   const invCode = () => { try { return localStorage.getItem(INV) || ""; } catch (e) { return ""; } };
   const inviteLink = () => (myFid ? `${location.origin}/?inv=${myFid}` : "");

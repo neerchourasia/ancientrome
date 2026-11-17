@@ -923,36 +923,17 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 #tape-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 12; display: flex; gap: 6px; align-items: center; background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.55); border-radius: 999px; padding: 6px 12px; }
 #tape-bar button { min-width: 40px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 #tape-bar .tp-time { margin-left: 6px; font-variant-numeric: tabular-nums; color: #fff3cf; font-size: .9rem; }
-#class-latin.on { background: #fff; border-color: #fff; }
-#hunt-hud { position: fixed; left: 12px; top: 176px; z-index: 4; max-width: 300px; padding: 8px 12px; font-size: .85rem; color: var(--ink); background: rgba(28,22,16,.88); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; cursor: default; }
-#hunt-hud[hidden] { display: none; }
-#hunt-hud ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
-#hunt-hud li.got { color: #8fd49a; }
 #hd-body p { margin: 6px 0; font-size: 1.05rem; }
 .hd-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 2px; }
 #huntdone .dbtns button { font: 700 .95rem inherit; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold); }
 @media print { body > *:not(#huntdone) { display: none !important; } #huntdone { position: static !important; display: block !important; } #huntdone .dclose, #huntdone .dbtns { display: none !important; } }
 
-.class-code { margin-top: 14px; display: grid; gap: 6px; justify-items: start; font-size: .95rem; }
-.class-code label { font-weight: 700; }
-.cc-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.class-code input { font: 600 1rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 9px 12px; width: 15em; max-width: 100%; border-radius: 8px; border: 1px solid rgba(226,185,85,.5); background: rgba(20,16,11,.85); color: var(--ink, #f1ead8); }
-.class-code button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 0; border-radius: 8px; color: #2a2118; background: var(--gold, #e2b955); }
-#class-code-msg { color: #f0a090; min-height: 1.2em; }
 
 .ac-google { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; font: 600 .95rem system-ui; cursor: pointer; padding: 10px 14px; border: 1px solid #dadce0; border-radius: 8px; color: #3c4043; background: #fff; }
 .ac-google:hover { background: #f7f8f8; }
 .ac-or { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: .85rem; opacity: .8; }
 .ac-or::before, .ac-or::after { content: ""; flex: 1; border-top: 1px solid rgba(255,255,255,.25); }
 
-#class-msg { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 30; max-width: min(640px, 92vw); display: flex; gap: 8px; align-items: flex-start; padding: 12px 16px; font-size: 1.05rem; color: #2a2118; background: var(--gold, #e2b955); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
-#class-msg[hidden], #class-board[hidden], #class-pause[hidden] { display: none; }
-#class-msg::before { content: "📣"; }
-#class-msg button { margin-left: auto; font: 700 1.1rem system-ui; background: transparent; border: 0; cursor: pointer; color: inherit; }
-#class-pause { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; text-align: center; color: var(--ink, #f1ead8); background: rgba(20,16,11,.82); backdrop-filter: blur(3px); font: 700 1.5rem system-ui; }
-#class-pause span { font-size: 4rem; display: block; } #class-pause p { margin: 6px 0; } #class-pause small { font-weight: 400; font-size: 1rem; color: var(--muted, #c9bd9f); }
-#class-board { position: fixed; left: 12px; bottom: 64px; z-index: 4; max-width: 260px; padding: 8px 12px; font-size: .85rem; color: var(--ink, #f1ead8); background: rgba(28,22,16,.9); border: 1px solid rgba(226,185,85,.5); border-radius: 10px; }
-#class-board h3 { margin: 0 0 4px; font-size: .95rem; } #class-board ol { list-style: none; margin: 2px 0 6px; padding: 0; } #class-board li.me { font-weight: 700; color: #8fd49a; }
 
 .wd-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .wd-list li { padding: 5px 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; }
@@ -1002,7 +983,6 @@ html[lang="zh"] body, html[lang="zh"] button, html[lang="zh"] select, html[lang=
 .tour-opt small { opacity: .8; }
 .tour-opt ul { margin: 2px 0 6px 18px; padding: 0; font-size: .88rem; }
 .tour-go { justify-self: start; }
-#hunt-hud:not([hidden]) ~ #tour-hud { top: 330px; }
 
 /* photo missions (photomissions.js) */
 #photo-bar { flex-wrap: wrap; justify-content: center; max-width: 92vw; border-radius: 18px; }

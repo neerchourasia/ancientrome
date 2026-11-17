@@ -1,12 +1,12 @@
 "use strict";
 // Light graphics for slow computers (a school laptop, an old Chromebook). Light mode draws the picture at three quarters of the size, with no shadows and no edge smoothing, a shorter view distance and
-// fewer people, which on a slow graphics chip can double the frame rate. It is on when the link has low=1 (class.html has a box for it), when the browser remembers it (rome-low), or when the game notices
+// fewer people, which on a slow graphics chip can double the frame rate. It is on when the link has low=1, when the browser remembers it (rome-low), or when the game notices
 // it is running slowly: under 20 frames a second for two checks of four seconds each. The game then says so and starts again in light mode (class mode keeps the student's progress across the restart,
 // because it lives in the tab). The button in the menu (⚡ Graphics) and in the class bar switches it by hand, either way. Light mode is decided when the page loads (the renderer is made then), so
-// switching reloads the page. Depends on classmode.js (CLASSMODE.low) and game.js (toast).
+// switching reloads the page. Depends on options.js (GAMEOPTS.low) and game.js (toast).
 
 const Perf = (() => {
-  const low = () => !!(window.CLASSMODE && CLASSMODE.low);
+  const low = () => !!(window.GAMEOPTS && GAMEOPTS.low);
   let acc = 0, frames = 0, slow = 0, off = false, offered = false;
   const remember = (on) => { try { localStorage.setItem("rome-low", on ? "1" : "0"); } catch (e) { /* storage unavailable */ } };
 
@@ -26,7 +26,7 @@ const Perf = (() => {
   }
   const label = () => (low() ? "⚡ Light graphics: on" : "⚡ Light graphics: off");
   function bind() {
-    for (const id of ["btn-gfx", "class-low"]) {
+    for (const id of ["btn-gfx"]) {
       const b = document.getElementById(id); if (!b) continue;
       b.textContent = label();
       b.addEventListener("click", () => { off = true; set(!low()); });

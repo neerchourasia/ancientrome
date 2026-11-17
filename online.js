@@ -400,34 +400,26 @@ const Online = (() => {
   }
   // Tell the game server that someone opened the site (once per page load): the admins' visitor list shows when, what kind of device, and the character name if there is one
   function visit() {
-    if (!URL || !visitorId() || classroom()) return;
+    if (!URL || !visitorId()) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
     try { fetch(`${http}/visit?v=${visitorId()}&n=${encodeURIComponent(Character.exists ? Character.name : "")}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   // Tell the game server a few things the visitor did on this visit (the admins' User journey): short lines like "went to Delhi", no chat and nothing typed
   function journey(sid, events) {
-    if (!URL || !visitorId() || !events.length || classroom()) return;
+    if (!URL || !visitorId() || !events.length) return;
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
     try { fetch(`${http}/journey?v=${visitorId()}&s=${sid}&n=${encodeURIComponent(Character.exists ? Character.name : "")}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   // Is this name allowed? The game server checks (and asks an AI as well, when it has one); if it cannot be reached the name is let through here and checked when you connect
-  const classroom = () => typeof CLASSMODE !== "undefined" && CLASSMODE.on;       // class mode (classmode.js): nothing is sent to the game server, not even a character's name
   async function checkName(name) {
-    if (!URL || classroom()) return { ok: true };
+    if (!URL) return { ok: true };
     const http = URL.replace(/^ws/, "http").replace(/\/play$/, ""), ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
     try {
       const r = await fetch(`${http}/name?n=${encodeURIComponent(name)}`, { signal: ctl.signal });
       return r.ok ? await r.json() : { ok: true };
     } catch (e) { return { ok: true }; } finally { clearTimeout(timer); }
-  }
-
-  // In class mode the one thing sent to the game server is the class report, when the teacher has switched on watching (classreport.js): a name the student chose and what the game knows of their progress
-  function classReport(cid, sid, name, data, events, done) {
-    if (!URL || !/^[0-9a-f]{8}$/.test(cid || "")) return;
-    const http = URL.replace(/^ws/, "http").replace(/\/play$/, "");
-    try { fetch(`${http}/class/report?c=${cid}&s=${sid}&n=${encodeURIComponent(name)}&d=${encodeURIComponent(JSON.stringify(data))}&e=${encodeURIComponent(JSON.stringify(events))}`, { keepalive: true }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && done) done(j); }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   function walkTick(dt) {
@@ -726,5 +718,5 @@ const Online = (() => {
 
   function leaveGame() { send({ t: "leave" }); }
 
-  return { bind, connect, classReport, atBallCourt, playBall, playAgain, localRoom: () => local, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
+  return { bind, connect, atBallCourt, playBall, playAgain, localRoom: () => local, atDock, playDragon, atWushu, playWushu, atXiangqi, playXiangqi, checkName, journey, openLobby, queue, update, swing, leave, leaveGame, raceTick, navalSend: send, ladderText, poseMine, walkTick, peersUpdate, get connected() { return !!ws && ws.readyState === 1 && !!welcome; }, peerList: () => [...peers.values()], shovePeer, get inDuel() { return !!duel; }, peek: () => duel, get available() { return !!URL; } };
 })();

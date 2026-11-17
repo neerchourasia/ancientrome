@@ -1,7 +1,7 @@
 "use strict";
 // The Latin word journal: 📖 Latin words in the menu. With Latin names on (latin.js) and in ancient Rome, every Latin word you meet is written in your journal with its English meaning: the words of the
 // sights you walk up to (forum, amphitheatrum...), of the shops you walk into (pistrinum, caupona...), of what the keepers say, and of the shopkeeper's menu (emere, vendere...). The journal lists the
-// words you have met (and shows the English of each, or hides it so you can test yourself), and the teacher's dashboard counts them. Kept in the browser (rome-words). The Latin is the author's own
+// words you have met (and shows the English of each, or hides it so you can test yourself). Kept in the browser (rome-words). The Latin is the author's own
 // and is to be checked by a Latin teacher (see latin.js): the meanings are the usual dictionary ones. Depends on latin.js, game.js (toast, openPanel) and shopkeep.js/interiors.js (they call it).
 
 const Journal = (() => {

@@ -27,11 +27,11 @@ try { const saved = localStorage.getItem("rome-era"); if (saved === "modern") er
 
 function init() {
   const canvas = $("#view");
-  const LOW = !!(window.CLASSMODE && CLASSMODE.low);                                       // light graphics for slow computers (perf.js)
+  const LOW = !!(window.GAMEOPTS && GAMEOPTS.low);                                       // light graphics for slow computers (perf.js)
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW }); }
   catch (e) {                                                                                    // (the computer would not start 3D: one more try with the lightest settings; if that fails too, boot.js says what to do)
     renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "default", stencil: false });
-    if (window.CLASSMODE) CLASSMODE.low = true;
+    if (window.GAMEOPTS) GAMEOPTS.low = true;
   }
   renderer.setPixelRatio(LOW ? Math.min(devicePixelRatio, 1) * 0.75 : Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = !LOW;
@@ -326,28 +326,7 @@ function wireInput(canvas) {
   for (const e of document.querySelectorAll("#intro [data-enter]")) e.addEventListener("click", (ev) => { ev.preventDefault(); $("#start").click(); });
   for (const e of document.querySelectorAll("#intro [data-demo]")) e.addEventListener("click", (ev) => { ev.preventDefault(); if (Account.startDemo()) begin(); else Account.gate(begin); });
   $("#demo-login").addEventListener("click", () => Account.open());
-  $("#hd-close").addEventListener("click", closePanels); $("#hd-print").addEventListener("click", () => window.print()); $("#hunt-hud").addEventListener("click", () => Hunt.reopen());
-  // class mode: a teacher's link (classmode.js) starts the game at once, with no login; the options in the link are applied once the student has made a character
-  if (window.CLASSMODE && CLASSMODE.on) {
-    Account.startClass(CLASSMODE); begin();
-    const ll = $("#class-low"); if (ll) ll.hidden = false;
-    const lb = $("#class-latin");
-    if (lb) { lb.hidden = false; lb.classList.toggle("on", Latin.on); lb.addEventListener("click", () => { Latin.set(!Latin.on); lb.classList.toggle("on", Latin.on); }); }
-    let tries = 0;
-    const iv = setInterval(() => {
-      if (++tries > 600) { clearInterval(iv); return; }
-      if (!started || !Character.exists || creatorOpen) return;
-      clearInterval(iv);
-      const sight = CLASSMODE.at ? ALL_LANDMARKS.find((l) => l.id === CLASSMODE.at && !l.game) : null;
-      if (CLASSMODE.era !== periodNow()) setPeriod(CLASSMODE.era);                         // (the era in the link, whatever this tab had before)
-      if (sight && sight.only && sight.only !== era) setPeriod(sight.only);                // (a sight that exists in only one era)
-      const home = sight ? (sight.id.startsWith("d-") ? "delhi" : sight.id.startsWith("c-") ? "cancun" : sight.id.startsWith("b-") ? "beijing" : "rome") : CLASSMODE.city;
-      if (home !== "rome") arriveIn(home, null);
-      if (sight) setTimeout(() => placeAt(sight.stand[0], sight.stand[1], 0), 800);         // (after the city has been built)
-      if (CLASSMODE.hour !== null) { Time.set(CLASSMODE.hour); sky.setHour(Time.hour, true); }
-      if (CLASSMODE.hunt.length) Hunt.start(CLASSMODE.hunt);
-    }, 500);
-  }
+  $("#hd-close").addEventListener("click", closePanels); $("#hd-print").addEventListener("click", () => window.print());
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   Challenge.bind();
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
@@ -1932,7 +1911,7 @@ function tick(dt) {
   Doors.update(dt);
   Interiors.update(dt);
   Shopkeep.update(dt);
-  Hunt.update(dt); Challenge.update(dt);
+  Challenge.update(dt);
   Tour.update(dt); Builds.update(dt); PeriodBuildings.update(dt); MountHire.update(dt); Dig.update(dt); Workshops.update(dt);
   Crowd.update(dt, clock);
   renderer.render(scene, camera);
@@ -1941,7 +1920,6 @@ function tick(dt) {
 }
 
 function loop(now) {
-  if (window.CLASS_PAUSED) { last = now; requestAnimationFrame(loop); return; }                       // the teacher has paused the class (classreport.js): the game stands still
   if (typeof Perf !== "undefined") Perf.frame((now - last) / 1000);                                  // (is this computer too slow? perf.js)
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now; clock += dt;

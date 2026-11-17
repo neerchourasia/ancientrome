@@ -10,7 +10,6 @@ const Challenge = (() => {
   const PERIODS = ["ancient", "mid", "modern"];
   const $c = (id) => document.getElementById(id);
   const tr = (t) => (typeof I18n !== "undefined" && I18n.t ? I18n.t(t) : t);
-  const classroom = () => !!(window.CLASSMODE && CLASSMODE.on);
   const lm = (id) => ALL_LANDMARKS.find((l) => l.id === id && !l.home && !l.game);
   const homeOf = (id) => (id.startsWith("d-") ? "delhi" : id.startsWith("c-") ? "cancun" : id.startsWith("b-") ? "beijing" : "rome");
   const clean = (s) => String(s || "").replace(/[^\p{L}\p{N} _.\-]/gu, "").trim().slice(0, 16);
@@ -24,7 +23,7 @@ const Challenge = (() => {
     return { id, per, cx, cz, ct: Number.isFinite(ct) ? Math.max(0, Math.min(36000, ct)) : 0, by: clean(q.get("cb")) };
   }
   let pending = null;
-  if (!classroom()) {
+  {
     try {
       const p = fromQuery(new URLSearchParams(location.search));
       if (p) {
@@ -105,7 +104,6 @@ const Challenge = (() => {
 
   // the picker: the sights of the city you are in (and the era), the nearest first
   function open() {
-    if (classroom()) return;
     if (mode !== "walk" || panelOpen) { toast(tr("Close what is open and stop the game first")); return; }
     const here = ALL_LANDMARKS.filter((l) => !l.home && !l.game && homeOf(l.id) === city && (!l.only || l.only === era) && Math.hypot(player.x - l.x, player.z - l.z) > l.r)
       .sort((a, b) => Math.hypot(player.x - a.x, player.z - a.z) - Math.hypot(player.x - b.x, player.z - b.z));
@@ -137,7 +135,6 @@ const Challenge = (() => {
 
   function bind() {
     const b = $c("btn-chal");
-    if (classroom()) { if (b) b.hidden = true; return; }
     if (b) b.addEventListener("click", open);
     $c("cd-copy").addEventListener("click", () => {
       const done = () => toast(tr("Challenge link copied: send it to a friend"));

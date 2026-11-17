@@ -1,7 +1,7 @@
 "use strict";
 // The service worker: the page works when the internet is slow, patchy or gone. The first time a computer opens the game with the internet on, this file saves all of the game's files in the
 // browser (about 3 MB); from then on the page opens from that copy, so a school Wi-Fi that drops in the middle of a lesson changes nothing: the game itself needs no internet in class mode. Only
-// the teacher dashboard and playing against other people need it. Pages (the front page, the teacher page) are fetched from the internet first, for three seconds, so a new version arrives as soon
+// playing against other people needs it. Pages (the front page) are fetched from the internet first, for three seconds, so a new version arrives as soon
 // as there is one; the game's own files carry their version in the address (?v=), so they are taken from the saved copy and the right ones are fetched whenever the version changes. The saved copy
 // belongs to one version (sw.js?v=N): a new version saves its own and throws the old one away. Registered by swreg.js. Nothing is saved from other sites (the game server is never touched).
 
@@ -45,7 +45,7 @@ self.addEventListener("fetch", (e) => {
     e.respondWith((async () => {
       try {
         const res = await withTimeout(fetch(req), 3000);
-        if (res.ok && (url.pathname === "/" || /\/(index|class|class-live)\.html$/.test(url.pathname))) { const c = await caches.open(CACHE); c.put(new Request(url.origin + url.pathname), res.clone()); }
+        if (res.ok && (url.pathname === "/" || /\/index\.html$/.test(url.pathname))) { const c = await caches.open(CACHE); c.put(new Request(url.origin + url.pathname), res.clone()); }
         return res;
       } catch (err) {
         const cache = await caches.open(CACHE);

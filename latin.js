@@ -2,7 +2,7 @@
 // Latin names for Ancient Rome: 🏛️ in the class bar (class mode), or ?latin=1 in the link. While it is on (and you are in ancient Rome), the landmark names, the shop names, the keepers and what
 // the keepers say are shown in Latin with the English beside them, and the signs over the shop doors are Latin only, in capitals with V for U as on an inscription. It works through i18n.js:
 // wherever a piece of text is exactly one of the English names below (or contains one of the landmark names), i18n.js asks Latin.map for the Latin. The Latin is the author's own and has been
-// not been checked by a Latin teacher yet (a few of the words came from one): CHECK THE WORDS BELOW before using them with a class.
+// not been checked by a Latin teacher yet (a few of the words came from one): CHECK THE WORDS BELOW before relying on them.
 // Names: the classical names of the buildings (aedes Saturni, arcus Titi...). Shops: pistrinum (a bakery), caupona (an inn or tavern), officina (a workshop), taberna vestiaria (a clothes shop),
 // taberna olearia (an oil shop), figlina (a pottery). Keepers: pistor, caupo, faber, vestiarius (a clothes seller), mercator, figulus, and tabernarius (a shopkeeper).
 
@@ -37,7 +37,7 @@ const Latin = (() => {
   };
   const longest = NAMES.slice().sort((a, b) => b[0].length - a[0].length);
   let on = false;
-  try { on = localStorage.getItem(KEY) === "1" || (typeof CLASSMODE !== "undefined" && CLASSMODE.latin); } catch (e) { /* storage unavailable */ }
+  try { on = localStorage.getItem(KEY) === "1" || (typeof GAMEOPTS !== "undefined" && GAMEOPTS.latin); } catch (e) { /* storage unavailable */ }
   const active = () => on && typeof city !== "undefined" && city === "rome" && typeof era !== "undefined" && era === "ancient";
 
   // the Latin for a text (the English kept in brackets), or undefined when there is none

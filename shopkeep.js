@@ -233,9 +233,9 @@ const Shopkeep = (() => {
       rows.push(back());
     } else if (view === "table") {
       rows.push(el("h3", tr("At the table")), purse());
-      if (!classroom) rows.push(el("p", T_("Dice against {0}: the higher total wins (the keeper wins ties; doubles pay double).", tr(shop.keeper).toLowerCase()), "dnote"));
+      rows.push(el("p", T_("Dice against {0}: the higher total wins (the keeper wins ties; doubles pay double).", tr(shop.keeper).toLowerCase()), "dnote"));
       const bets = el("div", undefined, "sk-menu");
-      if (!classroom) for (const bet of [5, 10, 25, 50]) bets.append(btn(T_("🎲 Bet {0}", bet), () => dice(bet), Vitals.coins < bet));
+      for (const bet of [5, 10, 25, 50]) bets.append(btn(T_("🎲 Bet {0}", bet), () => dice(bet), Vitals.coins < bet));
       bets.append(btn(tr("♟️ A game of xiangqi (practice)"), () => { closePanels(); if (typeof Online !== "undefined") Online.playXiangqi(); }), btn(tr("👋 Goodbye"), closePanels));
       rows.push(bets);
       const mates = tableMates();
@@ -244,10 +244,10 @@ const Shopkeep = (() => {
         rows.push(el("p", m.bot ? T_("{0}, a regular, sits across from you.", m.name) : T_("{0} sits across from you.", m.name), "dnote"));
         const row = el("div", undefined, "sk-menu");
         if (m.bot) {
-          if (!classroom) for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => diceWithRegular(bet, m.name), Vitals.coins < bet));
+          for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => diceWithRegular(bet, m.name), Vitals.coins < bet));
           row.append(btn(T_("♟️ Xiangqi with {0}", m.name), () => { closePanels(); if (typeof Online !== "undefined") Online.playXiangqi(); }));
         } else {
-          if (!classroom) for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => askPlayer(m, "dice", bet), Vitals.coins < bet || !loggedIn()));
+          for (const bet of [5, 10, 25, 50]) row.append(btn(T_("🎲 Dice with {0} · {1}", m.name, bet), () => askPlayer(m, "dice", bet), Vitals.coins < bet || !loggedIn()));
           row.append(btn(T_("♟️ Xiangqi with {0}", m.name), () => askPlayer(m, "xiangqi"), !loggedIn()));
         }
         rows.push(row);
@@ -286,7 +286,6 @@ const Shopkeep = (() => {
     const e = st.errand; if (!e || e.shop !== shop.id || owns(e.good) < e.n) return;
     const pay = Math.round(e.reward * (1 + 0.05 * repOf(shop.id)));
     st.inv[e.good] = owns(e.good) - e.n; if (!st.inv[e.good]) delete st.inv[e.good];
-    if (typeof ClassReport !== "undefined") ClassReport.note(`did an errand for a ${shop.kindName.toLowerCase()}`);
     Vitals.coins += pay; st.errand = null; st.done++; st.rep[shop.id] = (st.rep[shop.id] || 0) + Math.round(pay / 2); Sfx.play("coin"); save();
     if (typeof Online !== "undefined" && Online.connected) Online.navalSend({ t: "errand" });
     say(T_("Thank you! Here are {0} denarii. Errands done: {1}", pay, st.done));
@@ -336,9 +335,8 @@ const Shopkeep = (() => {
   }
 
   // dice at the table: two dice each, the higher total wins your bet back; the keeper wins ties; doubles pay double
-  const classroom = typeof CLASSMODE !== "undefined" && CLASSMODE.on;                  // (no betting in a class)
   function dice(bet) {
-    if (classroom || Vitals.coins < bet) return;
+    if (Vitals.coins < bet) return;
     const d = () => 1 + Math.floor(Math.random() * 6), me = [d(), d()], ke = [d(), d()], ms = me[0] + me[1], ks = ke[0] + ke[1], face = (a) => a.map((v) => FACES[v - 1]).join(" ");
     Sfx.play("rattle");
     let result;
@@ -349,7 +347,7 @@ const Shopkeep = (() => {
 
   // dice with a regular who sits across from you: two dice each, the higher total wins the stake (a tie is a draw; doubles pay double)
   function diceWithRegular(bet, name) {
-    if (classroom || Vitals.coins < bet) return;
+    if (Vitals.coins < bet) return;
     const d = () => 1 + Math.floor(Math.random() * 6), me = [d(), d()], he = [d(), d()], ms = me[0] + me[1], hs = he[0] + he[1], face = (a) => a.map((v) => FACES[v - 1]).join(" ");
     Sfx.play("rattle");
     let result;

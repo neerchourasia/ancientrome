@@ -6987,125 +6987,11 @@ def drop(conn):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# classes: a teacher who switches on "watch what each student does" on class.html gets a class id and a secret key (made in the teacher's browser); the class link carries only the id, and every
-# student's browser reports its progress to /class/report. The teacher's page (class-live.html) reads it with /class/view and the key: the server checks that the first 8 hex digits of sha256(key)
-# are the class id, so nothing needs to be stored to know who the teacher is (and a restart loses nothing but the reports, which the browsers send again). Everything is kept in memory only: nothing
-# about a class or a student is ever written to disk, no address is kept, and a class that nobody has reported to for 10 hours is forgotten. Only what the game itself knows is reported (a name the
-# student chose, the city, the sights found, a few counts and short lines like "found the Pantheon"): never chat or anything typed.
-CLASS_MAX, CLASS_STUDENTS, CLASS_EVENTS, CLASS_TTL = 300, 60, 40, 10 * 3600
-CLASSES = {}                    # class id -> {"t": last report, "s": {student id: record}}
-CLASS_HITS = {}                 # address -> times of recent calls (a whole school can share one address, so the limit is generous)
-
+# a plain text cleaner (letters, digits and a little punctuation, one line, cut to n letters): chat pictures, mail lines, notes and the like
 
 def class_clean(v, n):
     v = re.sub(r"[^\w .,'\-:()!?]", "", str(v if v is not None else ""), flags=re.UNICODE)
     return re.sub(r"\s+", " ", v).strip()[:n]
-
-
-def class_key_ok(cid, key):
-    return bool(re.fullmatch(r"[0-9a-f]{8}", cid or "")) and bool(re.fullmatch(r"[0-9a-f]{32}", key or "")) and hashlib.sha256(key.encode()).hexdigest()[:8] == cid
-
-
-def class_prune(t):
-    for cid in [c for c, v in CLASSES.items() if t - v["t"] > CLASS_TTL]:
-        del CLASSES[cid]
-
-
-def class_new(t):
-    return {"t": t, "s": {}, "msg": {"id": 0, "text": ""}, "paused": False, "board": False}
-
-
-def class_board(cl, n=5):
-    """The class leaderboard the students see when the teacher switches it on: the richest and the biggest gains (names and numbers only)."""
-    rows = list(cl["s"].values())
-    return {"rich": [[r["name"], r["coins"]] for r in sorted((r for r in rows if r["coins"] > 0), key=lambda r: r["coins"], reverse=True)[:n]],
-            "gain": [[r["name"], r["gain"]] for r in sorted((r for r in rows if r.get("gain", 0) > 0), key=lambda r: r["gain"], reverse=True)[:n]]}
-
-
-def class_state(cl):
-    """What every student's browser is told in the answer to each report: the teacher's latest message, whether the class is paused, and (if switched on) the leaderboard."""
-    out = {"msg": cl["msg"], "paused": cl["paused"]}
-    if cl["board"]:
-        out["board"] = class_board(cl)
-    return out
-
-
-def class_set(cid, key, msg=None, paused=None, board=None):
-    """The teacher sends the class a message, pauses or resumes it, or switches the leaderboard on or off (needs the class key). Returns the new state, or None when the key is wrong."""
-    if not class_key_ok(cid, key):
-        return None
-    t = now()
-    cl = CLASSES.get(cid)
-    if cl is None:
-        if len(CLASSES) >= CLASS_MAX:
-            class_prune(t)
-            if len(CLASSES) >= CLASS_MAX:
-                return None
-        cl = CLASSES[cid] = class_new(t)
-    if msg is not None:
-        text = class_clean(msg, 140)
-        if text:
-            cl["msg"] = {"id": cl["msg"]["id"] + 1, "text": text}
-    if paused is not None:
-        cl["paused"] = bool(paused)
-    if board is not None:
-        cl["board"] = bool(board)
-    cl["t"] = t
-    return class_state(cl)
-
-
-def class_report(cid, sid, name, data, events):
-    """A student's browser says how far they have got. Returns False when the report is refused (bad ids, too many classes or students)."""
-    if not re.fullmatch(r"[0-9a-f]{8}", cid or "") or not re.fullmatch(r"[0-9a-f]{8,16}", sid or ""):
-        return False
-    t = now()
-    cl = CLASSES.get(cid)
-    if cl is None:
-        if len(CLASSES) >= CLASS_MAX:
-            class_prune(t)
-            if len(CLASSES) >= CLASS_MAX:
-                return False
-        cl = CLASSES[cid] = class_new(t)
-    st = cl["s"].get(sid)
-    if st is None:
-        if len(cl["s"]) >= CLASS_STUDENTS:
-            return False
-        st = cl["s"][sid] = {"t0": t, "t": t, "at": -1e9, "ev": [], "name": "?", "city": None, "era": None, "coins": 0, "shops": 0, "errands": 0, "crafted": 0, "ach": 0, "sights": [], "hunt": None}
-    if t - st["at"] < 1.5:       # (a browser that reports more than once in a second and a half is ignored)
-        return class_state(cl)
-    st["at"] = st["t"] = cl["t"] = t
-    st["name"] = class_clean(name, 16) or "?"
-    d = data if isinstance(data, dict) else {}
-    st["city"] = d.get("city") if d.get("city") in WORLD_CITIES else None
-    st["era"] = d.get("era") if d.get("era") in ("ancient", "modern") else None
-    for k in ("coins", "shops", "errands", "crafted", "ach", "words"):
-        st[k] = int(num(d.get(k), 0, 10 ** 9, 0))
-    st["gain"] = int(num(d.get("gain"), -10 ** 9, 10 ** 9, 0))       # (money now minus the money they started the lesson with)
-    sights = d.get("sights") if isinstance(d.get("sights"), list) else []
-    st["sights"] = [x for x in (class_clean(i, 24) for i in sights[:80]) if x]
-    h = d.get("hunt")
-    st["hunt"] = {"n": int(num(h.get("n"), 0, 12, 0)), "of": int(num(h.get("of"), 0, 12, 0)), "done": int(num(h.get("done"), 0, 10 ** 6, 0))} if isinstance(h, dict) else None
-    for e in (events if isinstance(events, list) else [])[:8]:
-        txt = class_clean(e, 80)
-        if txt:
-            st["ev"].append((t, txt))
-    del st["ev"][:-CLASS_EVENTS]
-    return class_state(cl)
-
-
-def class_view(cid, key):
-    """What the teacher sees: every student of the class, or None when the key is not this class's key."""
-    if not class_key_ok(cid, key):
-        return None
-    t = now()
-    out = []
-    for sid, st in sorted((CLASSES.get(cid) or {"s": {}})["s"].items(), key=lambda kv: kv[1]["name"].lower()):
-        if t - st["t"] > CLASS_TTL:
-            continue
-        out.append({"id": sid[:6], "name": st["name"], "ago": int(t - st["t"]), "since": int(t - st["t0"]), "city": st["city"], "era": st["era"], "coins": st["coins"], "shops": st["shops"],
-                    "errands": st["errands"], "crafted": st["crafted"], "ach": st["ach"], "words": st.get("words", 0), "sights": st["sights"], "hunt": st["hunt"], "gain": st.get("gain", 0), "events": [{"ago": int(t - at), "text": tx} for at, tx in st["ev"]]})
-    cl = CLASSES.get(cid)
-    return {"students": out, "msg": cl["msg"]["text"] if cl else "", "paused": bool(cl and cl["paused"]), "board": bool(cl and cl["board"])}
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -7195,38 +7081,6 @@ async def handle_http(reader, writer):
             flag("inappropriate name tried", nm, "low", ip=ip, gap=30)
         cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
         return await reply(writer, 200, json.dumps({"ok": ok, "reason": why, "name": nm}).encode(), "application/json", cors)
-    if path in ("/class/report", "/class/view", "/class/set"):          # a class: students report their progress, the teacher reads it (see "classes" above)
-        if not origin_ok(hdr.get("origin")):
-            return await reply(writer, 403, b"origin not allowed")
-        t = now()
-        hits = [x for x in CLASS_HITS.get(ip, []) if t - x < 60]
-        if len(hits) >= (900 if path == "/class/report" else 60):
-            return await reply(writer, 503, b"slow down")
-        CLASS_HITS[ip] = hits + [t]
-        if len(CLASS_HITS) > 3000:
-            CLASS_HITS.clear()
-        cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
-        q1 = lambda k, n: (query.get(k) or [""])[0][:n]
-        if path == "/class/report":
-            def load(k, n):
-                try:
-                    return json.loads(q1(k, n) or "null")
-                except Exception:
-                    return None
-            state = class_report(q1("c", 8), q1("s", 16), q1("n", 40), load("d", 2500), load("e", 1200))
-            if not state:
-                return await reply(writer, 400, b"", "text/plain", cors)
-            return await reply(writer, 200, json.dumps(state).encode(), "application/json", cors + "Cache-Control: no-store\r\n")
-        if path == "/class/set":
-            flag01 = lambda k: None if k not in query else (query[k][0] == "1")
-            state = class_set(q1("c", 8), q1("k", 32), q1("m", 300) if "m" in query else None, flag01("p"), flag01("b"))
-            if state is None:
-                return await reply(writer, 403, b"wrong key", "text/plain", cors)
-            return await reply(writer, 200, json.dumps(state).encode(), "application/json", cors + "Cache-Control: no-store\r\n")
-        view = class_view(q1("c", 8), q1("k", 32))
-        if view is None:
-            return await reply(writer, 403, b"wrong key", "text/plain", cors)
-        return await reply(writer, 200, json.dumps(view).encode(), "application/json", cors + "Cache-Control: no-store\r\n")
     if path == "/health":
         return await reply(writer, 200, json.dumps({"ok": True, "world": world_on(), "world_error": _world_err[0], "up": int(time.time() - BOOT_T), "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
 

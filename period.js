@@ -3,7 +3,7 @@
 // Republican Beijing (c. 1930). It is a "period look" on top of the city's older layout (the streets and buildings are the old ones; the new places of the time are in periodbuildings.js): an old-photograph colour grade
 // with a dark edge (not in light graphics), the people dressed for the time (Citizens palette in city.js), the guards in the soldiers of the time (guards.js), the names on the screen, and a note
 // "In c. 1550: ..." on the history card of the sights that have one. game.js keeps the state (`skin`: true in the middle time, with `era` staying "ancient" so every rule of the game stays as it
-// was). Depends on game.js (city, era, skin, $) and classmode.js (low).
+// was). Depends on game.js (city, era, skin, $) and options.js (low).
 
 const Period = (() => {
   const NAMES = { rome: "Renaissance Rome", delhi: "Delhi under the British Raj", cancun: "Spanish Yucatán", beijing: "Republican Beijing" };
@@ -57,7 +57,7 @@ const Period = (() => {
   const small = (c) => `${BADGE[c] || ""} · ${YEARS[c] || ""}`;
   function apply(on) {
     document.body.classList.toggle("mid", on);
-    document.body.classList.toggle("midfilm", on && !(window.CLASSMODE && CLASSMODE.low));
+    document.body.classList.toggle("midfilm", on && !(window.GAMEOPTS && GAMEOPTS.low));
   }
   return { NAMES, YEARS, BADGE, SAY, apply, small, note: (id) => NOTES[id] || "", robes: (c) => (ROBES[c] || ROBES.rome).map((h) => new THREE.Color(h)), guard: (c) => GUARDS[c] || GUARDS.rome };
 })();

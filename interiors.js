@@ -308,7 +308,6 @@ const Interiors = (() => {
       if (inside && !p.inside) {
         p.inside = true;
         if (typeof Shopkeep !== "undefined") Shopkeep.visit(info(p).id);
-        if (typeof ClassReport !== "undefined") ClassReport.note(`walked into a ${p.kind.name.toLowerCase()}`);
         if (typeof Journal !== "undefined") Journal.shop(p.kind.name);
         if (mode === "walk" && open) {
           Sfx.play("bell");
