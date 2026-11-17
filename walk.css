@@ -1101,3 +1101,6 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
 #vitals .coins b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800; }
 #v-rest { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
 #v-tax.warn { color: #ffe066; }
+
+/* a border round the whole screen in the cool colours (it never catches a click) */
+body::after { content: ""; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; border: 5px solid transparent; border-image: linear-gradient(115deg, #ffe066 0%, #a6e35c 22%, #3ec97c 44%, #38bdf8 72%, #5b8def 100%) 1; box-shadow: inset 0 0 14px rgba(56,189,248,.45); }
