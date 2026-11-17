@@ -47,9 +47,9 @@ const MountHire = (() => {
     for (const x of [-4.2, 4.2]) bar(1.4, 0.8, 0.9, hay, x, 0.4, 1.6);
     animals.slice(0, 3).forEach((id, i) => { const a = Car.model(id); a.position.set(-3 + i * 3, 0, -1.8); a.rotation.y = Math.PI + (i - 1) * 0.15; g.add(a); });
     const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128; const x = cv.getContext("2d");
-    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#e2b955"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
+    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#3ec97c"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
     x.fillStyle = "#f1ead8"; x.font = "bold 40px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("🐎 " + tr("Mount hire"), 256, 50, 470);
-    x.font = "26px sans-serif"; x.fillStyle = "#e2b955"; x.fillText(`${MINUTES} ${tr("minutes")} · ${tr("open the menu")}`, 256, 88, 470);
+    x.font = "26px sans-serif"; x.fillStyle = "#3ec97c"; x.fillText(`${MINUTES} ${tr("minutes")} · ${tr("open the menu")}`, 256, 88, 470);
     const sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false })); sp.scale.set(8, 2, 1); sp.position.set(0, 5, 0); g.add(sp);
     return g;
   }

@@ -61,9 +61,9 @@ const Workshops = (() => {
     add(new T.CylinderGeometry(0.4, 0.3, 0.7, 10), lam(0xb8622f), 0, 1.25, 0.9); add(new T.CylinderGeometry(0.2, 0.4, 0.3, 10), lam(0xb8622f), 0, 1.75, 0.9);   // a pot
     add(new T.BoxGeometry(1.3, 1.6, 0.15), wood, 2.1, 1.7, 0.9); add(new T.BoxGeometry(1.1, 1.2, 0.05), lam(0x3a6a9a), 2.1, 1.7, 0.99);   // a loom with cloth
     const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128; const x = cv.getContext("2d");
-    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#e2b955"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
+    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#3ec97c"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
     x.fillStyle = "#f1ead8"; x.font = "bold 40px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("🔨 " + tr("Workshop"), 256, 50, 470);
-    x.font = "26px sans-serif"; x.fillStyle = "#e2b955"; x.fillText(tr("smith · potter · weaver"), 256, 88, 470);
+    x.font = "26px sans-serif"; x.fillStyle = "#3ec97c"; x.fillText(tr("smith · potter · weaver"), 256, 88, 470);
     const sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false })); sp.scale.set(8, 2, 1); sp.position.set(0, 4.6, 0); sp.userData.label = true; g.add(sp);
     return g;
   }

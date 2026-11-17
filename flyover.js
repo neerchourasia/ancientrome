@@ -28,12 +28,12 @@ const Flyover = (() => {
   function makeBar() {
     if (bar) return;
     bar = document.createElement("div"); bar.id = "flyover-bar";
-    bar.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.9);color:#f4ead6;border:1px solid #e2b955;border-radius:12px;padding:10px 14px;font:600 .85rem system-ui,sans-serif;display:none;flex-direction:column;gap:6px;align-items:center;max-width:94vw;text-align:center";
-    nameEl = document.createElement("strong"); nameEl.style.cssText = "font:700 1.05rem Georgia,serif;color:#e2b955";
+    bar.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.9);color:#f4ead6;border:1px solid #3ec97c;border-radius:12px;padding:10px 14px;font:600 .85rem system-ui,sans-serif;display:none;flex-direction:column;gap:6px;align-items:center;max-width:94vw;text-align:center";
+    nameEl = document.createElement("strong"); nameEl.style.cssText = "font:700 1.05rem Georgia,serif;color:#3ec97c";
     subEl = document.createElement("span"); subEl.style.cssText = "opacity:.85";
     const help = document.createElement("small"); help.style.cssText = "opacity:.7;font-weight:500"; help.textContent = tr("Drag to look · W A S D fly where you look, E up, Q down, Shift faster · wheel: closer, or faster · Space: hover or tour · Esc to land");
     const row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px";
-    const mk = (label, f) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.style.cssText = "font:inherit;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#ffd24a;color:#2a2118"; b.addEventListener("click", f); row.append(b); return b; };
+    const mk = (label, f) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.style.cssText = "font:inherit;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#5b8def;color:#2a2118"; b.addEventListener("click", f); row.append(b); return b; };
     toggleBtn = mk("", () => toggle()); mk(tr("⌂ Land"), () => stop());
     bar.append(nameEl, subEl, row, help); document.body.append(bar);
   }

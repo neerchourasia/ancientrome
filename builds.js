@@ -71,7 +71,7 @@ const Builds = (() => {
     const g = cv.getContext("2d"), text = `${EMBLEMS[b.emblem % 8] || "🛡"} [${b.tag}] ${b.name}`;
     g.fillStyle = "rgba(28,22,16,.9)"; g.strokeStyle = "#" + COLORS[b.color % 8].toString(16).padStart(6, "0"); g.lineWidth = 8; g.beginPath(); g.roundRect(6, 16, 500, 96, 20); g.fill(); g.stroke();
     g.fillStyle = "#f1ead8"; g.font = "bold 36px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 256, 56, 470);
-    g.font = "26px sans-serif"; g.fillStyle = "#e2b955"; g.fillText(tr(KINDS[b.kind].name), 256, 92);
+    g.font = "26px sans-serif"; g.fillStyle = "#3ec97c"; g.fillText(tr(KINDS[b.kind].name), 256, 92);
     const sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false }));
     sp.scale.set(7, 1.75, 1); sp.position.y = h; return sp;
   }

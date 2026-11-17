@@ -502,14 +502,14 @@ const Furnish = (() => {
   function showHint(mode) {
     if (!hintEl) {
       hintEl = document.createElement("div"); hintEl.id = "place-hint";
-      hintEl.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.94);color:#f4ead6;border:1px solid #e2b955;border-radius:10px;padding:8px 12px;font:600 .85rem system-ui,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw";
+      hintEl.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:60;background:rgba(30,22,12,.94);color:#f4ead6;border:1px solid #3ec97c;border-radius:10px;padding:8px 12px;font:600 .85rem system-ui,sans-serif;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:94vw";
       document.body.append(hintEl);
     }
     const t = document.createElement("span"), bs = [];
     if (mode === "arrange") { t.textContent = tr("Arrange: drag a piece to move it, drop it where it goes"); bs.push(["✕ Done (Esc)", () => setArrange(false)]); }
     else { t.textContent = `${tr(PIECES[placing.id][0])}: ${tr(placing.drag ? "drop it on the floor" : "click where it goes")}`; bs.push(["↻ Turn (R)", () => turnGhost()], ["✓ Place here (Enter)", () => confirmPlace()], ["✕ Done (Esc)", () => endPlace(true)]); }
     hintEl.replaceChildren(t);
-    for (const [label, f] of bs) { const b = document.createElement("button"); b.type = "button"; b.textContent = tr(label); b.style.cssText = "font:inherit;cursor:pointer;padding:5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#ffd24a;color:#2a2118"; b.addEventListener("click", f); hintEl.append(b); }
+    for (const [label, f] of bs) { const b = document.createElement("button"); b.type = "button"; b.textContent = tr(label); b.style.cssText = "font:inherit;cursor:pointer;padding:5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:#5b8def;color:#2a2118"; b.addEventListener("click", f); hintEl.append(b); }
     hintEl.style.display = "flex";
   }
   function onMove(ev) { lastPtr = ev; const p = floorPoint(ev); if (p) ghostAt(p.x, p.z); }

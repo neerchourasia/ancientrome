@@ -86,9 +86,9 @@ const Dig = (() => {
     add(new T.CylinderGeometry(0.05, 0.05, 2.6, 6), wood, 4.2, 1.3, -3.4); const shade = add(new T.ConeGeometry(2.0, 0.6, 12), lam(0xe8dcc0), 4.2, 2.7, -3.4);
     add(new T.BoxGeometry(0.7, 0.45, 0.5), wood, -1.6, 0.22, 3.1);
     const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128; const x = cv.getContext("2d");
-    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#e2b955"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
+    x.fillStyle = "rgba(34,26,16,.9)"; x.strokeStyle = "#3ec97c"; x.lineWidth = 6; x.beginPath(); x.roundRect(6, 14, 500, 100, 18); x.fill(); x.stroke();
     x.fillStyle = "#f1ead8"; x.font = "bold 40px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("⛏ " + tr("Dig site"), 256, 50, 470);
-    x.font = "26px sans-serif"; x.fillStyle = "#e2b955"; x.fillText(tr("open the menu to dig"), 256, 88, 470);
+    x.font = "26px sans-serif"; x.fillStyle = "#3ec97c"; x.fillText(tr("open the menu to dig"), 256, 88, 470);
     const sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false })); sp.scale.set(8, 2, 1); sp.position.set(0, 4.2, 0); sp.userData.label = true; g.add(sp);
     g.userData.shade = shade; return g;
   }

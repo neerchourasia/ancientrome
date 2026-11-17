@@ -19,9 +19,9 @@ const PeriodBuildings = (() => {
   function label(text, sub, h) {
     const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128;
     const g = cv.getContext("2d");
-    g.fillStyle = "rgba(34,26,16,.88)"; g.strokeStyle = "#e2b955"; g.lineWidth = 6; g.beginPath(); g.roundRect(6, 14, 500, 100, 18); g.fill(); g.stroke();
+    g.fillStyle = "rgba(34,26,16,.88)"; g.strokeStyle = "#3ec97c"; g.lineWidth = 6; g.beginPath(); g.roundRect(6, 14, 500, 100, 18); g.fill(); g.stroke();
     g.fillStyle = "#f1ead8"; g.font = "bold 34px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 256, 52, 470);
-    g.font = "24px sans-serif"; g.fillStyle = "#e2b955"; g.fillText(sub, 256, 88, 470);
+    g.font = "24px sans-serif"; g.fillStyle = "#3ec97c"; g.fillText(sub, 256, 88, 470);
     const sp = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false }));
     sp.scale.set(8, 2, 1); sp.position.y = h; sp.userData.label = true; return sp;
   }

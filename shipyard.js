@@ -113,10 +113,10 @@ const Shipyard = (() => {
       const p = slotPos(side, i), on = d[side][i];
       g.beginPath(); g.arc(p.x, p.y, 13, 0, 6.3);
       g.fillStyle = on ? "#2e2e30" : "rgba(255,255,255,.12)"; g.fill();
-      g.lineWidth = 2; g.strokeStyle = on ? "#e2b955" : "rgba(255,255,255,.45)"; g.setLineDash(on ? [] : [4, 3]); g.stroke(); g.setLineDash([]);
+      g.lineWidth = 2; g.strokeStyle = on ? "#3ec97c" : "rgba(255,255,255,.45)"; g.setLineDash(on ? [] : [4, 3]); g.stroke(); g.setLineDash([]);
       if (on) {                                                    // the barrel, pointing the way the cannon is aimed
         const th = d[side === "port" ? "pa" : "sa"][i] * Math.PI / 4, out = side === "port" ? -1 : 1, ex = p.x + out * Math.sin(th) * 22, ey = p.y - Math.cos(th) * 22;
-        g.strokeStyle = "#e2b955"; g.lineWidth = 5; g.lineCap = "round"; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(ex, ey); g.stroke(); g.lineCap = "butt";
+        g.strokeStyle = "#3ec97c"; g.lineWidth = 5; g.lineCap = "round"; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(ex, ey); g.stroke(); g.lineCap = "butt";
       }
       if (pick && pick.side === side && pick.i === i && on) { g.beginPath(); g.arc(p.x, p.y, 18, 0, 6.3); g.lineWidth = 3; g.strokeStyle = "#ffffff"; g.stroke(); }
     }
