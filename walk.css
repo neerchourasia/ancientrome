@@ -1087,3 +1087,10 @@ button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):no
 /* the one that is chosen or switched on: a bright ring */
 button.on, button.active, button[aria-pressed="true"], .mgroup.open > .mh { box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(56,189,248,.9) !important; }
 button:disabled { background: #2a3d44 !important; color: #86a0a6 !important; border: 1.5px solid rgba(255,255,255,.18) !important; box-shadow: none; cursor: default; }
+
+/* something is waiting for you (a gift to take, a message, a tax to pay): the button to press goes red and pulses */
+html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):is(.mh.alert, #btn-gift.ready, #btn-tax.alert, #btn-gift.ready.ready) {
+  background: linear-gradient(115deg, #ff9a8b 0%, #ff5252 45%, #d6202f 100%) !important; color: #fff !important; border-color: #fff !important;
+  box-shadow: 0 0 12px rgba(255,64,64,.9); animation: redpulse 1.2s ease-in-out infinite;
+}
+@keyframes redpulse { 50% { box-shadow: 0 0 22px rgba(255,64,64,1); transform: scale(1.04); } }
