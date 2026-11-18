@@ -3,10 +3,8 @@
   --ink: #e9f4f4;
   --muted: #a6c2c6;
   --gold: #3ec97c;                                                              /* (the accent: green; the name is from the old gold) */
-  --g1: #ffe066; --g2: #a6e35c; --g3: #3ec97c; --g4: #38bdf8; --g5: #5b8def;   /* the five colours of the gradient (look.js changes them with the theme) */
-  --edge: #5fe0b0; --panel-solid: rgba(12,24,32,.97); --spark-hue: 0deg;
-  --grad: linear-gradient(115deg, var(--g1) 0%, var(--g2) 22%, var(--g3) 44%, var(--g4) 72%, var(--g5) 100%);   /* the soft green-to-blue gradient of buttons, bars and badges */
-  --bar-ok: linear-gradient(90deg, #3ec97c, #38bdf8); --bar-mid: linear-gradient(90deg, #ffe066, #f5b82e); --bar-low: linear-gradient(90deg, #ff8a7a, #d6202f); --grad-soft: linear-gradient(115deg, rgba(127,227,196,.22), rgba(62,201,124,.16) 30%, color-mix(in srgb, var(--g4) 18%, transparent) 65%, rgba(91,141,239,.22));
+  --grad: linear-gradient(115deg, #ffe066 0%, #a6e35c 22%, #3ec97c 44%, #38bdf8 72%, #5b8def 100%);   /* the soft green-to-blue gradient of buttons, bars and badges */
+  --bar-ok: linear-gradient(90deg, #3ec97c, #38bdf8); --bar-mid: linear-gradient(90deg, #ffe066, #f5b82e); --bar-low: linear-gradient(90deg, #ff8a7a, #d6202f); --grad-soft: linear-gradient(115deg, rgba(127,227,196,.22), rgba(62,201,124,.16) 30%, rgba(56,189,248,.18) 65%, rgba(91,141,239,.22));
   --red: #b3262b;
   --green: #4fa462;
 }
@@ -605,8 +603,8 @@ body.dueling .top-right .buttons, body.dueling #vitals, body.dueling .top-left {
 .rank-badge { display: inline-block; padding: 0 7px; margin-left: 2px; border-radius: 999px; background: rgba(62,201,124,.2); border: 1px solid rgba(62,201,124,.55); color: #ffe8a8; font-size: .78rem; white-space: nowrap; }
 /* the menu button: a fireball (a cream ring of flame round a dark, glowing core) with the menu icon in the middle */
 #btn-menu { position: fixed; left: 8px; bottom: 14px; z-index: 7; width: 104px; height: 104px; padding: 0 !important; border: 0 !important; border-radius: 50%; background: transparent !important; display: grid; place-items: center; }
-#btn-menu .spark { position: absolute; inset: 0; width: 100%; height: 100%; filter: hue-rotate(var(--spark-hue)) drop-shadow(0 0 7px rgba(70,150,255,.65)); transition: transform .35s ease, filter .35s ease; }
-#btn-menu:hover .spark, #btn-menu:focus-visible .spark { transform: scale(1.08); filter: hue-rotate(var(--spark-hue)) drop-shadow(0 0 12px rgba(90,170,255,.95)); }
+#btn-menu .spark { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 0 7px rgba(70,150,255,.65)); transition: transform .35s ease, filter .35s ease; }
+#btn-menu:hover .spark, #btn-menu:focus-visible .spark { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(90,170,255,.95)); }
 #btn-menu .mi { position: relative; font-size: 1.35rem; line-height: 1; color: #e6f6ff; text-shadow: 0 0 6px #05225a, 0 1px 3px rgba(0,0,0,.9); }
 #btn-menu.alert .spark { filter: sepia(1) saturate(3.2) brightness(1.05) drop-shadow(0 0 10px rgba(255,160,70,.95)); animation: fireAlert 1.1s ease-in-out infinite; }   /* something is waiting: the fireball burns orange */
 @keyframes fireAlert { 50% { filter: sepia(1) saturate(3.8) brightness(1.15) drop-shadow(0 0 18px rgba(255,180,90,1)); transform: scale(1.06); } }
@@ -1087,7 +1085,7 @@ button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):no
 button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled) kbd { border-color: rgba(0,0,0,.4); color: #06232a; }
 button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):hover, .in-btn:hover, #start:hover { filter: brightness(1.1) saturate(1.1); }
 /* the one that is chosen or switched on: a bright ring */
-button.on, button.active, button[aria-pressed="true"], .mgroup.open > .mh { box-shadow: 0 0 0 3px #fff, 0 0 14px color-mix(in srgb, var(--g4) 90%, transparent) !important; }
+button.on, button.active, button[aria-pressed="true"], .mgroup.open > .mh { box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(56,189,248,.9) !important; }
 button:disabled { background: #2a3d44 !important; color: #86a0a6 !important; border: 1.5px solid rgba(255,255,255,.18) !important; box-shadow: none; cursor: default; }
 
 /* something is waiting for you (a gift to take, a message, a tax to pay): the button to press goes red and pulses */
@@ -1109,27 +1107,27 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
 /* windows (shops, inventory, dialogs) and the character creator: a gradient edge and a gradient title */
 .dpanel .box, #creator {
   border: 2px solid transparent;
-  background: linear-gradient(var(--panel-solid), var(--panel-solid)) padding-box, var(--grad) border-box;
-  box-shadow: 0 6px 28px rgba(0,0,0,.55), 0 0 22px color-mix(in srgb, var(--g4) 20%, transparent);
+  background: linear-gradient(rgba(12,24,32,.97), rgba(12,24,32,.97)) padding-box, var(--grad) border-box;
+  box-shadow: 0 6px 28px rgba(0,0,0,.55), 0 0 22px rgba(56,189,248,.2);
 }
 .dpanel h2, #creator h2 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .dpanel header { border-bottom: 2px solid transparent; border-image: var(--grad) 1; padding-bottom: 4px; margin-bottom: 6px; }
 /* the heads-up panels (status box, landmark card, menu bar): a bright green-blue edge with a soft glow */
-#vitals, #card, .top-right .buttons:not(.collapsed) { border: 1.5px solid var(--edge); box-shadow: 0 2px 12px rgba(0,0,0,.4), 0 0 12px color-mix(in srgb, var(--g4) 35%, transparent); }
+#vitals, #card, .top-right .buttons:not(.collapsed) { border: 1.5px solid #5fe0b0; box-shadow: 0 2px 12px rgba(0,0,0,.4), 0 0 12px rgba(56,189,248,.35); }
 #card h2, #card h3 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 /* the round map and the name of the game */
-#minimap { border: 3px solid var(--edge); box-shadow: 0 0 0 2px var(--g4), 0 0 16px color-mix(in srgb, var(--g4) 70%, transparent); }
+#minimap { border: 3px solid #5fe0b0; box-shadow: 0 0 0 2px #38bdf8, 0 0 16px rgba(56,189,248,.7); }
 .top-left h1, #hud h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .top-left h1 small { -webkit-text-fill-color: var(--muted); }
 /* touch controls: the same gradient (the joystick knob, jump, run and the other round buttons) */
 #tc-knob { background: var(--grad); border-color: #fff; }
-#tc-stick { border-color: rgba(95,224,176,.8); box-shadow: 0 0 12px color-mix(in srgb, var(--g4) 40%, transparent); }
+#tc-stick { border-color: rgba(95,224,176,.8); box-shadow: 0 0 12px rgba(56,189,248,.4); }
 #tc-walk-btns button, .tc-row button { background: var(--grad); color: #06232a; text-shadow: none; border: 1.5px solid #fff; box-shadow: 0 2px 9px rgba(0,0,0,.4); }
-#tc-run.active, #tc-block.active, #tc-cruise.active { background: var(--grad); color: #06232a; box-shadow: 0 0 0 3px #fff, 0 0 14px color-mix(in srgb, var(--g4) 90%, transparent); }
+#tc-run.active, #tc-block.active, #tc-cruise.active { background: var(--grad); color: #06232a; box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(56,189,248,.9); }
 /* a shimmer runs across a button when the pointer is over it */
 @keyframes shimmer { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  html:not(.look-noshimmer) button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):not(.alert):not(.ready):hover, html:not(.look-noshimmer) .in-btn:hover, html:not(.look-noshimmer) #start:hover {
+  button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):not(.alert):not(.ready):hover, .in-btn:hover, #start:hover {
     background-size: 220% 100% !important; animation: shimmer .9s ease-in-out infinite alternate;
   }
 }
@@ -1140,14 +1138,3 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
 /* the start screen: the name in the corner and the big headline are gradient text */
 .in-brand, .in-hero h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
 .in-brand .in-logo { -webkit-text-fill-color: initial; }
-
-/* the Look and sound window and its switches */
-html.look-noborder #frame { display: none; }
-#look-themes { margin: 6px 0 10px; }
-.look-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; cursor: pointer; }
-.look-row input { width: 18px; height: 18px; accent-color: var(--g3); }
-
-/* phones: the status box moves up under the map so it does not sit on top of the landmark card */
-@media (max-width: 700px) and (min-height: 560px) { body.touch #vitals { bottom: auto; top: 158px; right: 8px; width: 170px; } }
-/* the pop-up messages: a rounded pill for a short one, and a tidy rounded box (not a blob) when the message is long */
-#toast { border-radius: 18px; max-width: min(92vw, 520px); text-align: center; border: 1.5px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,.45); }

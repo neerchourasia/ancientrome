@@ -7,20 +7,15 @@
   const svg = document.createElementNS(NS, "svg");
   svg.id = "frame"; svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
   svg.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483000;pointer-events:none;filter:drop-shadow(0 0 5px rgba(56,189,248,.55))";
-  svg.innerHTML = '<defs><linearGradient id="frameGrad" gradientUnits="userSpaceOnUse"><stop offset="0"/><stop offset=".22"/><stop offset=".44"/><stop offset=".72"/><stop offset="1"/></linearGradient></defs><path id="framePath" fill="url(#frameGrad)" fill-rule="evenodd" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>';
+  svg.innerHTML = '<defs><linearGradient id="frameGrad" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffe066"/><stop offset=".22" stop-color="#a6e35c"/><stop offset=".44" stop-color="#3ec97c"/><stop offset=".72" stop-color="#38bdf8"/><stop offset="1" stop-color="#5b8def"/></linearGradient></defs><path id="framePath" fill="url(#frameGrad)" fill-rule="evenodd" stroke="rgba(255,255,255,.9)" stroke-width="1.5"/>';
   const path = svg.lastChild, grad = svg.firstChild.firstChild;
   // how far the inner edge is from the screen edge at distance s along the way round (pixels): thicker towards the top left, thinner at the bottom right, with waves and bumps
   const thick = (s, P) => {
     const p = s / P, d = 7 + 6 * (0.5 + 0.5 * Math.cos(6.2832 * p)) + 3 * Math.sin(s / 80) + 2 * Math.sin(s / 29 + 1) + 6 * Math.pow(Math.max(0, Math.sin(s / 170)), 3);
-    return Math.max(5, Math.min(21, d)) * K;
+    return Math.max(5, Math.min(21, d));
   };
-  // the five colours of the gradient, from the theme (look.js) or the page's variables
-  const stops = () => { const cs = getComputedStyle(document.documentElement); return [1, 2, 3, 4, 5].map((i) => cs.getPropertyValue("--g" + i).trim() || ["#ffe066", "#a6e35c", "#3ec97c", "#38bdf8", "#5b8def"][i - 1]); };
-  function colour() { const c = stops(); grad.querySelectorAll("stop").forEach((e, i) => e.setAttribute("stop-color", c[i])); svg.style.filter = "drop-shadow(0 0 5px " + c[3] + ")"; }
-  let K = 1;   // thinner on small screens
   function draw() {
     const W = window.innerWidth, H = window.innerHeight, P = 2 * (W + H), pts = [];
-    K = Math.max(0.45, Math.min(1, Math.min(W, H) / 700));
     let s = 0;
     for (let x = 0; x < W; x += STEP, s += STEP) pts.push([x, thick(s, P)]);                        // along the top, left to right
     for (let y = 0; y < H; y += STEP, s += STEP) pts.push([W - thick(s, P), y]);                    // down the right
@@ -28,13 +23,11 @@
     for (let y = H; y > 0; y -= STEP, s += STEP) pts.push([thick(s, P), y]);                        // up the left
     path.setAttribute("d", `M0 0H${W}V${H}H0Z M${pts.map(q => q[0].toFixed(1) + " " + q[1].toFixed(1)).join("L")}Z`);
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    colour();
     grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0"); grad.setAttribute("x2", String(W)); grad.setAttribute("y2", String(H));
   }
   let queued = false;
   const redraw = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; draw(); }); };
   window.addEventListener("resize", redraw);
-  window.addEventListener("lookchange", redraw);
   draw();
   const calm = (window.GAMEOPTS && window.GAMEOPTS.low) || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   if (!calm) svg.animate([{ opacity: 0.82 }, { opacity: 1 }], { duration: 3600, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
@@ -49,7 +42,6 @@ window.coolTagBg = function (g) {
   g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r); g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
   g.fillStyle = "rgba(6,26,32,.82)"; g.fill();
   const gr = g.createLinearGradient(x, 0, x + w, 0);
-  const cs = getComputedStyle(document.documentElement), c = [1, 2, 3, 4, 5].map((i) => cs.getPropertyValue("--g" + i).trim() || ["#ffe066", "#a6e35c", "#3ec97c", "#38bdf8", "#5b8def"][i - 1]);
-  [0, 0.25, 0.5, 0.75, 1].forEach((o, i) => gr.addColorStop(o, c[i]));
+  gr.addColorStop(0, "#ffe066"); gr.addColorStop(0.25, "#a6e35c"); gr.addColorStop(0.5, "#3ec97c"); gr.addColorStop(0.75, "#38bdf8"); gr.addColorStop(1, "#5b8def");
   g.lineWidth = 4; g.strokeStyle = gr; g.stroke();
 };

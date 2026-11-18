@@ -163,7 +163,6 @@ const Sfx = (() => {
     bump: () => { puff(0.18, 240, 0.7, 0.75); tone(85, 0.28, "sine", 0.6, 45); },
     oof: () => { tone(230, 0.2, "sawtooth", 0.14, 150); puff(0.12, 500, 0.8, 0.3); },
     beep: () => tone(880, 0.14, "square", 0.13),
-    chime: () => { tone(988, 0.5, "sine", 0.1); tone(1319, 0.7, "sine", 0.09, null, null, 0.12); },   // something is waiting for you
     tick: () => { tone(1500, 0.05, "sine", 0.05, 1050); puff(0.02, 4200, 2, 0.05); },   // a button press
     honk: (o) => { tone(410, 0.3, "square", 0.09, null, o); tone(520, 0.3, "square", 0.07, null, o); },
     jump: () => { tone(300, 0.12, "triangle", 0.18, 520); puff(0.08, 900, 1, 0.12); },
@@ -320,5 +319,5 @@ const Sfx = (() => {
 // every button press ticks softly (the touch controls and disabled buttons stay quiet)
 document.addEventListener("click", (e) => {
   const b = e.target && e.target.closest ? e.target.closest("button") : null;
-  if (b && !b.disabled && !(b.id && b.id.startsWith("tc-")) && !(typeof Look !== "undefined" && !Look.tick)) Sfx.play("tick");
+  if (b && !b.disabled && !(b.id && b.id.startsWith("tc-"))) Sfx.play("tick");
 }, true);
