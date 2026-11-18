@@ -1102,3 +1102,35 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
 #v-rest { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
 #v-tax.warn { color: #ffe066; }
 
+
+/* ---------- the cool look, everywhere ---------- */
+/* windows (shops, inventory, dialogs) and the character creator: a gradient edge and a gradient title */
+.dpanel .box, #creator {
+  border: 2px solid transparent;
+  background: linear-gradient(rgba(12,24,32,.97), rgba(12,24,32,.97)) padding-box, var(--grad) border-box;
+  box-shadow: 0 6px 28px rgba(0,0,0,.55), 0 0 22px rgba(56,189,248,.2);
+}
+.dpanel h2, #creator h2 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dpanel header { border-bottom: 2px solid transparent; border-image: var(--grad) 1; padding-bottom: 4px; margin-bottom: 6px; }
+/* the heads-up panels (status box, landmark card, menu bar): a bright green-blue edge with a soft glow */
+#vitals, #card, .top-right .buttons:not(.collapsed) { border: 1.5px solid #5fe0b0; box-shadow: 0 2px 12px rgba(0,0,0,.4), 0 0 12px rgba(56,189,248,.35); }
+#card h2, #card h3 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* the round map and the name of the game */
+#minimap { border: 3px solid #5fe0b0; box-shadow: 0 0 0 2px #38bdf8, 0 0 16px rgba(56,189,248,.7); }
+.top-left h1, #hud h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.top-left h1 small { -webkit-text-fill-color: var(--muted); }
+/* touch controls: the same gradient (the joystick knob, jump, run and the other round buttons) */
+#tc-knob { background: var(--grad); border-color: #fff; }
+#tc-stick { border-color: rgba(95,224,176,.8); box-shadow: 0 0 12px rgba(56,189,248,.4); }
+#tc-walk-btns button, .tc-row button { background: var(--grad); color: #06232a; text-shadow: none; border: 1.5px solid #fff; box-shadow: 0 2px 9px rgba(0,0,0,.4); }
+#tc-run.active, #tc-block.active, #tc-cruise.active { background: var(--grad); color: #06232a; box-shadow: 0 0 0 3px #fff, 0 0 14px rgba(56,189,248,.9); }
+/* a shimmer runs across a button when the pointer is over it */
+@keyframes shimmer { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^="tc-"]):not([style*="background"]):not(:disabled):not(.alert):not(.ready):hover, .in-btn:hover, #start:hover {
+    background-size: 220% 100% !important; animation: shimmer .9s ease-in-out infinite alternate;
+  }
+}
+/* (gradient text: no text-shadow, which would show through the clear letters; a soft drop-shadow keeps it readable) */
+.top-left h1, #hud h1, .dpanel h2, #creator h2, #card h2, #card h3, #v-rest, #vitals .coins b { text-shadow: none; }
+.top-left h1, #hud h1 { filter: drop-shadow(0 1px 3px rgba(0,0,0,.85)); }

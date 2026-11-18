@@ -28,5 +28,7 @@
   const redraw = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; draw(); }); };
   window.addEventListener("resize", redraw);
   draw();
+  const calm = (window.GAMEOPTS && window.GAMEOPTS.low) || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (!calm) svg.animate([{ opacity: 0.82 }, { opacity: 1 }], { duration: 3600, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
   (document.body || document.documentElement).appendChild(svg);
 })();

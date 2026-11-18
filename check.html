@@ -10,7 +10,7 @@
     * { box-sizing: border-box; }
     body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
     main { max-width: 680px; margin: 0 auto; padding: 28px 16px 56px; }
-    h1 { margin: 0 0 6px; font: 700 1.8rem Georgia, serif; }
+    h1 { margin: 0 0 6px; font: 700 1.8rem Georgia, serif; background:linear-gradient(115deg,#ffe066 0%,#a6e35c 22%,#3ec97c 44%,#38bdf8 72%,#5b8def 100%);-webkit-background-clip:text;background-clip:text;color:transparent; }
     .muted { color: var(--muted); }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
     .verdict { font-size: 1.2rem; font-weight: 700; }
@@ -19,7 +19,8 @@
     td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
     td:first-child { width: 48%; color: var(--muted); }
     a, button { color: var(--gold); }
-    button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 0; border-radius: 8px; color: #12262e; background: var(--gold); }
+    button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 16px; border: 1.5px solid #fff; border-radius: 10px; color: #06232a; background: linear-gradient(115deg,#ffe066 0%,#a6e35c 22%,#3ec97c 44%,#38bdf8 72%,#5b8def 100%); box-shadow: 0 2px 9px rgba(0,0,0,.4); }
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;border:5px solid transparent;border-image:linear-gradient(115deg,#ffe066 0%,#a6e35c 22%,#3ec97c 44%,#38bdf8 72%,#5b8def 100%) 1;box-shadow:inset 0 0 14px rgba(56,189,248,.45)}
     ol { padding-left: 22px; }
   </style>
 </head>
