@@ -33,7 +33,7 @@ const Flyover = (() => {
     subEl = document.createElement("span"); subEl.style.cssText = "opacity:.85";
     const help = document.createElement("small"); help.style.cssText = "opacity:.7;font-weight:500"; help.textContent = tr("Drag to look · W A S D fly where you look, E up, Q down, Shift faster · wheel: closer, or faster · Space: hover or tour · Esc to land");
     const row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px";
-    const mk = (label, f) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.style.cssText = "font:inherit;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:linear-gradient(115deg,#ffe066,#a6e35c 22%,#3ec97c 44%,#38bdf8 72%,#5b8def);color:#2a2118"; b.addEventListener("click", f); row.append(b); return b; };
+    const mk = (label, f) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.style.cssText = "font:inherit;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:var(--grad);color:#2a2118"; b.addEventListener("click", f); row.append(b); return b; };
     toggleBtn = mk("", () => toggle()); mk(tr("⌂ Land"), () => stop());
     bar.append(nameEl, subEl, row, help); document.body.append(bar);
   }

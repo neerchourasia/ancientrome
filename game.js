@@ -359,7 +359,11 @@ function wireInput(canvas) {
     });
     for (const g of groups) for (const b of g.querySelectorAll("button:not(.mh)")) b.addEventListener("click", () => { if (window.innerWidth < 700) show(false); });
     const gift = () => typeof Gifts !== "undefined" && Gifts.ready, msgs = () => typeof Social !== "undefined" && Social.unread() > 0;
+    let waiting = false;
     setInterval(() => {
+      const w = gift() || msgs();
+      if (w && !waiting && typeof Sfx !== "undefined" && typeof Look !== "undefined" && Look.chime) Sfx.play("chime");   // something new is waiting
+      waiting = w;
       mb.classList.toggle("alert", !open && (gift() || msgs()));
       for (const g of groups) { const h = g.querySelector(".mh"), id = h.textContent; h.classList.toggle("alert", !g.classList.contains("open") && ((id === "Money and work" && gift()) || (id === "People" && msgs()))); }
     }, 1500);
