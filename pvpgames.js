@@ -191,7 +191,7 @@ const Mini = (() => {
     const fig = createFigure(); paintFigure(fig.mats, pl.look); applyAccessories(fig, pl.look.acc);
     fig.sword.visible = false; fig.g.rotation.order = "YXZ";
     const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
-    x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = color; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
+    x.font = "bold 30px sans-serif"; x.textAlign = "center"; coolTagBg(x); x.fillStyle = color; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.2; tag.renderOrder = 10; fig.g.add(tag);
     scene.add(fig.g); return fig;
   }
@@ -238,7 +238,7 @@ const Mini = (() => {
     const fig = createFigure(); paintFigure(fig.mats, pl.look); applyAccessories(fig, pl.look.acc);
     fig.sword.visible = false; fig.g.rotation.order = "YXZ";
     const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
-    x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = "#ffb09c"; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
+    x.font = "bold 30px sans-serif"; x.textAlign = "center"; coolTagBg(x); x.fillStyle = "#ffb09c"; x.fillText(pl.name.replace(" (practice bot)", " (bot)"), 128, 44);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.2; tag.renderOrder = 10; fig.g.add(tag);
     fig.g.position.set(c.x, 0.05, c.z + (me0 ? 12 : -12)); fig.g.rotation.y = me0 ? 0 : Math.PI; scene.add(fig.g);
     const hud = document.createElement("div"); hud.id = "ball-hud"; hud.innerHTML = '<b id="bh-score"></b><span id="bh-note"></span><small id="bh-help"></small>'; document.body.append(hud);
@@ -314,7 +314,7 @@ const Mini = (() => {
     const boats = m.players.map((pl, i) => {
       const g = makeBoat(BOAT_COLORS[i % 4]); g.position.set(c.x, 0.06, c.lanes[i % 4]); scene.add(g);
       const nm = document.createElement("canvas"); nm.width = 256; nm.height = 64; const x = nm.getContext("2d");
-      x.font = "bold 30px sans-serif"; x.textAlign = "center"; x.fillStyle = "rgba(0,0,0,.55)"; x.fillRect(0, 8, 256, 48); x.fillStyle = mine(i) ? "#9fe0ff" : "#fff3cf"; x.fillText(pl.name.replace(" (practice bot)", ""), 128, 44);
+      x.font = "bold 30px sans-serif"; x.textAlign = "center"; coolTagBg(x); x.fillStyle = mine(i) ? "#9fe0ff" : "#fff3cf"; x.fillText(pl.name.replace(" (practice bot)", ""), 128, 44);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(nm), depthTest: false, transparent: true })); tag.scale.set(4, 1, 1); tag.position.set(0, 5, 0); tag.renderOrder = 10; g.add(tag);
       return { g, s: 0, v: 0, phase: Math.random() * 6, last: 0 };
     });

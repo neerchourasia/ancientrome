@@ -469,7 +469,7 @@ const Online = (() => {
     c.width = 256; c.height = 64;
     const g = c.getContext("2d");
     g.font = "bold 30px sans-serif"; g.textAlign = "center";
-    g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 8, 256, 48);
+    coolTagBg(g);
     g.fillStyle = color || "#fff"; g.fillText(text, 128, 44);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
     s.scale.set(2.4, 0.6, 1); s.position.y = 2.2; s.renderOrder = 10;

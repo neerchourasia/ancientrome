@@ -527,7 +527,7 @@ const Naval = (() => {
     c.width = 256; c.height = 64;
     const g = c.getContext("2d");
     g.font = "bold 28px sans-serif"; g.textAlign = "center";
-    g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 8, 256, 48);
+    coolTagBg(g);
     g.fillStyle = "#fff"; g.fillText(text.replace(" (practice ship)", " (bot)").slice(0, 20), 128, 44);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
     sp.scale.set(7, 1.75, 1); sp.position.set(0, 8.5, 0); sp.renderOrder = 10;

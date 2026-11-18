@@ -1,4 +1,5 @@
 // The frame round the screen: a ribbon in the yellow-green-blue colours whose inner edge wobbles, thick in one place and thin in another, with a few bumps, like a hand-drawn swoosh.
+// (It also holds the one name-tag background that the labels over people and ships use: coolTagBg.)
 // It is one SVG over everything that never catches a click, drawn again when the window changes size.
 (function () {
   "use strict";
@@ -32,3 +33,15 @@
   if (!calm) svg.animate([{ opacity: 0.82 }, { opacity: 1 }], { duration: 3600, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
   (document.body || document.documentElement).appendChild(svg);
 })();
+
+// The plate behind a name over a person or a ship (drawn on the 256 x 64 label canvas, text drawn by the caller on top): a rounded dark blue-green pill with a yellow-green-blue edge.
+window.coolTagBg = function (g) {
+  const r = 22, x = 5, y = 9, w = 246, h = 46;
+  g.beginPath();
+  g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r); g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+  g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r); g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
+  g.fillStyle = "rgba(6,26,32,.82)"; g.fill();
+  const gr = g.createLinearGradient(x, 0, x + w, 0);
+  gr.addColorStop(0, "#ffe066"); gr.addColorStop(0.25, "#a6e35c"); gr.addColorStop(0.5, "#3ec97c"); gr.addColorStop(0.75, "#38bdf8"); gr.addColorStop(1, "#5b8def");
+  g.lineWidth = 4; g.strokeStyle = gr; g.stroke();
+};

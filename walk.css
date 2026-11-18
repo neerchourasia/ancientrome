@@ -1134,3 +1134,7 @@ html body button:not(#btn-menu):not(.dclose):not([aria-label="Close"]):not([id^=
 /* (gradient text: no text-shadow, which would show through the clear letters; a soft drop-shadow keeps it readable) */
 .top-left h1, #hud h1, .dpanel h2, #creator h2, #card h2, #card h3, #v-rest, #vitals .coins b { text-shadow: none; }
 .top-left h1, #hud h1 { filter: drop-shadow(0 1px 3px rgba(0,0,0,.85)); }
+
+/* the start screen: the name in the corner and the big headline are gradient text */
+.in-brand, .in-hero h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+.in-brand .in-logo { -webkit-text-fill-color: initial; }
