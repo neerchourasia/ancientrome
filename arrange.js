@@ -1,4 +1,5 @@
-// Arrange the screen (menu -> Settings -> Arrange the screen): drag each box of the game's screen (the landmark card, the status box, the map, the menu, the title, the day and place, the controls hint) where you like, or hide the ones you do not need.
+// Arrange the screen and the view modes (menu -> Settings -> Arrange the screen / View: Full, Explorer or Real life, which shows nothing but the menu).
+// Arrange the screen: drag each box of the game's screen (the landmark card, the status box, the map, the menu, the title, the day and place, the controls hint) where you like, or hide the ones you do not need.
 // The boxes themselves are not touched while you drag: a dashed frame sits over each one, and the frame carries the drag and the hide button. The places are kept in the browser (rome-layout) as a share of the window, so they still fit when the window changes size.
 // The menu button and the menu bar can be moved but not hidden (you would lose the way back to this).
 const Arrange = (() => {
@@ -106,7 +107,34 @@ const Arrange = (() => {
 
   window.addEventListener("keydown", swallow, true); window.addEventListener("keyup", (ev) => { if (on) ev.stopImmediatePropagation(); }, true);
   window.addEventListener("resize", () => applyAll());
-  function ready() { applyAll(); const b = document.getElementById("btn-arrange"); if (b) b.addEventListener("click", start); }
+  // ---- the view modes: how much of the screen is shown (menu -> Settings -> View) ----
+  const VIEWS = [
+    { id: "full",     label: "Full",      say: "Full view: everything on the screen." },
+    { id: "explorer", label: "Explorer",  say: "Explorer view: the map, the status box and the menu. The rest is hidden." },
+    { id: "real",     label: "Real life", say: "Real life: nothing but the menu. Open the menu, then Settings, then View to bring the screen back." },
+  ];
+  const VKEY = "rome-view";
+  let view = "full";
+  try { const v = localStorage.getItem(VKEY); if (VIEWS.some((x) => x.id === v)) view = v; } catch (e) { /* storage unavailable */ }
+  function showView(say) {
+    const root = document.documentElement, v = VIEWS.find((x) => x.id === view);
+    for (const x of VIEWS) root.classList.toggle("view-" + x.id, x.id === view);
+    const b = document.getElementById("btn-view"); if (b) b.textContent = "👁 View: " + v.label;
+    if (say && typeof toast === "function") toast(v.say);
+  }
+  function setView(id, say) {
+    if (!VIEWS.some((x) => x.id === id)) return;
+    view = id; try { localStorage.setItem(VKEY, view); } catch (e) { /* ignore */ }
+    showView(say);
+  }
+  const nextView = () => VIEWS[(VIEWS.findIndex((x) => x.id === view) + 1) % VIEWS.length].id;
+  showView(false);                                   // the right view from the very first paint (the class is on <html>)
+
+  function ready() {
+    applyAll(); showView(false);
+    const b = document.getElementById("btn-arrange"); if (b) b.addEventListener("click", start);
+    const v = document.getElementById("btn-view"); if (v) v.addEventListener("click", () => setView(nextView(), true));
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
-  return { start, stop, reset() { st = {}; save(); applyAll(); }, get active() { return on; } };
+  return { start, stop, setView, get view() { return view; }, reset() { st = {}; save(); applyAll(); }, get active() { return on; } };
 })();
