@@ -119,7 +119,7 @@ const Arrange = (() => {
   function showView(say) {
     const root = document.documentElement, v = VIEWS.find((x) => x.id === view);
     for (const x of VIEWS) root.classList.toggle("view-" + x.id, x.id === view);
-    const b = document.getElementById("btn-view"); if (b) b.textContent = "👁 View: " + v.label;
+    const b = document.getElementById("btn-screenview"); if (b) b.textContent = "👁 View: " + v.label;
     if (say && typeof toast === "function") toast(v.say);
   }
   function setView(id, say) {
@@ -133,7 +133,7 @@ const Arrange = (() => {
   function ready() {
     applyAll(); showView(false);
     const b = document.getElementById("btn-arrange"); if (b) b.addEventListener("click", start);
-    const v = document.getElementById("btn-view"); if (v) v.addEventListener("click", () => setView(nextView(), true));
+    const v = document.getElementById("btn-screenview"); if (v) v.addEventListener("click", () => setView(nextView(), true));
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready); else ready();
   return { start, stop, setView, get view() { return view; }, reset() { st = {}; save(); applyAll(); }, get active() { return on; } };
