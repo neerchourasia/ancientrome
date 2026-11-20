@@ -111,6 +111,10 @@ const Arrange = (() => {
   const VIEWS = [
     { id: "full",     label: "Full",      say: "Full view: everything on the screen." },
     { id: "explorer", label: "Explorer",  say: "Explorer view: the map, the status box and the menu. The rest is hidden." },
+    { id: "map",      label: "Map",       say: "Map view: just the map and the menu." },
+    { id: "status",   label: "Status",    say: "Status view: just the status box and the menu." },
+    { id: "guide",    label: "Guide",     say: "Guide view: the title, the day and place, the landmark card and the menu." },
+    { id: "scenery",  label: "Scenery",   say: "Scenery view: the border and the menu, nothing else." },
     { id: "real",     label: "Real life", say: "Real life: nothing but the menu. Open the menu, then Settings, then View to bring the screen back." },
   ];
   const VKEY = "rome-view";

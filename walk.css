@@ -1152,5 +1152,9 @@ body.arranging #help { opacity: 1 !important; }
 
 /* the view modes (arrange.js): Explorer keeps the map, the status box and the menu; Real life keeps nothing but the menu (while arranging, everything shows). The border is drawn straight on <html> (border.js), so it is hidden from there. */
 html.view-explorer body:not(.arranging) :is(.top-left, .top-center, #card, #help),
+html.view-map body:not(.arranging) :is(.top-left, .top-center, #card, #help, #vitals),
+html.view-status body:not(.arranging) :is(.top-left, .top-center, #card, #help, #minimap),
+html.view-guide body:not(.arranging) :is(#help, #vitals, #minimap),
+html.view-scenery body:not(.arranging) :is(.top-left, .top-center, #card, #vitals, #help, #minimap, #chat-log),
 html.view-real body:not(.arranging) :is(.top-left, .top-center, #card, #vitals, #help, #minimap, #chat-log) { display: none !important; }
-html.view-explorer:has(body:not(.arranging)) > #frame, html.view-real:has(body:not(.arranging)) > #frame { display: none !important; }
+html:is(.view-explorer, .view-map, .view-status, .view-guide, .view-real):has(body:not(.arranging)) > #frame { display: none !important; }
