@@ -1,18 +1,19 @@
 "use strict";
 // Car and plane space (the file and the object are still called NercarSpace): a huge open field of grass with things to fly round, for your cars and planes and the NERCAR. 🚀 Car and plane space (in the menu) takes you there on foot; there, two buttons at the bottom of the
 // screen give you a vehicle: 🚗 Rent a NERCAR (expensive: RENT, paid every time) or 🚗 Get out yours (a list of the cars and planes you own: buy them in the Market; no weather grounds a plane here). Press the menu button again to go back to where you were.
-// It is not a city of its own: it is built far away from the others (x = -30000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
+// It is not a city of its own: it is built far away from the others (x = -60000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
 // concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The things to fly round (a tower, a ring of pillars, a gate to fly through, slalom walls and big
-// balls, and a scatter of pillars and balls over the whole field, and ten big gates) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
+// balls, and a scatter of pillars and balls over the whole field, and thirty big gates) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
 // Depends on game.js, car.js (the NERCAR), vitals.js (the money) and market.js (whether you own one) at run time.
 
 const NercarSpace = (() => {
-  const OX = -30000, HALF = 20000;                                 // the middle of the field, and half of its width: 40 km across (the NERCAR crosses 900 m in half a second)
+  const OX = -60000, HALF = 50000;                                 // the middle of the field, and half of its width: 100 km across (the NERCAR crosses 900 m in half a second)
   const K = 10, Z = 2;                                             // the layout below is drawn small: its distances are made K times longer and the things Z times bigger
   const RENT = 50000;                                              // what a rented NERCAR costs, every time (buying one costs 1,000,000)
   const FIELD = { minX: OX - HALF, maxX: OX + HALF, minZ: -HALF, maxZ: HALF };
   let group = null, active = false, saved = null, wired = false;
-  const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const mats = new Map();                                          // one material for each colour (there are hundreds of things in the field)
+  const lam = (c) => { if (!mats.has(c)) mats.set(c, new THREE.MeshLambertMaterial({ color: c })); return mats.get(c); };
   const $n = (id) => document.getElementById(id);
 
   function stripes() {                                             // two greens in big squares, so you can see how fast you go
@@ -55,13 +56,13 @@ const NercarSpace = (() => {
     let seed = 20261121;                                                // a scatter over the whole field (the same every time), not near where you arrive
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     const colors = [0xc0392b, 0xe6b422, 0x2c6fbb, 0x8e44ad, 0x27ae60, 0xe67e22, 0xd8d2c4];
-    for (let i = 0; i < 10; i++) {                                      // ten big gates in a ring round the middle, to fly through
-      const a = (i / 10) * Math.PI * 2 + 0.3, d = 9000 + (i % 3) * 2500, x = Math.cos(a) * d, z = Math.sin(a) * d, c = colors[i % colors.length];
+    for (let i = 0; i < 30; i++) {                                      // thirty big gates in three rings round the middle, to fly through
+      const ring = i % 3, a = (Math.floor(i / 3) / 10) * Math.PI * 2 + ring * 0.4, d = [9000, 22000, 38000][ring], x = Math.cos(a) * d, z = Math.sin(a) * d, c = colors[i % colors.length];
       put(x, z - 90, 26, 26, 120, c, 0); put(x, z + 90, 26, 26, 120, c, 0); put(x, z, 30, 230, 20, c, 120);
     }
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 900; i++) {
       const x = (rnd() * 2 - 1) * (HALF - 1500), z = (rnd() * 2 - 1) * (HALF - 1500);
-      if (Math.hypot(x - (-HALF + 400), z) < 1200) continue;
+      if (Math.hypot(x + 3000, z) < 1500) continue;
       const c = colors[Math.floor(rnd() * colors.length)];
       if (i % 3) put(x, z, 20 + rnd() * 30, 20 + rnd() * 30, 60 + rnd() * 200, c, 0); else putBall(x, z, 20 + rnd() * 40, c);
     }
@@ -110,7 +111,7 @@ const NercarSpace = (() => {
     active = true;
     group.visible = true;
     Object.assign(BOUNDS, FIELD);
-    placeAt(OX - HALF + 400, 0, -Math.PI / 2);
+    placeAt(OX - 3000, 0, -Math.PI / 2);
     $("#hud .top-left h1").innerHTML = "Time Machine <small>Car and plane space</small>";
     $("#map-title").textContent = "Car and plane space";
     setHud(true);
