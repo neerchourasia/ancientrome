@@ -5,6 +5,7 @@
 //                 and you shiver.
 //   Food poisoning from street food (more often in summer): you lose what you ate and some health, for a short while.
 //   Heatstroke .. in Delhi's summer, from walking in the midday sun with nothing to drink: you slow down and feel dizzy.
+//   Ner poisoning  a strong poison (1 health a second away from home, 16 minutes); only time or the strongest medicine cures it.
 //   Plague ...... every few weeks an outbreak sweeps one city for three days; being in a crowd then can infect you. Serious: it
 //                 drains health and slows you for a long time, and only a strong medicine (or a long rest) cures it.
 // Sleeping at home and resting speed up recovery. Medicines are sold by the healer in the market. An illness never kills you
@@ -18,7 +19,7 @@ const Disease = (() => {
     poison: { name: "Food poisoning", icon: "🤢", secs: 100, drain: 0.25, regen: 0.6, speed: 0.9, cure: "time, or a tonic" },
     heat: { name: "Heatstroke", icon: "😵", secs: 240, drain: 0.1, regen: 0.7, speed: 0.78, cure: "shade, water or a cool drink" },
     plague: { name: "Plague", icon: "☠", secs: 1200, drain: 0.32, regen: 0.2, speed: 0.72, cure: "theriac, the strong medicine" },
-    Ner: { name: "Ner poisoning", icon: "", secs: 1000, drain: 1, regen: 0.6, speed: 0.9, cure: "time, or a tonic" },
+    Ner: { name: "Ner poisoning", icon: "☣️", secs: 1000, drain: 1, regen: 0.6, speed: 0.9, cure: "time, or the strongest medicine" },
   };
   let sick = {};                 // kind -> seconds left
   let wetT = 0, marshT = 0, sunT = 0, sneezeT = 8, coughT = 6, tickT = 0, lastOutbreak = "", shownOutbreak = "", hudT = 0, saveT = 0;
@@ -36,7 +37,7 @@ const Disease = (() => {
   }
   // at your house: in it, or in its grounds (Rome), or on your plot (Delhi). Being ill anywhere else costs you health.
   const atHome = () => (typeof city !== "undefined" && city === "cancun" ? (Cancun.built && (Cancun.homeInside(player.x, player.z) || Cancun.inHome(player.x, player.z))) : typeof city !== "undefined" && city === "delhi" ? (Delhi.built && (Delhi.homeInside(player.x, player.z) || Delhi.inPlot(player.x, player.z))) : (Home.inside(player.x, player.z) || Math.hypot(player.x - Home.X, player.z - Home.Z) < 16));
-  const AWAY = { cold: 0.2, fever: 0.3, poison: 0.35, heat: 0.25, plague: 0.5 };   // health lost per second while ill and away from home
+  const AWAY = { cold: 0.2, fever: 0.3, poison: 0.35, heat: 0.25, plague: 0.5, Ner: 1 };   // health lost per second while ill and away from home
   const indoors = () => (typeof city !== "undefined" && city === "cancun" ? (Cancun.built && Cancun.homeInside(player.x, player.z)) : typeof city !== "undefined" && city === "delhi" ? (Delhi.built && Delhi.homeInside(player.x, player.z)) : (Home.inside(player.x, player.z) || (typeof Jobs !== "undefined" && Jobs.inHall(player.x, player.z))));
 
   let grace = 0;     // for a few minutes after you get better (or are cured) you cannot catch anything common again
@@ -88,7 +89,7 @@ const Disease = (() => {
       const home = Vitals.resting || indoors() && Time.isNight;
       sick[k] -= dt * (home ? 3 : 1) * (Vitals.hunger > 60 ? 1.2 : 1);           // rest and good food help you through
       if (k === "heat" && (indoors() || Vitals.resting)) sick[k] -= dt * 6;       // shade
-      drain += away ? AWAY[k] : 0; regen = Math.min(regen, D[k].regen); slow = Math.min(slow, D[k].speed);
+      drain += away ? (AWAY[k] || 0) : 0; regen = Math.min(regen, D[k].regen); slow = Math.min(slow, D[k].speed);
       if (sick[k] <= 0) { sick[k] = 0; grace = 300; toast(`You feel better: the ${D[k].name.toLowerCase()} has passed.`); render(); }
     }
     Disease.regenMul = regen; Disease.speedMul = slow;

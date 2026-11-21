@@ -214,16 +214,16 @@ const Market = (() => {
   const CURES = {
     c_tea: { type: "cure", name: "Hot honey and herb drink", price: 10, note: "Cures a cold.", cures: ["cold"], where: ["rome"] },
     c_tonic: { type: "cure", name: "Bitter bark tonic", price: 40, note: "Cures marsh fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["rome"] },
-    c_theriac: { type: "cure", name: "Theriac", price: 130, note: "The great antidote of Rome: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["rome"] },
+    c_theriac: { type: "cure", name: "Theriac", price: 130, note: "The great antidote of Rome: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague", "Ner"], where: ["rome"] },
     c_ginger: { type: "cure", name: "Ginger and jujube tea", price: 10, note: "A hot sweet tea that cures a cold.", cures: ["cold"], where: ["beijing"] },
     c_herbal: { type: "cure", name: "Herbal decoction", price: 40, note: "A bitter brew from the physician's shop. Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["beijing"] },
-    c_ginseng: { type: "cure", name: "Ginseng and lingzhi", price: 130, note: "The strongest remedy of the imperial physicians: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["beijing"] },
+    c_ginseng: { type: "cure", name: "Ginseng and lingzhi", price: 130, note: "The strongest remedy of the imperial physicians: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague", "Ner"], where: ["beijing"] },
     c_lime: { type: "cure", name: "Honey and lime tea", price: 10, note: "A hot tea of lime leaves and honey that cures a cold.", cures: ["cold"], where: ["cancun"] },
     c_soursop: { type: "cure", name: "Soursop leaf tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["cancun"] },
-    c_chilam: { type: "cure", name: "The h-men's great remedy", price: 130, note: "The strongest cure of the Maya healers: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["cancun"] },
+    c_chilam: { type: "cure", name: "The h-men's great remedy", price: 130, note: "The strongest cure of the Maya healers: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague", "Ner"], where: ["cancun"] },
     c_kadha: { type: "cure", name: "Tulsi and ginger kadha", price: 10, note: "A hot herbal drink that cures a cold.", cures: ["cold"], where: ["delhi"] },
     c_neem: { type: "cure", name: "Neem and giloy tonic", price: 40, note: "Cures fever, food poisoning and heatstroke.", cures: ["fever", "poison", "heat"], where: ["delhi"] },
-    c_rasa: { type: "cure", name: "Ayurvedic rasayana", price: 130, note: "The strongest medicine of the vaidyas: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague"], where: ["delhi"] },
+    c_rasa: { type: "cure", name: "Ayurvedic rasayana", price: 130, note: "The strongest medicine of the vaidyas: cures any illness, even plague.", cures: ["cold", "fever", "poison", "heat", "plague", "Ner"], where: ["delhi"] },
   };
   Object.assign(FOODS, {   // more dishes in every city and era
     f_figs: F("Figs and dates", 7, 11, "Sweet dried fruit, the sweets of ancient Rome.", ["rome", "ancient"]),
