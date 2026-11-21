@@ -23,11 +23,11 @@ const Souvenirs = (() => {
     ["beijing-brick", "beijing", "🧱", "A brick of the Great Wall", "b-wall", "Ming builders baked the bricks in kilns by the wall, and sticky rice mortar held them."],
     ["beijing-seal", "beijing", "🟩", "A jade seal", "b-harmony", "An emperor's seal was the sign of his power: whoever held it could write the law."],
     ["beijing-heaven", "beijing", "⛩️", "A model of the Temple of Heaven", "b-heaven", "Its blue roof is the colour of the sky: here the emperor prayed for the harvest."],
-     ["Ner-car-rider", "any", "", "A model of the Ner car", "Ner-car", "its black: its a car."],
+     ["any-nercar", "any", "🚗", "A model of the NERCAR", "nercar", "its black: its a car."],   // (given by owning a NERCAR: see have())
   ];
-  const CITIES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
+  const CITIES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing", any: "Anywhere" };
   const lmName = (id) => { const l = ALL_LANDMARKS.find((x) => x.id === id); return l ? l.name : id; };
-  const have = () => LIST.filter((s) => discovered.has(s[4]));
+  const have = () => LIST.filter((s) => discovered.has(s[4]) || (s[4] === "nercar" && typeof Market !== "undefined" && Market.owns("nercar")));   // (the NERCAR model is not a sight: it is yours when you own a NERCAR)
   const sig = () => have().map((s) => s[0]).join(",");
   const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
 
@@ -47,6 +47,7 @@ const Souvenirs = (() => {
       case "delhi-diya": add(new T.CylinderGeometry(0.1, 0.06, 0.05, 12), bronze, 0, 0.025, 0); add(new T.SphereGeometry(0.03, 8, 6), new T.MeshBasicMaterial({ color: 0xffc860 }), 0, 0.09, 0); break;
       case "delhi-feather": add(new T.ConeGeometry(0.045, 0.34, 8), lambert(0x1f8a8a), 0, 0.2, 0, 0, 0, 0.5); add(new T.SphereGeometry(0.04, 8, 6), blue, 0.04, 0.3, 0); break;
       case "delhi-spice": add(new T.CylinderGeometry(0.08, 0.09, 0.15, 12), lambert(0xc4621f), 0, 0.075, 0); add(new T.CylinderGeometry(0.06, 0.06, 0.04, 12), wood, 0, 0.17, 0); break;
+      case "any-nercar": add(new T.BoxGeometry(0.4, 0.05, 0.1), lambert(0x111111), 0, 0.075, 0); add(new T.BoxGeometry(0.12, 0.03, 0.07), lambert(0x2a3a48), 0.05, 0.11, 0); for (const x of [-0.12, 0.1]) add(new T.BoxGeometry(0.08, 0.01, 0.06), new T.MeshBasicMaterial({ color: 0x62b3ff }), x, 0.04, 0); break;
       case "cancun-castillo": for (let i = 0; i < 4; i++) add(new T.BoxGeometry(0.3 - i * 0.07, 0.06, 0.3 - i * 0.07), stone, 0, 0.03 + i * 0.06, 0); add(new T.BoxGeometry(0.07, 0.06, 0.07), cream, 0, 0.27, 0); break;
       case "cancun-ball": add(new T.SphereGeometry(0.1, 14, 10), lambert(0x6a3b22), 0, 0.1, 0); break;
       case "cancun-jade": add(new T.SphereGeometry(0.07, 12, 8), jade, 0, 0.07, 0); add(new T.SphereGeometry(0.05, 12, 8), jade, 0.12, 0.05, 0.02); break;
@@ -89,7 +90,7 @@ const Souvenirs = (() => {
       body.append(el("h4", name, "tn-round"));
       for (const s of LIST.filter((x) => x[1] === c)) {
         const row = el("div", undefined, `sp-row${got.has(s[0]) ? "" : " sv-lock"}`), t = el("span");
-        t.textContent = got.has(s[0]) ? `${s[2]} ${s[3]}: ${s[5]}` : `🔒 ${s[3]}: discover ${lmName(s[4])}`;
+        t.textContent = got.has(s[0]) ? `${s[2]} ${s[3]}: ${s[5]}` : s[4] === "nercar" ? `🔒 ${s[3]}: buy a NERCAR in the Market` : `🔒 ${s[3]}: discover ${lmName(s[4])}`;
         row.append(t); body.append(row);
       }
     }

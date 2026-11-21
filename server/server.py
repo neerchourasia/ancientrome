@@ -6259,7 +6259,7 @@ def replay_add(kind, names, winner, moves, tape=None, end=None):
 
 
 SOUVENIRS = ("rome-denarius", "rome-rudis", "rome-pantheon", "rome-wheel", "delhi-gate", "delhi-diya", "delhi-feather", "delhi-spice",
-             "cancun-castillo", "cancun-ball", "cancun-jade", "cancun-conch", "beijing-lantern", "beijing-brick", "beijing-seal", "beijing-heaven")       # (what the browser can show on a profile: see souvenirs.js)
+             "cancun-castillo", "cancun-ball", "cancun-jade", "cancun-conch", "beijing-lantern", "beijing-brick", "beijing-seal", "beijing-heaven", "any-nercar")       # (what the browser can show on a profile: see souvenirs.js)
 SOUV_GAP = 5.0
 
 
