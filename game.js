@@ -1229,7 +1229,7 @@ function periodLabels() {
 }
 
 function toggleEra() {
-  if (NercarSpace.active) { toast("Leave NERCAR space first (press its button in the menu)."); return; }
+  if (NercarSpace.active) { toast("Leave car and plane space first (press its button in the menu)."); return; }
   if (Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
   if (mode !== "walk") { toast("Leave the game first to switch eras"); return; }
   setPeriod(periodNow() === "ancient" ? "mid" : periodNow() === "mid" ? "modern" : "ancient");
@@ -1259,7 +1259,7 @@ let travelBusy = false;
 const mapCache = {};
 // The Travel button (or B): a list of the cities, and you choose where to go.
 function openTravel() {
-  if (NercarSpace.active) { toast("Leave NERCAR space first (press its button in the menu)."); return; }
+  if (NercarSpace.active) { toast("Leave car and plane space first (press its button in the menu)."); return; }
   if (Jail.active) { toast("You are in jail: wait out your sentence or bribe the guard."); return; }
   if ($("#travel").classList.contains("show")) { closePanels(); return; }
   if (mode !== "walk" || panelOpen || sleepT > 0 || !started) { toast("Close what is open and stop the game first to travel"); return; }

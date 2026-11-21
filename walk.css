@@ -1163,3 +1163,5 @@ html:is(.view-explorer, .view-map, .view-status, .view-guide, .view-real):has(bo
 #ns-hud[hidden] { display: none; }
 #ns-hud button { padding: 10px 16px; font-size: .95rem; font-weight: 700; color: var(--ink); background: rgba(28,22,16,.9); border: 1px solid rgba(226,185,85,.6); border-radius: 10px; cursor: pointer; }
 #ns-hud button:hover { background: rgba(60,48,30,.95); }
+#ns-list { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; max-height: 50vh; overflow-y: auto; }
+#ns-list[hidden] { display: none; }

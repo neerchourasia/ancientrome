@@ -1,9 +1,9 @@
 "use strict";
-// NERCAR space: a huge open field of grass with a few things to fly round, for flying the NERCAR. 🚀 NERCAR space (in the menu) takes you there on foot; there, two buttons at the bottom of the
-// screen give you a NERCAR: 🚗 Rent a NERCAR (expensive: RENT, paid every time) or 🚗 Get out yours (free, if you own one: buy it in the Market). Press the menu button again to go back to where you were.
+// Car and plane space (the file and the object are still called NercarSpace): a huge open field of grass with things to fly round, for your cars and planes and the NERCAR. 🚀 Car and plane space (in the menu) takes you there on foot; there, two buttons at the bottom of the
+// screen give you a vehicle: 🚗 Rent a NERCAR (expensive: RENT, paid every time) or 🚗 Get out yours (a list of the cars and planes you own: buy them in the Market; no weather grounds a plane here). Press the menu button again to go back to where you were.
 // It is not a city of its own: it is built far away from the others (x = -30000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
 // concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The things to fly round (a tower, a ring of pillars, a gate to fly through, slalom walls and big
-// balls, and a scatter of pillars and balls over the whole field) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
+// balls, and a scatter of pillars and balls over the whole field, and ten big gates) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
 // Depends on game.js, car.js (the NERCAR), vitals.js (the money) and market.js (whether you own one) at run time.
 
 const NercarSpace = (() => {
@@ -55,7 +55,11 @@ const NercarSpace = (() => {
     let seed = 20261121;                                                // a scatter over the whole field (the same every time), not near where you arrive
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     const colors = [0xc0392b, 0xe6b422, 0x2c6fbb, 0x8e44ad, 0x27ae60, 0xe67e22, 0xd8d2c4];
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 10; i++) {                                      // ten big gates in a ring round the middle, to fly through
+      const a = (i / 10) * Math.PI * 2 + 0.3, d = 9000 + (i % 3) * 2500, x = Math.cos(a) * d, z = Math.sin(a) * d, c = colors[i % colors.length];
+      put(x, z - 90, 26, 26, 120, c, 0); put(x, z + 90, 26, 26, 120, c, 0); put(x, z, 30, 230, 20, c, 120);
+    }
+    for (let i = 0; i < 260; i++) {
       const x = (rnd() * 2 - 1) * (HALF - 1500), z = (rnd() * 2 - 1) * (HALF - 1500);
       if (Math.hypot(x - (-HALF + 400), z) < 1200) continue;
       const c = colors[Math.floor(rnd() * colors.length)];
@@ -73,16 +77,24 @@ const NercarSpace = (() => {
     const rent = $n("ns-rent"), own = $n("ns-own");
     rent.textContent = `🚗 Rent a NERCAR (${RENT} denarii)`;
     rent.addEventListener("click", () => {
-      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a NERCAR." : "Get out of what you are in first."); return; }
+      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a vehicle." : "Get out of what you are in first."); return; }
       if (Vitals.coins < RENT) { toast(`A rented NERCAR costs ${RENT} denarii: you have ${Math.floor(Vitals.coins)}.`); return; }
       Vitals.coins -= RENT; Sfx.play("coin");
       toast(`You rent a NERCAR for ${RENT} denarii.`);
       Car.deploy("nercar");
     });
+    const list = document.createElement("div"); list.id = "ns-list"; list.hidden = true; $n("ns-hud").prepend(list);
     own.addEventListener("click", () => {
-      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a NERCAR." : "Get out of what you are in first."); return; }
-      if (!Market.owns("nercar")) { toast("You do not own a NERCAR. Buy one in the Market, or rent one here."); return; }
-      Car.deploy("nercar");
+      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a vehicle." : "Get out of what you are in first."); return; }
+      if (!list.hidden) { list.hidden = true; return; }
+      const mine = Object.keys(Market.ITEMS).filter((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && (Car.MODELS[id].era || "modern") === "modern" && Market.owns(id));
+      if (!mine.length) { toast("You do not own a car or a plane yet. Buy one in the Market, or rent a NERCAR here."); return; }
+      list.replaceChildren(...mine.map((id) => {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = `${Market.ITEMS[id].name}`;
+        b.addEventListener("click", () => { list.hidden = true; if (active && mode === "walk") Car.deploy(id); });
+        return b;
+      }));
+      list.hidden = false;
     });
   }
 
@@ -99,10 +111,10 @@ const NercarSpace = (() => {
     group.visible = true;
     Object.assign(BOUNDS, FIELD);
     placeAt(OX - HALF + 400, 0, -Math.PI / 2);
-    $("#hud .top-left h1").innerHTML = "Time Machine <small>NERCAR space</small>";
-    $("#map-title").textContent = "NERCAR space";
+    $("#hud .top-left h1").innerHTML = "Time Machine <small>Car and plane space</small>";
+    $("#map-title").textContent = "Car and plane space";
     setHud(true);
-    toast("🚀 NERCAR space: rent a NERCAR (buttons at the bottom), or get yours out if you own one. W to go, Space up, Shift down. The menu button takes you back.");
+    toast("🚀 Car and plane space: rent a NERCAR or get out one of yours (buttons at the bottom). The menu button takes you back.");
   }
 
   function leave() {
