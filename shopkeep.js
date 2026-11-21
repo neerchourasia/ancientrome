@@ -28,7 +28,7 @@ const Shopkeep = (() => {
     longjing: ["Longjing tea", 30, "beijing", "jar", 0x5a7a3a, "Tea shop"], jasmine: ["Jasmine tea", 22, "beijing", "jar", 0xe0e0d0, "Tea shop"], teapot: ["Clay teapot", 45, "beijing", "jar", 0x8a4a2a, "Tea shop"],
     cacao: ["Cacao beans", 10, "cancun", "sack", 0x5a3a22, "Cacao seller"], vanilla: ["Vanilla pods", 25, "cancun", "tool", 0x2a1a10, "Cacao seller"], honey: ["Honey jar", 14, "cancun", "jar", 0xd9a030, "Cacao seller"],
     obsidian: ["Obsidian blade", 45, "cancun", "tool", 0x1a1a22, "Obsidian trader"], copal: ["Copal incense", 12, "cancun", "box", 0xe0d8b0, "Obsidian trader"], bowl: ["Painted bowl", 18, "cancun", "cup", 0xc4673c, "Obsidian trader"],
-    snacks: ["Snack box", 6, "beijing", "box", 0xe23b3b, "Convenience store"], umbrella: ["Umbrella", 15, "beijing", "tool", 0x2c7fe0, "Convenience store"], phonecard: ["Phone card", 8, "beijing", "box", 0xf2c21b, "Convenience store"],
+    snacks: ["Snack box", 6, "beijing", "box", 0xe23b3b, "Convenience store"], umbrella: ["Umbrella", 15, "beijing", "tool", 0x2c7fe0, "Convenience store"], phonecard: ["Phone card", 8, "beijing", "box", 0xf2c21b, "Convenience store"],Ner: ["Ner", 100, "car and plane space", "Ner deseis", 000000, "Ner store"]
   };
   // what the keepers can make from your goods: id: [name, value, city, shape, colour, ""] (made, not sold), and the recipe (the shop kind with the workbench, what it takes)
   Object.assign(GOODS, {
