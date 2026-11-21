@@ -23,6 +23,7 @@ const Souvenirs = (() => {
     ["beijing-brick", "beijing", "🧱", "A brick of the Great Wall", "b-wall", "Ming builders baked the bricks in kilns by the wall, and sticky rice mortar held them."],
     ["beijing-seal", "beijing", "🟩", "A jade seal", "b-harmony", "An emperor's seal was the sign of his power: whoever held it could write the law."],
     ["beijing-heaven", "beijing", "⛩️", "A model of the Temple of Heaven", "b-heaven", "Its blue roof is the colour of the sky: here the emperor prayed for the harvest."],
+     ["Ner-car-rider", "any", "", "A model of the Ner car", "Ner-car", "its black: its a car."],
   ];
   const CITIES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
   const lmName = (id) => { const l = ALL_LANDMARKS.find((x) => x.id === id); return l ? l.name : id; };
