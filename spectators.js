@@ -33,7 +33,7 @@ const Crowd = (() => {
       }
     }
 
-    const bodyGeo = new THREE.CylinderGeometry(0.26, 0.32, 0.8, 6); bodyGeo.translate(0, 0.4, 0);
+    const bodyGeo = new THREE.CylinderGeometry(0.60, 0.40, 0.8, 7); bodyGeo.translate(0, 0.4, 0);
     const headGeo = new THREE.SphereGeometry(0.16, 6, 5); headGeo.translate(0, 0.95, 0);
     body = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), spots.length);
     head = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), spots.length);
