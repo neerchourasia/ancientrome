@@ -25,7 +25,7 @@ const Car = (() => {
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
     metro: { name: "Metro train", max: 23, accel: 3.4, turn: 0, color: 0x1d4fa0, len: 36, wid: 3.0, rail: true, camH: 3.5, camBack: 22, verb: "board" },   // runs on the rails of the metro (subway.js): it cannot steer
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
-    nercar: { name: "NERCAR", max: 500, accel: 20, turn: 4.2, color: 0x111111, len: 15, wid: 0.2, camH: 2.6, verb: "jump on", fly: true, hover: true, air: "heli", flyMul: 0.5, ceiling: 320, climb: 9, hard: 8, respond: 0.9 },   // flies with no wings (hoverUpdate, like a helicopter): at half its top speed (flyMul), and the full speed on the ground
+    nercar: { name: "NERCAR", max: 2000, ground: 1000, accel: 20, turn: 4.2, color: 0x111111, len: 15, wid: 0.2, camH: 2.6, verb: "jump on", fly: true, hover: true, air: "heli", ceiling: 320, climb: 9, hard: 8, respond: 0.9 },   // flies with no wings (hoverUpdate, like a helicopter): 2000 in the air (max) and 1000 on the ground (ground)
   };
   Object.assign(MODELS, AIRCRAFT);   // jets, helicopters, balloons ... (aircraft.js)
   const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
@@ -543,7 +543,7 @@ const Car = (() => {
       car.vx += (wx - car.vx) * Math.min(1, dt * 0.4); car.vz += (wz - car.vz) * Math.min(1, dt * 0.4);
       car.v = Math.hypot(car.vx, car.vz); dx = car.vx * dt; dz = car.vz * dt;
     } else {
-      const target = ((fwd ? 1 : 0) - (back ? 0.5 : 0)) * M.max * (air ? (M.flyMul || 1) : 0.25);                   // on the ground you can only creep along
+      const target = ((fwd ? 1 : 0) - (back ? 0.5 : 0)) * (air ? M.max : (M.ground || M.max * 0.25));                   // on the ground you can only creep along
       car.v += (target - car.v) * Math.min(1, dt * M.respond);
       dx = fx * car.v * dt; dz = fz * car.v * dt;
     }
