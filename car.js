@@ -25,6 +25,7 @@ const Car = (() => {
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
     metro: { name: "Metro train", max: 23, accel: 3.4, turn: 0, color: 0x1d4fa0, len: 36, wid: 3.0, rail: true, camH: 3.5, camBack: 22, verb: "board" },   // runs on the rails of the metro (subway.js): it cannot steer
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
+    Nercar: { name: "Nercar", max: 500, accel: 20, turn: 4,2, color: 10x25x26a95, len: 15, wid: 0.2, motor: false, camH: 2.6, verb: "jump on" },
   };
   Object.assign(MODELS, AIRCRAFT);   // jets, helicopters, balloons ... (aircraft.js)
   const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
