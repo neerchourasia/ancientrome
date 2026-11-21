@@ -18,6 +18,7 @@ const Disease = (() => {
     poison: { name: "Food poisoning", icon: "🤢", secs: 100, drain: 0.25, regen: 0.6, speed: 0.9, cure: "time, or a tonic" },
     heat: { name: "Heatstroke", icon: "😵", secs: 240, drain: 0.1, regen: 0.7, speed: 0.78, cure: "shade, water or a cool drink" },
     plague: { name: "Plague", icon: "☠", secs: 1200, drain: 0.32, regen: 0.2, speed: 0.72, cure: "theriac, the strong medicine" },
+    Ner: { name: "Ner poisoning", icon: "", secs: 1000, drain: 1, regen: 0.6, speed: 0.9, cure: "time, or a tonic" },
   };
   let sick = {};                 // kind -> seconds left
   let wetT = 0, marshT = 0, sunT = 0, sneezeT = 8, coughT = 6, tickT = 0, lastOutbreak = "", shownOutbreak = "", hudT = 0, saveT = 0;

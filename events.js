@@ -69,7 +69,7 @@ const Events = (() => {
   }
 
   // ---------------------------------------------------------------- a run
-  const rightVehicle = (c, M) => !!M && (c.kind === "metro" ? !!M.rail : !M.rail && !!M.fly === (c.kind === "air"));
+  const rightVehicle = (c, M) => !!M && (c.kind === "metro" ? !!M.rail : !M.rail && !!(M.fly && !M.notPlane) === (c.kind === "air"));
   function start(c) {
     const M = Car.driving && Car.current ? Car.MODELS[Car.current] : null;
     if (c.kind === "metro" && !(M && M.rail && Subway.underground && !Subway.auto)) { toast("Go down to the metro (a blue METRO sign), press F to drive a train yourself, then stand at an end station: the clock starts when you pull away."); }

@@ -511,11 +511,11 @@ const Jobs = (() => {
 
   // The messenger: carry a message to a landmark across the city before the time is up (the game's directions arrow shows the way)
   let courier = null;
-  const ownsVehicle = (wantFly) => typeof Car !== "undefined" && typeof Market !== "undefined" && Object.keys(Market.ITEMS).some((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!Car.MODELS[id].fly === wantFly && Market.owns(id));
+  const ownsVehicle = (wantFly) => typeof Car !== "undefined" && typeof Market !== "undefined" && Object.keys(Market.ITEMS).some((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!(Car.MODELS[id].fly && !Car.MODELS[id].notPlane) === wantFly && Market.owns(id));
   // Take out the fastest suitable vehicle you own (road vehicles for parcels; for cargo an aircraft with an engine, a balloon or glider only if it is all you have) and get in
   function autoBoard(wantFly) {
     if (typeof Car === "undefined" || typeof Market === "undefined" || Car.driving) return Car.driving;
-    const own = Object.keys(Market.ITEMS).filter((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!Car.MODELS[id].fly === wantFly && Market.owns(id));
+    const own = Object.keys(Market.ITEMS).filter((id) => Market.ITEMS[id].type === "car" && Car.MODELS[id] && !!(Car.MODELS[id].fly && !Car.MODELS[id].notPlane) === wantFly && Market.owns(id));
     const good = own.filter((id) => !wantFly || (Car.MODELS[id].air !== "balloon" && !Car.MODELS[id].glide));
     const pool = good.length ? good : own;
     if (!pool.length) return false;
