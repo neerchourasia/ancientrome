@@ -1,15 +1,19 @@
 "use strict";
-// NERCAR space: a wide open field of grass with a few things to fly round, for flying the NERCAR. 🚀 NERCAR space (in the menu) takes you there and gives you a NERCAR to fly (you do not need to own one);
-// press the same button again to go back to where you were. It is not a city of its own: it is built far away from the others (x = -12000, which the game server accepts), so you are still "in Rome"
-// as far as everything else is concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The few things to fly round (a tower, a ring of pillars, a gate to
-// fly through, slalom walls and big balls) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low. Depends on game.js and car.js at run time.
+// NERCAR space: a huge open field of grass with a few things to fly round, for flying the NERCAR. 🚀 NERCAR space (in the menu) takes you there on foot; there, two buttons at the bottom of the
+// screen give you a NERCAR: 🚗 Rent a NERCAR (expensive: RENT, paid every time) or 🚗 Get out yours (free, if you own one: buy it in the Market). Press the menu button again to go back to where you were.
+// It is not a city of its own: it is built far away from the others (x = -30000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
+// concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The things to fly round (a tower, a ring of pillars, a gate to fly through, slalom walls and big
+// balls, and a scatter of pillars and balls over the whole field) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
+// Depends on game.js, car.js (the NERCAR), vitals.js (the money) and market.js (whether you own one) at run time.
 
 const NercarSpace = (() => {
-  const OX = -12000, HALF = 6000;                                  // the middle of the field, and half of its width (the NERCAR crosses 900 m in half a second)
-  const K = 4, Z = 2;                                              // the layout below is drawn small: its distances are made K times longer and the things Z times bigger
+  const OX = -30000, HALF = 20000;                                 // the middle of the field, and half of its width: 40 km across (the NERCAR crosses 900 m in half a second)
+  const K = 10, Z = 2;                                             // the layout below is drawn small: its distances are made K times longer and the things Z times bigger
+  const RENT = 50000;                                              // what a rented NERCAR costs, every time (buying one costs 1,000,000)
   const FIELD = { minX: OX - HALF, maxX: OX + HALF, minZ: -HALF, maxZ: HALF };
-  let group = null, active = false, saved = null;
+  let group = null, active = false, saved = null, wired = false;
   const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const $n = (id) => document.getElementById(id);
 
   function stripes() {                                             // two greens in big squares, so you can see how fast you go
     const c = document.createElement("canvas"); c.width = c.height = 64;
@@ -22,18 +26,19 @@ const NercarSpace = (() => {
     return t;
   }
 
-  function box(x, z, w, d, h, color, y0 = 0) {                     // a solid block standing on the grass (or hanging at y0)
-    x *= K; z *= K; w *= Z; d *= Z; h *= Z; y0 *= Z;
+  // a solid block standing on the grass (or hanging at y0) and a solid ball, in metres from the middle of the field
+  function put(x, z, w, d, h, color, y0) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam(color));
     m.position.set(OX + x, y0 + h / 2, z); group.add(m);
     addBlockerBox(OX + x - w / 2, OX + x + w / 2, z - d / 2, z + d / 2, y0, y0 + h);
   }
-  function ball(x, z, r, color) {
-    x *= K; z *= K; r *= Z;
+  function putBall(x, z, r, color) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), lam(color));
     m.position.set(OX + x, r, z); group.add(m);
     addBlockerCircle(OX + x, z, r * 0.9, 0, r * 2);
   }
+  const box = (x, z, w, d, h, color, y0 = 0) => put(x * K, z * K, w * Z, d * Z, h * Z, color, y0 * Z);      // (the layout below: small numbers, scaled up by K and Z)
+  const ball = (x, z, r, color) => putBall(x * K, z * K, r * Z, color);
 
   function build() {
     group = new THREE.Group();
@@ -47,8 +52,38 @@ const NercarSpace = (() => {
     box(-520, -45, 12, 12, 55, 0x2c6fbb); box(-520, 45, 12, 12, 55, 0x2c6fbb); box(-520, 0, 14, 110, 9, 0x2c6fbb, 55);   // a gate to fly through (and a lintel on top)
     for (let i = 0; i < 5; i++) box(420 + i * 60, i % 2 ? 55 : -55, 10, 130, 22, 0x8e44ad);                          // slalom walls
     ball(-180, 420, 28, 0xe74c3c); ball(220, -430, 34, 0x27ae60); ball(560, 360, 24, 0xf39c12);
+    let seed = 20261121;                                                // a scatter over the whole field (the same every time), not near where you arrive
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const colors = [0xc0392b, 0xe6b422, 0x2c6fbb, 0x8e44ad, 0x27ae60, 0xe67e22, 0xd8d2c4];
+    for (let i = 0; i < 70; i++) {
+      const x = (rnd() * 2 - 1) * (HALF - 1500), z = (rnd() * 2 - 1) * (HALF - 1500);
+      if (Math.hypot(x - (-HALF + 400), z) < 1200) continue;
+      const c = colors[Math.floor(rnd() * colors.length)];
+      if (i % 3) put(x, z, 20 + rnd() * 30, 20 + rnd() * 30, 60 + rnd() * 200, c, 0); else putBall(x, z, 20 + rnd() * 40, c);
+    }
     group.visible = false;
     scene.add(group);
+  }
+
+  function setHud(on) {
+    const h = $n("ns-hud"); if (h) h.hidden = !on;
+  }
+  function wire() {                                                   // the two buttons at the bottom of the screen
+    if (wired) return; wired = true;
+    const rent = $n("ns-rent"), own = $n("ns-own");
+    rent.textContent = `🚗 Rent a NERCAR (${RENT} denarii)`;
+    rent.addEventListener("click", () => {
+      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a NERCAR." : "Get out of what you are in first."); return; }
+      if (Vitals.coins < RENT) { toast(`A rented NERCAR costs ${RENT} denarii: you have ${Math.floor(Vitals.coins)}.`); return; }
+      Vitals.coins -= RENT; Sfx.play("coin");
+      toast(`You rent a NERCAR for ${RENT} denarii.`);
+      Car.deploy("nercar");
+    });
+    own.addEventListener("click", () => {
+      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a NERCAR." : "Get out of what you are in first."); return; }
+      if (!Market.owns("nercar")) { toast("You do not own a NERCAR. Buy one in the Market, or rent one here."); return; }
+      Car.deploy("nercar");
+    });
   }
 
   function enter() {
@@ -56,6 +91,7 @@ const NercarSpace = (() => {
     if (mode !== "walk" || panelOpen) { toast("Close what is open and get out of what you are in first"); return; }
     if (typeof Subway !== "undefined" && Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
     if (!group) build();
+    wire();
     saved = { city, period: periodNow(), x: player.x, z: player.z, yaw: player.yaw };
     if (city !== "rome") arriveIn("rome", null);
     if (periodNow() !== "modern") setPeriod("modern");                 // (the NERCAR is a modern car)
@@ -65,13 +101,14 @@ const NercarSpace = (() => {
     placeAt(OX - HALF + 400, 0, -Math.PI / 2);
     $("#hud .top-left h1").innerHTML = "Time Machine <small>NERCAR space</small>";
     $("#map-title").textContent = "NERCAR space";
-    toast("🚀 NERCAR space: W to go, Space to go up, Shift to go down. Press the NERCAR space button again to go back.");
-    setTimeout(() => { if (active && mode === "walk") Car.deploy("nercar"); }, 400);
+    setHud(true);
+    toast("🚀 NERCAR space: rent a NERCAR (buttons at the bottom), or get yours out if you own one. W to go, Space up, Shift down. The menu button takes you back.");
   }
 
   function leave() {
     if (!active) return;
     active = false;
+    setHud(false);
     if (typeof Car !== "undefined") { if (Car.driving) { Car.debugSet({ alt: 0, vy: 0, v: 0 }); Car.exit(true); } Car.stow(); }
     group.visible = false;
     Object.assign(BOUNDS, ROME_BOUNDS);
@@ -84,5 +121,5 @@ const NercarSpace = (() => {
   }
 
   const toggle = () => (active ? leave() : enter());
-  return { enter, leave, toggle, get active() { return active; }, FIELD };
+  return { enter, leave, toggle, get active() { return active; }, FIELD, RENT };
 })();
