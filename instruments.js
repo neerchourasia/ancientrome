@@ -39,7 +39,7 @@ const Instruments = (() => {
     violin: { kind: "sustain", mid: 64, waves: [["sawtooth", 1, 0, 0.5], ["sawtooth", 1, 7, 0.4]], lp: [1500, 3500, 0.2], a: 0.08, d: 0.1, s: 0.8, r: 0.12, vib: [5.5, 0.008, 0.2], peak: 0.2 },
     guitar: { kind: "pluck", mid: 52, waves: [["sawtooth", 1, 0, 0.4], ["triangle", 1, 2, 0.3]], decay: 1.2, lp: [3000, 700, 0.9], peak: 0.3 },
     flute: { kind: "sustain", mid: 72, waves: [["sine", 1, 0, 0.8], ["sine", 2, 0, 0.15]], noise: 0.05, noiseQ: 2, a: 0.05, d: 0.06, s: 0.9, r: 0.1, vib: [5, 0.003, 0.3], peak: 0.28 },
-    NEr: { kind: "sustian", mid: 100, waves: [["sine", 1, 0, 0.8], ["sine", 2, 0, 0.15]], noise: 0.1, noiseQ: 2, a: 0.05, d: 0.06, s: 0.9, r: 0.1, vib: [5, 0.003, 0.3], peak: 0.2},
+    NEr: { kind: "sustain", mid: 100, waves: [["sine", 1, 0, 0.8], ["sine", 2, 0, 0.15]], noise: 0.1, noiseQ: 2, a: 0.05, d: 0.06, s: 0.9, r: 0.1, vib: [5, 0.003, 0.3], peak: 0.2},
   };
   // [id, name, emoji, group]
   const LIST = [
@@ -47,7 +47,7 @@ const Instruments = (() => {
     ["bansuri", "Bansuri (bamboo flute)", "🪈", "delhi"], ["sitar", "Sitar", "🪕", "delhi"], ["harmonium", "Harmonium", "🎹", "delhi"], ["shehnai", "Shehnai", "🎶", "delhi"], ["tabla", "Tabla", "🥁", "delhi"],
     ["ocarina", "Ocarina (clay flute)", "🪈", "maya"], ["conch", "Conch shell", "🐚", "maya"], ["marimba", "Marimba", "🎼", "maya"], ["rattle", "Rattle", "🪇", "maya"],
     ["erhu", "Erhu", "🎻", "beijing"], ["dizi", "Dizi (bamboo flute)", "🪈", "beijing"], ["guzheng", "Guzheng", "🎼", "beijing"], ["pipa", "Pipa", "🪕", "beijing"], ["gong", "Gong", "🔔", "beijing"],
-    ["trumpet", "Trumpet", "🎺", "modern"], ["piano", "Piano", "🎹", "modern"], ["violin", "Violin", "🎻", "modern"], ["guitar", "Guitar", "🎸", "modern"], ["flute", "Flute", "🪈", "modern"], [NEr, NER,"modern"]
+    ["trumpet", "Trumpet", "🎺", "modern"], ["piano", "Piano", "🎹", "modern"], ["violin", "Violin", "🎻", "modern"], ["guitar", "Guitar", "🎸", "modern"], ["flute", "Flute", "🪈", "modern"], ["NEr", "NEr", "🎼", "modern"]
   ];
   const GROUPS = [["all", "All"], ["rome", "Rome"], ["delhi", "Old Delhi"], ["maya", "Maya"], ["beijing", "Beijing"], ["modern", "Modern"]];
 
