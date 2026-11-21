@@ -61,7 +61,7 @@ const Fares = (() => {
     if (typeof started === "undefined" || !started) return;
     const st = Car.state(), veh = Car.driving && st ? Car.MODELS[Car.current] : null;
     const inTaxi = !!veh && Car.current === "taxi" && era === "modern";
-    const pax = veh && veh.fly && era === "modern" ? (PAX[Car.current] || 0) : 0;
+    const pax = veh && veh.fly && !veh.notPlane && era === "modern" ? (PAX[Car.current] || 0) : 0;
     if (fare && (!veh || era !== "modern" || fare.city !== city || (fare.kind === "taxi" && !inTaxi) || (fare.kind === "air" && !pax))) { cancel(fare.kind === "taxi" ? "You left your taxi: the fare is cancelled." : "You left your aircraft: the passengers go home."); return; }
     cooldown -= dt;
     if (marker && marker.visible && marker.userData.arm) marker.userData.arm.rotation.z = -0.4 + Math.sin(performance.now() / 150) * 0.5;
