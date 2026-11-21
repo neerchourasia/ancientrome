@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <circle cx="32" cy="32" r="32" fill="#ffffff"/>
   <g transform="translate(32 32) scale(.85) translate(-32 -36.5)">
-  <path d="M4 23Q32 11 60 23V56H4Z" fill="#00000"/>
-  <g fill="#22c8e6">
+  <path d="M4 23Q32 11 60 23V56H4Z" fill="#000000"/>
+  <g fill="#ffffff">
     <path d="M8.5 36V28.5a2.5 2.5 0 0 1 5 0V36Z"/>
     <path d="M16.5 36V28.5a2.5 2.5 0 0 1 5 0V36Z"/>
     <path d="M42.5 36V28.5a2.5 2.5 0 0 1 5 0V36Z"/>
@@ -12,11 +12,11 @@
     <path d="M41 56V47a3 3 0 0 1 6 0V56Z"/>
     <path d="M51 56V47a3 3 0 0 1 6 0V56Z"/>
   </g>
-  <circle cx="32" cy="35" r="12" fill="#0a4a5c" stroke="#f1ffd0" stroke-width="3"/>
-  <g stroke="#9be22b" stroke-linecap="round" stroke-width="3">
+  <circle cx="32" cy="35" r="12" fill="#000000" stroke="#ffffff" stroke-width="3"/>
+  <g stroke="#ffffff" stroke-linecap="round" stroke-width="3">
     <path d="M32 35V27"/>
     <path d="M32 35l6 4"/>
   </g>
-  <circle cx="32" cy="35" r="2" fill="#9be22b"/>
+  <circle cx="32" cy="35" r="2" fill="#ffffff"/>
   </g>
 </svg>
