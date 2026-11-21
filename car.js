@@ -234,7 +234,7 @@ const Car = (() => {
 
   function enter() {
     if (!nearby() || (!car.anyEra && eraOf(car.M) !== era)) return;
-    if (car.M.fly && Weather.grounded) { toast(`Flights are grounded in this weather (${Weather.kind}). Wait for it to pass.`); return; }
+    if (car.M.fly && Weather.grounded && !(typeof NercarSpace !== "undefined" && NercarSpace.active)) { toast(`Flights are grounded in this weather (${Weather.kind}). Wait for it to pass.`); return; }
     driving = true; mode = "drive"; walkRoof = 0;
     showPilot();
     placeCircles(false);

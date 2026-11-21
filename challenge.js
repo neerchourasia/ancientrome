@@ -134,7 +134,7 @@ const Challenge = (() => {
   }, 500);
 
   function bind() {
-    const b = $c("btn-chal");
+    const b = $c("btn-chal-run");
     if (b) b.addEventListener("click", open);
     $c("cd-copy").addEventListener("click", () => {
       const done = () => toast(tr("Challenge link copied: send it to a friend"));

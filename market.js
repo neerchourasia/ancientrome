@@ -99,7 +99,7 @@ const Market = (() => {
     scooter: { type: "car", name: "Vespa scooter", price: 250, note: "Quick and nimble. Top speed 54 km/h." },
     citycar: { type: "car", name: "City car", price: 500, note: "A blue runabout. Top speed 86 km/h." },
     plane: { type: "car", air: true, name: "Light plane", price: 3500, note: "A small propeller plane for the modern cities. Build up speed on a long straight street, hold Space above about 100 km/h to take off, and land gently. Fly to the edge of a city and press F to fly on to the next one. Top speed 223 km/h." },
-    nercar: { type: "car", name: "NERCAR", price: 100000, note: "The car that the owner of this game made." },
+    nercar: { type: "car", name: "NERCAR", price: 1000000, note: "The car that the owner of this game made." },
     sportscar: { type: "car", name: "Sports car", price: 1200, note: "Low, red and fast. Top speed 130 km/h." },
     rickshaw: { type: "car", name: "Cycle rickshaw", price: 200, note: "Pedal-powered, in bright colours. Top speed 25 km/h." },
     oxcart: { type: "mount", name: "Bullock cart", price: 150, note: "A wooden cart pulled by an ox. Top speed 18 km/h." },
