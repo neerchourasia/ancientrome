@@ -904,6 +904,15 @@ const I18n = (() => {
     ["good", "buenas", "buone", "अच्छे", "不错"],
     ["missed", "falladas", "mancate", "चूके", "错过"],
     ["best run", "mejor racha", "serie migliore", "सबसे लंबी लय", "最长连击"],
+    // Ner place and the Ner store
+    ["Ner store", "Tienda Ner", "Negozio Ner", "नेर की दुकान", "Ner商店"],
+    ["The Ner keeper", "El dueño de la tienda Ner", "Il negoziante Ner", "नेर दुकान का मालिक", "Ner店主"],
+    ["Welcome to Ner place! Everything here is Ner.", "¡Bienvenido a Ner place! Aquí todo es Ner.", "Benvenuto a Ner place! Qui tutto è Ner.", "नेर प्लेस में आपका स्वागत है! यहाँ सब कुछ नेर है।", "欢迎来到Ner之地!这里一切都是Ner。"],
+    ["Ner place", "Ner place", "Ner place", "नेर प्लेस", "Ner之地"],
+    ["From Ner place", "De Ner place", "Da Ner place", "नेर प्लेस से", "来自Ner之地"],
+    ["🏠 Ner place", "🏠 Ner place", "🏠 Ner place", "🏠 नेर प्लेस", "🏠 Ner之地"],
+    ["🏠 Ner place: walk in through the gate to the Ner store. The menu button takes you back.", "🏠 Ner place: entra por la puerta hasta la tienda Ner. El botón del menú te devuelve.", "🏠 Ner place: entra dal cancello fino al negozio Ner. Il pulsante del menu ti riporta indietro.", "🏠 नेर प्लेस: फाटक से अंदर जाकर नेर की दुकान तक जाइए। मेनू का बटन आपको वापस ले जाता है।", "🏠 Ner之地:从大门走进去,就是Ner商店。菜单按钮可以带你回去。"],
+    ["Leave Ner place first (press its button in the menu).", "Sal primero de Ner place (pulsa su botón en el menú).", "Esci prima da Ner place (premi il suo pulsante nel menu).", "पहले नेर प्लेस से बाहर निकलिए (मेनू में उसका बटन दबाएँ)।", "请先离开Ner之地(按菜单里它的按钮)。"],
   ];
   // phrases with a number or a name in them: [regular expression, { language: template with $1, $2... }]
   const PATTERNS = [

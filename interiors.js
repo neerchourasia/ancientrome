@@ -28,6 +28,9 @@ const Interiors = (() => {
       { name: "Chai stall", trade: "food", late: true, keeper: "The chaiwala", line: "Masala chai? Sit, sit, it is almost ready.", counter: 0x8a6a4a, goods: [0xc98b46, 0xe0d0a0, 0x8a4a2a], sign: "#2a5a4a" },
     ],
     cancunCentre: [{ name: "Visitor centre", trade: "goods", keeper: "The guide", line: "Welcome to Chichén Itzá! Ask me anything about the Maya.", counter: 0xb5835a, goods: [0xc4673c, 0x3f8a6a, 0xe0c060], sign: "#2a5a6a" }],
+    ner: [
+      { name: "Ner store", trade: "goods", late: true, keeper: "The Ner keeper", line: "Welcome to Ner place! Everything here is Ner.", counter: 0x333333, goods: [0x000000, 0xf2f2f0, 0x8a8a8a], sign: "#000000" },
+    ],
     cancunMaya: [
       { name: "Cacao seller", trade: "goods", keeper: "The cacao trader", line: "Cacao beans are money here. Taste a cup: thick, bitter and sweet.", counter: 0x8a5a3a, goods: [0x5a3a22, 0xe0c080, 0x8a4a2a], sign: "#5a3a22" },
       { name: "Obsidian trader", trade: "goods", keeper: "The stone trader", line: "Black glass from the volcano. It cuts sharper than any bronze.", counter: 0x5a5a5a, goods: [0x1a1a22, 0x3a3a44, 0x8a8a8a], sign: "#2a2a3a" },
@@ -108,7 +111,7 @@ const Interiors = (() => {
       const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), rm), k = s.roof === "chinese" ? 1.5 : 1.2; cone.scale.set(s.w * 0.78 + 1.6, s.roof === "chinese" ? 3.4 : 2.8, s.d * 0.78 + 1.6); cone.rotation.y = Math.PI / 4;
       cone.position.set(s.x, hh + 0.45 + cone.scale.y / 2, s.z); cone.castShadow = true; g.add(cone); void k;
     }
-    register({ x: s.x, z: s.z, w: s.w, d: s.d, h: hh, kinds: s.kinds, kind: s.kind, idKind: s.idKind, side: s.side, signY: s.signY, parent: g, era: s.era, blk, tint: () => color, hide: () => { mesh.visible = false; } });
+    register({ x: s.x, z: s.z, w: s.w, d: s.d, h: hh, kinds: s.kinds, kind: s.kind, idKind: s.idKind, band: s.band, side: s.side, signY: s.signY, parent: g, era: s.era, blk, tint: () => color, hide: () => { mesh.visible = false; } });
     return mesh;
   }
 
@@ -143,6 +146,7 @@ const Interiors = (() => {
 
   function build(p) {
     const b = p.b, kind = p.kind, ext = p.ext, g = new THREE.Group(), pm = ext ? p.wallMat : plaster[b.ci % plaster.length], h = b.h;
+    const bm = ext && ext.band ? new THREE.MeshLambertMaterial({ color: ext.band, emissive: 0x151515 }) : bandMat;                    // (a building can have a dark band of its own colour)
     const rh = Math.min(ROOM_H, h - 0.3), top = rh + 0.3;                                              // the room is 3.9 m high, or a little lower in a low building
     curEx = ext && ext.era ? { era: ext.era } : undefined;
     p.built = true;
@@ -155,7 +159,7 @@ const Interiors = (() => {
     // walls: a dark band to 3.2 m and plaster above, 0.5 m thick; the door wall has a gap
     const wall = (ax0, ax1, az0, az1, y0, y1, solid) => {
       const lo = Math.max(y0, 0), mid = Math.min(Math.max(BAND_H, y0), top), yt = Math.min(y1, top);
-      if (y0 < BAND_H) box(g, ax0, ax1, lo, Math.min(BAND_H, yt), az0, az1, bandMat, false);
+      if (y0 < BAND_H) box(g, ax0, ax1, lo, Math.min(BAND_H, yt), az0, az1, bm, false);
       if (yt > BAND_H) box(g, ax0, ax1, mid, yt, az0, az1, pm, false);
       if (solid) addBlockerBox(ax0, ax1, az0, az1, y0, h + 1, curEx);
     };
@@ -336,7 +340,7 @@ const Interiors = (() => {
   }
 
   // The shop whose keeper you are standing near (in an open shop), for the F key and the prompt: { p, name, keeper, line, trade, city, id }
-  const CITY_OF = { rome: "rome", delhi: "delhi", cancunCentre: "cancun", cancun: "cancun", cancunMaya: "cancun", beijingHall: "beijing", beijingCbd: "beijing" };
+  const CITY_OF = { ner: "ner", rome: "rome", delhi: "delhi", cancunCentre: "cancun", cancun: "cancun", cancunMaya: "cancun", beijingHall: "beijing", beijingCbd: "beijing" };
   function keeperNear(x, z, feet = 0) {
     if (feet > 2) return null;
     for (const p of picked) {

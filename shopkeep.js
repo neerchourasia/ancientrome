@@ -29,7 +29,7 @@ const Shopkeep = (() => {
     cacao: ["Cacao beans", 10, "cancun", "sack", 0x5a3a22, "Cacao seller"], vanilla: ["Vanilla pods", 25, "cancun", "tool", 0x2a1a10, "Cacao seller"], honey: ["Honey jar", 14, "cancun", "jar", 0xd9a030, "Cacao seller"],
     obsidian: ["Obsidian blade", 45, "cancun", "tool", 0x1a1a22, "Obsidian trader"], copal: ["Copal incense", 12, "cancun", "box", 0xe0d8b0, "Obsidian trader"], bowl: ["Painted bowl", 18, "cancun", "cup", 0xc4673c, "Obsidian trader"],
     snacks: ["Snack box", 6, "beijing", "box", 0xe23b3b, "Convenience store"], umbrella: ["Umbrella", 15, "beijing", "tool", 0x2c7fe0, "Convenience store"], phonecard: ["Phone card", 8, "beijing", "box", 0xf2c21b, "Convenience store"],
-    Ner: ["Ner", 100, "rome", "box", 0x000000, "Workshop"],
+    Ner: ["Ner", 100, "ner", "box", 0x000000, "Ner store"],
   };
   // what the keepers can make from your goods: id: [name, value, city, shape, colour, ""] (made, not sold), and the recipe (the shop kind with the workbench, what it takes)
   Object.assign(GOODS, {
@@ -43,7 +43,7 @@ const Shopkeep = (() => {
     pearlring: ["Jeweller", "silverring", "pearls"], giftincense: ["Attar seller", "incense", "sandal"], seacompass: ["Dive shop", "compass", "shellnecklace"], cacaotreats: ["Cacao seller", "cacao", "vanilla", "honey"],
     ritualknife: ["Obsidian trader", "obsidian", "copal"], scholarset: ["Brush shop", "brush", "ink", "paper"], teaset: ["Tea shop", "longjing", "teapot"],
   };
-  const IDS = Object.keys(GOODS), CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing" };
+  const IDS = Object.keys(GOODS), CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing", ner: "Ner place" };
   const soldBy = (kind) => IDS.filter((id) => GOODS[id][5] === kind);
 
   const GOSSIP = {

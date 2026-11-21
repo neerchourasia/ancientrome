@@ -101,6 +101,7 @@ const NercarSpace = (() => {
 
   function enter() {
     if (active) return;
+    if (typeof NerPlace !== "undefined" && NerPlace.active) { toast("Leave Ner place first (press its button in the menu)."); return; }
     if (mode !== "walk" || panelOpen) { toast("Close what is open and get out of what you are in first"); return; }
     if (typeof Subway !== "undefined" && Subway.underground) { toast("Come up from the metro first (U on the platform)."); return; }
     if (!group) build();
