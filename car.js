@@ -25,7 +25,8 @@ const Car = (() => {
     donkey: { name: "Donkey", max: 8, accel: 4.5, turn: 2.3, color: 0x8a8580, len: 2.1, wid: 0.9, era: "ancient", motor: false, camH: 2.0, verb: "climb on" },
     metro: { name: "Metro train", max: 23, accel: 3.4, turn: 0, color: 0x1d4fa0, len: 36, wid: 3.0, rail: true, camH: 3.5, camBack: 22, verb: "board" },   // runs on the rails of the metro (subway.js): it cannot steer
     elephant: { name: "Elephant", max: 14, accel: 6, turn: 1.5, color: 0x9c9a95, len: 4.8, wid: 2.2, era: "ancient", motor: false, camH: 2.6, verb: "climb on" },
-    nercar: { name: "NERCAR", max: 2000, ground: 1000, accel: 20, turn: 4.2, color: 0x111111, len: 15, wid: 0.2, camH: 2.6, verb: "jump on", fly: true, hover: true, air: "heli", ceiling: 320, climb: 9, hard: 8, respond: 0.9 },   // flies with no wings (hoverUpdate, like a helicopter): 2000 in the air (max) and 1000 on the ground (ground)
+    nercar: { name: "NERCAR", max: 1000, accel: 20, turn: 4.2, color: 0x111111, len: 15, wid: 0.2, camH: 2.6, verb: "jump on" },   // a long, low, black streamliner that drives like a car (the body is drawn in build)
+    nercarfly: { name: "NERCAR", max: 2000, ground: 1000, accel: 20, turn: 4.2, color: 0x111111, len: 15, wid: 0.2, camH: 2.6, verb: "jump on", fly: true, hover: true, air: "heli", ceiling: 320, climb: 9, hard: 8, respond: 0.9 },   // the same car as it flies in NERCAR space (nercarspace.js): no wings, 2000 in the air and 1000 on the ground (hoverUpdate)
   };
   Object.assign(MODELS, AIRCRAFT);   // jets, helicopters, balloons ... (aircraft.js)
   const eraOf = (M) => M.era || "modern"; // cars and rickshaws exist today; carts and elephants in the ancient cities
@@ -61,6 +62,16 @@ const Car = (() => {
       g.add(box(3.0, 2.2, 0.3, grey, 0, 1.95, 17.9), box(2.4, 1.0, 0.1, glassM, 0, 2.5, 18.1), box(0.4, 0.3, 0.1, lampM, -1.0, 1.5, 18.1), box(0.4, 0.3, 0.1, lampM, 1.0, 1.5, 18.1));
       g.add(box(2.6, 0.5, 35.4, grey, 0, 0.55, 0));
       return { g, wheels, legs };
+    } else if (id === "nercar" || id === "nercarfly") {   // a long, low streamliner hovering a little above the road: a side profile drawn to the car's width (the nose points to -z, like every vehicle), a dark canopy, a yellow headlight, a red tail light, blue glow bars under it and a blue thruster at the back
+      const L = M.len, k = L / 15, WD = 1.7, blue = new THREE.MeshBasicMaterial({ color: 0x62b3ff });
+      const profile = [[0, 0], [0, 0.84], [0.56, 0.91], [0.72, 1.07], [0.82, 1.04], [0.93, 0.62], [1, 0.32], [0.97, 0]];
+      const geo = new THREE.ExtrudeGeometry(new THREE.Shape(profile.map(([t, h]) => new THREE.Vector2((t - 0.5) * L, h * k))), { depth: WD, bevelEnabled: false });
+      geo.translate(0, 0, -WD / 2); geo.rotateY(Math.PI / 2);
+      const hull = new THREE.Mesh(geo, body); hull.position.y = 0.3 * k; hull.castShadow = true;
+      g.add(hull, box(1.2, 0.06, 3.0 * k, lam(0x2a3a48), 0, 1.36 * k, -0.2 * L));
+      g.add(box(0.5, 0.14, 0.08, lamp, 0, 0.6 * k, -L / 2 - 0.02), box(0.4, 0.14, 0.08, tail, 0, 1.0 * k, L / 2 + 0.02));
+      g.add(box(1.0, 0.06, 2.0 * k, blue, 0, 0.12 * k, 0.32 * L), box(1.0, 0.06, 2.0 * k, blue, 0, 0.12 * k, -0.27 * L));
+      const thruster = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8), blue); thruster.scale.set(0.5, 1.4, 0.8); thruster.position.set(0, 0.7 * k, L / 2 + 0.35); g.add(thruster);
     } else if (id === "scooter") {
       g.add(box(0.34, 0.4, 1.3, body, 0, 0.55, 0.1), box(0.3, 0.1, 0.55, lam(0x2b2b2b), 0, 0.82, 0.3), box(0.9, 0.06, 0.06, lam(0x2b2b2b), 0, 1.1, -0.55), box(0.06, 0.55, 0.06, lam(0x2b2b2b), 0, 0.82, -0.55));
       g.add(box(0.1, 0.1, 0.06, lamp, 0, 0.95, -0.7));

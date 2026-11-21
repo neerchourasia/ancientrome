@@ -66,7 +66,7 @@ const NercarSpace = (() => {
     $("#hud .top-left h1").innerHTML = "Time Machine <small>NERCAR space</small>";
     $("#map-title").textContent = "NERCAR space";
     toast("🚀 NERCAR space: W to go, Space to go up, Shift to go down. Press the NERCAR space button again to go back.");
-    setTimeout(() => { if (active && mode === "walk") Car.deploy("nercar"); }, 400);
+    setTimeout(() => { if (active && mode === "walk") Car.deploy("nercarfly"); }, 400);
   }
 
   function leave() {
