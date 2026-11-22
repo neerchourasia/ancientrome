@@ -10,6 +10,11 @@
   const CARS = ["Vespa scooter", "City car", "Sports car", "SUV", "Taxi", "Delivery truck", "Bus", "Motorcycle", "Light plane", "Chariot", "Cycle rickshaw", "Metro train"];
   for (const c of CARS) { const o = document.createElement("option"); o.value = o.textContent = c; $("car").append(o); }
 
+  // The game server's address for the email (https version of the same address the game connects to; on your own computer, port 8765).
+  const mailUrl = () => {
+    const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), ws = local ? "ws://localhost:8765/play" : String(cfg.serverUrl || "");
+    return ws.replace(/^ws/, "http").replace(/\/play\/?$/, "") + "/suggest-mail";
+  };
   const kind = () => document.querySelector('input[name="kind"]:checked').value;
   function layout() {
     const car = kind() === "car";
@@ -44,17 +49,19 @@
     if (Date.now() - last < 30000) return say("Please wait a moment before sending another.", "bad");
     if (!base || !anon) return say("This site has no place to send it to yet (config.js).", "bad");
     $("go").disabled = true; say("Sending...");
-    try {
-      const res = await fetch(base + "/rest/v1/suggestions", {
-        method: "POST",
-        headers: { apikey: anon, Authorization: "Bearer " + (token() || anon), "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({ kind: k, name: name || "(no name)", car_type: k === "car" && $("car").value ? $("car").value : null, message, contact: contact || null }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
+    const row = { kind: k, name: name || "(no name)", car_type: k === "car" && $("car").value ? $("car").value : null, message, contact: contact || null };
+    // Two things at once, and it counts as sent if either works: the database (the Admin page lists them) and an email to the admin through the game server.
+    const toDb = fetch(base + "/rest/v1/suggestions", {
+      method: "POST", headers: { apikey: anon, Authorization: "Bearer " + (token() || anon), "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(row),
+    }).then((res) => { if (!res.ok) throw new Error(String(res.status)); });
+    const toMail = fetch(mailUrl(), { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(row) })
+      .then((res) => { if (!res.ok) throw new Error(String(res.status)); });          // (text/plain keeps it a simple request: no pre-check by the browser)
+    const done = await Promise.allSettled([toDb, toMail]);
+    if (done.some((r) => r.status === "fulfilled")) {
       localStorage.setItem("rome-suggest-at", String(Date.now()));
       $("f").reset(); $("count").textContent = "0 / 1500"; layout();
       say(k === "car" ? "Thank you! We have your name. If the car goes in, we will tell you if you gave an email." : "Thank you! We read every one.", "ok");
-    } catch (err) {
+    } else {
       say("Could not send it just now. Please try again in a little while.", "bad");
     }
     $("go").disabled = false;

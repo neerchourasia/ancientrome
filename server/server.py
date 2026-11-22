@@ -5,6 +5,7 @@ Standard library only (Python 3.9+), so there is nothing to install:    python3 
 
 One port serves two things:
   GET  /health            a status page for the host's health check
+  POST /suggest-mail      the Suggest page (suggest.html) asks here to email a suggestion or car request to the admin
   WS   /play              the game connection (JSON text messages)
 
 Who decides what (this is the whole point of having a server):
@@ -53,6 +54,9 @@ def load_config():
         "coop_wait": float(e("COOP_WAIT", "8")),      # seconds to wait for more teammates once two are queued
         "naval_wait": float(e("NAVAL_WAIT", "8")),    # seconds to wait for more captains once two are queued
         "arena_wait": float(e("ARENA_WAIT", "10")),   # seconds to wait for more fighters (brawl, 2v2) once two are queued
+        "mail_key": "".join(e("RESEND_API_KEY", "").split()),            # SUGGEST_*: emails the admin each suggestion / car request (resend.com); all three needed
+        "mail_to": e("SUGGEST_EMAIL_TO", "").strip(),                    # where they go (the admin's own address; keep it here, not in the web files)
+        "mail_from": e("SUGGEST_EMAIL_FROM", "Time Machine <onboarding@resend.dev>").strip(),
         "origins": [o.strip() for o in e("ALLOWED_ORIGINS", "").split(",") if o.strip()],
         "max_conns": int(e("MAX_CONNS", "400")),
         "max_per_ip": int(e("MAX_PER_IP", "8")),
@@ -119,6 +123,8 @@ NAME_OK_WORDS = ("scunthorpe", "cumberland", "cucumber", "assassin", "classic", 
 NAME_BAD_MSG = "That name is not allowed here. Please choose a different, friendly name."
 NAME_CACHE = {}
 NAME_HITS = {}
+MAIL_HITS = {}             # per address: when it last asked to email a suggestion
+MAIL_ALL = []              # when any address did (so a flood from many addresses cannot fill the admin's inbox either)
 
 
 def local_name_check(name):
@@ -209,6 +215,37 @@ def _http_json(url, headers, body=None, method=None, timeout=8):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read()
         return json.loads(raw) if raw else None
+
+
+def suggestion_mail(d):
+    """(subject, text, reply_to) for a suggestion or car request sent from the Suggest page, or None if it is not one. Everything is cut to size."""
+    if not isinstance(d, dict):
+        return None
+    clip = lambda k, n: " ".join(str(d.get(k) or "").replace("\r", " ").split())[:n] if k != "message" else str(d.get(k) or "").replace("\r", "").strip()[:1500]
+    kind, name, msg, car, contact = d.get("kind"), clip("name", 60), clip("message", 1500), clip("car_type", 40), clip("contact", 120)
+    if kind not in ("idea", "car") or not name or (kind == "idea" and len(msg) < 3):
+        return None
+    reply_to = contact if re.fullmatch(r"[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+", contact or "") else ""
+    subject = ("Car request: " + name) if kind == "car" else ("Suggestion from " + name)
+    lines = ["Kind: " + ("name a car after me" if kind == "car" else "suggestion"), "Name: " + name]
+    if kind == "car":
+        lines.append("Car: " + (car or "any"))
+    lines.append("Email: " + (contact or "(none given)"))
+    lines += ["", msg or "(no message)"]
+    return subject[:100], "\n".join(lines), reply_to
+
+
+def send_suggestion_mail(subject, text, reply_to):
+    """Sends it through Resend. Runs in a thread. Returns True when Resend took it."""
+    body = {"from": CFG["mail_from"], "to": [CFG["mail_to"]], "subject": subject, "text": text}
+    if reply_to:
+        body["reply_to"] = reply_to
+    try:
+        _http_json("https://api.resend.com/emails", {"Authorization": "Bearer " + CFG["mail_key"], "Content-Type": "application/json", "User-Agent": "time-machine-server"}, body, "POST", timeout=10)
+        return True
+    except Exception as e:
+        print("could not email a suggestion:", type(e).__name__, str(e)[:120])
+        return False
 
 
 async def verify_token(token):
@@ -7081,6 +7118,35 @@ async def handle_http(reader, writer):
             flag("inappropriate name tried", nm, "low", ip=ip, gap=30)
         cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
         return await reply(writer, 200, json.dumps({"ok": ok, "reason": why, "name": nm}).encode(), "application/json", cors)
+    if path == "/suggest-mail":  # the Suggest page also asks here to email the suggestion to the admin (the page saves it in the database by itself)
+        cors = "Access-Control-Allow-Origin: %s\r\n" % (hdr.get("origin") or "*")
+        if method == "OPTIONS":
+            return await reply(writer, 204, b"", "text/plain", cors + "Access-Control-Allow-Methods: POST\r\nAccess-Control-Allow-Headers: content-type\r\n")
+        if method != "POST" or not origin_ok(hdr.get("origin")):
+            return await reply(writer, 403, b"not allowed")
+        try:
+            n = int(hdr.get("content-length", "0"))
+            if not 0 < n <= 6000:
+                return await reply(writer, 413, b"too big")
+            d = json.loads((await asyncio.wait_for(reader.readexactly(n), timeout=10)).decode("utf-8"))
+        except Exception:
+            return await reply(writer, 400, b"bad request", "text/plain", cors)
+        if not (CFG["mail_key"] and CFG["mail_to"]):
+            return await reply(writer, 204, b"", "text/plain", cors)             # emailing is not set up: the page keeps it in the database only
+        t = now()
+        MAIL_ALL[:] = [x for x in MAIL_ALL if t - x < 3600]
+        if t - MAIL_HITS.get(ip, -1e9) < 20 or len(MAIL_ALL) >= 40:
+            flag("suggestions sent too fast", "more than one every 20 seconds, or 40 in an hour", "low", ip=ip, gap=300)
+            return await reply(writer, 503, b"slow down", "text/plain", cors)
+        mail = suggestion_mail(d)
+        if not mail:
+            return await reply(writer, 400, b"bad request", "text/plain", cors)
+        MAIL_HITS[ip] = t
+        MAIL_ALL.append(t)
+        if len(MAIL_HITS) > 2000:
+            MAIL_HITS.clear()
+        ok = await asyncio.to_thread(send_suggestion_mail, *mail)
+        return await reply(writer, 204 if ok else 503, b"", "text/plain", cors)
     if path == "/health":
         return await reply(writer, 200, json.dumps({"ok": True, "world": world_on(), "world_error": _world_err[0], "up": int(time.time() - BOOT_T), "players": len(CONNS), "waiting": {k: len(v) for k, v in QUEUES.items()}}).encode(), "application/json")
 

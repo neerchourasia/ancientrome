@@ -150,6 +150,51 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(err["msg"])
         await ws.until(lambda m: m["t"] == "welcome")
 
+    # ---------------------------------------------------------------- the Suggest page's email to the admin
+
+    async def test_suggestions_are_emailed_to_the_admin_with_limits(self):
+        sent = []
+        old = (server.send_suggestion_mail, dict(server.CFG))
+        server.send_suggestion_mail = lambda subject, text, reply_to: sent.append((subject, text, reply_to)) or True
+        server.MAIL_HITS.clear(); server.MAIL_ALL.clear()
+
+        async def post(body, origin=None, ip="203.0.113.7", method="POST"):
+            r, w = await asyncio.open_connection("127.0.0.1", self.port)
+            raw = body if isinstance(body, bytes) else json.dumps(body).encode()
+            head = "%s /suggest-mail HTTP/1.1\r\nHost: x\r\nX-Forwarded-For: %s\r\nContent-Length: %d\r\n%s\r\n" % (method, ip, len(raw), ("Origin: %s\r\n" % origin) if origin else "")
+            w.write(head.encode() + raw)
+            return (await r.read()).decode().split(" ", 2)[1]
+        try:
+            idea = {"kind": "idea", "name": "Ann", "message": "A boat race at night\r\nplease", "contact": "ann@example.com"}
+            server.CFG.update(mail_key="", mail_to="")
+            self.assertEqual(await post(idea), "204")                       # not set up: nothing is sent, nothing breaks
+            self.assertEqual(sent, [])
+            server.CFG.update(mail_key="k", mail_to="admin@example.com")
+            self.assertEqual(await post(idea), "204")
+            self.assertEqual(len(sent), 1)
+            subject, text, reply_to = sent[0]
+            self.assertEqual(subject, "Suggestion from Ann")
+            self.assertEqual(reply_to, "ann@example.com")
+            self.assertIn("A boat race at night\nplease", text)
+            self.assertEqual(await post(idea), "503")                       # the same address again at once: slow down
+            car = {"kind": "car", "name": "Vik", "car_type": "Sports car", "message": "", "contact": "not an email"}
+            self.assertEqual(await post(car, ip="203.0.113.8"), "204")
+            self.assertEqual(sent[1][0], "Car request: Vik")
+            self.assertEqual(sent[1][2], "")                                # a bad email is never used as the reply address
+            self.assertIn("Car: Sports car", sent[1][1])
+            self.assertEqual(await post({"kind": "idea", "name": "x", "message": "hi"}, ip="203.0.113.9"), "400")   # too short
+            self.assertEqual(await post({"kind": "nope", "name": "x", "message": "hello"}, ip="203.0.113.10"), "400")
+            self.assertEqual(await post(b"not json", ip="203.0.113.11"), "400")
+            self.assertEqual(await post(idea, origin="https://evil.example", ip="203.0.113.12"), "403")   # only the game's own websites
+            self.assertEqual(await post(idea, ip="203.0.113.13", method="GET"), "403")
+            self.assertEqual(len(sent), 2)
+            server.MAIL_ALL[:] = [server.now()] * 40                          # a flood from many addresses is stopped too
+            self.assertEqual(await post(idea, ip="203.0.113.14"), "503")
+        finally:
+            server.send_suggestion_mail = old[0]
+            server.CFG.clear(); server.CFG.update(old[1])
+            server.MAIL_HITS.clear(); server.MAIL_ALL.clear()
+
     # ---------------------------------------------------------------- the admin's visitor log, suspicious activity and blocking
 
     async def test_visitors_are_logged_and_an_admin_can_block_someone_on_the_spot(self):
