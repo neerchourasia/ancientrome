@@ -30,6 +30,9 @@ const Shopkeep = (() => {
     obsidian: ["Obsidian blade", 45, "cancun", "tool", 0x1a1a22, "Obsidian trader"], copal: ["Copal incense", 12, "cancun", "box", 0xe0d8b0, "Obsidian trader"], bowl: ["Painted bowl", 18, "cancun", "cup", 0xc4673c, "Obsidian trader"],
     snacks: ["Snack box", 6, "beijing", "box", 0xe23b3b, "Convenience store"], umbrella: ["Umbrella", 15, "beijing", "tool", 0x2c7fe0, "Convenience store"], phonecard: ["Phone card", 8, "beijing", "box", 0xf2c21b, "Convenience store"],
     Ner: ["Ner", 100, "ner", "box", 0x000000, "Ner store"],
+    nertee: ["Ner T-shirt", 60, "ner", "sack", 0x000000, "Ner store"], nercap: ["Ner cap", 35, "ner", "disc", 0x000000, "Ner store"], nermug: ["Ner mug", 20, "ner", "cup", 0xf2f2f0, "Ner store"],
+    nerbottle: ["Ner water bottle", 25, "ner", "bottle", 0x8a8a8a, "Ner store"], nerposter: ["Ner poster", 30, "ner", "scroll", 0x000000, "Ner store"], nerstickers: ["Ner stickers", 8, "ner", "scroll", 0xf2f2f0, "Ner store"],
+    nerkeyring: ["Ner keyring", 15, "ner", "ring", 0x8a8a8a, "Ner store"],
   };
   // what the keepers can make from your goods: id: [name, value, city, shape, colour, ""] (made, not sold), and the recipe (the shop kind with the workbench, what it takes)
   Object.assign(GOODS, {
