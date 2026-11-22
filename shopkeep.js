@@ -43,7 +43,7 @@ const Shopkeep = (() => {
     pearlring: ["Jeweller", "silverring", "pearls"], giftincense: ["Attar seller", "incense", "sandal"], seacompass: ["Dive shop", "compass", "shellnecklace"], cacaotreats: ["Cacao seller", "cacao", "vanilla", "honey"],
     ritualknife: ["Obsidian trader", "obsidian", "copal"], scholarset: ["Brush shop", "brush", "ink", "paper"], teaset: ["Tea shop", "longjing", "teapot"],
   };
-  const IDS = Object.keys(GOODS), CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing", ner: "Ner place" };
+  const IDS = Object.keys(GOODS), CITY_NAMES = { rome: "Rome", delhi: "Old Delhi", cancun: "Cancún", beijing: "Beijing", ner: "Ner place (fake)" };
   const soldBy = (kind) => IDS.filter((id) => GOODS[id][5] === kind);
 
   const GOSSIP = {

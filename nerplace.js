@@ -57,8 +57,8 @@ const NerPlace = (() => {
     plaza.rotation.x = -Math.PI / 2; plaza.position.set(OX, 0.04, 0); plaza.receiveShadow = true; group.add(plaza);
     // the gate in the south wall of the plaza, with the name of the place over it
     block(-14, 112, 4, 4, 14, 0x111111); block(14, 112, 4, 4, 14, 0x111111); block(0, 112, 32, 4, 3, 0x111111, 14, false);
-    const sign = label("NER PLACE", "welcome", 24, 8, "#111111", "#ffffff"); sign.position.set(OX, 17.5, 114.1); group.add(sign);                       // (facing south: what you see arriving)
-    const back = label("NER PLACE", "come again", 24, 8, "#111111", "#ffffff"); back.position.set(OX, 17.5, 109.9); back.rotation.y = Math.PI; group.add(back);   // (facing north: what you see leaving)
+    const sign = label("NER PLACE", "(fake) · welcome", 24, 8, "#111111", "#ffffff"); sign.position.set(OX, 17.5, 114.1); group.add(sign);                       // (facing south: what you see arriving)
+    const back = label("NER PLACE", "(fake) · come again", 24, 8, "#111111", "#ffffff"); back.position.set(OX, 17.5, 109.9); back.rotation.y = Math.PI; group.add(back);   // (facing north: what you see leaving)
     // a low wall round the plaza, open at the gate
     const wall = (x, z, w, d) => block(x, z, w, d, 1.4, 0x2a2a2a);
     wall(0, -112, 224, 3); wall(-112, 0, 3, 224); wall(112, 0, 3, 224); wall(-65, 112, 94, 3); wall(65, 112, 94, 3);
@@ -95,9 +95,9 @@ const NerPlace = (() => {
     Object.assign(BOUNDS, FIELD);
     Object.assign(MAP, { x0: OX - HALF, x1: OX + HALF, z0: -HALF, z1: HALF });
     placeAt(OX, 150, 0);
-    $("#hud .top-left h1").innerHTML = "Time Machine <small>Ner place</small>";
-    $("#map-title").textContent = "Ner place";
-    toast("🏠 Ner place: walk in through the gate to the Ner store. The menu button takes you back.");
+    $("#hud .top-left h1").innerHTML = "Time Machine <small>Ner place (fake)</small>";
+    $("#map-title").textContent = "Ner place (fake)";
+    toast("🏠 Ner place (fake): walk in through the gate to the Ner store. The menu button takes you back.");
   }
 
   function leave() {
