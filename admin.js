@@ -41,7 +41,7 @@
     if (!t) return showLogin("");
     if (!(await isAdmin(t))) { $("login-msg").textContent = ""; showLogin(`${session ? session.email : "This account"} is not an admin. Sign in with an admin account.`); return; }
     $("login").hidden = true; $("app").hidden = false; $("who").textContent = session.email;
-    loadUsers(); connect();
+    loadUsers(); loadSuggestions(); connect();
   }
 
   // ---------------------------------------------------------------- the connection to the game server
@@ -111,6 +111,23 @@
       $("n-users").textContent = `${usersRows.length} account${usersRows.length === 1 ? "" : "s"}${usersRows.some((u) => u.coins !== undefined) ? ` · ${total.toLocaleString()} denarii in all (as last saved)` : ""}`;
       renderUsers();
     } catch (e) { $("n-users").textContent = "Could not load the list: " + e.message; }
+  }
+
+  async function loadSuggestions() {
+    const t = $("t-suggest"); $("n-suggest").textContent = "Loading..."; t.replaceChildren();
+    try {
+      const tk = await token(); if (!tk) return;
+      const rows = await api("/rest/v1/rpc/admin_suggestions", { token: tk, body: {} });
+      const open = rows.filter((r) => !r.done).length;
+      $("n-suggest").textContent = `${open} to read, ${rows.length - open} done`; $("b-suggest").textContent = open || ""; $("b-suggest").classList.toggle("hot", open > 0);
+      header(t, ["When", "What", "Name", "Car", "Message", "Reply to", ""]);
+      for (const r of rows) {
+        const tr = t.insertRow(); if (r.done) tr.style.opacity = ".5";
+        cell(tr, when(r.created_at)); cell(tr, r.kind === "car" ? "🚗 Car" : "💡 Idea"); cell(tr, r.name); cell(tr, r.car_type || ""); cell(tr, r.message); cell(tr, r.contact || r.user_email || "");
+        const act = tr.insertCell();
+        button(act, r.done ? "Undo" : "Done", async () => { try { await api("/rest/v1/rpc/admin_suggestion_done", { token: await token(), body: { sid: r.id, is_done: !r.done } }); loadSuggestions(); } catch (e) { $("msg").textContent = "Could not change it: " + e.message; } });
+      }
+    } catch (e) { $("n-suggest").textContent = "Could not load them (has supabase-suggestions.sql been run?): " + e.message; }
   }
 
   function showOnline(list, m) {
@@ -197,7 +214,7 @@
     for (const p of document.querySelectorAll(".pane")) p.hidden = p.dataset.pane !== name;
   }
   for (const b of document.querySelectorAll(".tab")) b.addEventListener("click", () => showTab(b.dataset.tab));
-  $("refresh").addEventListener("click", () => { loadUsers(); if (welcomed) loadLive(); else connect(); });
+  $("refresh").addEventListener("click", () => { loadUsers(); loadSuggestions(); if (welcomed) loadLive(); else connect(); });
   $("signout").addEventListener("click", () => { store(null); showLogin("Signed out."); });
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const msg = $("login-msg"); msg.textContent = "Signing in...";

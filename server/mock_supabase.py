@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 ANON, SERVICE = "anon-test-key-123456", "service-test-key-123456"
 USERS, SESSIONS, REFRESH, PROFILES, ENTITLEMENTS = {}, {}, {}, {}, {}
+SUGGESTIONS = []
 
 
 def session_for(user):
@@ -116,6 +117,13 @@ class H(BaseHTTPRequestHandler):
                 return self.reply(403, {"message": "row-level security: only the service key can write entitlements"})
             for row in (data if isinstance(data, list) else [data]):
                 ENTITLEMENTS[row["user_id"]] = {"user_id": row["user_id"], "premium": bool(row.get("premium"))}
+            return self.reply(201)
+        if u.path == "/rest/v1/suggestions":
+            ok = isinstance(data, dict) and data.get("kind") in ("idea", "car") and 1 <= len(str(data.get("name", ""))) <= 60 and len(str(data.get("message", ""))) <= 1500
+            if not ok or (data["kind"] == "idea" and len(str(data.get("message", ""))) < 3):
+                return self.reply(400, {"message": "new row violates check constraint"})
+            me = self.user()
+            SUGGESTIONS.append({**data, "user_id": me["id"] if me else None})
             return self.reply(201)
         self.reply(404, {"message": "not found"})
 

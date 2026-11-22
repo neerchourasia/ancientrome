@@ -376,6 +376,7 @@ const Admin = (() => {
       Vitals.coins += n; toast(`Added ${n} denarii.`); Account.saveNow(true);
     });
     $a("btn-admin").addEventListener("click", () => { if (!Account.admin) { toast("Only an admin account can open this."); return; } window.open("admin.html", "_blank", "noopener"); });
+    $a("btn-suggest").addEventListener("click", () => window.open("suggest.html", "_blank", "noopener"));
     $a("btn-admintools").addEventListener("click", openPanel_);
     for (const b of document.querySelectorAll("#admin .ad-tab")) b.addEventListener("click", () => showTab(b.dataset.tab));
     document.querySelector("#admin .ad-back").addEventListener("click", closePanels);

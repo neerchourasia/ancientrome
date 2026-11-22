@@ -48,6 +48,8 @@
         <div class="group">Watch</div>
         <button type="button" class="tab" data-tab="chat"><span class="ico">💬</span>Chat log <i id="b-chat" class="badge"></i></button>
         <button type="button" class="tab" data-tab="events"><span class="ico">🚩</span>Suspicious activity <i id="b-events" class="badge"></i></button>
+        <div class="group">Players write</div>
+        <button type="button" class="tab" data-tab="suggest"><span class="ico">💡</span>Suggestions <i id="b-suggest" class="badge"></i></button>
         <p class="dim foot">Restoring items and adding denarii to your own game is still in the game: open it, then 🧰 Admin tools.</p>
       </nav>
       <main class="main">
@@ -76,6 +78,11 @@
           <p class="dim">The last 300 public chat messages, newest first, with who sent them. Whispers and friend chats are never here. It is kept in the server's memory only, and a restart of the server empties it.</p>
           <div class="panel scroll"><table id="t-chat"></table></div>
         </section>
+        <section class="pane" data-pane="suggest" hidden>
+          <h2>Suggestions and car requests <span id="n-suggest" class="count"></span></h2>
+          <p class="dim">What players sent from the Suggest page (suggest.html), the ones not done first. It needs supabase-suggestions.sql to have been run once. Tick <b>Done</b> when you have dealt with one.</p>
+          <div class="panel scroll"><table id="t-suggest"></table></div>
+        </section>
         <section class="pane" data-pane="journey" hidden>
           <h2>User journey <span id="n-journey" class="count"></span></h2>
           <p class="dim">What each visitor did every time they came on: where they went, what they bought, which games they played. Pick a visitor to see each visit, oldest line first.</p>
@@ -87,6 +94,6 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="admin.js?v=1"></script>
+  <script src="admin.js?v=2"></script>
 </body>
 </html>

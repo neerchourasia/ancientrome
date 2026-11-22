@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Suggest something · Time Machine</title>
+  <style>
+    :root { --bg: #0b161c; --ink: #e9f4f4; --muted: #c9bd9f; --gold: #3ec97c; --card: #12262e; --line: rgba(62,201,124,.35); --ok: #8fd49a; --bad: #f0a090; --grad: linear-gradient(115deg,#ffe066 0%,#a6e35c 22%,#3ec97c 44%,#38bdf8 72%,#5b8def 100%); }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    main { max-width: 680px; margin: 0 auto; padding: 28px 16px 56px; }
+    h1 { margin: 0 0 6px; font: 700 1.8rem Georgia, serif; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .muted { color: var(--muted); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    label small { font-weight: 400; color: var(--muted); }
+    input[type=text], input[type=email], select, textarea { width: 100%; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--line); background: #0b161c; color: var(--ink); font: inherit; }
+    textarea { min-height: 120px; resize: vertical; }
+    .kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kinds label { margin: 0; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; cursor: pointer; font-weight: 700; }
+    .kinds label small { display: block; }
+    .kinds input { margin-right: 6px; }
+    .kinds label:has(input:checked) { border-color: #fff; background: rgba(62,201,124,.14); }
+    a { color: var(--gold); }
+    button { font: 700 1rem system-ui; cursor: pointer; padding: 9px 18px; border: 1.5px solid #fff; border-radius: 10px; color: #06232a; background: var(--grad); box-shadow: 0 2px 9px rgba(0,0,0,.4); }
+    button[disabled] { opacity: .55; cursor: default; }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    #car-only[hidden] { display: none; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    .count { float: right; font-weight: 400; color: var(--muted); font-size: .85rem; }
+    body::after { content: ""; position: fixed; inset: 0; pointer-events: none; border: 5px solid transparent; border-image: var(--grad) 1; box-shadow: inset 0 0 14px rgba(56,189,248,.45); }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="./">&larr; Back to the game</a></p>
+  <h1>Suggest something</h1>
+  <p class="muted">Tell us what you would like in the game, or ask for a car with your own name on it. Every message is read by a person.</p>
+
+  <form id="f" class="card" autocomplete="off" novalidate>
+    <div class="kinds" role="radiogroup" aria-label="What is it">
+      <label><input type="radio" name="kind" value="idea" checked>💡 A suggestion<small>A new thing, a fix, anything</small></label>
+      <label><input type="radio" name="kind" value="car">🚗 Name a car after me<small>Your name on a car in the game</small></label>
+    </div>
+
+    <label for="name"><span id="name-label">Your name</span> <small id="name-hint">(shown only to us)</small></label>
+    <input id="name" type="text" maxlength="60" required>
+
+    <div id="car-only" hidden>
+      <label for="car">Which car should carry the name? <small>(optional)</small></label>
+      <select id="car"><option value="">Any, you choose</option></select>
+    </div>
+
+    <label for="msg"><span id="msg-label">Your suggestion</span> <small id="msg-hint"></small><span class="count" id="count">0 / 1500</span></label>
+    <textarea id="msg" maxlength="1500"></textarea>
+
+    <label for="contact">Your email <small>(optional: only so we can answer you or tell you the car is in)</small></label>
+    <input id="contact" type="email" maxlength="120" autocomplete="email">
+
+    <div class="hp" aria-hidden="true"><label>Leave this empty <input id="site" type="text" tabindex="-1" autocomplete="off"></label></div>
+
+    <p class="muted" id="car-note" hidden>We cannot promise a car: names are checked first and rude, hateful or made-up-to-impersonate names are turned down. Please use a name you are happy to see on a car in front of other players.</p>
+    <p><button type="submit" id="go">Send</button> <span id="out" role="status"></span></p>
+  </form>
+  <p class="muted">We keep what you write here, with the name and the email if you give them, only to read your message and answer it, as set out in the <a href="privacy.html">privacy policy</a>.</p>
+</main>
+<script src="config.js"></script>
+<script src="suggest.js?v=1"></script>
+</body>
+</html>
