@@ -111,6 +111,8 @@ const Shopkeep = (() => {
   }
   const repOf = (id) => level(st.rep[id] || 0);
   const buyPrice = (id) => Math.max(1, Math.round(mark(GOODS[id][1]) * (1 - DISCOUNT[repOf(shop.id)] - (st.shops[shop.id] ? 0.3 : 0))));
+  const NERCAR_OFF = 0.3;                                          // the Ner store sells the NERCAR this much cheaper than the Market (the shop owner's and the regular customer's discounts come on top)
+  const carPrice = () => Math.max(1, Math.round(mark(Market.ITEMS.nercar.price) * (1 - NERCAR_OFF - DISCOUNT[repOf(shop.id)] - (st.shops[shop.id] ? 0.3 : 0))));
   const shopCost = () => mark(shop.trade === "food" ? 900 : shop.trade === "clothes" ? 1100 : 1300);
   const rateOf = (o) => Math.round(o.price / 20 + Object.entries(o.stock).reduce((a, [id, n]) => a + GOODS[id][1] * 0.08 * n, 0));
   const pendingOf = (o) => Math.round(rateOf(o) * (typeof Payroll !== "undefined" ? Payroll.realDays(o.at) : 0));
@@ -140,6 +142,7 @@ const Shopkeep = (() => {
       if (shop.trade === "food") menu.append(btn(tr("🍞 See what is cooking"), () => { closePanels(); setTimeout(() => Market.open("food"), 0); }));
       else if (shop.trade === "clothes") menu.append(btn(tr("👘 See the clothes"), () => { closePanels(); setTimeout(() => Market.open("clothes"), 0); }));
       else menu.append(btn(tr("🛒 Buy"), go("buy")));
+      if (shop.kindName === "Ner store") menu.append(Market.owns("nercar") ? btn(tr("🚗 You own a NERCAR"), () => {}, true) : btn(T_("🚗 Buy a NERCAR · {0} ({1}% off)", carPrice(), Math.round(NERCAR_OFF * 100)), buyNercar));
       if (shop.trade === "goods") menu.append(btn(tr("💰 Sell your goods"), go("sell")));
       if (recipesOf(shop.kindName).length) menu.append(btn(tr("🛠️ Workbench"), go("craft")));
       menu.append(btn(tr("📊 Price board"), go("board")), btn(tr("🗣️ Ask about the neighbourhood"), go("gossip")));
@@ -274,6 +277,14 @@ const Shopkeep = (() => {
     st.rep[shop.id] = (st.rep[shop.id] || 0) + Math.round(p / 2);
     Vitals.coins += p; Sfx.play("coin"); save();
     say(T_("Sold: {0} for {1} denarii.", tr(g[0]), p));
+  }
+
+  function buyNercar() {
+    if (Market.owns("nercar")) return;
+    const price = carPrice();
+    if (Vitals.coins < price) { say(T_("The {0} costs {1} denarii (you have {2}).", "NERCAR", price, Vitals.coins)); return; }
+    Vitals.coins -= price; Market.grant("nercar"); st.rep[shop.id] = (st.rep[shop.id] || 0) + price; Sfx.play("discover"); save();
+    say(T_("Bought: {0} for {1} denarii.", "NERCAR", price) + " " + tr("Your NERCAR is in your garage: take it out in the Garage, or in car and plane space."));
   }
 
   // an errand: a good from another goods shop in this city that exists in this era
