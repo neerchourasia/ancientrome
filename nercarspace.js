@@ -3,7 +3,7 @@
 // screen give you a vehicle: 🚗 Rent a NERCAR (expensive: RENT, paid every time) or 🚗 Get out yours (a list of the cars and planes you own: buy them in the Market; no weather grounds a plane here). Press the menu button again to go back to where you were.
 // It is not a city of its own: it is built far away from the others (x = -60000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
 // concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The things to fly round (a tower, a ring of pillars, a gate to fly through, slalom walls and big
-// balls, and a scatter of pillars and balls over the whole field, and thirty big gates) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
+// balls, and a scatter of pillars and balls over the whole field, thirty big gates, forty city blocks of towers and seventy long walls) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
 // Depends on game.js, car.js (the NERCAR), vitals.js (the money) and market.js (whether you own one) at run time.
 
 const NercarSpace = (() => {
@@ -30,12 +30,12 @@ const NercarSpace = (() => {
   // a solid block standing on the grass (or hanging at y0) and a solid ball, in metres from the middle of the field
   function put(x, z, w, d, h, color, y0) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam(color));
-    m.position.set(OX + x, y0 + h / 2, z); group.add(m);
+    m.position.set(OX + x, y0 + h / 2, z); m.updateMatrix(); m.matrixAutoUpdate = false; group.add(m);
     addBlockerBox(OX + x - w / 2, OX + x + w / 2, z - d / 2, z + d / 2, y0, y0 + h);
   }
   function putBall(x, z, r, color) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), lam(color));
-    m.position.set(OX + x, r, z); group.add(m);
+    m.position.set(OX + x, r, z); m.updateMatrix(); m.matrixAutoUpdate = false; group.add(m);
     addBlockerCircle(OX + x, z, r * 0.9, 0, r * 2);
   }
   const box = (x, z, w, d, h, color, y0 = 0) => put(x * K, z * K, w * Z, d * Z, h * Z, color, y0 * Z);      // (the layout below: small numbers, scaled up by K and Z)
@@ -60,11 +60,22 @@ const NercarSpace = (() => {
       const ring = i % 3, a = (Math.floor(i / 3) / 10) * Math.PI * 2 + ring * 0.4, d = [9000, 22000, 38000][ring], x = Math.cos(a) * d, z = Math.sin(a) * d, c = colors[i % colors.length];
       put(x, z - 90, 26, 26, 120, c, 0); put(x, z + 90, 26, 26, 120, c, 0); put(x, z, 30, 230, 20, c, 120);
     }
-    for (let i = 0; i < 900; i++) {
+    const away = (x, z) => Math.hypot(x + 3000, z) > 1500;                // (nothing where you arrive)
+    for (let i = 0; i < 2500; i++) {
       const x = (rnd() * 2 - 1) * (HALF - 1500), z = (rnd() * 2 - 1) * (HALF - 1500);
-      if (Math.hypot(x + 3000, z) < 1500) continue;
+      if (!away(x, z)) continue;
       const c = colors[Math.floor(rnd() * colors.length)];
       if (i % 3) put(x, z, 20 + rnd() * 30, 20 + rnd() * 30, 60 + rnd() * 200, c, 0); else putBall(x, z, 20 + rnd() * 40, c);
+    }
+    for (let i = 0; i < 40; i++) {                                      // forty city blocks: a dense cluster of towers of every height
+      const cx = (rnd() * 2 - 1) * (HALF - 3000), cz = (rnd() * 2 - 1) * (HALF - 3000), n = 8 + Math.floor(rnd() * 10);
+      if (!away(cx, cz)) continue;
+      for (let j = 0; j < n; j++) put(cx + (rnd() * 2 - 1) * 300, cz + (rnd() * 2 - 1) * 300, 25 + rnd() * 35, 25 + rnd() * 35, 80 + rnd() * 240, colors[Math.floor(rnd() * colors.length)], 0);
+    }
+    for (let i = 0; i < 70; i++) {                                      // seventy long walls to fly over or round
+      const x = (rnd() * 2 - 1) * (HALF - 2000), z = (rnd() * 2 - 1) * (HALF - 2000), len = 400 + rnd() * 1400, h = 40 + rnd() * 90, c = colors[Math.floor(rnd() * colors.length)];
+      if (!away(x, z)) continue;
+      if (i % 2) put(x, z, len, 14, h, c, 0); else put(x, z, 14, len, h, c, 0);
     }
     group.visible = false;
     scene.add(group);
