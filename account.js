@@ -414,6 +414,7 @@ const Account = (() => {
     }
     $a("btn-account").textContent = on ? `Account: ${session.email.split("@")[0].slice(0, 10)}` : demo ? "Log in to save" : "Log in";
     $a("demo-bar").hidden = !(demo && !on);
+    $a("btn-logout").hidden = !on;                      // the menu's Log out button is only for someone who is logged in
   }
 
   // The login screen that cannot be closed. `done` runs once someone has logged in.
@@ -475,6 +476,7 @@ const Account = (() => {
 
   function bind() {
     $a("btn-account").addEventListener("click", open);
+    $a("btn-logout").addEventListener("click", logOut);
     $a("account-close").addEventListener("click", closePanels);
     $a("account").addEventListener("click", (e) => { if (e.target.id === "account") closePanels(); });
     // Remember me: the choice is kept, and the email of a remembered login is filled in next time
