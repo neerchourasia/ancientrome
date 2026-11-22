@@ -142,7 +142,7 @@ const Shopkeep = (() => {
       if (shop.trade === "food") menu.append(btn(tr("🍞 See what is cooking"), () => { closePanels(); setTimeout(() => Market.open("food"), 0); }));
       else if (shop.trade === "clothes") menu.append(btn(tr("👘 See the clothes"), () => { closePanels(); setTimeout(() => Market.open("clothes"), 0); }));
       else menu.append(btn(tr("🛒 Buy"), go("buy")));
-      if (shop.kindName === "Ner store") menu.append(Market.owns("nercar") ? btn(tr("🚗 You own a NERCAR"), () => {}, true) : btn(T_("🚗 Buy a NERCAR · {0} ({1}% off)", carPrice(), Math.round(NERCAR_OFF * 100)), buyNercar));
+      if (shop.kindName === "Ner store") menu.append(Market.owns("nercar") ? btn(tr("🚗 You own a NERCAR"), () => {}, true) : btn(T_("🚗 Buy a NERCAR (fake) · {0} ({1}% off)", carPrice(), Math.round(NERCAR_OFF * 100)), buyNercar));
       if (shop.trade === "goods") menu.append(btn(tr("💰 Sell your goods"), go("sell")));
       if (recipesOf(shop.kindName).length) menu.append(btn(tr("🛠️ Workbench"), go("craft")));
       menu.append(btn(tr("📊 Price board"), go("board")), btn(tr("🗣️ Ask about the neighbourhood"), go("gossip")));
@@ -282,9 +282,9 @@ const Shopkeep = (() => {
   function buyNercar() {
     if (Market.owns("nercar")) return;
     const price = carPrice();
-    if (Vitals.coins < price) { say(T_("The {0} costs {1} denarii (you have {2}).", "NERCAR", price, Vitals.coins)); return; }
+    if (Vitals.coins < price) { say(T_("The {0} costs {1} denarii (you have {2}).", "NERCAR (fake)", price, Vitals.coins)); return; }
     Vitals.coins -= price; Market.grant("nercar"); st.rep[shop.id] = (st.rep[shop.id] || 0) + price; Sfx.play("discover"); save();
-    say(T_("Bought: {0} for {1} denarii.", "NERCAR", price) + " " + tr("Your NERCAR is in your garage: take it out in the Garage, or in car and plane space."));
+    say(T_("Bought: {0} for {1} denarii.", "NERCAR (fake)", price) + " " + tr("Your NERCAR is in your garage: take it out in the Garage, or in car and plane space."));
   }
 
   // an errand: a good from another goods shop in this city that exists in this era

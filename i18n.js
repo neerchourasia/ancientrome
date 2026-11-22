@@ -914,7 +914,7 @@ const I18n = (() => {
     ["🏠 Ner place: walk in through the gate to the Ner store. The menu button takes you back.", "🏠 Ner place: entra por la puerta hasta la tienda Ner. El botón del menú te devuelve.", "🏠 Ner place: entra dal cancello fino al negozio Ner. Il pulsante del menu ti riporta indietro.", "🏠 नेर प्लेस: फाटक से अंदर जाकर नेर की दुकान तक जाइए। मेनू का बटन आपको वापस ले जाता है।", "🏠 Ner之地:从大门走进去,就是Ner商店。菜单按钮可以带你回去。"],
     ["Leave Ner place first (press its button in the menu).", "Sal primero de Ner place (pulsa su botón en el menú).", "Esci prima da Ner place (premi il suo pulsante nel menu).", "पहले नेर प्लेस से बाहर निकलिए (मेनू में उसका बटन दबाएँ)।", "请先离开Ner之地(按菜单里它的按钮)。"],
     // the NERCAR at the Ner store
-    ["🚗 Buy a NERCAR · {0} ({1}% off)", "🚗 Comprar un NERCAR · {0} ({1}% de descuento)", "🚗 Compra un NERCAR · {0} ({1}% di sconto)", "🚗 NERCAR खरीदें · {0} ({1}% की छूट)", "🚗 购买NERCAR · {0}(优惠{1}%)"],
+    ["🚗 Buy a NERCAR (fake) · {0} ({1}% off)", "🚗 Comprar un NERCAR (falso) · {0} ({1}% de descuento)", "🚗 Compra un NERCAR (finto) · {0} ({1}% di sconto)", "🚗 NERCAR (नकली) खरीदें · {0} ({1}% की छूट)", "🚗 购买NERCAR(假)· {0}(优惠{1}%)"],
     ["🚗 You own a NERCAR", "🚗 Ya tienes un NERCAR", "🚗 Possiedi già un NERCAR", "🚗 आपके पास NERCAR है", "🚗 你已经有NERCAR了"],
     ["Your NERCAR is in your garage: take it out in the Garage, or in car and plane space.", "Tu NERCAR está en tu garaje: sácalo desde el garaje o en el espacio de coches y aviones.", "Il tuo NERCAR è nel garage: portalo fuori dal garage o nello spazio per auto e aerei.", "आपकी NERCAR आपके गैराज में है: उसे गैराज से या कार और विमान स्थान में निकालिए।", "你的NERCAR在车库里:从车库取出,或在车辆与飞机空间里取出。"],
   ];
