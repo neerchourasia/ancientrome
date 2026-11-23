@@ -1,12 +1,12 @@
 "use strict";
 // Emotes and photo mode.
-// EMOTES: 😀 Emotes in the menu: wave, dance, bow, cheer, clap or laugh. Your character does it for three seconds (moving stops it) and the other players near you see it too.
+// EMOTES: 😀 Emotes in the menu: wave, dance, bow, cheer, clap, laugh or Ner (a spin with your arms out). Your character does it for three seconds (moving stops it) and the other players near you see it too.
 // PHOTO MODE: 📷 Photo in the menu hides everything except the world: turn and zoom the camera as usual (C changes the view), press Take photo to save a picture
 //   (a PNG with a small "Time Machine" caption; Enter does the same), choose a look (sepia, black and white, vivid or a postcard with a white border), Share it where the browser can
 //   (phones), and Esc or Exit to come back. Depends on game.js (avatar parts, renderer, scene, camera) and online.js.
 
 const Emotes = (() => {
-  const LIST = [["wave", "👋 Wave"], ["dance", "💃 Dance"], ["bow", "🙇 Bow"], ["cheer", "🙌 Cheer"], ["clap", "👏 Clap"], ["laugh", "😂 Laugh"] ["ner", "N Ner"];
+  const LIST = [["wave", "👋 Wave"], ["dance", "💃 Dance"], ["bow", "🙇 Bow"], ["cheer", "🙌 Cheer"], ["clap", "👏 Clap"], ["laugh", "😂 Laugh"], ["ner", "🖤 Ner"]];
   const IDS = new Set(LIST.map((e) => e[0])), DURATION = 3;
   let mine = null;                                         // { e, t } while you are doing one
   const bump = (t, len) => Math.sin(Math.min(1, t / len) * Math.PI);        // 0 up to 1 and back to 0 over len seconds
@@ -21,6 +21,7 @@ const Emotes = (() => {
       case "bow": g.rotation.x = 0.95 * bump(t, DURATION); break;
       case "cheer": p.armL.rotation.z = -2.8 * k; p.armR.rotation.z = 2.8 * k; g.position.y += Math.abs(Math.sin(t * 7)) * 0.22 * k; break;
       case "clap": p.armL.rotation.x = p.armR.rotation.x = -1.35 * k; p.armL.rotation.z = (-0.1 + Math.sin(t * 16) * 0.28) * k; p.armR.rotation.z = (0.1 - Math.sin(t * 16) * 0.28) * k; break;
+      case "ner": p.armL.rotation.z = -1.5 * k; p.armR.rotation.z = 1.5 * k; g.rotation.y += 4 * Math.PI * (t / DURATION); break;                       // arms out, two turns on the spot
       case "laugh": g.rotation.z = Math.sin(t * 22) * 0.07 * k; g.rotation.x = -0.18 * bump(t, DURATION) + Math.sin(t * 22) * 0.03 * k; g.position.y += Math.abs(Math.sin(t * 11)) * 0.05 * k; break;
     }
     return true;

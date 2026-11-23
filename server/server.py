@@ -2772,7 +2772,7 @@ def eject_riders(driver, why):
         leave_ride(r, why)
 
 
-EMOTES = ("wave", "dance", "bow", "cheer", "clap", "laugh")
+EMOTES = ("wave", "dance", "bow", "cheer", "clap", "laugh", "ner")
 
 
 def on_emote(conn, m):
