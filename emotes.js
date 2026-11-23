@@ -6,7 +6,7 @@
 //   (phones), and Esc or Exit to come back. Depends on game.js (avatar parts, renderer, scene, camera) and online.js.
 
 const Emotes = (() => {
-  const LIST = [["wave", "👋 Wave"], ["dance", "💃 Dance"], ["bow", "🙇 Bow"], ["cheer", "🙌 Cheer"], ["clap", "👏 Clap"], ["laugh", "😂 Laugh"]];
+  const LIST = [["wave", "👋 Wave"], ["dance", "💃 Dance"], ["bow", "🙇 Bow"], ["cheer", "🙌 Cheer"], ["clap", "👏 Clap"], ["laugh", "😂 Laugh"] ["ner", "N Ner"];
   const IDS = new Set(LIST.map((e) => e[0])), DURATION = 3;
   let mine = null;                                         // { e, t } while you are doing one
   const bump = (t, len) => Math.sin(Math.min(1, t / len) * Math.PI);        // 0 up to 1 and back to 0 over len seconds
