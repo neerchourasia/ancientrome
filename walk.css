@@ -1165,3 +1165,9 @@ html:is(.view-explorer, .view-map, .view-status, .view-guide, .view-real):has(bo
 #ns-hud button:hover { background: rgba(60,48,30,.95); }
 #ns-list { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 220px; max-height: 50vh; overflow-y: auto; }
 #ns-list[hidden] { display: none; }
+
+.proj-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.proj-list a { display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(226,185,85,.45); background: rgba(0,0,0,.25); color: var(--ink); text-decoration: none; }
+.proj-list a:hover { background: rgba(226,185,85,.18); }
+.proj-list b { display: block; }
+.proj-list span { display: block; font-size: .8rem; color: var(--muted); }

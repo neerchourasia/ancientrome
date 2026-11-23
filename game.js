@@ -330,6 +330,7 @@ function wireInput(canvas) {
   $("#btn-dgames").addEventListener("click", () => DGames.open());
   Challenge.bind();
   $("#btn-nspace").addEventListener("click", () => NercarSpace.toggle());
+  $("#btn-projects").addEventListener("click", () => { if (mode !== "walk" || panelOpen) { toast("Close what is open and stop the game first"); return; } openPanel("#projects"); });
   $("#btn-nplace").addEventListener("click", () => NerPlace.toggle());
   for (const b of document.querySelectorAll(".dclose")) b.addEventListener("click", closePanels);
   $("#btn-city").addEventListener("click", openTravel);
