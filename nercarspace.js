@@ -1,6 +1,6 @@
 "use strict";
 // Car and plane space (the file and the object are still called NercarSpace): a huge open field of grass with things to fly round, for your cars and planes and the NERCAR. 🚀 Car and plane space (in the menu) takes you there on foot; there, two buttons at the bottom of the
-// screen give you a vehicle: 🚗 Rent a NERCAR (expensive: RENT, paid every time), ✈️ Rent a plane (RENT_PLANE) or 🚗 Get out yours (a list of the cars and planes you own: buy them in the Market; no weather grounds a plane here). Press the menu button again to go back to where you were.
+// screen give you a vehicle: 🚗 Rent a NERCAR (expensive: RENT, paid every time), ✈️ Rent a plane (RENT_PLANE), 🛩️ Rent a jet (RENT_JET) or 🚗 Get out yours (a list of the cars and planes you own: buy them in the Market; no weather grounds a plane here). Press the menu button again to go back to where you were.
 // It is not a city of its own: it is built far away from the others (x = -60000; the game server clamps positions to 20000, which does no harm), so you are still "in Rome" as far as everything else is
 // concerned, and the walls of the map (BOUNDS) are swapped for the edges of the field while you are in it. The things to fly round (a tower, a ring of pillars, a gate to fly through, slalom walls and big
 // balls, and a scatter of pillars and balls over the whole field, thirty big gates, forty city blocks of towers and seventy long walls) are solid like any building (addBlockerBox / addBlockerCircle in physics.js), so the NERCAR crashes into them if you fly low.
@@ -10,6 +10,7 @@ const NercarSpace = (() => {
   const OX = -60000, HALF = 50000;                                 // the middle of the field, and half of its width: 100 km across (the NERCAR crosses 900 m in half a second)
   const K = 10, Z = 2;                                             // the layout below is drawn small: its distances are made K times longer and the things Z times bigger
   const RENT_PLANE = 1000;                                        // what a rented light plane costs, every time (buying one costs 3500)
+  const RENT_JET = 2500;                                          // what a rented light jet costs, every time (buying one costs 8000)
   const RENT = 50000;                                              // what a rented NERCAR costs, every time (buying one costs 1,000,000)
   const FIELD = { minX: OX - HALF, maxX: OX + HALF, minZ: -HALF, maxZ: HALF };
   let group = null, active = false, saved = null, wired = false;
@@ -105,6 +106,15 @@ const NercarSpace = (() => {
       toast(`You rent a light plane for ${RENT_PLANE} denarii.`);
       Car.deploy("plane");
     });
+    const rj = $n("ns-rentjet");
+    rj.textContent = `🛩️ Rent a jet (${RENT_JET} denarii)`;
+    rj.addEventListener("click", () => {
+      if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a vehicle." : "Get out of what you are in first."); return; }
+      if (Vitals.coins < RENT_JET) { toast(`A rented jet costs ${RENT_JET} denarii: you have ${Math.floor(Vitals.coins)}.`); return; }
+      Vitals.coins -= RENT_JET; Sfx.play("coin");
+      toast(`You rent a light jet for ${RENT_JET} denarii.`);
+      Car.deploy("lightjet");
+    });
     const list = document.createElement("div"); list.id = "ns-list"; list.hidden = true; $n("ns-hud").prepend(list);
     own.addEventListener("click", () => {
       if (!active || mode !== "walk") { toast(Car.driving ? "You are already in a vehicle." : "Get out of what you are in first."); return; }
@@ -137,7 +147,7 @@ const NercarSpace = (() => {
     $("#hud .top-left h1").innerHTML = "Time Machine <small>Car and plane space</small>";
     $("#map-title").textContent = "Car and plane space";
     setHud(true);
-    toast("🚀 Car and plane space: rent a NERCAR or a plane, or get out one of yours (buttons at the bottom). The menu button takes you back.");
+    toast("🚀 Car and plane space: rent a NERCAR, a plane or a jet, or get out one of yours (buttons at the bottom). The menu button takes you back.");
   }
 
   function leave() {
@@ -156,5 +166,5 @@ const NercarSpace = (() => {
   }
 
   const toggle = () => (active ? leave() : enter());
-  return { enter, leave, toggle, get active() { return active; }, FIELD, RENT, RENT_PLANE };
+  return { enter, leave, toggle, get active() { return active; }, FIELD, RENT, RENT_PLANE, RENT_JET };
 })();
