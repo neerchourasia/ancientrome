@@ -1159,7 +1159,7 @@ html.view-scenery body:not(.arranging) :is(.top-left, .top-center, #card, #vital
 html.view-real body:not(.arranging) :is(.top-left, .top-center, #card, #vitals, #help, #minimap, #chat-log) { display: none !important; }
 html:is(.view-explorer, .view-map, .view-status, .view-guide, .view-real):has(body:not(.arranging)) > #frame { display: none !important; }
 
-#ns-hud { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 5; display: flex; gap: 10px; }
+#ns-hud { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: max-content; max-width: 96vw; }
 #ns-hud[hidden] { display: none; }
 #ns-hud button { padding: 10px 16px; font-size: .95rem; font-weight: 700; color: var(--ink); background: rgba(28,22,16,.9); border: 1px solid rgba(226,185,85,.6); border-radius: 10px; cursor: pointer; }
 #ns-hud button:hover { background: rgba(60,48,30,.95); }
