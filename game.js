@@ -861,6 +861,13 @@ function createFigure() {
   const sandals = [legL, legR].map((leg) => { const g2 = new THREE.Group(); for (const y of [-0.5, -0.4, -0.3]) g2.add(part(new THREE.TorusGeometry(0.085, 0.012, 5, 10), new THREE.MeshLambertMaterial({ color: 0xe0b83c, emissive: 0x3d2f05 }), 0, y, 0).rotateX(Math.PI / 2)); leg.add(g2); return g2; });
   const staff = new THREE.Group(); staff.add(part(new THREE.CylinderGeometry(0.025, 0.03, 1.7, 6), lam(0x7a5a33), 0, -0.4, -0.1), part(new THREE.SphereGeometry(0.05, 8, 6), lam(0xb08a3a), 0, 0.46, -0.1)); armR.add(staff);
   const scroll = new THREE.Group(); scroll.add(part(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8), lam(0xf0e6cc), 0, -0.52, -0.12).rotateX(Math.PI / 2), part(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 8), lam(0xa8342c), 0, -0.52, -0.27).rotateX(Math.PI / 2), part(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 8), lam(0xa8342c), 0, -0.52, 0.03).rotateX(Math.PI / 2)); armR.add(scroll);
+  // Ner clothes (given by the Ner store, shopkeep.js): a black T-shirt with a white N, and a black cap
+  const nerBlack = lam(0x111111), nerWhite = lam(0xf2f2f0);
+  const nerTee = part(new THREE.CylinderGeometry(0.27, 0.32, 0.5, 10), nerBlack, 0, 1.12, 0);
+  for (const x of [-0.045, 0.045]) nerTee.add(part(new THREE.BoxGeometry(0.025, 0.14, 0.02), nerWhite, x, 0.03, -0.3));
+  const nerSlash = part(new THREE.BoxGeometry(0.025, 0.16, 0.02), nerWhite, 0, 0.03, -0.3); nerSlash.rotation.z = 0.5; nerTee.add(nerSlash);
+  const nerCap = new THREE.Group(); nerCap.add(part(new THREE.SphereGeometry(0.235, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), nerBlack, 0, 1.54, 0), part(new THREE.BoxGeometry(0.3, 0.02, 0.17), nerBlack, 0, 1.585, -0.3), part(new THREE.BoxGeometry(0.06, 0.06, 0.01), nerWhite, 0, 1.66, -0.226));
+  Object.assign(acc, { ner_tee: [nerTee], ner_cap: [nerCap] });
   Object.assign(acc, { phrygian: [phrygian], petasos: [petasos], turban: [turban], headdress: [headdress], greencloak: [cloakOf(0x2f6b3a)], bluecloak: [cloakOf(0x2a4a8f)], furcloak: [furcloak], jerkin: [jerkin], mail: [mail], silverplate: [silverplate], silverbands, bracers, redboots, sandals, staff: [staff], scroll: [scroll] });
   for (const list of Object.values(acc)) for (const o of list) { o.visible = false; if (!o.parent) g.add(o); }
 

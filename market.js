@@ -67,6 +67,8 @@ const Market = (() => {
     ["r_skull", "Crystal skull", 2500, "A skull of clear rock crystal. Nobody knows who made it."],
   ];
   const ITEMS = {
+    ner_tee: { type: "wear", slot: "body", ner: true, name: "Ner T-shirt", price: 60, note: "A black T-shirt with a white N on the chest. (Only the Ner store gives it.)" },
+    ner_cap: { type: "wear", slot: "head", ner: true, name: "Ner cap", price: 35, note: "A black cap with a short peak. (Only the Ner store gives it.)" },
     wreath: { type: "wear", slot: "head", name: "Laurel wreath", price: 60, note: "The crown of a victor." },
     helmet: { type: "wear", slot: "head", name: "Crested helmet", price: 120, note: "Bronze, with a crimson crest." },
     crown: { type: "wear", slot: "head", name: "Golden crown", price: 250, note: "Fit for an emperor." },
@@ -88,6 +90,7 @@ const Market = (() => {
     monkey: { type: "pet", slot: "pet", name: "Monkey", price: 140, note: "A cheeky monkey with long arms that scampers after you. Helps: Grabs half your money back when a thief steals it." },
     peacock: { type: "pet", slot: "pet", name: "Peacock", price: 160, note: "A blue and green peacock, its long tail fanning out behind it. Helps: Quests pay 15% more." },
     owl: { type: "pet", slot: "pet", name: "Owl", price: 170, note: "The owl of Minerva, gliding in slow circles above you. Helps: Tells you tomorrow's weather every morning." },
+    ner_pet: { type: "pet", slot: "pet", ner: true, name: "Ner pet", price: 100, note: "A little black and white creature from Ner place that trots along behind you. It came free with your Ner. (Only the Ner store gives it.)" },
     cub: { type: "pet", slot: "pet", name: "Lion cub", price: 260, note: "A golden lion cub that trots at your heel. Helps: Scares off thieves." },
     bicycle: { type: "car", name: "Bicycle", price: 60, note: "Pedal-powered and cheap. Top speed 27 km/h." },
     motorcycle: { type: "car", name: "Motorcycle", price: 350, note: "A fast, light motorbike. Top speed 122 km/h." },
@@ -414,7 +417,7 @@ const Market = (() => {
         li.append(note); ul.append(li);
         return [h, ul];
       }
-      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => (x.type === "car" && x.air ? "air" : x.type) === type && (type !== "food" || foodHere(x)) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
+      for (const [id, it] of Object.entries(ITEMS).filter(([fid, x]) => (x.type === "car" && x.air ? "air" : x.type) === type && (type !== "food" || foodHere(x)) && (!x.ner || def.ownedOnly) && (type !== "cure" || x.where[0] === (typeof city !== "undefined" ? city : "rome")) && (!def.ownedOnly || s.items.includes(fid)))) {
         const li = document.createElement("li"), txt = document.createElement("span"), b = document.createElement("button");
         const name = document.createElement("strong"), note = document.createElement("small");
         name.textContent = it.name; note.textContent = it.type === "weapon" ? `${it.note} ${Weapons.describe(id)}` : it.note;

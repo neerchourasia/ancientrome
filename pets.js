@@ -79,6 +79,7 @@ const Pets = (() => {
     cub: () => buildQuad({ fur: 0xd9a54a, light: 0xeacb8a, s: 0.85, ears: "round", tailLen: 0.5 }),
     monkey: () => buildQuad({ fur: 0x7a5a3a, light: 0xd8b080, s: 0.7, ears: "round", tailUp: true, longLegs: true }),
     peacock: buildPeacock,
+    ner_pet: () => buildQuad({ fur: 0x111111, light: 0xf2f2f0, dark: 0x000000, s: 0.7, ears: "round", tailUp: true }),          // (given by the Ner store)
   };
   const flies = (id) => id === "eagle" || id === "owl" || id === "parrot";
 

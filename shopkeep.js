@@ -269,7 +269,14 @@ const Shopkeep = (() => {
     if (Vitals.coins < price) { say(T_("The {0} costs {1} denarii (you have {2}).", tr(g[0]).toLowerCase(), price, Vitals.coins)); return; }
     const before = repOf(shop.id);
     Vitals.coins -= price; st.inv[id] = Math.min(99, owns(id) + 1); st.rep[shop.id] = (st.rep[shop.id] || 0) + price; Sfx.play("coin"); save();
-    say(T_("Bought: {0} for {1} denarii.", tr(g[0]), price) + (repOf(shop.id) > before ? " " + T_("★ You are a regular customer now: {0}% off.", Math.round(DISCOUNT[repOf(shop.id)] * 100)) : ""));
+    say(T_("Bought: {0} for {1} denarii.", tr(g[0]), price) + (repOf(shop.id) > before ? " " + T_("★ You are a regular customer now: {0}% off.", Math.round(DISCOUNT[repOf(shop.id)] * 100)) : "") + nerGift(id));
+  }
+  // buying a Ner gives you a pet (the first time); buying the Ner T-shirt or the Ner cap gives you something to wear (the first time): they go to your menagerie and your dresser (market.js)
+  const NER_GIFTS = { Ner: ["ner_pet", "Your new pet is in your menagerie (Market, Your menagerie): press Bring along to take it with you."], nertee: ["ner_tee", "Your Ner T-shirt is in your dresser (Market, Your dresser): press Wear."], nercap: ["ner_cap", "Your Ner cap is in your dresser (Market, Your dresser): press Wear."] };
+  function nerGift(id) {
+    const gift = NER_GIFTS[id];
+    if (!gift || typeof Market === "undefined" || !Market.grant(gift[0])) return "";
+    return " 🎁 " + tr(gift[1]);
   }
   function sell(id) {
     const p = sellPrice(id, shop.city), g = GOODS[id];
